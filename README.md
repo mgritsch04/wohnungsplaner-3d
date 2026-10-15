@@ -88,9 +88,11 @@ auch seine nicht mehr verwendeten Plan-Dateien.
 * Möbelmodelle sind prozedurale Näherungen (als „Näherungsmodell“ gekennzeichnet); maßgeblich sind die Maße.
 * Mehrfachauswahl, gekrümmte Wände, mehrere Geschosse und Treppen sind noch nicht umgesetzt.
 * Speicherung ist browserlokal: anderes Gerät/Browser → Projektpaket exportieren/importieren.
-* Leistung: getestet mit Beispielwohnung und größeren Testgrundrissen; sehr große Pläne (> ~500 Wände,
-  > ~1000 Objekte) können den SVG-Editor und die 3D-Ansicht verlangsamen (kein Instancing für Möbel).
-  Software-Rendering (ohne GPU) liefert im Realismusmodus nur wenige FPS.
+* Leistung (gemessen, `src/model/perf.test.ts`, Node): abgeleitete Geometrie + 3D-Wandmeshes für
+  4 Räume ≈ 7 ms, 25 Räume ≈ 35 ms, 100 Räume/220 Wände ≈ 40 ms. Bei jeder Änderung wird der Plan
+  komplett neu abgeleitet; sehr große Pläne (> ~500 Wände, > ~1000 Objekte) können den SVG-Editor und
+  die 3D-Ansicht verlangsamen (kein Instancing für Möbel). Software-Rendering (ohne GPU, z. B. in CI)
+  liefert im Realismusmodus nur wenige FPS – echte GPUs sind deutlich schneller, wurden hier aber nicht gemessen.
 * Generische Preise sind grobe Schätzwerte, keine Händlerangebote.
 
 ## Roadmap
