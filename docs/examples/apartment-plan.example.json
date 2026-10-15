@@ -1,0 +1,26 @@
+{
+  "format": "apartment-plan",
+  "version": 1,
+  "units": "cm",
+  "coordinateSystem": { "y": "down" },
+  "name": "Zweizimmerwohnung (Beispiel)",
+  "metadata": { "source": "Beispiel aus der Dokumentation" },
+  "defaults": { "wallThickness": 12, "wallHeight": 260 },
+  "walls": [
+    { "id": "aussen-n", "start": [0, 0], "end": [860, 0], "thickness": 25 },
+    { "id": "aussen-o", "start": [860, 0], "end": [860, 420], "thickness": 25 },
+    { "id": "aussen-s", "start": [860, 420], "end": [0, 420], "thickness": 25 },
+    { "id": "aussen-w", "start": [0, 420], "end": [0, 0], "thickness": 25 },
+    { "id": "trenn", "start": [500, 0], "end": [500, 420], "thickness": 12, "status": "estimated", "note": "Dicke im Plan nicht lesbar" }
+  ],
+  "openings": [
+    { "type": "window", "wall": "aussen-n", "offset": 250, "width": 180, "height": 140, "sillHeight": 90 },
+    { "type": "window", "wall": "aussen-n", "offset": 680, "width": 120, "height": 140, "sillHeight": 90 },
+    { "type": "door", "wall": "trenn", "offset": 300, "width": 90, "height": 210, "hinge": "start", "swing": "left" },
+    { "type": "door", "at": [120, 420], "width": 100, "height": 210, "status": "uncertain" }
+  ],
+  "rooms": [
+    { "name": "Wohnzimmer", "labelPoint": [250, 210], "statedArea": 18.4 },
+    { "name": "Schlafzimmer", "labelPoint": [680, 210] }
+  ]
+}
