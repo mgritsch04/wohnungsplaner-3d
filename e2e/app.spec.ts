@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { getProject, getSelection, planToScreen, syntheticPlanPng } from './fixtures';
+import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf } from './fixtures';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -62,6 +62,7 @@ test('creates a room with numeric dimensions and resizes it', async ({ page }) =
 test('selects and drags furniture in 2D, synchronised with the model', async ({ page }) => {
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
   const p = await getProject(page);
   const table = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
   const start = await planToScreen(page, table.x, table.y);
@@ -87,6 +88,12 @@ test('selects and drags furniture in 2D, synchronised with the model', async ({ 
 test('draws walls with typed lengths and auto-creates a room', async ({ page }) => {
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  // zoom out so there is free space right of the sample apartment
+  const box = (await page.locator('[data-testid="editor2d"]').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, 200);
+  await page.waitForTimeout(200);
   await page.locator('.panel.left').getByRole('button', { name: /Wand/ }).first().click();
   const o = { x: 12, y: 0 };
   const s = await planToScreen(page, o.x, o.y);
@@ -173,6 +180,7 @@ test('imports an apartment-plan.json through the review stage', async ({ page })
 test('imports a raster plan, calibrates the scale and recognises walls', async ({ page }) => {
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
   await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
   const chooser = page.waitForEvent('filechooser');
   await page.locator('.dropzone').click();
@@ -232,4 +240,59 @@ test('exports the shopping list as CSV', async ({ page }) => {
   await page.getByRole('button', { name: 'Einkaufsliste als CSV exportieren' }).click();
   const d = await download;
   expect(d.suggestedFilename()).toMatch(/einkaufsliste\.csv$/);
+});
+
+test('imports page 2 of a vector PDF, applies the stated scale and recognises walls', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'plan.pdf', mimeType: 'application/pdf', buffer: vectorPlanPdf() });
+  await expect(page.getByText(/Seite wählen/)).toBeVisible({ timeout: 15000 });
+  await page.getByRole('button', { name: 'Seite 2' }).click();
+  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 15000 });
+  // stated scale 1:100 → marked as assumed, not calibrated
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByText('Maßstab angenommen', { exact: true })).toBeVisible();
+  const u = (await getProject(page)).underlay;
+  expect(u.calibrated).toBe(false);
+  // 5 m in the drawing must map to ~5 m
+  expect(u.pixelsPerPoint * 28.3465 * 5 * u.metersPerPixel).toBeCloseTo(5, 2);
+  // recognition needs a confirmed calibration: calibrate on the outer top line (5.2 m)
+  await page.evaluate(() => {
+    const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { underlay: { calibrated: boolean; scaleSource: string } }) => void) => void } } } }).__wp;
+    wp.useProjectStore.getState().apply((d) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText(/PDF-Vektordaten/).first()).toBeVisible();
+  const draft = await page.evaluate(() => (window as unknown as { __wp: { useImportStore: { getState: () => { draft: { walls: { thickness: number }[] } } } } }).__wp.useImportStore.getState().draft);
+  expect(draft.walls).toHaveLength(4);
+  for (const w of draft.walls) expect(w.thickness).toBeCloseTo(0.2, 1);
+  expect(errors).toEqual([]);
+});
+
+test('plans a kitchen run along a selected wall', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const p = await getProject(page);
+  // select the north wall of the living room
+  const s = await planToScreen(page, 1.0, -0.06);
+  await page.mouse.click(s.x, s.y);
+  expect((await getSelection(page))?.type).toBe('wall');
+  await page.locator('.panel.left').getByRole('button', { name: 'Küche' }).click();
+  await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
+  const q = await getProject(page);
+  const kitchen = q.furniture.filter((f: { kitchen?: unknown }) => f.kitchen);
+  expect(kitchen.length).toBeGreaterThanOrEqual(6);
+  expect(kitchen.some((f: { kitchen: { type: string } }) => f.kitchen.type === 'countertop')).toBe(true);
+  expect(q.furniture.length).toBeGreaterThan(p.furniture.length);
+  await expect(page.getByText('Stückliste Küche')).toBeVisible();
 });

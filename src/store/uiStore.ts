@@ -88,7 +88,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
     set({ hover });
   },
   setTool: (tool) => set({ tool }),
-  setViewMode: (viewMode) => set({ viewMode }),
+  setViewMode: (viewMode) => set({ viewMode, fitRequest: get().fitRequest + 1 }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setLeftTab: (leftTab) => set({ leftTab }),
   setRightTab: (rightTab) => set({ rightTab }),

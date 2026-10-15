@@ -1,6 +1,8 @@
-import * as pdfjs from 'pdfjs-dist';
+// The "legacy" build ships polyfills for very new JS features (e.g. Map#getOrInsertComputed)
+// that current browsers may not support yet; the modern build fails on them.
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { PlanFileError } from './fileValidation';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -168,8 +170,9 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
   }
 
   let kind: PdfContentAnalysis['kind'] = 'unknown';
-  if (pathCount > 50 && imageCount === 0) kind = 'vector';
-  else if (pathCount > 50 && imageCount > 0) kind = 'mixed';
+  const drawn = segments.length;
+  if (imageCount === 0 && drawn >= 4) kind = 'vector';
+  else if (imageCount > 0 && drawn >= 20) kind = 'mixed';
   else if (imageCount > 0) kind = 'raster';
   return { kind, pathCount, imageCount, textItems: texts.length, segments, texts };
 }

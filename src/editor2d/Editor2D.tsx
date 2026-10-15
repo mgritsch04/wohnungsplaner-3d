@@ -81,9 +81,14 @@ export function Editor2D() {
     return () => ro.disconnect();
   }, []);
 
-  // fit to content on request
+  // fit to content on request (and again if the pane resizes right after the request)
+  const lastFit = useRef({ request: -1, at: 0 });
   useEffect(() => {
     if (vp.width < 10) return;
+    const now = performance.now();
+    const isNewRequest = lastFit.current.request !== fitRequest;
+    if (!isNewRequest && now - lastFit.current.at > 400) return;
+    if (isNewRequest) lastFit.current = { request: fitRequest, at: now };
     const p = useProjectStore.getState().project;
     const points: Vec2[] = [...p.nodes, ...p.furniture.flatMap((f) => furnitureCorners(f))];
     if (p.underlay && p.underlay.visible) {
@@ -91,9 +96,9 @@ export function Editor2D() {
       points.push(imageToWorld(u, { x: 0, y: 0 }), imageToWorld(u, { x: u.pixelWidth, y: u.pixelHeight }));
     }
     const b = boundsOf(points) ?? { minX: -2, minY: -2, maxX: 6, maxY: 5 };
-    ui().setView2d(fitView(b, vp));
+    ui().setView2d(fitView(b, vp, 0.08));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitRequest, vp.width > 10]);
+  }, [fitRequest, vp.width, vp.height]);
 
   // reset tool-local state when the tool changes
   useEffect(() => {

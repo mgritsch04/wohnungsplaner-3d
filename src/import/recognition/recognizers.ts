@@ -9,7 +9,7 @@ export const vectorRecognizer: FloorPlanRecognizer = {
   id: 'local-vector',
   label: 'PDF-Vektordaten (lokal)',
   local: true,
-  canHandle: (i) => (i.vectorSegments?.length ?? 0) > 20,
+  canHandle: (i) => (i.vectorSegments?.length ?? 0) >= 4,
   recognize: async (i, onProgress) => {
     onProgress(0.3);
     const out = detectVectorWalls(i.vectorSegments ?? [], i.metersPerPixel);

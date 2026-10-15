@@ -169,24 +169,32 @@ function SceneContent({
 }
 
 function OrbitCamera({ controlsRef, center, span }: { controlsRef: React.RefObject<OrbitControlsImpl | null>; center: { x: number; y: number }; span: number }) {
-  const { camera, size } = useThree();
+  const { camera, get } = useThree();
   const resetRequest = usePerformanceStore((s) => s.cameraReset);
+  const viewMode = useUiStore((s) => s.viewMode);
   useEffect(() => {
-    // fit the apartment's bounding sphere into the narrower field of view
-    const cam = camera as THREE.PerspectiveCamera;
-    const vfov = THREE.MathUtils.degToRad(cam.fov);
-    const aspect = size.width / Math.max(1, size.height);
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    const radius = span * 0.62 + 1;
-    const distance = radius / Math.sin(Math.min(vfov, hfov) / 2);
-    const dir = new THREE.Vector3(0.35, 0.95, 1.05).normalize();
-    camera.position.set(center.x + dir.x * distance, dir.y * distance, center.y + dir.z * distance);
-    camera.lookAt(center.x, 0, center.y);
-    controlsRef.current?.target.set(center.x, 0.8, center.y);
-    controlsRef.current?.update();
-    // only on mount / explicit reset
+    const fit = () => {
+      // fit the apartment's bounding sphere into the narrower field of view
+      const size = get().size;
+      const cam = camera as THREE.PerspectiveCamera;
+      const vfov = THREE.MathUtils.degToRad(cam.fov);
+      const aspect = size.width / Math.max(1, size.height);
+      const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
+      const radius = span * 0.62 + 1;
+      const distance = radius / Math.sin(Math.min(vfov, hfov) / 2);
+      const dir = new THREE.Vector3(0.35, 0.95, 1.05).normalize();
+      camera.position.set(center.x + dir.x * distance, dir.y * distance, center.y + dir.z * distance);
+      camera.lookAt(center.x, 0, center.y);
+      controlsRef.current?.target.set(center.x, 0.8, center.y);
+      controlsRef.current?.update();
+    };
+    fit();
+    // the canvas is resized after a layout change – fit again once it settled
+    const t = setTimeout(fit, 120);
+    return () => clearTimeout(t);
+    // only on mount, explicit reset or layout change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetRequest]);
+  }, [resetRequest, viewMode]);
   return (
     <OrbitControls
       ref={controlsRef}
