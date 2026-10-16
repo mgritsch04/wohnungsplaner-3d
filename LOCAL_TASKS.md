@@ -140,3 +140,35 @@ Berichte zu 8a (#78) und 8b (#102) sind angekommen, danke – beide sind zusamme
 - alle Checks und die volle E2E-Suite grün sind;
 - gepusht ist;
 - du mir berichtet hast: Dateien, Tests, Commits, User-Test-Schritte.
+
+## Aufgabe 10: Maßband in 3D (#88)
+
+Bericht zu Aufgabe 9 (#89) ist angekommen, danke. Er kommt in den nächsten Sammel-PR; der aktuelle (#128) mit #99/#76/#82/#87/#78/#102 läuft gerade durch die CI.
+
+**Basis:** wie bei Aufgabe 9 von `origin/claude/quirky-faraday-0d9uep` abzweigen und vor dem Push hineinmergen (kein Rebase).
+
+**Branch:** `claude/tape-measure-88`
+
+**Ziel:** Issue #88 lesen. In 3D (Übersicht und Begehen) zwei Punkte auf Flächen anklicken (Boden, Wand, Möbel – per Raycast auf die vorhandenen Meshes), dazwischen eine Linie mit Länge in m (z. B. „2,35 m“), dazu Δ horizontal/vertikal. Mehrere Messungen nacheinander möglich; Esc oder ein Knopf löscht sie. Messungen sind Anzeige-Zustand, nicht im Projekt gespeichert.
+
+1. **Reine Funktion** für Abstand und Rundung (cm-genau) mit Unit-Tests.
+2. **Bedienung:** eigenes Werkzeug „Maßband“ (Taste prüfen, die noch frei ist, z. B. M, und in `src/ui/shortcutCatalog.ts` eintragen). Den Einstieg bitte **nicht** in `Toolbar.tsx` bauen (dort baut ein Agent um, #100) – stattdessen eine kleine Schaltfläche in der 3D-Ansicht (z. B. neben „Ansichten ▾“) und die Taste. Im Bericht vorschlagen, wo es in der neuen Symbolleiste hingehört.
+3. **Darstellung:** Linie und Endpunkte gut sichtbar (Tokens bzw. die vorhandenen Diff-/Plan-Farben als Vorbild), Beschriftung in Bildschirmgröße (drei/`Html` aus drei), im Begehen per Fadenkreuz-Klick.
+4. Während das Maßband aktiv ist, darf ein Klick nichts auswählen oder verschieben.
+
+**Darfst du jetzt anfassen:** `src/view3d/Scene3D.tsx` (der #76-Agent ist fertig). Bitte minimal einhängen, eigene Komponente in `src/view3d/`.
+
+**Nicht anfassen:**
+- `src/ui/Toolbar.tsx` (#100)
+- `src/model/schema.ts` (#65)
+- `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`
+- Issues
+
+**Tests:**
+- **Unit:** Abstand, Rundung, Δ-Werte.
+- **E2E** am Ende von `e2e/app.spec.ts`: Maßband an, zwei Klicks auf bekannte Punkte (z. B. Boden an zwei Koordinaten über `__wp`), Länge stimmt ±1 cm, Esc löscht, keine Auswahl entsteht, keine Konsolenfehler.
+
+**Fertig, wenn:**
+- alle Checks und die volle E2E-Suite grün sind;
+- gepusht ist;
+- du mir berichtet hast: Dateien, Tests, Commits, User-Test-Schritte.
