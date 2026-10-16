@@ -1,16 +1,32 @@
+import { useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUiStore } from '../store/uiStore';
 import { TIME_PRESETS } from '../view3d/lighting';
 
 const fmt = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
 
-/** Time-of-day slider with presets. Dragging collapses into one undo step. */
+/**
+ * Time-of-day slider with presets. While dragging, the value only goes to a light
+ * preview channel that the lighting reads every frame (no project clone, no app
+ * re-render); on release it is written to the project as one undo step.
+ */
 export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
-  const hour = useProjectStore((s) => s.project.settings.timeOfDay);
-  const st = useProjectStore.getState;
-  const set = (h: number, transient: boolean) => {
-    const fn = (d: { settings: { timeOfDay: number } }) => void (d.settings.timeOfDay = Math.max(0, Math.min(24, h)));
-    if (transient) st().updateTransient(fn);
-    else st().apply(fn);
+  const saved = useProjectStore((s) => s.project.settings.timeOfDay);
+  const preview = useUiStore((s) => s.timePreview);
+  const hour = preview ?? saved;
+  const dragging = useRef(false);
+  const set = (h: number) => {
+    const v = Math.max(0, Math.min(24, h));
+    if (v !== useProjectStore.getState().project.settings.timeOfDay) {
+      useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = v));
+    }
+  };
+  const commit = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const v = useUiStore.getState().timePreview;
+    if (v !== null) set(v);
+    useUiStore.getState().setTimePreview(null);
   };
   return (
     <div className={`time-control ${compact ? 'compact' : ''}`} title="Tageszeit für Licht und Schatten (Realismusmodus)">
@@ -24,16 +40,23 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
         step={0.25}
         value={hour}
         aria-label="Tageszeit"
-        onPointerDown={() => st().beginTransaction()}
-        onPointerUp={() => st().commitTransaction()}
-        onBlur={() => st().commitTransaction()}
-        onChange={(e) => set(Number(e.target.value), !!st().txBase)}
+        onPointerDown={() => (dragging.current = true)}
+        onPointerUp={commit}
+        onPointerCancel={commit}
+        onLostPointerCapture={commit}
+        onBlur={commit}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          // pointer drag: preview only; keyboard: write directly (one step per key press)
+          if (dragging.current) useUiStore.getState().setTimePreview(v);
+          else set(v);
+        }}
       />
       <select
         value=""
         aria-label="Tageszeit-Voreinstellung"
         onChange={(e) => {
-          if (e.target.value) set(Number(e.target.value), false);
+          if (e.target.value) set(Number(e.target.value));
         }}
       >
         <option value="">Zeit…</option>

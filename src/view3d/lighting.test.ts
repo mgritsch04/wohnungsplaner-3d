@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lightingAt, stepHour, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
+import { approachHour, lightingAt, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
 
 const lum = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
@@ -42,10 +42,22 @@ describe('time-of-day lighting', () => {
     expect(blue(sunset.sunColor)).toBeLessThan(blue(noon.sunColor));
     expect(blue(sunset.sunColor)).toBeGreaterThan(110);
   });
+});
 
-  it('blends towards a target hour along the shorter way round the clock', () => {
-    expect(stepHour(23, 1, 0.5)).toBeCloseTo(23.5, 9);
-    expect(stepHour(1, 23, 0.5)).toBeCloseTo(0.5, 9);
-    expect(stepHour(10, 10.2, 0.5)).toBe(10.2);
+describe('time-of-day smoothing', () => {
+  it('approaches the target frame-rate independently, the short way round the clock', () => {
+    // same elapsed time in one big frame or many small frames ends (almost) at the same hour
+    let a = 8;
+    for (let i = 0; i < 60; i++) a = approachHour(a, 20, 1 / 600, 0.05);
+    const b = approachHour(8, 20, 0.1, 0.05);
+    expect(a).toBeCloseTo(b, 6);
+    // after 0.25 s (5 τ) the 12-hour jump is practically complete; at 1 FPS it is immediate
+    let c = 8;
+    for (let i = 0; i < 15; i++) c = approachHour(c, 20, 1 / 60, 0.05);
+    expect(Math.abs(c - 20)).toBeLessThan(0.1);
+    expect(approachHour(8, 20, 1, 0.05)).toBeCloseTo(20, 6);
+    // 23 → 1 goes via midnight
+    const d = approachHour(23, 1, 0.02, 0.05);
+    expect(d > 23 || d < 1).toBe(true);
   });
 });

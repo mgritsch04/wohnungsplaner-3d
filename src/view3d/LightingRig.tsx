@@ -5,10 +5,14 @@ import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Light, Project, QualityMode } from '../model/schema';
 import { add, pointInPolygon, scale } from '../model/vec';
-import { kelvinToColor, lightingAt, stepHour, type LightingState } from './lighting';
+import { approachHour, kelvinToColor, lightingAt, type LightingState } from './lighting';
+import { useUiStore } from '../store/uiStore';
 
-/** How fast the displayed time follows the slider (hours per second) – smooth, but quick. */
-const BLEND_HOURS_PER_SECOND = 10;
+/**
+ * Smoothing time constant (s) of the displayed time behind the slider: short enough to
+ * feel immediate, long enough to soften preset jumps. Frame-rate independent.
+ */
+const BLEND_TAU = 0.05;
 const MAX_WINDOW_LIGHTS = 10;
 const MAX_ROOM_LIGHTS = 12;
 
@@ -124,15 +128,25 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     gl.toneMappingExposure = exposure * (realism ? st.exposure : 1);
   };
 
+  // live slider value, read in the render loop without re-rendering React
+  const preview = useRef<number | null>(useUiStore.getState().timePreview);
+  useEffect(() => useUiStore.subscribe((s) => void (preview.current = s.timePreview)), []);
+
   useFrame((_, dt) => {
-    const goal = realism ? target : 13;
+    const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
-    current.current = stepHour(current.current, goal, Math.max(0.001, dt) * BLEND_HOURS_PER_SECOND);
+    current.current = approachHour(current.current, goal, dt, BLEND_TAU);
     const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${windowLights.length}|${roomLights.length}`;
     if (key === applied.current) return;
     applied.current = key;
     apply(lightingAt(current.current));
   });
+
+  // e2e/debug hook: the hour the lighting currently shows (may lag the setting while blending)
+  useEffect(() => {
+    const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
+    if (wp) wp.lightingHour = () => current.current;
+  }, []);
 
   // re-apply after structural changes (new lights mounted, mode switch)
   useEffect(() => {

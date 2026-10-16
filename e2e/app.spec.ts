@@ -445,6 +445,22 @@ test('realism mode: time-of-day control with presets, one undo step per drag, no
   await page.mouse.down();
   await page.mouse.move(b.x + b.width * 0.5, b.y + b.height / 2, { steps: 8 });
   await page.mouse.move(b.x + b.width * 0.55, b.y + b.height / 2, { steps: 4 });
+  // while dragging only the live preview changes – no project clone/re-render per step
+  const during = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    return { saved: wp.useProjectStore.getState().project.settings.timeOfDay, preview: wp.useUiStore.getState().timePreview };
+  });
+  expect(during.saved).toBe(23.5);
+  expect(during.preview).toBeGreaterThan(10);
+  // the lighting follows within a couple of frames (frame-rate independent smoothing)
+  const lightingGap = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wp = (window as any).__wp;
+      return Math.abs(wp.lightingHour() - wp.useUiStore.getState().timePreview);
+    });
+  await expect.poll(lightingGap, { timeout: 20000 }).toBeLessThan(0.01);
   await page.mouse.up();
   const after = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[]; project: { settings: { timeOfDay: number } } } } } }).__wp.useProjectStore.getState());
   expect(after.project.settings.timeOfDay).toBeGreaterThan(10);
