@@ -7,77 +7,45 @@ Regeln: eigener Branch je Aufgabe, kein Push auf main, kein Force-Push, keine PR
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_017X7PnLx9bCA5dQWidUEW86
 
-## Rückmeldung zu Aufgabe 3 (#67 Laufwege)
-Danke, saubere Arbeit. Ab jetzt bitte nichts mehr auf `claude/walk-paths-67` pushen. Die Taste L trage ich bei der Integration in die neue Tastenkürzel-Übersicht ein (`src/ui/shortcutCatalog.ts`, kommt mit PR #117).
+## Rückmeldung zu Aufgabe 5 (Nutzungs-Limit): wird angehalten
+Danke für die gründliche Untersuchung. Ergebnis: Ein Takt von 60 s ist mit dokumentierten Mitteln nicht zuverlässig erreichbar, weil
+- die Status-Line in der Desktop-App nicht läuft und
+- `rate_limits` nur nach Antworten der jeweiligen Sitzung frisch sind.
 
-## Aufgabe 4: E2E-Fehler „doors and windows (#21)“ auf Windows finden und beheben
+Das Dashboard bekommt die Prozentwerte weiter aus den Sitzungsdaten über die Hauptsession. **Bitte keine weiteren Änderungen an den Einstellungen des Nutzers**: das Script `usage-add-mcp.cjs` nicht ausführen und nichts an der Desktop-App-Konfiguration. Ob die vorhandene `statusLine` wieder entfernt wird, entscheidet der Nutzer; bis dahin bleibt sie.
 
-Der Test `3D: doors and windows open/close …` schlägt bei dir in der **vollen** Suite reproduzierbar fehl („selection null statt Tür-ID“). Einzeln läuft er grün. In der Cloud ist er auch in der vollen Suite grün (42/42), deshalb kannst nur du das untersuchen.
+## Aufgabe 6: Küchen-Arbeitsdreieck prüfen (#82)
 
-**Branch:** `claude/fix-doors-e2e`, Basis ist der Integrations-Branch mit dem neuesten Stand:
-```
-git fetch origin
-git checkout -b claude/fix-doors-e2e origin/claude/quirky-faraday-0d9uep
-```
-Dort ist auch „click vs. drag“ schon repariert.
+**Branch:** `claude/kitchen-triangle-82` von `origin/main`. Vor dem finalen Push `git merge origin/main`, kein Rebase.
 
-**Vorgehen**
-1. **Reproduzieren:** `npx playwright test` (voll) mit `--trace on` bzw. `--trace retain-on-failure`. Zusätzlich herausfinden, welcher vorherige Test den Fehler auslöst: nur die Tests davor plus den Türen-Test laufen lassen, halbieren. Ist es Last bzw. Timing (z. B. Kamera noch in Bewegung, Fenstergröße, Fokus, Pointer-Lock, offene Hover-Karte über der Tür)?
-2. **Ursache benennen**, mit Beleg: Trace, Screenshot im Fehlerfall, Konsole.
-3. **Beheben:**
-   - Ist es ein echter App-Fehler (z. B. ein Klick wird verschluckt, ein Zustand aus einem vorherigen Test bleibt hängen), dann den App-Code korrigieren.
-   - Ist es reines Test-Timing, dann den Test robust machen, z. B. warten, bis die Kamera stillsteht, statt einer festen `waitForTimeout`.
-   - **Keinen Test überspringen oder abschwächen**, nur weil er rot ist.
-4. **Prüfen:** Die volle Suite muss danach bei dir **zweimal hintereinander** grün sein.
+**Ziel:** Issue #82 lesen (`gh issue view 82 -R mgritsch04/wohnungsplaner-3d`).
+
+1. **Reine Funktion** in `src/model/` (oder `src/kitchen/`, siehe vorhandenes `src/kitchen/kitchen.ts`):
+   - Sie findet in einem Raum **Spüle**, **Herd/Kochfeld** und **Kühlschrank** anhand der Katalog-Kategorien bzw. IDs der Küchenmodule (vorher im Katalog prüfen, welche es gibt; nichts erfinden).
+   - Sie berechnet die drei Seiten des Arbeitsdreiecks von Mitte Vorderkante zu Mitte Vorderkante und die Summe.
+   - Bewertung nach gängiger Faustregel: jede Seite 1,2–2,7 m, Summe 4–8 m. Im UI als „Richtwert, keine Norm“ kennzeichnen.
+   - Fehlt ein Element, kommt eine klare Meldung.
+2. **Anzeige:**
+   - 2D: Dreieck als gestrichelte Linien mit Längen. Grün im Richtwert, orange außerhalb.
+   - Dazu eine kurze Auswertung im Küchen-Panel (`src/ui/panels/` → Küche).
+   - Ein-/ausschaltbar. Ein eigenes Overlay in `src/editor2d/`, das `Editor2D.tsx` nur einhängt.
+3. **Farben:** Design-Tokens aus `src/theme.css`, keine festen Farben (`src/ui/theme.test.ts`). Hell und dunkel prüfen.
 
 **Nicht anfassen:**
+- `src/ui/panels/PropertiesPanel.tsx` und `src/versions/**` (dort arbeiten Agents an #99 und #76)
 - `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`
-- Issues, Labels, PRs
-- `src/styles.css` und Farben (ein anderer Agent überarbeitet sie gerade)
-- Ausrichten/Verteilen im Eigenschaften-Panel (ebenfalls ein anderer Agent)
+- Issues
 
-**Fertig, wenn**
-- `git push -u origin claude/fix-doors-e2e` erfolgt ist,
-- du mir per Nachricht berichtet hast: Ursache mit Beleg, Änderung, beide Testläufe, Commits.
+**Tests:**
+- **Unit:** Dreieck im Richtwert, eine Seite zu kurz, Summe zu lang, fehlendes Element, Raum ohne Küche.
+- **E2E** am Ende von `e2e/app.spec.ts`: Küchenzeile planen (siehe bestehenden Test „plans a kitchen run …“), Dreieck mit Längen sichtbar, Ausschalten blendet aus.
 
-## Aufgabe 5: Nutzungs-Limit alle 60 s fürs Dashboard bereitstellen (#113)
+**Fertig, wenn:**
+- alle Checks und die volle E2E-Suite grün sind;
+- auf `claude/kitchen-triangle-82` gepusht ist;
+- du mir per Nachricht berichtet hast: Regeln, Dateien, Tests, Commits, User-Test-Schritte.
 
-Erst nach Aufgabe 4. Der Nutzer hat zugestimmt. Trotzdem jede Änderung an seinen Einstellungsdateien vorher kurz zeigen und bestätigen lassen; nichts überschreiben, sondern bestehende Einstellungen ergänzen.
+## Ergänzung zu Aufgabe 6
+Laut #82 sollen die Grenzwerte **einstellbar** sein. Dafür reichen zwei Felder im Küchen-Panel: Seitenlänge min/max und Summe max, mit den Faustregel-Werten als Standard. Gespeichert werden sie in den Projekt-Einstellungen mit Default, damit alte Projekte unverändert laden.
 
-**Hintergrund:** Das Dashboard „Entwicklungsstand live“ (https://claude.ai/artifact/Smc3PMAsNzSgMnFG2WHqK2) soll den Verbrauch des 5-Stunden- und des Wochenlimits alle 60 s zeigen.
-- Der Connector „Claude Code Remote“ ist für Seiten gesperrt.
-- Offiziell dokumentiert ist aber: Claude Code übergibt dem **Status-Line-Script** `rate_limits.five_hour.used_percentage`, `rate_limits.five_hour.resets_at`, `rate_limits.seven_day.used_percentage` und `rate_limits.seven_day.resets_at` (siehe https://code.claude.com/docs/en/statusline, Abschnitt „Available data“ / „Rate limit usage“). Mit `refreshInterval` läuft das Script im festen Takt.
-
-**Teil A – Status-Line-Script (in deiner eigenen Claude-Code-Installation auf dem PC)**
-1. Lege `C:\Users\maxim\.claude\usage-statusline.mjs` an, ein Node-Script ohne Abhängigkeiten, weil `jq` unter Windows meist fehlt. Es
-   - liest das JSON von stdin;
-   - schreibt `C:\Users\maxim\.claude\usage\usage.json`, und zwar atomar (erst in eine temporäre Datei, dann umbenennen). Inhalt:
-     ```json
-     {"at":"<ISO-Zeit>","five_hour":{"used_percentage":63,"resets_at":1792170600},
-      "seven_day":{"used_percentage":8,"resets_at":1792238400},
-      "history":[{"at":"…","five_hour":63}]}
-     ```
-     - Fehlt ein Fenster im Input, bleibt der alte Wert stehen (laut Doku kann ein Fenster einzeln fehlen).
-     - `history` behält höchstens die letzten 300 Punkte und nur einen Punkt pro Minute.
-     - Keine anderen Daten (kein Transcript, keine Pfade, keine Session-Inhalte).
-   - gibt eine kurze Status-Zeile aus, z. B. `5h 63 % · Woche 8 %`. Wenn es schon eine Status-Line gab, deren Ausgabe beibehalten.
-2. In `C:\Users\maxim\.claude\settings.json` `statusLine` setzen bzw. ergänzen:
-   ```json
-   {"type":"command","command":"node C:/Users/maxim/.claude/usage-statusline.mjs","refreshInterval":60}
-   ```
-   Vorher zeigen, was dort steht.
-3. Prüfen, dass die Datei `usage.json` entsteht und sich aktualisiert, nachdem du eine Antwort gegeben hast.
-
-**Teil B – Lese-Zugang für das Dashboard über die Claude-Desktop-App**
-- Das Dashboard kann einen lokalen MCP-Server auf dem PC des Nutzers aufrufen (`host:<name>`), wenn es in der Claude-Desktop-App geöffnet wird.
-- Richte dafür in der Konfiguration der Claude-Desktop-App einen Server namens `usage` ein (Datei `claude_desktop_config.json` der Desktop-App; den genauen Ort bitte selbst prüfen und dem Nutzer zeigen). Am besten mit dem offiziellen Filesystem-Server, `npx -y @modelcontextprotocol/server-filesystem C:\Users\maxim\.claude\usage`.
-- **Nur dieser eine Ordner** wird freigegeben, nichts anderes.
-- Der Nutzer muss die Desktop-App danach neu starten.
-- Berichte mir den **genauen Namen des Lese-Tools**, z. B. `read_text_file` oder `read_file`, und dessen Argumente, damit ich das Dashboard darauf umstelle.
-
-**Fertig, wenn**
-- `usage.json` sich nach Antworten aktualisiert,
-- der MCP-Server in der Desktop-App eingetragen ist,
-- du mir per Nachricht berichtet hast: Pfade, Inhalt einer Beispiel-`usage.json`, Server-Name, Tool-Name und Argumente, und was der Nutzer noch tun muss.
-
-Keine Zugangsdaten oder Tokens anfassen, keine undokumentierten Schnittstellen nutzen. Kein Commit ins Repo nötig.
+Außerdem muss sich die Prüfung beim Verschieben der Geräte aktualisieren. Während des Ziehens darf sie ruhig pausieren, wie bei den Engstellen.
