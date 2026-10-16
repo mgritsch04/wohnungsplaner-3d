@@ -528,6 +528,31 @@ test('rotating the selected item (panel buttons, Q/E): collision-checked, one un
   expect(errors).toEqual([]);
 });
 
+test('hover info: name, category, size and price after a short delay; hidden while dragging (#9)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const s = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.move(s.x, s.y);
+  const card = page.getByTestId('furniture-hover');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(sofa.name);
+  await expect(card).toContainText('Sofas & Sessel');
+  await expect(card).toContainText('210 × 90 × 82 cm');
+  await expect(card).toContainText('Schätzung'); // generic items carry estimated prices
+  // dragging: the card goes away and does not interfere
+  await page.mouse.down();
+  await expect(card).toHaveCount(0);
+  await page.mouse.up();
+  // away from furniture → no card
+  const empty = await planToScreen(page, 1.0, 1.0);
+  await page.mouse.move(empty.x, empty.y);
+  await expect(card).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
