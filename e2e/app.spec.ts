@@ -1595,6 +1595,8 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(await page.evaluate(() => (window as any).__wp.three.gl.getContext().isContextLost())).toBe(false);
     const png = await page.screenshot({ clip });
+    // kept in test-results (uploaded by CI when a test fails) to see what a wrong value looked like (#157)
+    await writeFile(test.info().outputPath(`brightness-${hour}-${lamps}.png`), png);
     return page.evaluate(async (b64) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
@@ -1618,7 +1620,12 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       const out: string[] = [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       wp.three.scene.traverse((o: any) => {
-        if (o.isLight) out.push(`${o.type}:${o.intensity.toFixed(2)}${o.visible ? '' : '(hidden)'}`);
+        if (o.isLight)
+          out.push(
+            `${o.type}:${o.intensity.toFixed(2)}${o.visible ? '' : '(hidden)'}` +
+              // lamp shadows (#130, #157): casting? map rendered? update pending?
+              (o.castShadow ? `[shadow map:${o.shadow.map ? 'yes' : 'no'} pending:${o.shadow.needsUpdate}]` : ''),
+          );
       });
       const gl = wp.three.gl.getContext();
       return `${out.join(' ')} | exposure ${wp.three.gl.toneMappingExposure.toFixed(2)} | maxFragUniforms ${gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)} | renderer ${gl.getParameter(gl.RENDERER)}`;
