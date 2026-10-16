@@ -326,3 +326,79 @@ describe('wall penetration and snapping robustness', () => {
     expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.14, 4);
   });
 });
+
+describe('unified furniture rules', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+  function room() {
+    const p = roomProject();
+    const d = derivePlan(p);
+    return { p, d, obs: buildPlacementObstacles(d) };
+  }
+
+  it('a floor lamp inside a sofa is a real overlap on both items (error, shown in 2D/3D)', () => {
+    const { p, d, obs } = room();
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 1.5 });
+    const lamp = createFurnitureFromCatalog(cat('generic-floor-lamp'), { x: 2.2, y: 1.5 });
+    p.furniture.push(sofa, lamp);
+    const c = furnitureConflicts(p, d, obs);
+    expect(c.get(lamp.id)?.level).toBe('error');
+    expect(c.get(sofa.id)?.issues.some((i) => i.kind === 'overlap' && i.refId === lamp.id)).toBe(true);
+  });
+
+  it('intended combinations are no conflict: chair under table, rug under sofa, table lamp on table', () => {
+    const { p, d, obs } = room();
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 2, y: 1.2 });
+    const rug = createFurnitureFromCatalog(cat('generic-rug-160'), { x: 2, y: 1.5 });
+    const lamp = { ...createFurnitureFromCatalog(cat('generic-table-lamp'), { x: 2.4, y: 1.6 }), elevation: 0.75 };
+    p.furniture.push(table, chair, rug, lamp);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('dragging a table lamp onto a coffee table puts it on the table top, off it back to the floor', () => {
+    const { p, d, obs } = room();
+    const table = createFurnitureFromCatalog(cat('generic-coffee-table'), { x: 2, y: 1.5 });
+    const lamp = createFurnitureFromCatalog(cat('generic-table-lamp'), { x: 0.6, y: 0.6 });
+    p.furniture.push(table, lamp);
+    moveFurnitureTo(p, d, obs, lamp.id, { x: 2.1, y: 1.5 }, { snap: true, collide: true });
+    const l = p.furniture.find((f) => f.id === lamp.id)!;
+    expect(l.x).toBeCloseTo(2.1, 3);
+    expect(l.elevation).toBeCloseTo(table.height, 6);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+    moveFurnitureTo(p, d, obs, lamp.id, { x: 3.4, y: 2.5 }, { snap: true, collide: true });
+    expect(p.furniture.find((f) => f.id === lamp.id)!.elevation).toBe(0);
+  });
+
+  it('dragging a floor lamp into a sofa stops at the sofa (same blocking as walls)', () => {
+    const { p, d, obs } = room();
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 1.5 });
+    const lamp = createFurnitureFromCatalog(cat('generic-floor-lamp'), { x: 0.4, y: 1.5 });
+    p.furniture.push(sofa, lamp);
+    moveFurnitureTo(p, d, obs, lamp.id, { x: 2, y: 1.5 }, { snap: true, collide: true });
+    const l = p.furniture.find((f) => f.id === lamp.id)!;
+    expect(l.x + l.width / 2).toBeLessThanOrEqual(2 - sofa.width / 2 + 1e-3);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('warns when doors/drawers have no room to open, not when there is enough space', () => {
+    const { p, d, obs } = room();
+    const wardrobe = createFurnitureFromCatalog(cat('generic-wardrobe-100'), { x: 2, y: 0.3 });
+    const chair = createFurnitureFromCatalog(cat('generic-armchair'), { x: 2, y: 0.6 + 0.3 + 0.41 });
+    p.furniture.push(wardrobe, chair);
+    const c = furnitureConflicts(p, d, obs).get(wardrobe.id);
+    expect(c?.level).toBe('warn');
+    expect(c?.issues[0].message).toMatch(/nur 30 cm frei/);
+    p.furniture[1] = { ...chair, y: 0.6 + 0.8 + 0.41 };
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('a generated kitchen run with countertop has no conflicts', async () => {
+    const { placeKitchenRun, generateCountertops } = await import('../kitchen/kitchen');
+    const p = roomProject();
+    const w = closestWall(p, { x: 2, y: -0.06 })!;
+    placeKitchenRun(p, { wallId: w.wall.id, side: 1, start: 0.5, modules: [{ catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-sink-80' }, { catalogId: 'generic-k-dishwasher' }, { catalogId: 'generic-k-wall-60' }] });
+    generateCountertops(p);
+    const d = derivePlan(p);
+    expect([...furnitureConflicts(p, d, buildPlacementObstacles(d))].map(([, c]) => c.issues.map((i) => i.message))).toEqual([]);
+  });
+});

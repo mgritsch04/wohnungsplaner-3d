@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { Furniture } from '../model/schema';
-import type { CollisionRegion, FurnitureConflict, PlacementIssue } from '../model/placement';
+import { issueLevel, type CollisionRegion, type FurnitureConflict, type PlacementIssue } from '../model/placement';
 import { planRotationToWorldY } from '../model/units';
 
 const COLORS = { error: '#e11d48', warn: '#f59e0b' } as const;
@@ -67,7 +67,7 @@ const ItemMarker = memo(
           </mesh>
         </group>
         {conflict.issues.map((issue, i) => (
-          <IssueMarker key={`${issue.kind}-${issue.refId ?? i}`} issue={issue} color={COLORS[issue.kind === 'wall' || issue.kind === 'door-leaf' ? 'error' : 'warn']} itemId={item.id} />
+          <IssueMarker key={`${issue.kind}-${issue.refId ?? i}`} issue={issue} color={COLORS[issueLevel(issue.kind) === 'error' ? 'error' : 'warn']} itemId={item.id} />
         ))}
       </group>
     );
@@ -76,10 +76,11 @@ const ItemMarker = memo(
 );
 
 function IssueMarker({ issue, color, itemId }: { issue: PlacementIssue; color: string; itemId: string }) {
-  // the door swing is a floor area: show it as a thin slab instead of a 2 m block
+  // door swing and the space needed in front of doors/drawers are floor areas: thin slab
+  const floorArea = issue.kind === 'door-swing' || issue.kind === 'clearance';
   const culpritRegion = useMemo(
-    () => (issue.culprit && issue.kind === 'door-swing' ? { ...issue.culprit, z0: 0.004, z1: 0.012 } : issue.culprit),
-    [issue.culprit, issue.kind],
+    () => (issue.culprit && floorArea ? { ...issue.culprit, z0: 0.004, z1: 0.012 } : issue.culprit),
+    [issue.culprit, floorArea],
   );
   const geos = useMemo(() => {
     const region = issue.region ? regionGeometry(issue.region) : null;
@@ -103,7 +104,7 @@ function IssueMarker({ issue, color, itemId }: { issue: PlacementIssue; color: s
       )}
       {geos.culprit && issue.kind !== 'wall' && (
         <mesh geometry={geos.culprit} raycast={noRaycast} renderOrder={18}>
-          <meshBasicMaterial color={color} transparent opacity={issue.kind === 'door-swing' ? 0.28 : 0.22} depthWrite={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={color} transparent opacity={floorArea ? 0.28 : 0.22} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       )}
       {geos.culpritEdges && (

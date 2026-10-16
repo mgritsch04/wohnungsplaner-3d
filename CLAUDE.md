@@ -6,5 +6,5 @@
 * Kleine, fokussierte Commits mit Präfix (`feat:`, `fix:`, `test:`, `perf:`, `docs:`), nach den relevanten Checks; danach pushen und Ergebnis prüfen.
 * Architektur: eine Quelle der Wahrheit (`src/model`), abgeleitete Geometrie in `derivePlan()`; Händler-Integrationen nur in `src/catalog/providers`, nie im Geometrie-Kern.
 * Keine Secrets committen, keine Scraping-/Umgehungstechniken, keine erfundenen Produktdaten.
-* Ideen-Backlog: `docs/IDEAS.md`. Ohne konkreten Auftrag: Backlog + Projektstatus lesen, die höchste unblockierte `Ready`-Aufgabe umsetzen, testen, Backlog/Status aktualisieren. Konkrete Aufträge haben Vorrang.
+* Ideen-Backlog: `docs/IDEAS.md` (nur die Hauptsession pflegt ihn). Ohne konkreten Auftrag: Ablauf in `docs/DEVELOPMENT_WORKFLOW.md` › „Ideen, Aufgaben und Abnahme über GitHub-Issues“ (User-Test-Rückmeldungen, `idea-inbox`-Issues, dann höchste unblockierte `Ready`-Aufgabe). Konkrete Aufträge haben Vorrang. Nie einen fehlgeschlagenen User-Test als bestanden markieren.
 * Smart Home: Konzept in `docs/smart-home/` (nur Planung; keine Home-Assistant-Zugangsdaten im Browser-Code).
