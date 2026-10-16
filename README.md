@@ -41,7 +41,8 @@ Voraussetzung: Node.js ≥ 20. Für die E2E-Tests wird Chromium von Playwright g
 | Echte Produkte: „Produkt von Händlerseite übernehmen“ (schema.org-Daten aus eingefügter Seite) und Produktlisten (CSV/JSON) – keine offizielle IKEA/Möbelix-API | ✅ (siehe [docs/INTEGRATIONS_IKEA.md](docs/INTEGRATIONS_IKEA.md)) |
 | Küchenplaner: Module an Wand ausrichten, Breiten, Frontfarbe, Arbeitsplatten-Generierung, Konfliktprüfung, Stückliste | ✅ |
 | Materialien & Licht: Wand-/Bodenmaterialien je Raum/Wandseite, Tageszeit, Belichtung, Leuchten mit Farbtemperatur | ✅ |
-| Planungs- und Realismusmodus, adaptive Qualität, FPS-Anzeige | ✅ |
+| Planungs- und Realismusmodus (Umgebungsverdeckung, SMAA, Tonemapping, Himmel, Oberflächenstrukturen, leuchtende Lampen), adaptive Qualität, FPS-Anzeige | ✅ |
+| Architektur-Details: Sockelleisten, Fensterbänke innen/außen, Fensterflügel mit Griffen, Türzargen mit Bekleidung und Drücker | ✅ |
 | Speichern: Autosave (IndexedDB), Projektliste, Projektpaket-Export/-Import inkl. Plan-Bildern | ✅ |
 | Budget: Summen, Kategorien/Händler, fehlende Preise, Schätzung vs. bestätigt, CSV-Einkaufsliste | ✅ |
 
@@ -86,7 +87,7 @@ auch seine nicht mehr verwendeten Plan-Dateien.
   schraffierte Wände mit dünnen Konturen und Bemaßungstexte werden nicht ausgewertet. Tür/Fenster-Typ
   ist eine Heuristik; Höhen sind Standardannahmen. Ergebnisse immer prüfen.
 * Maßstabsangabe 1:N setzt voraus, dass das PDF im Originalpapiermaß vorliegt – daher nur „angenommen“.
-* Möbelmodelle sind prozedurale Näherungen (als „Näherungsmodell“ gekennzeichnet); maßgeblich sind die Maße.
+* Möbelmodelle sind prozedurale Näherungen (als „Näherungsmodell“ gekennzeichnet); maßgeblich sind die Maße. Für echte Optik ein GLB-Modell hinterlegen.
 * Mehrfachauswahl, gekrümmte Wände, mehrere Geschosse und Treppen sind noch nicht umgesetzt.
 * Speicherung ist browserlokal: anderes Gerät/Browser → Projektpaket exportieren/importieren.
 * Leistung (gemessen, `src/model/perf.test.ts`, Node): abgeleitete Geometrie + 3D-Wandmeshes für
