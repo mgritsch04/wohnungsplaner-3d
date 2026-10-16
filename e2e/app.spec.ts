@@ -3348,3 +3348,47 @@ test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and 
   await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('catalog: drag and drop places a product at the dropped point in 2D and 3D; outside a room it is rejected (#131)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByLabel('Katalog durchsuchen').fill('Zimmerpflanze');
+  const entry = page.locator('.catalog-item', { hasText: 'Zimmerpflanze groß' });
+  const svg = page.locator('[data-testid="editor2d"] svg');
+  const count = async () => (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').length;
+  const before = await count();
+  const box = (await svg.boundingBox())!;
+
+  // 2D: dropped in the living room at (2.51, 2.06) → on the 5 cm furniture grid, selected
+  const target = await planToScreen(page, 2.51, 2.06);
+  await entry.dragTo(svg, { targetPosition: { x: target.x - box.x, y: target.y - box.y } });
+  await expect.poll(count).toBe(before + 1);
+  const p = await getProject(page);
+  const placed = p.furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
+  expect(placed.x).toBeCloseTo(2.5, 3);
+  expect(placed.y).toBeCloseTo(2.05, 3);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: placed.id });
+  await expect(page.getByTestId('drop-ghost')).toHaveCount(0);
+  // one undo step removes it again
+  await page.keyboard.press('Control+z');
+  await expect.poll(count).toBe(before);
+
+  // outside every room (left margin of the fitted plan): rejected with a hint, nothing added
+  await entry.dragTo(svg, { targetPosition: { x: 12, y: box.height / 2 } });
+  await expect(page.getByText('nicht abgelegt – bitte in einen Raum ziehen')).toBeVisible();
+  expect(await count()).toBe(before);
+
+  // 3D: dropped onto the living-room floor near (2.5, 2)
+  const canvas = page.locator('[data-testid="scene3d"] canvas');
+  await expect(canvas).toBeVisible({ timeout: 20000 });
+  const cbox = (await canvas.boundingBox())!;
+  const s = await worldToScreen3d(page, 2.5, 0, 2);
+  await entry.dragTo(canvas, { targetPosition: { x: s.x - cbox.x, y: s.y - cbox.y } });
+  await expect.poll(count).toBe(before + 1);
+  const q = await getProject(page);
+  const placed3d = q.furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
+  expect(Math.abs(placed3d.x - 2.5)).toBeLessThan(0.1);
+  expect(Math.abs(placed3d.y - 2)).toBeLessThan(0.1);
+  expect(errors).toEqual([]);
+});
