@@ -30,7 +30,7 @@ import { isPhoneLayout, usePhoneLayout, type PhoneSheet } from './ui/phoneLayout
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
 
-// on a phone the room should be visible right away: start in 3D instead of 2D + 3D side by side (#89)
+// on a phone the room should be visible right away: start in 3D instead of 2D + 3D side by side (#129)
 if (isPhoneLayout() && useUiStore.getState().viewMode === 'split') useUiStore.setState({ viewMode: '3d' });
 
 export default function App() {
@@ -71,7 +71,7 @@ export default function App() {
   const rightTab = useUiStore((s) => s.rightTab);
   const setRightTab = useUiStore((s) => s.setRightTab);
   const hasDraft = useImportStore((s) => !!s.draft);
-  // phone view (#89): plan/3D get the whole screen, the side panels open as a sheet from the bottom
+  // phone view (#129): plan/3D get the whole screen, the side panels open as a sheet from the bottom
   const phone = usePhoneLayout();
   const [sheet, setSheet] = useState<PhoneSheet>(null);
   const phoneClass = phone ? ` phone${sheet ? ` sheet-${sheet}` : ''}` : '';

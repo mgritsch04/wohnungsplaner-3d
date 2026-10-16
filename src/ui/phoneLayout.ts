@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Handy-Ansicht (#89, aus #129): schmale Bildschirme (hochkant) und niedrige im Querformat.
+ * Handy-Ansicht (#129, Backlog-Zeile 89 in docs/IDEAS.md): schmale Bildschirme (hochkant) und niedrige im Querformat.
  * Die einzige Stelle für die Schwelle – das CSS hängt an der Klasse `.app.phone`, nicht an
  * einer eigenen Media-Query. Ein PC-Fenster mit normaler Größe ist nie betroffen.
  */

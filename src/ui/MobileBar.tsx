@@ -2,7 +2,7 @@ import { useUiStore } from '../store/uiStore';
 import type { PhoneSheet } from './phoneLayout';
 
 /**
- * Untere Leiste der Handy-Ansicht (#89): Plan/3D bekommen den ganzen Platz, die beiden
+ * Untere Leiste der Handy-Ansicht (#129): Plan/3D bekommen den ganzen Platz, die beiden
  * Seitenpanels öffnen sich als Blatt von unten (erneut tippen schließt).
  */
 export function MobileBar({ sheet, onSheet }: { sheet: PhoneSheet; onSheet: (s: PhoneSheet) => void }) {

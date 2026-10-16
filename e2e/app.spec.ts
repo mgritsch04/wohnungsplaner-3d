@@ -3304,7 +3304,7 @@ test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and 
   expect(errors).toEqual([]);
 });
 
-test.describe('Handy-Ansicht (#89)', () => {
+test.describe('Handy-Ansicht (#129)', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('Plan/3D füllen den Bildschirm, Panels öffnen sich als Blatt über die untere Leiste', async ({ page }) => {

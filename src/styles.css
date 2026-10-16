@@ -1194,7 +1194,7 @@ dl.stats dd {
   }
 }
 
-/* ---------- Handy-Ansicht (#89, aus Issue 129) ----------
+/* ---------- Handy-Ansicht (Issue 129, Backlog-Zeile 89) ----------
  * Gilt nur mit der Klasse .app.phone (Schwelle: PHONE_QUERY in src/ui/phoneLayout.ts).
  * Plan/3D füllen den Bildschirm; die Panels sind ausgeblendet und öffnen sich über die
  * untere Leiste (MobileBar) als Blatt über der Ansicht; die Statusleiste entfällt. */
