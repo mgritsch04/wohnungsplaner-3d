@@ -2037,6 +2037,8 @@ test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width
 
   // minimum 60 cm (lowest allowed value): a 60 cm passage is no longer narrower → marker gone
   const left = page.locator('.panel.left');
+  // the settings live in the collapsible group "Engstellen" (closed by default, #122)
+  await left.getByRole('button', { name: 'Engstellen' }).click();
   const min = left.getByRole('textbox', { name: 'Durchgang mindestens cm' });
   await min.fill('60');
   await min.press('Enter');
@@ -3204,7 +3206,8 @@ test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and 
     const label = (await b.getAttribute('aria-label')) ?? '';
     expect(label.length, 'icon button without aria-label').toBeGreaterThan(1);
     expect((await b.getAttribute('title')) ?? '').toContain(label.split(' ')[0]);
-    expect((await b.innerText()).trim()).toBe('');
+    // icon only, or icon with its name as visible caption (#122)
+    expect(['', label]).toContain((await b.innerText()).trim());
   }
   // every toolbar button has a name
   for (const b of await toolbar.locator('button').all()) {
