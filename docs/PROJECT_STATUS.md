@@ -49,7 +49,7 @@ Prüfstufen: **Impl.** Code vorhanden · **Auto** automatischer Test/Build grün
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
-- Vitest: ✅ 174/174 · Playwright: siehe unten
+- Vitest: ✅ 174/174 · Playwright: ✅ 20/20 (Headless-Chromium, SwiftShader)
 
 ## Wartet auf deinen Test
 1. 3D: Möbel anklicken (bleibt ausgewählt, bewegt sich nicht) und ziehen (folgt der Maus, kein Sprung) – auch in der Schnittansicht.
