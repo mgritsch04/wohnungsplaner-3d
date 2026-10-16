@@ -30,4 +30,19 @@ describe('budget', () => {
     expect(csv).toContain('70,00;140,00;Schätzung');
     expect(csv).toContain('Gesamt (bekannte Preise)');
   });
+
+  it('shopping list CSV: sizes column, identical items merged into one line with quantity (#57)', () => {
+    const a = item('generic-chair', {});
+    const b = item('generic-chair', {});
+    const c = item('generic-chair', { quantity: 2 });
+    const table = item('generic-dining-table-4', {});
+    const csv = budgetToCsv(computeBudget([a, b, c, table]));
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toContain('Maße B × T × H (cm)');
+    const chair = lines.filter((l) => l.includes(a.name));
+    expect(chair).toHaveLength(1);
+    expect(chair[0]).toContain('45 × 52 × 86');
+    expect(chair[0]).toContain(';4;70,00;280,00;');
+  });
 });
+
