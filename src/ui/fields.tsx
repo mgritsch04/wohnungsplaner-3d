@@ -1,0 +1,165 @@
+import { useEffect, useState, type ReactNode } from 'react';
+
+interface NumberFieldProps {
+  label: string;
+  /** Value in base units (meters for lengths). */
+  value: number;
+  onChange: (v: number) => void;
+  /** Display factor: 100 shows meters as cm. */
+  factor?: number;
+  unit?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  digits?: number;
+  disabled?: boolean;
+  title?: string;
+}
+
+/**
+ * Numeric input that commits on Enter/blur, accepts German decimal commas,
+ * validates against min/max (in display units) and reverts invalid input.
+ */
+export function NumberField({ label, value, onChange, factor = 1, unit, min, max, step, digits = 1, disabled, title }: NumberFieldProps) {
+  const fmt = (v: number) => {
+    const x = v * factor;
+    return String(Math.round(x * 10 ** digits) / 10 ** digits).replace('.', ',');
+  };
+  const [text, setText] = useState(fmt(value));
+  const [error, setError] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(fmt(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused]);
+
+  const commit = () => {
+    const parsed = parseFloat(text.replace(',', '.'));
+    if (!Number.isFinite(parsed) || (min !== undefined && parsed < min) || (max !== undefined && parsed > max)) {
+      setError(true);
+      setText(fmt(value));
+      setTimeout(() => setError(false), 1200);
+      return;
+    }
+    setError(false);
+    const next = parsed / factor;
+    if (Math.abs(next - value) > 1e-9) onChange(next);
+  };
+
+  return (
+    <label className={`field ${error ? 'field-error' : ''}`} title={title ?? (min !== undefined && max !== undefined ? `${min} – ${max} ${unit ?? ''}` : undefined)}>
+      <span className="field-label">{label}</span>
+      <span className="field-input">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={text}
+          disabled={disabled}
+          step={step}
+          onFocus={(e) => {
+            setFocused(true);
+            e.target.select();
+          }}
+          onBlur={() => {
+            setFocused(false);
+            commit();
+          }}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Escape') {
+              setText(fmt(value));
+              (e.target as HTMLInputElement).blur();
+            }
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              const s = (step ?? 1) * (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+              const cur = parseFloat(text.replace(',', '.'));
+              if (Number.isFinite(cur)) {
+                let n = cur + s;
+                if (min !== undefined) n = Math.max(min, n);
+                if (max !== undefined) n = Math.min(max, n);
+                onChange(n / factor);
+                setText(String(Math.round(n * 10 ** digits) / 10 ** digits).replace('.', ','));
+              }
+            }
+          }}
+        />
+        {unit && <span className="field-unit">{unit}</span>}
+      </span>
+    </label>
+  );
+}
+
+export function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [text, setText] = useState(value);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(value);
+  }, [value, focused]);
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <span className="field-input">
+        <input
+          type="text"
+          value={text}
+          placeholder={placeholder}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            if (text !== value) onChange(text);
+          }}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        />
+      </span>
+    </label>
+  );
+}
+
+export function SelectField<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <span className="field-input">
+        <select value={value} onChange={(e) => onChange(e.target.value as T)}>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </span>
+    </label>
+  );
+}
+
+export function CheckField({ label, checked, onChange, title }: { label: string; checked: boolean; onChange: (v: boolean) => void; title?: string }) {
+  return (
+    <label className="check" title={title}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+export function Section({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
+  return (
+    <section className="panel-section">
+      <header>
+        <h3>{title}</h3>
+        {actions}
+      </header>
+      <div className="panel-section-body">{children}</div>
+    </section>
+  );
+}
+
+export function Badge({ kind, children, title }: { kind: 'ok' | 'warn' | 'info' | 'muted' | 'error'; children: ReactNode; title?: string }) {
+  return (
+    <span className={`badge badge-${kind}`} title={title}>
+      {children}
+    </span>
+  );
+}
