@@ -172,3 +172,34 @@ Bericht zu Aufgabe 9 (#89) ist angekommen, danke. Er kommt in den nächsten Samm
 - alle Checks und die volle E2E-Suite grün sind;
 - gepusht ist;
 - du mir berichtet hast: Dateien, Tests, Commits, User-Test-Schritte.
+
+## Aufgabe 11: Maßlinien-Beschriftung (#125), danach 2D-Plan verfeinern (#104)
+
+Bericht zu Aufgabe 10 (#88) ist angekommen, danke. Er kommt mit #89 in den nächsten Sammel-PR.
+
+**Zum Hinweis „Arbeitskopie stand plötzlich auf main“:** Das war sehr wahrscheinlich der Nutzer selbst. Er hat nach meiner Anleitung in `C:\Users\maxim\wohnungsplaner-3d` `git checkout main` / `git pull` ausgeführt, um die App zu starten. **Bitte ab jetzt nicht mehr in diesem Ordner arbeiten**, damit ihr euch nicht in die Quere kommt:
+- Lege dir einmalig eine eigene Arbeitskopie neben dem Ordner des Nutzers an, z. B. `git worktree add ..\wohnungsplaner-3d-hallo origin/claude/quirky-faraday-0d9uep`, und arbeite nur noch dort (eigene `npm install`).
+- Den Ordner des Nutzers nicht mehr umschalten, nichts darin ändern und keinen Server darin starten oder beenden.
+
+Bitte zwei kleine Aufgaben **nacheinander**, je auf einem eigenen Branch von `origin/claude/quirky-faraday-0d9uep`. Vor jedem Push diesen Branch hineinmergen, kein Rebase.
+
+### 11a: Maßlinien-Beschriftung bei kurzen Linien (#125), Branch `claude/dimension-labels-125`
+- Issue #125 lesen. Bei sehr kurzen Maßlinien verdeckt die Beschriftung die Linie, und die hintere Linie liegt über dem Stiel des Dreh-Griffs.
+- Ziel: Kurze Linien bekommen das Etikett versetzt neben der Linie, mit dünner Hilfslinie oder einfach außen. Der Dreh-Griff bleibt frei bedienbar.
+- Code: `src/model/clearances.ts` und das zugehörige Overlay in `src/editor2d/`.
+- Tests: Unit (Platzierung bei kurzer Linie) und Anpassung bzw. Ergänzung des vorhandenen E2E „clearances (#50)“.
+
+### 11b: 2D-Plan verfeinern (#104), Branch `claude/plan-polish-104`
+- Issue #104 lesen. Klarere Linienstärken (Wände kräftig, Möbel dünner, Hilfslinien fein) und dezentere Farben, lesbar in allen Zoomstufen. Linienstärken in Bildschirm-Pixeln, unabhängig vom Zoom (`vector-effect: non-scaling-stroke` oder skaliert über den Zoomfaktor).
+- Farben über die `--color-plan-*`-Tokens (der Plan bleibt im Dunkelmodus hell). Die bestehenden Overlays (Küchendreieck, Sichtlinien, Engstellen, Maßlinien) bleiben gut erkennbar.
+- Vorher-nachher-Screenshots bei 3 Zoomstufen, selbst ansehen.
+- Tests: Die vorhandenen E2E-Tests müssen grün bleiben. Neu ist ein kleiner E2E-Test, der die Strichbreite der Wände bei zwei Zoomstufen vergleicht (bleibt in Pixeln gleich).
+
+**Nicht anfassen** (dort arbeiten Agents):
+- `src/ui/Toolbar.tsx` (#100)
+- `src/model/schema.ts` (#65; die Möbelgruppen ändern eventuell auch die 2D-Auswahlumrandung, deshalb Auswahl-Rahmen und Hover möglichst nicht umbauen)
+- `vite.config.ts` und `package.json` (Artefakt-Build #129)
+- `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`
+- Issues
+
+**Fertig, wenn:** je Branch alle Checks und die volle E2E-Suite grün sind, gepusht ist und du mir **je Teilaufgabe** berichtet hast.
