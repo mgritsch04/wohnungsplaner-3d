@@ -54,6 +54,15 @@ describe('room proposals', () => {
     expect(left.statedArea).toBeUndefined();
   });
 
+  it('takes name and area from one combined text item, as CAD exports write them (#114)', () => {
+    const rooms = proposeRooms(twoRooms, { texts: [{ str: 'Kueche 6,00 m2', x: 2, y: 3 }, { str: 'Wohnen 18,40 m²', x: 5.5, y: 3 }] });
+    const [left, right] = [...rooms].sort((a, b) => a.labelPoint.x - b.labelPoint.x);
+    expect(left.name).toBe('Kueche');
+    expect(left.statedArea).toBe(6);
+    expect(right.name).toBe('Wohnen');
+    expect(right.statedArea).toBe(18.4);
+  });
+
   it('marks very small areas as uncertain, ignores tiny ones and open wall chains', () => {
     // a 1.2 × 1.2 m shaft (net 1 m²) and a 0.4 × 0.4 m gap between walls
     const shaft = [wall({ x: 0, y: 0 }, { x: 1.2, y: 0 }), wall({ x: 1.2, y: 0 }, { x: 1.2, y: 1.2 }), wall({ x: 1.2, y: 1.2 }, { x: 0, y: 1.2 }), wall({ x: 0, y: 1.2 }, { x: 0, y: 0 })];

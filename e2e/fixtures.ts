@@ -228,3 +228,83 @@ export function dimensionedPlanPdf(): Buffer {
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(out, 'latin1');
 }
+
+/**
+ * Synthetic CAD-style floor plan (#114), modelled on how AutoCAD exports plans – NOT a copy of
+ * a real plan: A3 landscape, 1:75, rooms filled with pastel colours, walls as dark grey filled
+ * polygons (no double lines), room fills as narrow strips, a tile hatch, thin outlines, room labels, a title block with frame and a small
+ * site plan beside the floor plan. 9 m × 6.5 m, outer walls 30 cm, inner walls 12 cm.
+ */
+export function cadFilledPlanPdf(): Buffer {
+  const m = 1000 / 75 / 25.4 * 72; // points per metre at 1:75 (≈ 37.8)
+  const ox = 140;
+  const oy = 300;
+  const P = (x: number, y: number) => `${(ox + x * m).toFixed(2)} ${(oy + y * m).toFixed(2)}`;
+  const rect = (x0: number, y0: number, x1: number, y1: number) => `${P(x0, y0)} m ${P(x1, y0)} l ${P(x1, y1)} l ${P(x0, y1)} l h`;
+  const ops: string[] = [];
+  // room fills (pastel), drawn first
+  const rooms: [number, number, number, number, string][] = [
+    [0, 0, 5, 6.5, '0.98 0.93 0.78'],
+    [5, 0, 9, 3.5, '0.80 0.90 0.98'],
+    [5, 3.5, 7, 6.5, '0.82 0.95 0.85'],
+    [7, 3.5, 9, 6.5, '0.98 0.85 0.85'],
+  ];
+  // CAD programs often export a solid hatch as many narrow filled strips (here 15 cm each)
+  for (const [x0, y0, x1, y1, c] of rooms) {
+    ops.push(`${c} rg`);
+    for (let y = y0; y < y1 - 1e-9; y += 0.15) ops.push(`${rect(x0, y, x1, Math.min(y1, y + 0.15))} f`);
+  }
+  // tile hatch in the bathroom: thin grey 30 cm grid
+  ops.push('0.55 G 0.1 w');
+  for (let x = 5.3; x < 7; x += 0.3) ops.push(`${P(x, 3.5)} m ${P(x, 6.5)} l S`);
+  for (let y = 3.8; y < 6.5; y += 0.3) ops.push(`${P(5, y)} m ${P(7, y)} l S`);
+  // walls: dark grey solid hatch, one filled rectangle per wall piece; door gaps are left open
+  const T = 0.3;
+  const t = 0.12;
+  const walls: [number, number, number, number][] = [
+    // outer walls (outside of the 9 × 6.5 m interior), with a 1 m entrance gap in the south wall
+    [-T, -T, 1.0, 0], [2.0, -T, 9 + T, 0],
+    [-T, 6.5, 9 + T, 6.5 + T],
+    [-T, 0, 0, 6.5], [9, 0, 9 + T, 6.5],
+    // interior: x = 5 (living | rest) with a door 1.0–1.9 m, y = 3.5 (bedroom | bath/kitchen) with doors
+    [5 - t / 2, 0, 5 + t / 2, 1.0], [5 - t / 2, 1.9, 5 + t / 2, 6.5],
+    [5, 3.5 - t / 2, 5.2, 3.5 + t / 2], [6.0, 3.5 - t / 2, 7.4, 3.5 + t / 2], [8.2, 3.5 - t / 2, 9, 3.5 + t / 2],
+    [7 - t / 2, 3.5, 7 + t / 2, 6.5],
+  ];
+  ops.push('0.25 0.25 0.25 rg');
+  for (const [x0, y0, x1, y1] of walls) ops.push(`${rect(x0, y0, x1, y1)} f`);
+  // thin outlines around the wall pieces (as CAD exports often add them)
+  ops.push('0 G 0.18 w');
+  for (const [x0, y0, x1, y1] of walls) ops.push(`${rect(x0, y0, x1, y1)} S`);
+  // windows in the north wall: thin parallel lines in a gap would be classic – here only frames on top
+  ops.push('0.3 w', `${P(1.5, 6.5 + T / 2)} m ${P(3.0, 6.5 + T / 2)} l S`);
+  // room labels with areas
+  const label = (s: string, x: number, y: number) => `BT /F1 9 Tf 1 0 0 1 ${P(x, y)} Tm (${s}) Tj ET`;
+  ops.push('0 g', label('Wohnen 32,50 m2', 1.5, 3.2), label('Schlafen 14,00 m2', 6.0, 1.7), label('Bad 6,00 m2', 5.3, 5.0), label('Kueche 6,00 m2', 7.3, 5.0));
+  // title block and drawing frame (long thin lines all around the sheet)
+  ops.push('0 G 0.7 w', '20 20 m 1171 20 l 1171 822 l 20 822 l h S');
+  ops.push('0.35 w', '871 20 m 871 160 l 1171 160 l S', '871 90 m 1171 90 l S');
+  ops.push('BT /F1 14 Tf 1 0 0 1 885 130 Tm (Grundriss Wohnung - Beispiel) Tj ET', 'BT /F1 10 Tf 1 0 0 1 885 60 Tm (Massstab M 1:75   Format A3) Tj ET');
+  // site plan: a small building block in a corner (filled), with a property boundary
+  ops.push('0.6 0.6 0.6 rg 900 600 m 1000 600 l 1000 680 l 900 680 l h f', '0 G 0.3 w 870 570 m 1130 570 l 1130 780 l 870 780 l h S');
+  ops.push('BT /F1 9 Tf 1 0 0 1 880 555 Tm (Lageplan M 1:1000) Tj ET');
+  const content = ops.join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1191 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
