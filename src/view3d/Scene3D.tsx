@@ -24,6 +24,8 @@ import { snapToGrid } from '../model/operations';
 import { CollisionMarkers } from './CollisionMarkers';
 import { NarrowPassageMarkers } from './NarrowPassageMarkers';
 import { WalkPathMarkers } from './WalkPathMarkers';
+import { TapeMeasure3D } from './TapeMeasure3D';
+import { TapeMeasureButton } from './TapeMeasureButton';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 import { toggleOpening } from '../ui/actions';
 import { BookmarksMenu } from './BookmarksMenu';
@@ -98,6 +100,7 @@ export function Scene3D() {
       {cameraMode === 'orbit' && <OrbitZoomSlider />}
       {/* saving a view changes the project – not offered while comparing (Alt+1 … 9 still jumps) */}
       {!session && <BookmarksMenu />}
+      {!session && <TapeMeasureButton />}
       {session && <CompareBar />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && ducking && (
@@ -257,6 +260,7 @@ function SceneContent({
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
+      <TapeMeasure3D />
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects />

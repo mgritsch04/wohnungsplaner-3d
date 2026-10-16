@@ -87,6 +87,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         action: 'Gespeicherte Ansicht 1–9 anspringen (speichern im Menü „Ansichten“ oben rechts in 3D)',
         match: Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`),
       },
+      { keys: 'K', action: 'Maßband an/aus: zwei Punkte anklicken (Übersicht) bzw. mit dem Fadenkreuz (Begehen); Esc löscht die Messungen', match: ['k'] },
     ],
   },
   {
