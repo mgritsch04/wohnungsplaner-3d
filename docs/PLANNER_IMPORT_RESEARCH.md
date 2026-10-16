@@ -1,87 +1,101 @@
 # Planer- und Produktimport: IKEA Österreich & Möbelix Österreich
 
-_Stand: 2026-10-16 (Runde 3). Vorgängerrunden: [`INTEGRATIONS_IKEA.md`](INTEGRATIONS_IKEA.md)._
+_Stand: 2026-10-16, Runde 4 (nach Freigabe weiterer Domains). Frühere Runden: [`INTEGRATIONS_IKEA.md`](INTEGRATIONS_IKEA.md)._
 
-Kennzeichnung: `VERIFIED` (in dieser Sitzung selbst geprüft) · `PARTIALLY VERIFIED` · `UNVERIFIED` (nur aus Code-Lektüre/Sekundärquellen) · `UNAVAILABLE` (aus dieser Umgebung nicht prüfbar) · `BLOCKED` (Zugriffsschutz – wird respektiert).
+Kennzeichnung: `VERIFIED` (in dieser Sitzung selbst geprüft) · `PARTIALLY VERIFIED` · `UNVERIFIED` (Hypothese, Code-Lektüre oder Sekundärquelle) · `UNAVAILABLE` (aus dieser Umgebung nicht prüfbar) · `BLOCKED` (Zugriffsschutz des Anbieters – wird respektiert).
 
-Grundregeln dieser Untersuchung: nur öffentlich erreichbare Seiten, normale Browser-/HTTP-Abrufe in sehr geringer Zahl (≈ 10 Seitenabrufe + die von einer Planer-Seite selbst geladenen Skripte), kein Umgehen von Anmeldung, Bot-Schutz oder Ratenbegrenzung, keine Nutzerkonten, keine Weitergabe von Händlerinhalten im Repository (Tests nutzen nur einen gekürzten Auszug der strukturierten Daten).
+Regeln dieser Untersuchung: nur öffentlich erreichbare Seiten und normale Browser-Abläufe (Headless-Chromium ohne Tarnung), sehr geringe Anfragezahl, keine Konten, keine fremden Planungen, kein Umgehen von Anmeldung, Bot-Schutz, Herkunftsprüfungen oder Ratenbegrenzung. Händlerinhalte (Seiten, Modelle) liegen nicht im Repository; Testdaten sind gekürzte strukturierte Daten bzw. eine eigene anonyme Testplanung.
 
 ## Kurzfazit
 
-| Ziel | Ergebnis | Status |
+| Ziel | IKEA Österreich | Möbelix Österreich |
 |---|---|---|
-| **Einzelprodukt IKEA AT** (Name, Artikelnr., Maße, Preis, Bild, 3D-Modell-Adresse) | Echte Produktseiten enthalten vollständige schema.org-Daten (`Product` + `3DModel`). Unser Parser liest sie korrekt; echter End-to-End-Lauf in der App: Seite einfügen → übernehmen → im Plan platzieren | `VERIFIED` (2 echte Seiten, 1 echter E2E-Lauf) |
-| **3D-Modell (GLB) von IKEA laden** | Adressen werden von der Seite selbst deklariert (`web-api.ikea.com/dimma/assets/…glb`), 21 Varianten bei KALLAX. Download/CORS/Lizenz hier nicht prüfbar: Host in dieser Umgebung gesperrt | Adressen `VERIFIED`, Abruf `UNAVAILABLE` |
-| **Möbelix AT** | Website antwortet mit Cloudflare-Bot-Challenge (`cf-mitigated: challenge`, HTTP 403) | `BLOCKED` – wird nicht umgangen |
-| **Produktlisten / Planer-Stücklisten** | Kein öffentliches Austauschformat gefunden; Merklisten und geteilte Planungen liegen hinter Konto bzw. sind per robots.txt ausgeschlossen | `UNVERIFIED` |
-| **Komplette Planer-Pläne (PAX, BESTÅ, METOD-Küche …)** | Planungen liegen serverseitig im „DEXF“-Dienst von IKEA; Laden erfordert einen app-internen API-Schlüssel und für gespeicherte Entwürfe ein Konto-Token | **Nicht legitim umsetzbar** (`UNVERIFIED` im Detail, da Dienst hier gesperrt) |
-| **Geometrie/Positionen aus Planern** | Nur innerhalb der Planer-App (WebGL); kein öffentliches Exportformat gefunden | `UNVERIFIED` |
+| Einzelprodukt (Name, Nr., Maße, Preis, Bild) | ✅ Ende-zu-Ende (Seite einfügen **oder** Hilfsskript) – `VERIFIED` | ❌ `BLOCKED` (Cloudflare-Challenge) |
+| Echtes 3D-Modell (GLB) | ✅ Download + Laden in der App, Maße stimmen – `VERIFIED`; Direktabruf aus der App von IKEA gesperrt (Herkunftsprüfung) | ❌ nicht untersuchbar |
+| Produktliste/Stückliste | ✅ Artikelnummern → Produktliste mit Modellen (Skript + Mehrdatei-Import) – `VERIFIED` | ❌ |
+| Komplette Planung (Raum + Möbel, Positionen) | ✅ PAX/„StorageOne“-Planung als JSON → Raum + Korpusse – `VERIFIED` mit eigener Testplanung; JSON muss der Nutzer selbst aus seinem Browser holen | ❌ |
+| Küchenplanung (METOD) | ❓ Backend aus dieser Umgebung gesperrt – `UNAVAILABLE` | ❌ |
 
-**Ehrliche Einordnung:** Der Import _einzelner echter IKEA-Produkte_ funktioniert jetzt nachweislich mit echten Daten. Ein Import _kompletter Planer-Pläne_ (Küche, PAX …) funktioniert **nicht** und lässt sich ohne offizielle Freigabe durch IKEA auch nicht sauber bauen.
+**Ehrlich:** Komplettimport funktioniert für IKEA-**Aufbewahrungsplaner** (PAX, getestet), nicht für den Küchenplaner. Die App selbst ruft keine IKEA-Dienste auf; sie verarbeitet, was der Nutzer bereitstellt.
 
-## 1. Erreichbarkeit aus dieser Umgebung (2026-10-16)
+## 1. Erneut getestete Domains (2026-10-16, nach Freigabe)
 
-| Host | Ergebnis | Bedeutung |
+| Host | Vorher | Jetzt | Bedeutung |
+|---|---|---|---|
+| `www.ikea.com` | erreichbar (Runde 3) | 200 | Produktseiten, Planer-Apps |
+| `web-api.ikea.com` | Proxy-Sperre | **erreichbar** | `/dimma/assets/…` GLB: 200 ohne `Origin`, 200 mit `Origin: https://www.ikea.com`, **403 bei fremder Herkunft** (z. B. `http://localhost:4173`). `robots.txt`: `Disallow: /`, `Allow: /dimma/assets/` |
+| `api.dexf.ikea.com` | Proxy-Sperre | **erreichbar** | ohne Schlüssel: `403 {"message":"The API key you provided does not have access…"}`; im Browser sendet IKEAs App einen eigenen `dexf-api-key` |
+| `kitchen.planner.ikea.com` | Proxy-Sperre | 200 (nur die App-Hülle) | Backend `api.kitchen.planner.ikea.com` weiter **gesperrt** (Umgebung) |
+| `www.moebelix.at` | 403 | 403 | **Cloudflare-Challenge** (`cf-mitigated: challenge`), auch im Browser; `challenges.cloudflare.com` hier gesperrt |
+| weiterhin von der Umgebung gesperrt | | | `sik.search.blue.cdtapps.com` (Suche), `api.salesitem.ingka.com` (Verfügbarkeit), `api.ingka.ikea.com` (Gast-Token, Warenkorb), `content.dexf.ikea.com` (Planer-Modelle/Bilder), `account.dexf.ikea.com`, `api.kitchen.planner.ikea.com`, `www.gstatic.com` (Draco-Decoder des IKEA-Viewers), `api.moebelix.at` |
+
+## 2. IKEA – Produkte
+
+### 2.1 Produktseite (`VERIFIED`, KALLAX 104.099.32, ENHET 106.230.36, SALTSJÖBADEN S895.792.19)
+* JSON-LD `Product`: `name`, `sku`/`mpn`, `width`/`depth`/`height` („111.5 cm“), `offers.price`/`priceCurrency`, `availability`, `color`, `material`, `category`, Bilder.
+* JSON-LD `3DModel` mit `encoding[].contentUrl` (`model/gltf-binary`), Pfad `web-api.ikea.com/dimma/assets/1.2/{nr}/{set}/{qualität}/{format}/…`. Qualitäten `iqp1–3`, `rqp1–3`, `simple`; Formate `glb`, `glb_draco`, `gltf`. Gemessene Größen (KALLAX, Draco): iqp3 2,8 MB · iqp2 1,9 MB · iqp1 0,6 MB · rqp3 0,34 MB · rqp1 0,12 MB. ENHET hat nur `rqp`; die SALTSJÖBADEN-Kombination hat **kein** Modell.
+* Kurz-URL `https://www.ikea.com/at/de/p/-{nr}/` bzw. `-s{nr}/` leitet per 301 auf die Produktseite weiter (Muster aus IKEAs Planer-Konfiguration `productInformationPageLinkV2`).
+
+### 2.2 Produkt-Viewer „rotera“ (beobachtet, **nicht genutzt**)
+Beim Öffnen der 3D-Ansicht lädt die Seite `web-api.ikea.com/at/de/rotera/data/{model|price|variations|complementary}/{nr}/` (JSON, Maße in mm, Preis inkl./exkl. MwSt., Varianten) und `…/rotera/static/models/{nr}-mini.glb` (80 kB). Die Datenendpunkte verlangen IKEAs `x-client-id` (ohne: 401) und sind per robots.txt ausgeschlossen → nicht verwendet.
+
+### 2.3 3D-Modelle (`VERIFIED`)
+* KALLAX iqp3: glTF 2.0, `KHR_draco_mesh_compression`, 1 Mesh, 4 PNG-Texturen, Meter, Y oben, Ursprung Bodenmitte. Bounding-Box 111,8 × 147,1 × 40,3 cm (Seite: 111,5 × 146,5 × 39). ENHET rqp3: 30,2 × 180,1 × 31,8 cm (Seite: 30 × 180 × 32,1).
+* In der App geladen, auf Produktmaße skaliert, in 3D dargestellt (Screenshot geprüft). Ausrichtung „vorne = +Z“ entspricht der glTF-Konvention; visuell in der Software-Darstellung nicht eindeutig bestätigt (`PARTIALLY VERIFIED`).
+* Direkter Abruf aus der App im Browser: IKEA antwortet bei fremder Herkunft mit 403 → **bewusste Sperre**, wird nicht umgangen (kein Proxy, kein Header-Fälschen). Legitime Wege: Link im Browser öffnen (Download) und Datei wählen, oder das Hilfsskript (s. u.).
+
+### 2.4 Suche, Verfügbarkeit, Merkliste
+Suche (`sik.search.blue.cdtapps.com`) und Verfügbarkeit (`api.salesitem.ingka.com`) sind in dieser Umgebung gesperrt (`UNAVAILABLE`); Suche ist zudem per robots.txt für Crawler ausgeschlossen. Merklisten/Warenkorb erfordern Gast-Token bzw. Konto → nicht genutzt.
+
+## 3. IKEA – Planer und komplette Planungen
+
+### 3.1 PAX/„StorageOne“-Planer (`VERIFIED`, eigene anonyme Testplanung)
+Ablauf im Browser: Planer öffnen → Korpus/Kombination wählen → **„Zusammenfassung“**. Dabei speichert der Planer ohne Konto:
+1. `POST api.dexf.ikea.com/vpc/v1/room/configurations` → `{"roomId":"3V9YZ44"}` (Raum)
+2. `POST api.dexf.ikea.com/vpc/v1/configurations/retailunit/AT/locale/de-AT` → `{"configurationId":"343J5TD", "_links": {"short-url": ".../pax/web/latest/at/de/#/u/343J5TD", …}}`
+
+Erneutes Öffnen über `…/#/u/343J5TD` lädt `GET …/vpc/v1/configurations/retailunit/AT/locale/de-AT/343J5TD` (mit IKEAs `dexf-api-key`) – **Hin- und Rückweg geprüft**. „Speichern“ im Profil verlangt dagegen ein Konto.
+
+Inhalt der gespeicherten JSON:
+* `itemList.item[]` – Artikel und Mengen (z. B. 13 Positionen für eine Eckkombination).
+* `icf.content.articles[]` – jedes Teil mit `product_id` (`ART-80458207`), `category` (`pax-hinge-frame`, `pax-shelf`, …), `dimensions` (mm: x Breite, y Höhe, z Tiefe), `transform.position` (mm, Mittelpunkt, y oben), `transform.rotation` (Grad um y, z. B. 270), `parent_ids`/`child_ids` (Einbauteile → Korpus).
+* `configuration.content.entities[]` – Szenengraph inkl. Raum: Bodenfläche mit `cornerPersistentIds`, Ecken mit Position (mm), Deckenecken (y = Raumhöhe), Wände (`kv-wall`, `wallState`).
+
+**Umgesetzt:** Import dieser JSON → Raum (lichte Maße) + Korpusse an ihren Positionen/Rotationen; Einbauteile je Korpus zusammengefasst. Geprüft: 5 × 4 m-Raum mit L-förmiger Kombination, keine Wandkollisionen, 3D-Darstellung angesehen.
+
+**Wie kommt der Nutzer an die JSON?** Die App darf IKEAs Dienst nicht selbst aufrufen (das ginge nur mit IKEAs eigenem Anwendungsschlüssel). Weg für die eigene Planung: Planung im IKEA-Planer öffnen (Planungscode-Link) → Entwicklerwerkzeuge (F12) → Netzwerk → Filter `configurations` → Anfrage mit dem Code → Antwort speichern/kopieren → in der App _Import › „IKEA-Planung (JSON) übernehmen“_. (`NEEDS USER TEST` – der Ablauf in DevTools ist für Laien umständlich.)
+
+Grenzen: Korpusse werden als maßgenaue Näherungsmodelle dargestellt (Planer-Modelle liegen auf `content.dexf.ikea.com`, hier gesperrt); Türen/Griffe nicht separat; die Eckeinsatz-Koordinaten im ICF sind uneinheitlich (Teil wird nur als Einbauteil gezählt); Raumöffnungen (Fenster/Türen) im Planer nicht untersucht.
+
+### 3.2 Küchenplaner METOD (`UNAVAILABLE`)
+`kitchen.planner.ikea.com` lädt, braucht aber `api.kitchen.planner.ikea.com` (CSRF-Token, Service-Discovery) – hier gesperrt. Aus dem Code: Routen `/planner/:designId/`, `/designs/:designId/share/`, `/login/` → Planungen sind an Konten gebunden; ob ein ICF-Export wie bei PAX existiert, ist offen (`UNVERIFIED`).
+
+### 3.3 Andere Planer
+`/addon-app/space/…` (Raum-/Konfiguratorplattform), `coro3`, `skytta` – nicht untersucht.
+
+## 4. Möbelix Österreich (`BLOCKED`)
+Website und robots.txt antworten mit Cloudflare-Challenge (curl und Browser); die Challenge-Skripte (`challenges.cloudflare.com`) sind hier zusätzlich gesperrt. Es wird nicht versucht, das zu umgehen. Kein API-, Modell- oder Planer-Befund möglich. Der Weg „Seitenquelltext aus dem eigenen Browser einfügen“ steht in der App bereit (`NEEDS USER TEST`).
+
+## 5. Umgesetzt (Code)
+
+| Baustein | Datei | Tests |
 |---|---|---|
-| `www.ikea.com` | HTTP 200 (auch mit Standard-curl-Kennung) | **neu erreichbar** (Runden 1–2: gesperrt) |
-| `web-api.ikea.com` (3D-Assets) | Proxy verweigert Tunnel (`ERR_TUNNEL_CONNECTION_FAILED`) | Netzwerkrichtlinie der Umgebung |
-| `api.dexf.ikea.com` (Planer-Backend) | dto. | dto. |
-| `kitchen.planner.ikea.com`, `planner.ikea.com` | Proxy: 403 beim CONNECT | dto. |
-| `sik.search.blue.cdtapps.com`, `api.ingka.ikea.com` | dto. | dto. |
-| `www.moebelix.at` | HTTP 403 **von Cloudflare** mit Bot-Challenge („Just a moment…“) | Zugriffsschutz der Website → `BLOCKED`, wird respektiert |
+| schema.org-`3DModel` lesen, IKEA-Variantenwahl (iqp2 → … → rqp1, Draco bevorzugt) | `src/catalog/providers/structuredData.ts`, `ikeaModels.ts` | Unit |
+| Artikelnummern aus Text, Kurz-URL, Kategorie-Heuristik | `src/catalog/providers/ikeaList.ts` | Unit |
+| Hilfsskript Artikelnummern → `produktliste.json` (+ GLB) | `scripts/ikea-products.mjs` | echter Lauf: KALLAX, ENHET (mit GLB), SALTSJÖBADEN |
+| Produktliste + `.glb` gemeinsam importieren (Prüfung, Maßvergleich) | `src/catalog/catalogImport.ts` | Unit + E2E |
+| IKEA-Planung (JSON) → Raum + Korpusse | `src/catalog/providers/ikeaPlanner.ts`, `src/import/ikeaPlanActions.ts` | Unit + E2E (gekürzte echte Testplanung) |
+| Verständliche Meldung, warum der Direktabruf scheitert | `registry.ts`, `ProductImportModal.tsx` | E2E |
 
-## 2. IKEA Österreich – Produktseiten (`VERIFIED`)
+Echter Ende-zu-Ende-Lauf (lokal, nicht im Repo): `node scripts/ikea-products.mjs "104.099.32, 2x 106.230.36, S895.792.19" --models` → 3 Produkte, 2 GLB → in der App importiert → platziert → 3D ohne Fehler.
 
-Geprüft: `KALLAX Regal weiß` (`/at/de/p/kallax-regal-weiss-10409932/`) und `SALTSJÖBADEN 3er-Bettsofa` (Kombination `s89579219`).
+## 6. Offene Punkte / was ich brauche
+1. **Küchenplaner:** Freigabe von `api.kitchen.planner.ikea.com` (und für Planer-Modelle `content.dexf.ikea.com`) in den Netzwerkeinstellungen der Umgebung – dann untersuche ich, ob METOD-Planungen ein ähnliches Format liefern.
+2. **Testen:** eine eigene PAX-Planung per DevTools-JSON importieren; ob der Weg für dich praktikabel ist.
+3. **Möbelix:** eine Produktseite aus deinem Browser einfügen (Strg+U) und melden, was erkannt wird; sonst bleibt Möbelix blockiert.
+4. **Rechtliches:** IKEAs Nutzungsbedingungen zu Modellen/Planungsdaten nicht geprüft – die App behandelt alles als „privat, nicht weitergeben“.
 
-* `<script type="application/ld+json" id="pip-range-json-ld">` mit `@type: Product`: `name`, `sku`/`mpn` (`104.099.32`), `width`/`depth`/`height` als Text mit Einheit (`"111.5 cm"`, `"39 cm"`, `"146.5 cm"`), `offers.price`/`priceCurrency` (`99`, `EUR`), `availability`, `color`, `material`, `category`, Bilder (`ImageObject`), Bewertungen.
-* Zweiter Block `@type: 3DModel` mit `encoding[]` → `MediaObject` `{contentUrl, encodingFormat: "model/gltf-binary"}`. KALLAX: 21 Varianten (Pfadteile `iqp1–3`, `rqp1–3` = vermutlich Qualitätsstufen, je `glb`, `glb_draco`, `gltf`, plus `geomagical/simple`). Die Bedeutung der Stufen ist **nicht dokumentiert** (`UNVERIFIED`); die Seite listet eine Draco-komprimierte Variante zuerst – die App nimmt die erste.
-* Nicht jedes Produkt hat ein Modell: Die SALTSJÖBADEN-Kombination enthält **keinen** `3DModel`-Block (Maße/Preis aber vollständig).
-* Das in Runde 2 aus Fremdcode übernommene Element `<script id="pip-xr-viewer-model">` kommt auf beiden Seiten **nicht** vor → veraltet. Die App nutzt jetzt das standardisierte schema.org-`3DModel` und behält die alte Heuristik nur als Rückfall.
-* robots.txt von ikea.com (geprüft): u. a. `Disallow: */home-design/share/*` (geteilte Planungen), `*/ikea-family/home-project-planner/*`, `*/3daas-rotera/*`, `*/global/assets/rotera/*`, `*/favourites/*`, `*/shoppingcart/*`. Diese Pfade ruft die App nicht ab und soll sie auch künftig nicht automatisiert abrufen.
-
-### Proof of Concept (echt, Ende-zu-Ende) – `VERIFIED`
-Lokaler Playwright-Lauf mit der echten KALLAX-Seite (Quelltext eingefügt wie vom Nutzer per Strg+U):
-1. Erkannt als HTML; Quellen: JSON-LD, Meta, „3D-Modell (schema.org 3DModel, 21 Varianten)“, Maßzeilen.
-2. Qualität „vollständig aus Quelle“; Name `KALLAX Regal - weiß 112x147 cm`, Artikelnr. `104.099.32`, Preis € 99,00, Maße 111,5 × 39 × 146,5 cm, Kategorie „Schränke & Regale“.
-3. „Modell direkt laden“ → Abruf scheitert hier an der Netzsperre (`ERR_TUNNEL_CONNECTION_FAILED`); die App zeigt den vorgesehenen Ausweg (Link öffnen, Datei wählen).
-4. „Hinzufügen und platzieren“ → Objekt im Plan mit IKEA-Maßen, Händler, Link; im 3D als maßstäbliche Näherung.
-
-Die echte Seite wird **nicht** ins Repository übernommen. Regressionstest: gekürzter Auszug der beiden JSON-LD-Blöcke in `src/catalog/providers/providers.test.ts`.
-
-## 3. IKEA-Planer (`UNVERIFIED` im Detail – Backend hier gesperrt)
-
-Gefundene Planer (Seite `/at/de/planners/`):
-* Küche METOD: `https://kitchen.planner.ikea.com/at/de/` (eigener Host).
-* „StorageOne“-Planer auf www.ikea.com: `/addon-app/storageone/{pax|besta|billy|kallax|platsa|smastad|eket|ivar|boaxel|…}/web/latest/at/de/`.
-* „Space“-Plattform (Räume/Konfiguratoren): `/addon-app/space/platform/latest/at/de/…`, weitere: `coro3`, `skytta`, `guida`.
-
-Statische Analyse der vom PAX-Planer geladenen Skripte (normale Seitenauslieferung, 104 Dateien, 1,5 MB) und eine Beobachtung im Browser:
-* Beim Start fordert der Planer `GET https://api.dexf.ikea.com/setting/v1/data/apps/storageonepax/retail-units/AT/locales/de-AT` an – in dieser Umgebung gesperrt, daher startet der Planer hier nicht (`UNAVAILABLE`).
-* Produktdaten: `https://api.dexf.ikea.com/product/…`, `…/webplanner/…`. Anfragen tragen einen Header `dexf-api-key` (in der App hinterlegter Schlüssel) und für Konto-Funktionen `Authorization: Bearer <Nutzertoken>`.
-* Planungen: Routen `/vpc/:vpcCode` (Planungscode zum Weitergeben), `/designId/:designId`, `/spr/:sprId`; Speichern/Laden über `…/designs/{ID}/with-sections` mit API-Schlüssel und Nutzertoken. Ein Ladeweg für VPC-Codes ohne Konto war in den initial geladenen Skripten nicht auffindbar.
-* Ein Exportformat (Datei) für Planungen wurde nicht gefunden.
-
-**Bewertung:** Ein Import kompletter Planungen müsste diesen nicht dokumentierten Dienst mit einem Schlüssel aufrufen, der IKEAs eigener App gehört, und für gespeicherte Planungen ein Konto-Token verwenden. Das wäre eine nicht autorisierte Nutzung bzw. Zugriff auf private Kontodaten → **wird nicht umgesetzt**. Auch das Abrufen geteilter Planungsseiten (`/home-design/share/`) ist per robots.txt ausgeschlossen.
-
-**Legitimer Ersatzweg (Vorschlag, nicht umgesetzt):** Die Planer zeigen eine Zusammenfassung/Einkaufsliste mit Artikelnummern und Mengen. Der Nutzer könnte diese Liste kopieren; die App erkennt Artikelnummern (`XXX.XXX.XX`, Kombinationen `SXXX.XXX.XX`) und Mengen und legt Einträge an, deren Maße/Preise dann je Produktseite (wie oben) ergänzt werden. Positionen/Geometrie der Planung gehen dabei verloren. Das genaue Textformat der Zusammenfassung ist **unbekannt** (`UNVERIFIED`) – dafür brauche ich ein Beispiel von dir.
-
-## 4. Möbelix Österreich – `BLOCKED`
-
-`https://www.moebelix.at/` und `robots.txt` liefern aus dieser Umgebung eine Cloudflare-Challenge (`server: cloudflare`, `cf-mitigated: challenge`). Das ist ein Bot-Schutz; er wird nicht umgangen (kein Headless-Lösen, keine Header-Tricks). Über Planer, Produktlisten oder 3D-Modelle bei Möbelix lässt sich deshalb nichts Neues sagen.
-
-Was trotzdem funktioniert: Der bestehende Weg „Seitenquelltext aus deinem Browser einfügen“ – wenn Möbelix schema.org-Daten ausliefert, liest die App sie wie bei IKEA. (`NEEDS USER TEST`)
-
-## 5. Architektur (unverändert modular)
-
-* Händlerlogik nur in `src/catalog/providers/` (Registry, Parser, Umwandlung, Modellabruf); Geometrie-Kern unberührt.
-* Neu: `collectModels()` liest schema.org-`3DModel` (alle glTF/GLB-Kodierungen, Seitenreihenfolge) → `ParsedProductPage.modelCandidates`, `modelUrl` = erste Variante; die Heuristik (`pip-xr-viewer-model`, `.glb`-Adressen) greift nur noch, wenn keine Deklaration vorhanden ist.
-* Ein künftiger Planer-Adapter (Stückliste) würde als weiterer Provider-Baustein neben `structuredData.ts` liegen.
-
-## 6. Was ich von dir brauche
-
-1. **Netzwerkfreigabe (optional, für Prüfung der 3D-Modelle):** Die Netzwerkrichtlinie dieser Umgebung sperrt `web-api.ikea.com` (und `api.dexf.ikea.com`, `kitchen.planner.ikea.com`). Freigabe in den Umgebungseinstellungen unter _Network access → Allowed domains_ (Anleitung: https://code.claude.com/docs/en/cloud-environments#network-access). Dann prüfe ich Download, CORS-Header und Modellmaße einer GLB-Datei.
-2. **Selbst testen (am wichtigsten):** In der App _Katalog → „Produkt von Händlerseite übernehmen“_ mit einer echten IKEA-Seite (Strg+U, alles kopieren) und „Modell direkt laden“. Ob IKEA den Direktabruf aus der App erlaubt (CORS), zeigt nur dein Browser.
-3. **Möbelix:** eine Produktseite im Browser öffnen, Quelltext in die App einfügen und mir sagen, was erkannt wird.
-4. **Planer-Stückliste:** falls gewünscht, den kopierten Text einer IKEA-Planer-Zusammenfassung (ohne persönliche Daten) – dann baue ich den Stücklisten-Import.
-5. **Lizenzfrage:** Nutzungsbedingungen für IKEA-3D-Modelle sind nicht geprüft; die App zeigt nur einen Hinweis „privat nutzen, nicht weiterverbreiten“.
+## 7. Sinnvolle nächste Schritte
+* Planungsimport um Türen/Griffe und echte Korpus-Modelle erweitern (falls `content.dexf.ikea.com` erlaubt und Nutzung zulässig).
+* Stückliste der Planung (`itemList`) direkt an das Hilfsskript übergeben → Namen, Preise, Modelle für alle Teile.
+* Einfacherer Weg für den Nutzer, die Planungs-JSON zu erhalten (Anleitung mit Screenshots).
