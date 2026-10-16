@@ -2139,11 +2139,15 @@ test('before/after comparison in 3D: A | B with the same camera, moved/removed f
     await expect(dlg).toBeVisible();
     return dlg;
   };
+  let saved = 0;
   const saveState = async (name: string) => {
     const dlg = await openVersions();
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`); // list loaded
     await dlg.getByLabel('Name des Stands').fill(name);
     await dlg.getByRole('button', { name: 'Aktuellen Stand speichern' }).click();
-    await expect(dlg.getByTestId('version-item').filter({ hasText: name })).toHaveCount(1);
+    saved++;
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`);
+    await expect(dlg.getByTestId('version-item').locator('strong').getByText(name, { exact: true })).toHaveCount(1);
     await dlg.getByRole('button', { name: 'Schließen' }).click();
   };
   const p0 = await getProject(page);
@@ -2158,11 +2162,15 @@ test('before/after comparison in 3D: A | B with the same camera, moved/removed f
   await page.mouse.move(start.x + 40, start.y + 10, { steps: 5 });
   await page.mouse.move(start.x + 80, start.y + 20, { steps: 5 });
   await page.mouse.up();
+  const tableX = async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id).x;
+  await expect.poll(tableX).toBeGreaterThan(table.x + 0.3);
   const lampAt = await planToScreen(page, lamp.x, lamp.y);
   await page.mouse.click(lampAt.x, lampAt.y);
   await expect.poll(async () => (await getSelection(page))?.id).toBe(lamp.id);
   await page.keyboard.press('Delete');
   await expect.poll(async () => (await getProject(page)).furniture.some((f: { id: string }) => f.id === lamp.id)).toBe(false);
+  // both changes are committed (no gesture left open) before state B is saved
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useProjectStore.getState().txBase === null)).toBe(true);
   await saveState('B');
 
   const before = await page.evaluate(() => {
@@ -2172,6 +2180,7 @@ test('before/after comparison in 3D: A | B with the same camera, moved/removed f
 
   // pick A and B, compare in 3D
   const dlg = await openVersions();
+  await expect(dlg.getByTestId('version-item')).toHaveCount(2); // list loaded (the selects are filled from it)
   const optionLabel = async (select: string, name: string) => (await dlg.getByLabel(select).locator('option').allInnerTexts()).find((t) => t.startsWith(`${name} (`))!;
   await dlg.getByLabel('Stand A').selectOption({ label: await optionLabel('Stand A', 'A') });
   await dlg.getByLabel('Stand B').selectOption({ label: await optionLabel('Stand B', 'B') });
