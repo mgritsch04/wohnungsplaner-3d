@@ -12,12 +12,13 @@ import type { DerivedPlan } from './derived';
 import type { Furniture, Project } from './schema';
 import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid, scale, signedArea, sub, type Vec2 } from './vec';
 import { normalizeAngle } from './units';
+import { frontClearance, isRug, isStackable, isSurface, pairRule } from './placementRules';
 
 export interface Obstacle {
   polygon: Vec2[];
   z0: number;
   z1: number;
-  kind: 'wall' | 'door-leaf';
+  kind: 'wall' | 'door-leaf' | 'furniture';
   refId: string;
 }
 
@@ -298,7 +299,7 @@ export interface CollisionRegion {
 }
 
 export interface PlacementIssue {
-  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap';
+  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance';
   message: string;
   refId?: string;
   /** Where the item intersects the obstacle (footprint ∩ obstacle, common height range). */
@@ -307,9 +308,13 @@ export interface PlacementIssue {
   culprit?: CollisionRegion;
 }
 
-/** Wall/door-leaf intersections are errors; swing/outside are warnings; overlaps are informational. */
+/**
+ * Real intersections (wall, door leaf, other furniture) are errors; door swing,
+ * outside the room and missing space in front of doors/drawers are warnings.
+ * Intended combinations (rug, chair under table, kitchen inserts) are no issue at all.
+ */
 export function issueLevel(kind: PlacementIssue['kind']): 'error' | 'warn' | 'info' {
-  return kind === 'wall' || kind === 'door-leaf' ? 'error' : kind === 'door-swing' || kind === 'outside' ? 'warn' : 'info';
+  return kind === 'wall' || kind === 'door-leaf' || kind === 'overlap' ? 'error' : 'warn';
 }
 
 /**
@@ -429,7 +434,7 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
     if (!inAny && !issues.some((i) => i.kind === 'wall')) issues.push({ kind: 'outside', message: centerIn ? 'Ragt aus dem Raum hinaus.' : 'Steht außerhalb der Räume.' });
   }
   for (const o of p.furniture) {
-    if (o.id === item.id || o.category === 'textile' || item.category === 'textile') continue;
+    if (o.id === item.id || pairRule(item, o).allowed) continue;
     if (Math.min(o.elevation + o.height, item.elevation + item.height) - Math.max(o.elevation, item.elevation) <= 0.005) continue;
     const oc = furnitureCorners(o);
     if (footprintsOverlap(fc, oc, 0.003)) {
@@ -437,7 +442,41 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
       issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, refId: o.id, region: intersection(item, fc, culprit), culprit });
     }
   }
+  // doors/drawers need free space in front of the item
+  const need = frontClearance(item);
+  if (need > 0) {
+    const zone = frontZone(item, need);
+    for (const o of p.furniture) {
+      if (o.id === item.id || isRug(o) || pairRule(item, o).allowed || issues.some((i) => i.refId === o.id)) continue;
+      if (o.elevation > item.elevation + item.height || o.elevation + o.height < item.elevation + 0.05) continue;
+      const oc = furnitureCorners(o);
+      if (!footprintsOverlap(zone, oc, 0.003)) continue;
+      const free = frontGap(item, oc);
+      const culprit = { polygon: zone, z0: item.elevation, z1: item.elevation + item.height };
+      issues.push({
+        kind: 'clearance',
+        message: `Vor „${item.name}“ sind nur ${Math.max(0, Math.round(free * 100))} cm frei – Türen/Schubladen brauchen etwa ${Math.round(need * 100)} cm („${o.name}“ steht im Weg).`,
+        refId: o.id,
+        region: intersection(item, oc, culprit),
+        culprit,
+      });
+    }
+  }
   return issues;
+}
+
+/** Rectangle of depth `d` directly in front of the item (local +y side). */
+function frontZone(f: Pick<Furniture, 'x' | 'y' | 'width' | 'depth' | 'rotation'>, d: number): Vec2[] {
+  const fwd = { x: -Math.sin(f.rotation), y: Math.cos(f.rotation) }; // rotate((0,1), r)
+  const c = add({ x: f.x, y: f.y }, scale(fwd, f.depth / 2 + d / 2));
+  return furnitureCorners({ x: c.x, y: c.y, width: f.width - 0.02, depth: d, rotation: f.rotation });
+}
+
+/** Free distance between the item's front and the nearest corner of polygon `oc`. */
+function frontGap(f: Pick<Furniture, 'x' | 'y' | 'depth' | 'rotation'>, oc: Vec2[]): number {
+  const fwd = { x: -Math.sin(f.rotation), y: Math.cos(f.rotation) };
+  const front = dot({ x: f.x, y: f.y }, fwd) + f.depth / 2;
+  return Math.min(...oc.map((q) => dot(q, fwd) - front));
 }
 
 export interface FurnitureConflict {
@@ -495,12 +534,34 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
       snapped = s.wallIds;
     }
   }
+  // small items (table lamps, decor) stand on the table/cabinet below them
+  let elevation = f.elevation;
+  if (opts.snap && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
   if (opts.collide && !free) {
-    const r = constrainMove({ ...f, rotation }, goal, obstacles, undefined, f);
+    const all = [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
+    const r = constrainMove({ ...f, rotation, elevation }, goal, all, undefined, f);
     goal = { x: r.x, y: r.y };
   }
   f.x = Math.round(goal.x * 1000) / 1000;
   f.y = Math.round(goal.y * 1000) / 1000;
   f.rotation = rotation;
+  f.elevation = Math.round(elevation * 1000) / 1000;
   return snapped;
+}
+
+/** Other furniture the item must not move into (intended combinations excluded). */
+export function furnitureObstacles(d: Project, item: Furniture): Obstacle[] {
+  return d.furniture
+    .filter((o) => o.id !== item.id && !pairRule(item, o).allowed)
+    .map((o) => ({ polygon: furnitureCorners(o), z0: o.elevation, z1: o.elevation + o.height, kind: 'furniture' as const, refId: o.id }));
+}
+
+/** Height of the highest surface (table, cabinet …) under point `p`, or 0 (floor). */
+export function surfaceTopAt(d: Project, exceptId: string, p: Vec2): number {
+  let top = 0;
+  for (const o of d.furniture) {
+    if (o.id === exceptId || !isSurface(o)) continue;
+    if (pointInPolygon(p, furnitureCorners(o))) top = Math.max(top, o.elevation + o.height);
+  }
+  return top;
 }

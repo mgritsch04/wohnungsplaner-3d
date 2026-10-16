@@ -234,7 +234,8 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
   const w = f.width;
   const d = f.depth;
-  const stroke = selected ? '#2563eb' : hovered ? '#1d4ed8' : conflict === 'error' ? '#dc2626' : conflict === 'warn' ? '#d97706' : '#4b5563';
+  // a conflict stays visible while the item is selected/dragged (selection = thicker outline)
+  const stroke = conflict === 'error' ? '#dc2626' : conflict === 'warn' ? '#d97706' : selected ? '#2563eb' : hovered ? '#1d4ed8' : '#4b5563';
   const fill = shape === 'rug' ? lighten(f.color, 0.3) : lighten(f.color, 0.55);
   const sw = selected ? 2 : 1;
   const details: React.ReactNode[] = [];

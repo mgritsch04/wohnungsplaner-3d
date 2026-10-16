@@ -781,3 +781,42 @@ test('imports a stored IKEA PAX planner design (real structure): room + frames a
   await page.screenshot({ path: 'test-results/ikea-plan-3d.png' });
   expect(errors).toEqual([]);
 });
+
+test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the sofa stops at it (2D)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p0 = await getProject(page);
+  const sofa = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const lamp = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-floor-lamp');
+  // 1) lamp placed inside the sofa (e.g. typed coordinates) → real overlap, red in 3D
+  await page.evaluate(
+    ([id, x, y]) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+        const f = d.furniture.find((q: { id: string }) => q.id === id);
+        f.x = x;
+        f.y = y;
+      }),
+    [lamp.id, sofa.x, sofa.y] as const,
+  );
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(2000);
+  const markers = await collisionMarkers(page);
+  expect(markers).toContain(`collision:${lamp.id}`);
+  expect(markers).toContain(`collision-issue:${lamp.id}:overlap:${sofa.id}`);
+  // 2) undo, then drag the lamp towards the sofa in 2D: it stops at the sofa's side
+  await page.keyboard.press('Control+z');
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(500);
+  const l0 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === lamp.id);
+  const from = await planToScreen(page, l0.x, l0.y);
+  const to = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 10 });
+  await page.mouse.up();
+  const l1 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === lamp.id);
+  expect([l1.x, l1.y]).not.toEqual([l0.x, l0.y]);
+  expect(Math.abs(l1.x - sofa.x) < sofa.width / 2 + l1.width / 2 - 0.005 && Math.abs(l1.y - sofa.y) < sofa.depth / 2 + l1.depth / 2 - 0.005).toBe(false);
+  expect(errors).toEqual([]);
+});
