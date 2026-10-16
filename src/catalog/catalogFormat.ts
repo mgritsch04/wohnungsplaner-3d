@@ -28,6 +28,8 @@ const CatalogEntrySchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   shape: z.string().max(40).optional(),
   modelUrl: z.string().max(2000).optional(),
+  /** Name of a .glb file imported together with the list (no path). */
+  modelFile: z.string().max(200).regex(/^[^/\\]+\.glb$/i, 'nur ein Dateiname mit Endung .glb').optional(),
   articleNumber: z.string().max(60).optional(),
 });
 
@@ -94,6 +96,11 @@ function slug(s: string) {
 }
 
 export function parseCatalogJson(text: string, fileName: string): CatalogItem[] {
+  return parseCatalogJsonWithModels(text, fileName).items;
+}
+
+/** Like parseCatalogJson, plus the `modelFile` names per catalog item id. */
+export function parseCatalogJsonWithModels(text: string, fileName: string): { items: CatalogItem[]; modelFiles: Map<string, string> } {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -102,7 +109,10 @@ export function parseCatalogJson(text: string, fileName: string): CatalogItem[] 
   }
   const res = CatalogFileSchema.safeParse(raw);
   if (!res.success) throw new FileFormatError('Die Produktliste ist ungültig.', formatZodError(res.error));
-  return entriesToCatalogItems(res.data.items, res.data.units, res.data.name ?? fileName);
+  const items = entriesToCatalogItems(res.data.items, res.data.units, res.data.name ?? fileName);
+  const modelFiles = new Map<string, string>();
+  res.data.items.forEach((e, i) => e.modelFile && modelFiles.set(items[i].id, e.modelFile));
+  return { items, modelFiles };
 }
 
 /** Minimal RFC-4180-style CSV parser supporting ; or , separators and quoted fields. */

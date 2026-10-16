@@ -21,6 +21,7 @@ const SHAPES: Record<string, string> = {
 function ModelSection({
   url,
   declared,
+  fetchNote,
   model,
   state,
   dims,
@@ -30,6 +31,8 @@ function ModelSection({
   url: string | null;
   /** Number of models the page declares as schema.org 3DModel (0 = heuristic find). */
   declared: number;
+  /** Retailer-specific reason why direct loading is refused (shown on failure). */
+  fetchNote?: string;
   model: FetchedModel | null;
   state: { busy: boolean; message: string | null; failed: boolean };
   dims: { width: number; depth: number; height: number } | null;
@@ -46,7 +49,7 @@ function ModelSection({
     } else {
       const why =
         r.error === 'cors-or-network'
-          ? 'Der Server des Händlers erlaubt keinen direkten Abruf aus dieser App (Browser-Sicherheit/CORS) oder ist nicht erreichbar.'
+          ? fetchNote ?? 'Der Server des Händlers erlaubt keinen direkten Abruf aus dieser App (Browser-Sicherheit/CORS) oder ist nicht erreichbar.'
           : r.error === 'timeout'
             ? 'Zeitüberschreitung beim Abruf.'
             : r.error === 'http'
@@ -317,6 +320,7 @@ export function ProductImportModal() {
               <ModelSection
                 url={product.modelUrl}
                 declared={product.modelCandidates.length}
+                fetchNote={provider.modelFetchNote}
                 model={model}
                 state={modelState}
                 dims={w && d && h ? { width: w, depth: d, height: h } : null}

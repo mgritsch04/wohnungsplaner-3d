@@ -26,3 +26,16 @@ export function pickFile(accept: string): Promise<File | null> {
 export function safeFileName(name: string): string {
   return name.replace(/[^\p{L}\p{N}\-_ ]+/gu, '').trim().replace(/\s+/g, '-') || 'wohnung';
 }
+
+/** Open a multi-select file picker; resolves with the chosen files (empty when cancelled). */
+export function pickFiles(accept: string): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = true;
+    input.onchange = () => resolve([...(input.files ?? [])]);
+    input.oncancel = () => resolve([]);
+    input.click();
+  });
+}

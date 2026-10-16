@@ -52,3 +52,26 @@ Kategorien: `sofa, bed, table, chair, storage, desk, lighting, textile, kitchen,
 ```
 
 Nur `http(s)`-Links werden übernommen. Importierte Listen werden lokal (IndexedDB) gespeichert.
+
+## 3D-Modelle mitliefern (`modelFile`)
+
+Ein Listeneintrag kann mit `"modelFile": "10409932.glb"` (nur Dateiname, Endung `.glb`) auf eine
+GLB-Datei verweisen. Beim Import im Dateidialog **die Liste und die .glb-Dateien gemeinsam
+auswählen** (Mehrfachauswahl). Jede Datei wird geprüft (gültiges glTF, ladbar, Maße); die Maße der
+Liste bleiben maßgeblich (das Modell wird darauf skaliert). Bei Abweichungen über 10 % oder
+vertauschter Breite/Tiefe erscheint ein Hinweis; fehlende oder ungültige Dateien → maßstäbliche
+Näherung. (Nur JSON; CSV unterstützt `modell_url`, aber keine mitgelieferten Dateien.)
+
+## Hilfsskript: IKEA-Artikelnummern → Produktliste
+
+```bash
+node scripts/ikea-products.mjs "104.099.32, 2x 106.230.36, S895.792.19" --models --out ikea-import
+# Text-/Listen-Datei statt Argument ebenfalls möglich; max. 25 (höchstens 50) Artikel pro Lauf
+```
+
+Ruft je Artikel die **öffentliche** Produktseite `https://www.ikea.com/at/de/p/-<Nummer>/` ab
+(1,5 s Abstand), liest deren schema.org-Daten mit dem Parser der App und schreibt
+`produktliste.json` + `bericht.json`; mit `--models` zusätzlich die von der Seite deklarierte
+GLB-Datei (`web-api.ikea.com/dimma/assets`, laut robots.txt erlaubt). Keine Suche, keine Konten,
+keine internen IKEA-APIs. Modelle/Bilder nur privat nutzen; der Ordner `ikea-import/` ist in
+`.gitignore`. Hinter einem Proxy (z. B. Cloud-Umgebung): `NODE_USE_ENV_PROXY=1` setzen.

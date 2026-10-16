@@ -120,8 +120,8 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   }
 
   if (models.length) {
-    // the page's own order; IKEA lists its preferred (Draco-compressed) variant first
-    modelUrl = models[0];
+    // retailer-specific choice (IKEA: quality/format preference), else the page's own order
+    modelUrl = providerForUrl(pageUrl?.trim() || str(products[0]?.url) || meta.url || null).pickModel?.(models) ?? models[0];
     sources.push(`3D-Modell (schema.org 3DModel${models.length > 1 ? `, ${models.length} Varianten` : ''})`);
   }
   if (products.length > 1) warnings.push(`${products.length} Produkte in den strukturierten Daten – das erste wird verwendet.`);
