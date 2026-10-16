@@ -1033,10 +1033,26 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       return s / (d.length / 4);
     }, png.toString('base64'));
   };
+  // diagnostics for the CI log: which lights exist and how strong they are right now
+  const lightReport = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wp = (window as any).__wp;
+      const out: string[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      wp.three.scene.traverse((o: any) => {
+        if (o.isLight) out.push(`${o.type}:${o.intensity.toFixed(2)}${o.visible ? '' : '(hidden)'}`);
+      });
+      const gl = wp.three.gl.getContext();
+      return `${out.join(' ')} | exposure ${wp.three.gl.toneMappingExposure.toFixed(2)} | maxFragUniforms ${gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)} | renderer ${gl.getParameter(gl.RENDERER)}`;
+    });
   const noon = await brightness(13, 'auto');
   const evening = await brightness(21, 'auto');
   const night = await brightness(23.5, 'auto');
+  const nightLights = await lightReport();
   const nightOff = await brightness(23.5, 'off');
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  lamps off: ${await lightReport()}`);
+  expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
   expect((await getProject(page)).settings.lamps).toBe('off');
   expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
   expect(night).toBeLessThan(evening * 0.85); // and it keeps getting darker after 21:00 (was identical)

@@ -15,7 +15,7 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 
 | # | Titel (Issue) | Beschreibung | Nutzen | Prio | Abhängigkeiten | Abnahme | Status |
 |---|---|---|---|---|---|---|---|
-| 1 | Auswahlprobleme in 3D (Hinweis aus #31) | Klären, welche Möbel sich in 3D nicht auswählen lassen (Rückfrage in #31), dann beheben | zuverlässige Auswahl | P1 | deine Antwort in #31 | betroffene Möbel lassen sich in 3D auswählen | Ready |
+| 1 | Auswahlprobleme in 3D (Hinweis aus #31) | Klären, welche Möbel sich in 3D nicht auswählen lassen (Rückfrage in #31), dann beheben | zuverlässige Auswahl | P1 | deine Antwort in #31 | betroffene Möbel lassen sich in 3D auswählen | Blocked |
 | 2 | Zoom-Regler (#6) | Regler am unteren Viewport-Rand, synchron mit Mausrad | Bedienung ohne Mausrad/Touchpad | P2 | – | siehe Issue | Ready |
 | 3 | Positionsmarker im 2D-Plan beim Begehen (#19) | Punkt + Blickrichtung im 2D-Plan, live, nur bei 2D + 3D | Orientierung in großen Wohnungen | P2 | – | siehe Issue | Ready |
 | 4 | Ducken beim Begehen (#20) | Taste für Ducken mit niedrigerer Kamera (deine Klarstellung in #20), Anzeige im Bild | Blick unter Tische/Regale | P3 | Augenhöhe-Einstellung (#23) | siehe Issue | Ready |

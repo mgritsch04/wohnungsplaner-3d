@@ -7,7 +7,7 @@ import { kelvinToColor } from './lighting';
 import { registerLampLight, registerLampShade } from './lampRegistry';
 
 /** Light of one lamp at full brightness (candela-like, physically based lights). */
-const LAMP_INTENSITY = 3;
+const LAMP_INTENSITY = 6;
 
 /**
  * Procedural, primitive-based furniture models. All models are built in a local

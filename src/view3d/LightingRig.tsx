@@ -16,6 +16,8 @@ import { useUiStore } from '../store/uiStore';
 const BLEND_TAU = 0.05;
 const MAX_WINDOW_LIGHTS = 10;
 const MAX_ROOM_LIGHTS = 12;
+/** Automatic ceiling light of rooms without own lamps (when lamps are on). */
+const ROOM_LIGHT_INTENSITY = 5;
 
 interface Props {
   project: Project;
@@ -135,7 +137,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       });
       roomLights.forEach((_, i) => {
         const l = roomRefs.current[i];
-        if (l) l.intensity = 2.2 * lamps;
+        if (l) l.intensity = ROOM_LIGHT_INTENSITY * lamps;
       });
       const sky = skyRef.current;
       const uniforms = (sky?.material as THREE.ShaderMaterial | undefined)?.uniforms;

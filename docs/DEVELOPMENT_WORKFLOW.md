@@ -99,6 +99,7 @@ Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kon
 - Eine laufende Sitzung kann ihr **eigenes** Modell nicht selbst wechseln; das Modell wird beim Start festgelegt (bei dir: Modellauswahl bzw. `/model`, bei Routinen in deren Einstellungen).
 - Die Hauptsession **delegiert** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
 - **Routine:** Für einen Lauf mit höchstens einer Aufgabe reicht meist Sonnet. Du kannst das Modell der Routine unter https://claude.ai/code/routines einstellen; die Hauptsession ändert es nicht eigenmächtig.
+- Wechselt die Hauptsession für eine Aufgabe das Modell bzw. gibt sie an ein anderes Modell ab und ändert das die Arbeit (z. B. Opus-Sitzung nötig), sagt sie dir das kurz im Chat bzw. im Issue.
 - Scheitert eine Aufgabe mit dem kleineren Modell (Tests rot, Ursache unklar), wird sie mit Begründung im Issue an das nächsthöhere Modell bzw. eine von dir gestartete Opus-Sitzung übergeben.
 
 ## Geplante Durchläufe (Routine)

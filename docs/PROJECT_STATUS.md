@@ -84,7 +84,7 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
-- Vitest: ✅ 204/204 · Playwright: ✅ 25/25 vollständiger Lauf (Stand #7/#8); neue Tests für #5 und #23/#22 einzeln ✅ (Headless-Chromium, SwiftShader); CI des PR prüft die ganze Suite
+- Vitest: ✅ 205/205 · Playwright lokal: ✅ 28/28 vollständiger Lauf (Stand vor #39), #39- und Nachtlicht-Test einzeln ✅ (Headless-Chromium, SwiftShader); CI des PR prüft die ganze Suite
 
 ## Wartet auf deinen Test
 Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …`):
@@ -123,5 +123,5 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 Siehe [`IDEAS.md`](IDEAS.md) → `Ready` (Reihenfolge dort).
 
 ## Git
-- Branch `claude/quirky-faraday-0d9uep`; `main` = `a9cc64f` (PR #2 gemergt); Runde 5 wird per PR #3 integriert
-- Runde 5: `eb638f2` IKEA-Modellwahl · `b79c590` Artikelliste/Skript/Mehrdatei-Import · `97f7532` PAX-Planung · `37b14ad` Recherche · `624baee` Smart-Home-Doku · `0bd9806`/`0035663` Backlog · `c1648c6` Knopf-Fix
+- Branch `claude/quirky-faraday-0d9uep`; `main` = `438c13b` (PR #17 gemergt: Issue-Workflow + Kollisionssystem). Offener PR #32 mit Runde 6 (#5, #7, #8, #9, #22, #23, #39, Workflow-Regeln).
+- Frühere Runden: PR #1 (`5797457`), PR #2 (`a9cc64f`), PR #3 (IKEA/Smart-Home-Doku).
