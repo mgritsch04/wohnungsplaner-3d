@@ -3,15 +3,24 @@
 _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
 
 ## Aktuell
-- **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „IKEA/Möbelix-Integration und Smart-Home-Konzept“
-- **Erledigt in dieser Runde (5):** IKEA – echte Produktdaten und 3D-Modelle, Artikelliste → Produktliste mit Modellen, gespeicherte PAX-Planung → Raum + Korpusse; Möbelix weiterhin blockiert; Smart-Home-Konzept (`docs/smart-home/`); Ideen-Backlog (`docs/IDEAS.md`)
-- **Vorherige Runde (4):** Kollisionen in 3D, Mausempfindlichkeit, Klick vs. Ziehen, Wandfang, Tageszeit-Regler – **testest du selbst** (unverändert in dieser Runde)
-- **Nächster Schritt:** deine Antworten in [`smart-home/DECISIONS.md`](smart-home/DECISIONS.md), Test der IKEA-Wege; danach höchste `Ready`-Aufgabe in [`IDEAS.md`](IDEAS.md)
+- **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
+- **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
+- **Erledigt in Runde 6:** einheitliches Kollisionssystem (#4) → User-Test #16
+- **Nächster Schritt:** höchste `Ready`-Aufgabe in [`IDEAS.md`](IDEAS.md) (Nachtbeleuchtung #7)
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
 
 Prüfstufen: **Impl.** Code vorhanden · **Auto** automatischer Test/Build grün · **Manuell** von Claude in der laufenden App (Headless-Chromium, Software-Rendering) angesehen · **Nutzer** von dir bestätigt
+
+## Runde 6 (Workflow + Arbeitsauftrag A–I)
+
+Status je Aufgabe: implementiert · automatisiert getestet · User-Test offen (#) · vom Nutzer bestätigt · fehlgeschlagen · blockiert.
+
+| Aufgabe | Implementiert | Automatisiert getestet | Abnahme |
+|---|---|---|---|
+| Issue-Workflow, Labels, Vorlagen, Ideen-Erfassung | ✅ `DEVELOPMENT_WORKFLOW.md`, `IDEA_CAPTURE.md`, `.github/ISSUE_TEMPLATE/` | – | – |
+| A Kollisionssystem (#4): eine Regel für 2D/3D/Ziehen/Platzieren; Möbel-Überschneidung = Fehler (rot) und blockiert das Ziehen; erlaubt: Teppich/Vorhang, Stuhl unter Tisch/Schreibtisch, Kücheneinbauten; Tischlampe/Deko stellt sich beim Ziehen auf Tisch/Kommode; Warnung (orange) bei zu wenig Platz vor Schrank-/Schubladenfronten. Regeln: `src/model/placementRules.ts` | ✅ | ✅ Unit (Lampe im Sofa, Stuhl/Tisch/Teppich/Tischlampe ohne Konflikt, Stapeln, Ziehen stoppt am Sofa, Frontabstand, Küchenzeile) + E2E (3D-Marker Lampe/Sofa, 2D-Ziehen stoppt) | 🧪 User-Test offen #16 (nicht visuell von mir bewertet) |
 
 ## Diese Runde (Arbeitsauftrag 1–8)
 
@@ -62,19 +71,17 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 | Gamepad | PLANNED (wartet auf Freigabe) | Bewertung `CONTROLLER_ASSESSMENT.md` | – | – | – |
 | Küchenplaner, Budget, CSV | NEEDS USER TEST / DONE | ✅ | ✅ | ✅ | – |
 
-**Von dir bestätigt:** noch nichts.
+**Von dir bestätigt (Rückmeldung 2026-10-16):** Mausempfindlichkeit, Klick/Ziehen/Auswahl, Wandfang und Ecken, 2D/3D-Synchronisierung, manueller GLB-Download/-Import. **Nicht bestanden / Nachbesserung:** Kollisionen (#4 → #16), Nachtwirkung der Tageszeit (#7).
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
 - Vitest: ✅ 184/184 · Playwright: ✅ 22/22 (Headless-Chromium, SwiftShader; ein Namenskonflikt des neuen Import-Knopfs wurde dabei gefunden und behoben)
 
 ## Wartet auf deinen Test
-1. 3D: Möbel anklicken (bleibt ausgewählt, bewegt sich nicht) und ziehen (folgt der Maus, kein Sprung) – auch in der Schnittansicht.
-2. Sofa an die Eingangstür schieben: rote Markierung im Raum, Türblatt markiert, verschwindet beim Wegziehen.
-3. Möbel an Wände/Ecken ziehen: rastet ruhig ein, nicht an Türöffnungen, löst sich erst bei deutlichem Wegziehen.
-4. Tageszeit-Regler im Realismusmodus: folgt das Licht direkt?
-5. Mausempfindlichkeit (Projekt › Steuerung) beim Begehen und Drehen.
-6. IKEA: Artikelliste mit `node scripts/ikea-products.mjs … --models` abrufen und mit den GLB-Dateien importieren; eigene PAX-Planung als JSON speichern (DevTools) und unter Import übernehmen; eine Möbelix-Seite einfügen.
+Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …`):
+- #16 Kollisionen (Lampe/Sofa, Stuhl unter Tisch, Lampe auf Tisch, Platz vor Schranktüren)
+- #11 Projekt speichern / erneut öffnen
+- #12 IKEA: Artikelliste → Produktliste, PAX-Planung
 
 ## Blocker
 - **IKEA-Küchenplaner, Suche, Verfügbarkeit, Planer-Modelle:** von der Netzwerkrichtlinie der Umgebung gesperrt (`api.kitchen.planner.ikea.com`, `sik.search.blue.cdtapps.com`, `api.salesitem.ingka.com`, `content.dexf.ikea.com`).
@@ -84,13 +91,13 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 
 ## Bekannte Grenzen
 - **Allgemeiner Website-/Quelltext-Import (zurückgestellt, Aufgabe 8):** zuverlässig nur bei Seiten mit schema.org-Daten (JSON-LD/Microdata/Meta). Bei per JavaScript nachgeladenen Shops enthält der Quelltext oft keine Produktdaten; reiner Seitentext liefert nur Maße (heuristisch, kann Zusatzmaße wie Sitzhöhe verwechseln); mehrere Produkte auf einer Seite → das erste wird genommen; die App ruft Seiten nie selbst ab (CORS). Wird nach den Händler-/Planer-Themen überarbeitet.
-- Konfliktanzeige zeigt Überschneidungen von Möbeln untereinander nur als Hinweis (nicht im 3D-Raum), weil z. B. Stühle unter Tischen gewollt sind.
+- Kollision nutzt die Außenmaße (Quader) der Möbel – auch bei importierten Modellen; Hohlräume (z. B. unter einem Bett) werden nicht berücksichtigt.
 - Erkennung nur für achsparallele, gefüllte Wände.
 - 3D-Leistung auf echter GPU nicht gemessen (Cloud: Software-Rendering).
 - Speicherung browserlokal (Export als Projektpaket für andere Geräte).
 
 ## Als Nächstes (Vorschlag)
-Siehe [`IDEAS.md`](IDEAS.md) → `Ready`: 1. Smart Home P2 (simulierte Geräte im Planer) · 2. IKEA-Planung mit Stückliste anreichern · 3. allgemeinen Quelltext-Import überarbeiten.
+Siehe [`IDEAS.md`](IDEAS.md) → `Ready` (Reihenfolge dort).
 
 ## Git
 - Branch `claude/quirky-faraday-0d9uep`; `main` = `a9cc64f` (PR #2 gemergt); Runde 5 wird per PR #3 integriert
