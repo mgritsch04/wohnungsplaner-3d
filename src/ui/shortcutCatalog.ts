@@ -7,7 +7,7 @@ import type { Tool } from '../store/uiStore';
  */
 
 /** Tool keys in the 2D editor (used by the handler, too). */
-export const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure' };
+export const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure', l: 'walkpath' };
 
 const TOOL_LABEL: Partial<Record<Tool, string>> = {
   select: 'Auswählen / Verschieben',
@@ -17,6 +17,7 @@ const TOOL_LABEL: Partial<Record<Tool, string>> = {
   window: 'Fenster setzen',
   passage: 'Durchgang setzen',
   measure: 'Messen',
+  walkpath: 'Laufweg messen (Start und Ziel anklicken)',
 };
 
 export interface Shortcut {
