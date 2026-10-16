@@ -1738,9 +1738,10 @@ test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width
   // the 3D view shows floor markers too
   const markers3d = () =>
     page.evaluate(() => {
+      // the scene registers itself a moment after the canvas appears
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const scene = (window as any).__wp.three.scene;
-      return scene.getObjectByName('narrow-passages')?.children.length ?? -1;
+      const scene = (window as any).__wp.three?.scene;
+      return scene?.getObjectByName('narrow-passages')?.children.length ?? -1;
     });
   await expect.poll(markers3d).toBeGreaterThan(0);
 
