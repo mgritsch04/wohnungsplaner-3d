@@ -8,6 +8,7 @@ import type { SaveState } from '../persistence/useAutosave';
 import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPlanActions';
 import { exportShoppingCsv } from '../budget/budgetActions';
 import { openPrintView } from '../export/PrintView';
+import { exportGlbFile } from '../export/exportGlbFile';
 import { TimeOfDayControl } from './TimeOfDayControl';
 
 export function Toolbar({ saveState }: { saveState: SaveState }) {
@@ -86,6 +87,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               <button onClick={closeAfter(exportFloorPlanJson)}>Grundriss (apartment-plan.json)</button>
               <button onClick={closeAfter(exportShoppingCsv)}>Einkaufsliste (CSV)</button>
               <button onClick={closeAfter(openPrintView)}>Plan drucken / PDF / PNG…</button>
+              <button onClick={closeAfter(exportGlbFile)}>3D-Modell als GLB …</button>
             </div>
           )}
         </div>
