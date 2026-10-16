@@ -1265,3 +1265,141 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
   line-height: 1.4;
   resize: vertical;
 }
+
+/* ---------- print view / plan export (#71, #72) ---------- */
+.print-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: #d1d5db;
+  padding: 0 0 24px;
+}
+.print-controls {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.print-page {
+  margin: 0 auto;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: var(--shadow);
+  padding: 10mm;
+  width: 210mm;
+  min-height: 297mm;
+  font-size: 9pt;
+}
+.print-page.landscape {
+  width: 297mm;
+  min-height: 210mm;
+}
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8mm;
+  border-bottom: 0.3mm solid #111827;
+  padding-bottom: 2mm;
+  margin-bottom: 3mm;
+}
+.print-header h1 {
+  font-size: 15pt;
+  margin: 0;
+}
+.print-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+}
+.print-page.landscape .print-body {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.print-plan svg {
+  display: block;
+  margin: 0 auto;
+}
+.print-page.landscape .print-list {
+  width: 95mm;
+  flex: none;
+  margin-left: auto;
+}
+.print-list h2 {
+  font-size: 11pt;
+  margin: 0 0 1.5mm;
+}
+.print-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.print-list th,
+.print-list td {
+  text-align: left;
+  padding: 0.6mm 1.2mm;
+  border-bottom: 0.2mm solid #d1d5db;
+  vertical-align: top;
+}
+.print-list th {
+  border-bottom: 0.3mm solid #111827;
+}
+.print-list .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.print-list tfoot td {
+  font-weight: 700;
+  border-bottom: none;
+  border-top: 0.3mm solid #111827;
+}
+.print-page.dense {
+  font-size: 7.5pt;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+    background: none !important;
+  }
+  /* only the print view is printed – the whole app (toolbar, panels, 2D/3D) is hidden */
+  body:has(> .print-view) > :not(.print-view),
+  .print-controls {
+    display: none !important;
+  }
+  .print-view {
+    position: static;
+    overflow: visible;
+    padding: 0;
+  }
+  .print-view,
+  .print-view * {
+    background: none !important;
+    box-shadow: none !important;
+  }
+  .print-page,
+  .print-page.landscape {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .print-page,
+  .print-plan,
+  .print-list {
+    break-inside: avoid;
+  }
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
