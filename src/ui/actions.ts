@@ -11,6 +11,7 @@ import { buildPackage, parsePackageOrProject } from '../formats/project/packageF
 import { FileFormatError } from '../formats/zodErrors';
 import { db } from '../persistence/db';
 import { loadProject, saveProject } from '../persistence/projects';
+import { exportVersions, replaceVersions } from '../persistence/versions';
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import type { Furniture } from '../model/schema';
@@ -217,7 +218,7 @@ export async function openProject(id: string) {
 export async function exportPackage() {
   try {
     const p = store().project;
-    const { pkg, missing } = await buildPackage(p, db.getAsset);
+    const { pkg, missing } = await buildPackage(p, db.getAsset, await exportVersions(p.id));
     downloadBlob(JSON.stringify(pkg), `${safeFileName(p.name)}.wohnplan.json`);
     if (missing.length) ui().toast(`Achtung: ${missing.length} referenzierte Datei(en) fehlen lokal und sind nicht im Export enthalten.`, 'error');
     else ui().toast('Projekt exportiert (inkl. Grundriss-Bilder und Modelle)', 'success');
@@ -245,6 +246,7 @@ export async function importProjectFile() {
     await saveProject(store().project).catch(() => undefined);
     store().load(project);
     await saveProject(project);
+    if (parsed.versions.length) await replaceVersions(project.id, parsed.versions);
     ui().setSelection(null);
     ui().requestFit();
     ui().toast(parsed.warnings.length ? `Importiert mit Hinweisen: ${parsed.warnings.slice(0, 2).join('; ')}` : 'Projekt importiert', parsed.warnings.length ? 'info' : 'success');

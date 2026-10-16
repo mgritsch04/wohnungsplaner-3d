@@ -24,6 +24,16 @@ export interface ProjectPackage {
   exportedAt: string;
   project: Project;
   assets: Record<string, PackageAsset>;
+  /** Saved project states (#66); missing in older packages. */
+  versions?: PackageVersion[];
+}
+
+/** A saved project state inside a package: the full project document at that time. */
+export interface PackageVersion {
+  name: string;
+  createdAt: string;
+  auto: boolean;
+  project: Project;
 }
 
 /** All asset ids referenced by a project. */
@@ -52,10 +62,15 @@ export function base64ToBlob(b64: string, mimeType: string): Blob {
   return new Blob([bytes], { type: mimeType });
 }
 
-export async function buildPackage(p: Project, getAsset: (id: string) => Promise<Blob | undefined>): Promise<{ pkg: ProjectPackage; missing: string[] }> {
+export async function buildPackage(
+  p: Project,
+  getAsset: (id: string) => Promise<Blob | undefined>,
+  versions: PackageVersion[] = [],
+): Promise<{ pkg: ProjectPackage; missing: string[] }> {
   const assets: Record<string, PackageAsset> = {};
   const missing: string[] = [];
-  for (const id of referencedAssetIds(p)) {
+  // each asset once, also when several saved states reference it
+  for (const id of new Set([p, ...versions.map((v) => v.project)].flatMap(referencedAssetIds))) {
     const blob = await getAsset(id);
     if (!blob) {
       missing.push(id);
@@ -63,11 +78,12 @@ export async function buildPackage(p: Project, getAsset: (id: string) => Promise
     }
     assets[id] = { mimeType: blob.type || 'application/octet-stream', data: await blobToBase64(blob) };
   }
-  return { pkg: { format: PACKAGE_FORMAT, packageVersion: PACKAGE_VERSION, exportedAt: new Date().toISOString(), project: p, assets }, missing };
+  return { pkg: { format: PACKAGE_FORMAT, packageVersion: PACKAGE_VERSION, exportedAt: new Date().toISOString(), project: p, assets, versions }, missing };
 }
 
 export interface ParsedPackage extends ParsedProject {
   assets: Record<string, Blob>;
+  versions: PackageVersion[];
 }
 
 /** Accepts a package file OR a bare project file. */
@@ -93,8 +109,19 @@ export function parsePackageOrProject(text: string): ParsedPackage {
         warnings.push(`Asset ${id} konnte nicht gelesen werden.`);
       }
     }
-    for (const id of referencedAssetIds(parsed.project)) if (!assets[id]) warnings.push(`Asset ${id} fehlt im Paket (z. B. Grundriss-Bild).`);
-    return { ...parsed, warnings, assets };
+    const versions: PackageVersion[] = [];
+    for (const v of Array.isArray(pkg.versions) ? pkg.versions : []) {
+      const name = typeof v?.name === 'string' ? v.name : 'Stand';
+      try {
+        const createdAt = typeof v.createdAt === 'string' && !Number.isNaN(Date.parse(v.createdAt)) ? v.createdAt : (pkg.exportedAt ?? new Date().toISOString());
+        versions.push({ name, createdAt, auto: v.auto === true, project: parseProject(v.project).project });
+      } catch {
+        warnings.push(`Gespeicherter Stand „${name}“ ist ungültig und wurde übersprungen.`);
+      }
+    }
+    const allIds = new Set([parsed.project, ...versions.map((v) => v.project)].flatMap(referencedAssetIds));
+    for (const id of allIds) if (!assets[id]) warnings.push(`Asset ${id} fehlt im Paket (z. B. Grundriss-Bild).`);
+    return { ...parsed, warnings, assets, versions };
   }
-  return { ...parseProject(raw), assets: {} };
+  return { ...parseProject(raw), assets: {}, versions: [] };
 }
