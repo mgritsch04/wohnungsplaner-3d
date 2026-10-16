@@ -1,6 +1,7 @@
 import type { DerivedPlan } from '../model/derived';
 import type { Furniture } from '../model/schema';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
+import { clipFootprint } from '../model/geometry/walls';
 import { closestPointOnSegment, pointInPolygon, sub, type Vec2 } from '../model/vec';
 
 /** Heights relevant for walking: obstacles between STEP and HEAD block the player. */
@@ -12,7 +13,10 @@ export const PLAYER_RADIUS = 0.22;
 
 export type Collider = Vec2[];
 
-/** Convex obstacle polygons from wall pieces (respecting door openings) and solid furniture. */
+/**
+ * Convex obstacle polygons from wall pieces (respecting door openings), closed
+ * doors (#21: a closed leaf shuts its opening like the wall) and solid furniture.
+ */
 export function buildColliders(derived: DerivedPlan, furniture: Furniture[]): Collider[] {
   const out: Collider[] = [];
   for (const pieces of derived.pieces.values()) {
@@ -21,6 +25,16 @@ export function buildColliders(derived: DerivedPlan, furniture: Furniture[]): Co
     }
   }
   for (const h of derived.hubs) out.push(h.polygon);
+  for (const [wallId, list] of derived.openings) {
+    const fp = derived.footprints.get(wallId);
+    if (!fp) continue;
+    for (const r of list) {
+      const leaves = derived.leaves.get(r.opening.id) ?? [];
+      if (r.opening.open || !leaves.some((l) => l.z0 < HEAD_HEIGHT && l.z1 > STEP_HEIGHT)) continue;
+      const gap = clipFootprint(fp, r.s0, r.s1);
+      if (gap.length >= 3) out.push(gap);
+    }
+  }
   for (const f of furniture) {
     if (!f.solid) continue;
     if (f.elevation >= HEAD_HEIGHT || f.elevation + f.height <= STEP_HEIGHT) continue;
