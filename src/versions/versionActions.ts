@@ -4,6 +4,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { VersionLimitError, autoVersionName, contentHash, contentKey, restoreVersionContent } from './versions';
 import type { Project } from '../model/schema';
+import { startCompare, type CompareStand } from './compareStore';
 
 const store = () => useProjectStore.getState();
 const ui = () => useUiStore.getState();
@@ -91,6 +92,34 @@ export async function removeVersion(meta: VersionMeta): Promise<boolean> {
   } catch (e) {
     console.error('Stand löschen fehlgeschlagen', e);
     ui().toast(`Stand konnte nicht gelöscht werden: ${describe(e)}`, 'error');
+    return false;
+  }
+}
+
+/** One side of a 3D comparison: a saved state (id) or the current project (id null). */
+export interface CompareChoice {
+  id: string | null;
+  label: string;
+}
+
+/**
+ * Before/after comparison in 3D (#76): load both states and show them as a read-only
+ * preview. The project itself is not changed (no undo step, nothing saved).
+ */
+export async function compareVersionsIn3d(a: CompareChoice, b: CompareChoice): Promise<boolean> {
+  try {
+    const load = async (c: CompareChoice): Promise<CompareStand> => {
+      if (c.id === null) return { label: c.label, project: currentProject() };
+      const p = await loadVersion(c.id);
+      if (!p) throw new Error(`Stand „${c.label}“ wurde nicht gefunden.`);
+      return { label: c.label, project: p };
+    };
+    const [sa, sb] = await Promise.all([load(a), load(b)]);
+    startCompare(sa, sb);
+    return true;
+  } catch (e) {
+    console.error('Vergleich in 3D fehlgeschlagen', e);
+    ui().toast(`Vergleich nicht möglich: ${describe(e)}`, 'error');
     return false;
   }
 }

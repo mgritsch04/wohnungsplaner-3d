@@ -29,14 +29,34 @@ import { toggleOpening } from '../ui/actions';
 import { BookmarksMenu } from './BookmarksMenu';
 import { CameraBookmarkDriver } from './CameraBookmarkDriver';
 import { orbitFitSuppressed, registerOrbitRig } from './cameraBookmarks';
+import { useCompareStore, type CompareSide } from '../versions/compareStore';
+import type { FurnitureDiff } from '../versions/diff';
+import { CompareBar } from '../versions/CompareBar';
+import { CompareMarkers } from './CompareMarkers';
+
+/** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
+interface ComparePreview {
+  side: CompareSide;
+  diff: FurnitureDiff;
+}
+
+const noop = () => {};
+const NO_IDS: string[] = [];
 
 export function Scene3D() {
-  const project = useProjectStore((s) => s.project);
-  const cameraMode = useUiStore((s) => s.cameraMode);
-  const quality = project.settings.quality;
+  const storeProject = useProjectStore((s) => s.project);
+  // before/after comparison (#76): show a saved state instead of the project – read only,
+  // the project store is not touched; the camera (and its framing) stays the same for A and B
+  const session = useCompareStore((s) => s.session);
+  const showing = useCompareStore((s) => s.showing);
+  const project = session ? session[showing].project : storeProject;
+  const compare = useMemo<ComparePreview | null>(() => (session ? { side: showing, diff: session.diff } : null), [session, showing]);
+  const uiCameraMode = useUiStore((s) => s.cameraMode);
+  const cameraMode = session ? 'orbit' : uiCameraMode;
+  const quality = storeProject.settings.quality;
   const [locked, setLocked] = useState(false);
   const ducking = useUiStore((s) => s.walkDuck);
-  const carried = useUiStore((s) => (s.walkCarry ? project.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
+  const carried = useUiStore((s) => (s.walkCarry ? storeProject.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
   const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -69,14 +89,16 @@ export function Scene3D() {
           onPointerMissed={(e) => {
             const d = downAt.current;
             const moved = d ? Math.hypot(e.clientX - d.x, e.clientY - d.y) : 0;
-            if (e.button === 0 && cameraMode === 'orbit' && moved <= CLICK_THRESHOLD_PX) useUiStore.getState().setSelection(null);
+            if (e.button === 0 && cameraMode === 'orbit' && !compare && moved <= CLICK_THRESHOLD_PX) useUiStore.getState().setSelection(null);
           }}
         >
-          <SceneContent project={project} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
+          <SceneContent project={project} frame={storeProject} compare={compare} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
       {cameraMode === 'orbit' && <OrbitZoomSlider />}
-      <BookmarksMenu />
+      {/* saving a view changes the project – not offered while comparing (Alt+1 … 9 still jumps) */}
+      {!session && <BookmarksMenu />}
+      {session && <CompareBar />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && ducking && (
         <div className="walk-duck" data-testid="walk-duck">
@@ -100,22 +122,33 @@ export function Scene3D() {
 
 function SceneContent({
   project,
+  frame,
+  compare,
   quality,
   cameraMode,
   onLockChange,
   cutaway,
 }: {
+  /** The project shown (the store project, or a read-only state while comparing). */
   project: Project;
+  /** The project that frames the camera (always the store project, so A and B share one view). */
+  frame: Project;
+  /** Before/after comparison: read-only preview with markings. */
+  compare: ComparePreview | null;
   quality: QualityMode;
   cameraMode: 'orbit' | 'walk';
   onLockChange: (l: boolean) => void;
   cutaway: boolean;
 }) {
   const archKey = architectureKey(project);
+  const frameKey = architectureKey(frame);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const derived = useMemo(() => derivePlan(project), [archKey]);
-  const selection = useUiStore((s) => s.selection);
-  const multi = useUiStore((s) => s.multi);
+  const readOnly = compare !== null;
+  const uiSelection = useUiStore((s) => s.selection);
+  const uiMulti = useUiStore((s) => s.multi);
+  const selection = readOnly ? null : uiSelection;
+  const multi = readOnly ? NO_IDS : uiMulti;
   const setSelection = useUiStore((s) => s.setSelection);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
   const { gl, camera, scene } = useThree();
@@ -126,10 +159,10 @@ function SceneContent({
   }, [camera, gl, scene]);
 
   const bounds = useMemo(() => {
-    const pts = [...project.nodes, ...project.furniture.flatMap((f) => furnitureCorners(f))];
+    const pts = [...frame.nodes, ...frame.furniture.flatMap((f) => furnitureCorners(f))];
     return boundsOf(pts) ?? { minX: -3, minY: -3, maxX: 3, maxY: 3 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [archKey]);
+  }, [frameKey]);
   const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
 
   // section cut: clip everything above 1.2 m to look into rooms from above
@@ -200,9 +233,9 @@ function SceneContent({
         derived={derived}
         quality={quality}
         selectedId={selection?.id ?? null}
-        onSelect={onSelectArch}
+        onSelect={readOnly ? noop : onSelectArch}
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
-        onToggleOpening={cameraMode === 'orbit' ? onToggleOpening : undefined}
+        onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
       />
       {project.furniture.map((f) => (
@@ -216,8 +249,11 @@ function SceneContent({
           onDrag={onDrag}
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}
+          readOnly={readOnly}
         />
       ))}
+      {compare && <CompareMarkers diff={compare.diff} side={compare.side} />}
+      <FitOnCompareLayout comparing={readOnly} />
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
@@ -242,6 +278,29 @@ function SceneContent({
       )}
     </>
   );
+}
+
+/**
+ * The comparison (#76) is shown in the full workspace. Coming from (or going back to) the
+ * split view, the canvas changes its size: fit the apartment once the new size arrived.
+ * Switching between A and B never re-fits – both are seen from the same camera.
+ */
+function FitOnCompareLayout({ comparing }: { comparing: boolean }) {
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  const prev = useRef(comparing);
+  const pendingUntil = useRef(0);
+  useEffect(() => {
+    if (prev.current === comparing) return;
+    prev.current = comparing;
+    if (useUiStore.getState().viewMode === 'split') pendingUntil.current = performance.now() + 2000;
+  }, [comparing]);
+  useEffect(() => {
+    if (performance.now() > pendingUntil.current) return;
+    pendingUntil.current = 0;
+    usePerformanceStore.getState().resetCamera();
+  }, [width, height]);
+  return null;
 }
 
 /**

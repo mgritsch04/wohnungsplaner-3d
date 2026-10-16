@@ -1679,3 +1679,13 @@ code {
 .panel-issues > * + * {
   margin-top: var(--space-1);
 }
+
+/* ---------- Vorher-nachher-Vergleich (#76): gesperrte Bedienelemente ---------- */
+.compare-lock-contents {
+  display: contents;
+}
+.compare-locked,
+.compare-lock-contents.compare-locked > * {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}

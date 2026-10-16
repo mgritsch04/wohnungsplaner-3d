@@ -21,6 +21,7 @@ import { ProjectPanel } from './ui/panels/ProjectPanel';
 import { useCatalogStore } from './catalog/catalogStore';
 import { useImportStore } from './import/importStore';
 import { PrintViewHost } from './export/PrintView';
+import { useCompareStore } from './versions/compareStore';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -53,7 +54,11 @@ export default function App() {
     })();
   }, []);
 
-  const viewMode = useUiStore((s) => s.viewMode);
+  const uiViewMode = useUiStore((s) => s.viewMode);
+  // before/after comparison (#76): 3D only, everything that edits is inert until it ends
+  const comparing = useCompareStore((s) => s.session !== null);
+  const viewMode = comparing ? '3d' : uiViewMode;
+  const locked = comparing ? 'compare-locked' : undefined;
   const leftTab = useUiStore((s) => s.leftTab);
   const setLeftTab = useUiStore((s) => s.setLeftTab);
   const rightTab = useUiStore((s) => s.rightTab);
@@ -62,12 +67,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="app-header">
+      <div className={locked ? `app-header ${locked}` : 'app-header'} inert={comparing}>
         <Toolbar saveState={autosave.state} />
         {autosave.state === 'error' && autosave.error && <SaveErrorBanner reason={autosave.error} onRetry={autosave.retry} />}
       </div>
       <div className="main">
-        <aside className="panel left" aria-label="Werkzeuge und Katalog">
+        <aside className={`panel left ${locked ?? ''}`.trim()} aria-label="Werkzeuge und Katalog" inert={comparing}>
           <nav className="tabs">
             {(
               [
@@ -101,7 +106,7 @@ export default function App() {
             </div>
           )}
         </main>
-        <aside className="panel right" aria-label="Eigenschaften">
+        <aside className={`panel right ${locked ?? ''}`.trim()} aria-label="Eigenschaften" inert={comparing}>
           <nav className="tabs">
             {(
               [
@@ -120,7 +125,9 @@ export default function App() {
           {rightTab === 'project' && <ProjectPanel />}
         </aside>
       </div>
-      <StatusBar />
+      <div className={`compare-lock-contents ${locked ?? ''}`.trim()} inert={comparing}>
+        <StatusBar />
+      </div>
       <ModalHost />
       <PrintViewHost />
       <Toasts />

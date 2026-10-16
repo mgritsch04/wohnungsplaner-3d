@@ -2178,6 +2178,144 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   await expect(page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Eingang/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('before/after comparison in 3D: A | B with the same camera, moved/removed furniture marked, project unchanged (#76)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const openVersions = async () => {
+    await page.getByRole('button', { name: 'Projekt ▾' }).click();
+    await page.getByRole('button', { name: /^Versionen/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Versionen' });
+    await expect(dlg).toBeVisible();
+    return dlg;
+  };
+  let saved = 0;
+  const saveState = async (name: string) => {
+    const dlg = await openVersions();
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`); // list loaded
+    await dlg.getByLabel('Name des Stands').fill(name);
+    await dlg.getByRole('button', { name: 'Aktuellen Stand speichern' }).click();
+    saved++;
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`);
+    await expect(dlg.getByTestId('version-item').locator('strong').getByText(name, { exact: true })).toHaveCount(1);
+    await dlg.getByRole('button', { name: 'Schließen' }).click();
+  };
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const lamp = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-floor-lamp');
+
+  // state A, then move the coffee table and delete the floor lamp, state B
+  await saveState('A');
+  const start = await planToScreen(page, table.x, table.y);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 40, start.y + 10, { steps: 5 });
+  await page.mouse.move(start.x + 80, start.y + 20, { steps: 5 });
+  await page.mouse.up();
+  const tableX = async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id).x;
+  await expect.poll(tableX).toBeGreaterThan(table.x + 0.3);
+  const lampAt = await planToScreen(page, lamp.x, lamp.y);
+  await page.mouse.click(lampAt.x, lampAt.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe(lamp.id);
+  await page.keyboard.press('Delete');
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { id: string }) => f.id === lamp.id)).toBe(false);
+  // both changes are committed (no gesture left open) before state B is saved
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useProjectStore.getState().txBase === null)).toBe(true);
+  await saveState('B');
+
+  const before = await page.evaluate(() => {
+    const s = (window as any).__wp.useProjectStore.getState();
+    return { json: JSON.stringify(s.project), past: s.past.length, future: s.future.length, revision: s.revision };
+  });
+
+  // pick A and B, compare in 3D
+  const dlg = await openVersions();
+  await expect(dlg.getByTestId('version-item')).toHaveCount(2); // list loaded (the selects are filled from it)
+  const optionLabel = async (select: string, name: string) => (await dlg.getByLabel(select).locator('option').allInnerTexts()).find((t) => t.startsWith(`${name} (`))!;
+  await dlg.getByLabel('Stand A').selectOption({ label: await optionLabel('Stand A', 'A') });
+  await dlg.getByLabel('Stand B').selectOption({ label: await optionLabel('Stand B', 'B') });
+  await dlg.getByRole('button', { name: 'In 3D vergleichen' }).click();
+  await expect(dlg).toBeHidden();
+  const bar = page.getByTestId('compare-bar');
+  await expect(bar).toBeVisible();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-testid="editor2d"]')).toHaveCount(0); // 3D only while comparing
+  await expect(bar.getByTestId('compare-legend')).toHaveText('1 verschoben, 1 entfernt');
+  await expect(bar.getByText('Bearbeiten ist im Vergleich gesperrt')).toBeVisible();
+  await expect(bar.getByRole('button', { name: /^A/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(1500); // canvas resized, camera settled
+
+  type V = { x: number; y: number; z: number };
+  const camPos = (): Promise<V> =>
+    page.evaluate(() => {
+      const c = (window as any).__wp.three.camera.position;
+      return { x: c.x, y: c.y, z: c.z };
+    });
+  const sceneState = () =>
+    page.evaluate(
+      ({ tableId, lampId }) => {
+        const scene = (window as any).__wp.three.scene;
+        const furniture: Record<string, number> = {};
+        const marks: string[] = [];
+        scene.traverse((o: any) => {
+          if (o.userData?.compareMarker) marks.push(`${o.userData.compareMarker}:${o.userData.ghost ? 'ghost' : 'item'}:${o.userData.furnitureId}`);
+          else if (o.userData?.furnitureId) furniture[o.userData.furnitureId] = o.position.x;
+        });
+        return { tableX: furniture[tableId], hasLamp: lampId in furniture, marks: marks.sort() };
+      },
+      { tableId: table.id, lampId: lamp.id },
+    );
+  const dist = (a: V, b: V) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+  const camA = await camPos();
+  const sceneA = await sceneState();
+  expect(sceneA.hasLamp).toBe(true);
+  expect(sceneA.tableX).toBeCloseTo(table.x, 6);
+  expect(sceneA.marks).toEqual([`moved:item:${table.id}`, `removed:item:${lamp.id}`].sort());
+  await page.screenshot({ path: 'test-results/compare-a.png' });
+
+  // Space switches to B: other scene, same camera
+  await page.keyboard.press(' ');
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await sceneState()).hasLamp).toBe(false);
+  const sceneB = await sceneState();
+  expect(sceneB.tableX).toBeGreaterThan(table.x + 0.3);
+  expect(sceneB.marks).toEqual([`moved:item:${table.id}`, `removed:ghost:${lamp.id}`].sort());
+  expect(dist(await camPos(), camA)).toBeLessThan(1e-6);
+  await page.screenshot({ path: 'test-results/compare-b.png' });
+
+  // the buttons switch, too; the camera still does not move
+  await bar.getByRole('button', { name: /^A/ }).click();
+  await expect.poll(async () => (await sceneState()).hasLamp).toBe(true);
+  expect(dist(await camPos(), camA)).toBeLessThan(1e-6);
+  await page.keyboard.press(' '); // the focused A button must not "click" back
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(300);
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+
+  // editing is locked: Delete / Ctrl+Z change nothing, the toolbar is inert
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Control+z');
+  await expect(page.getByText('Im Vergleichsmodus ist Bearbeiten gesperrt', { exact: false })).toBeVisible();
+  await expect(page.locator('.app-header')).toHaveAttribute('inert', '');
+
+  // end: the project is exactly as before, no undo step was added
+  await bar.getByRole('button', { name: 'Vergleich beenden' }).click();
+  await expect(bar).toBeHidden();
+  await expect(page.locator('[data-testid="editor2d"]')).toBeVisible();
+  const after = await page.evaluate(() => {
+    const s = (window as any).__wp.useProjectStore.getState();
+    return { json: JSON.stringify(s.project), past: s.past.length, future: s.future.length, revision: s.revision };
+  });
+  expect(after).toEqual(before);
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('2d');
+  // Ctrl+Z works again afterwards (restores the deleted lamp)
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { id: string }) => f.id === lamp.id)).toBe(true);
+  expect(errors).toEqual([]);
+});
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 test('properties panel: groups collapse, keep their state across selections and work with the keyboard (#99)', async ({ page }) => {

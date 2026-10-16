@@ -20,11 +20,13 @@ interface Props {
   onDragEnd: () => void;
   /** Drag aborted by the browser: restore the position from before the drag. */
   onDragCancel: () => void;
+  /** Read-only preview (before/after comparison #76): no selection, dragging or hover. */
+  readOnly?: boolean;
 }
 
 /** One furniture object in 3D. Can be dragged on the floor plane. */
 export const FurnitureObject = memo(
-  function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd, onDragCancel }: Props) {
+  function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd, onDragCancel, readOnly = false }: Props) {
     const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean; sx: number; sy: number; onBlur: () => void } | null>(null);
     // never leave an open transaction behind if the item disappears mid-drag
     useEffect(
@@ -110,6 +112,29 @@ export const FurnitureObject = memo(
       e.stopPropagation();
     };
 
+    const body = (
+      <>
+        {item.model.type === 'gltf' ? (
+          <ModelErrorBoundary fallback={fallback}>
+            <Suspense fallback={fallback}>
+              <GltfModel item={item} fallback={fallback} castShadow={castShadow} />
+            </Suspense>
+          </ModelErrorBoundary>
+        ) : (
+          fallback
+        )}
+        {selected && <SelectionBox w={item.width} d={item.depth} h={item.height} />}
+      </>
+    );
+
+    if (readOnly) {
+      return (
+        <group position={[item.x, item.elevation, item.y]} rotation={[0, planRotationToWorldY(item.rotation), 0]} userData={{ furnitureId: item.id, preview: true }}>
+          {body}
+        </group>
+      );
+    }
+
     return (
       <group
         position={[item.x, item.elevation, item.y]}
@@ -131,20 +156,11 @@ export const FurnitureObject = memo(
           if (h?.type === 'furniture' && h.id === item.id) useUiStore.getState().setHover(null);
         }}
       >
-        {item.model.type === 'gltf' ? (
-          <ModelErrorBoundary fallback={fallback}>
-            <Suspense fallback={fallback}>
-              <GltfModel item={item} fallback={fallback} castShadow={castShadow} />
-            </Suspense>
-          </ModelErrorBoundary>
-        ) : (
-          fallback
-        )}
-        {selected && <SelectionBox w={item.width} d={item.depth} h={item.height} />}
+        {body}
       </group>
     );
   },
-  (a, b) => a.quality === b.quality && a.selected === b.selected && JSON.stringify(a.item) === JSON.stringify(b.item),
+  (a, b) => a.quality === b.quality && a.selected === b.selected && a.readOnly === b.readOnly && JSON.stringify(a.item) === JSON.stringify(b.item),
 );
 
 function SelectionBox({ w, d, h }: { w: number; d: number; h: number }) {
