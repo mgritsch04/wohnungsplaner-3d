@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import shortcutsSource from './useShortcuts.ts?raw';
 import walkSource from '../view3d/WalkControls.tsx?raw';
+import { ORBIT_MOVE_KEYS } from '../view3d/orbitKeys';
 import { SHORTCUT_GROUPS, TOOL_KEYS } from './shortcutCatalog';
 const listed = new Set(SHORTCUT_GROUPS.flatMap((g) => g.items.flatMap((i) => i.match)));
 
@@ -38,6 +39,14 @@ describe('keyboard overview (#59)', () => {
     for (const m of code.matchAll(/'((?:Key[A-Z])|(?:Arrow\w+)|(?:Shift(?:Left|Right)))'/g)) codes.add(m[1]);
     expect(codes.size).toBeGreaterThan(8);
     expect([...codes].filter((c) => !listed.has(c))).toEqual([]);
+  });
+
+  it('lists every key that moves the 3D overview camera (#132)', () => {
+    const group = SHORTCUT_GROUPS.find((g) => g.title === '3D-Übersicht: Kamera')!;
+    const codes = new Set(group.items.flatMap((i) => i.match));
+    expect(Object.keys(ORBIT_MOVE_KEYS).filter((c) => !codes.has(c))).toEqual([]);
+    expect(group.items.some((i) => /Mausrad/.test(i.keys))).toBe(true);
+    expect(group.items.some((i) => /mittlere Maustaste/.test(i.keys))).toBe(true);
   });
 
   it('shows every tool key once with a label', () => {

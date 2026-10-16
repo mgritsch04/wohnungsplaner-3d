@@ -7,6 +7,7 @@ import { BOOKMARK_KEYS, jumpToBookmarkIndex } from '../view3d/cameraBookmarks';
 import { useTapeStore } from '../view3d/tapeStore';
 import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, useCompareStore } from '../versions/compareStore';
 import { groupSelection, ungroupSelection } from './groupActions';
+import { orbitKeyMoves } from '../view3d/orbitKeys';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 
@@ -23,6 +24,10 @@ export function useShortcuts() {
       // walking keys (G = carry furniture #39, C = crouch #20, E/O = open the door/window in sight #21/#107)
       // belong to the walkthrough – there E does not rotate the selection
       if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'e', 'o'].includes(key) && !mod) return;
+      // W A S D / arrow keys move the 3D overview camera (#132) – handled in Scene3D, so W is not the wall tool there
+      const furnitureSelected = ui.selection?.type === 'furniture';
+      const comparing = useCompareStore.getState().session !== null;
+      if (!mod && !e.altKey && orbitKeyMoves(e.code, { viewMode: ui.viewMode, cameraMode: ui.cameraMode, furnitureSelected, comparing })) return;
       // Alt+1 … Alt+9: camera bookmarks (#55). Matched by e.code, so it works with every layout
       // (Option+digit types other characters on macOS); only while the 3D view is visible.
       const digit = /^Digit([1-9])$/.exec(e.code);

@@ -82,6 +82,21 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: '3D-Übersicht: Kamera',
+    where: '3D, Modus „Übersicht“ (in 2D + 3D: Maus über der 3D-Ansicht)',
+    items: [
+      { keys: 'Linke oder mittlere Maustaste + Ziehen', action: 'Ansicht um die Mitte drehen (Möbel bleiben stehen)', match: [] },
+      { keys: 'Rechte Maustaste (oder Umschalt + linke) + Ziehen', action: 'Ansicht verschieben', match: [] },
+      { keys: 'Mausrad', action: 'Zum Mauszeiger hin zoomen', match: [] },
+      {
+        keys: 'W A S D / Pfeiltasten',
+        action: 'Ansicht in der Ebene bewegen, Umschalt: schneller (Pfeiltasten verschieben stattdessen ein ausgewähltes Möbel)',
+        match: ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'],
+      },
+      { keys: 'Linke Maustaste auf Möbel + Ziehen', action: 'Möbel verschieben – die Ansicht dreht sich dabei nicht mit', match: [] },
+    ],
+  },
+  {
     title: '3D-Ansichten',
     where: '3D (Übersicht und Begehen)',
     items: [
