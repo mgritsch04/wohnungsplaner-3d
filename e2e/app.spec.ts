@@ -4,6 +4,7 @@ import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf
 import { boxGlb } from '../src/test/glbFixture';
 import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
 import { derivePlan } from '../src/model/derived';
+import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -2581,5 +2582,49 @@ test('3D tape measure in the walkthrough: crosshair clicks measure, the capture 
   await expect(page.getByTestId('tape-label')).toHaveCount(1);
   expect(Number(await page.getByTestId('tape-label').getAttribute('data-length'))).toBeGreaterThan(0.1);
   expect(await getSelection(page)).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('clearances (#125): short distance gets its label beside the line, the rotate handle stays free', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId: string }) => f.catalogId === 'generic-coffee-table');
+  // select the coffee table, then push it to 8 cm in front of the sofa (sofa back edge at y = 3.097)
+  const s = await planToScreen(page, table.x, table.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  await page.evaluate((id) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__wp.useProjectStore.getState().apply((d: { furniture: { id: string; y: number; depth: number }[] }) => {
+      const f = d.furniture.find((x) => x.id === id)!;
+      f.y = 3.097 - 0.08 - f.depth / 2;
+    });
+  }, table.id);
+  await page.keyboard.down('Alt');
+  const front = plan.locator('[data-testid="clearance"][data-side="front"]');
+  await expect(front).toHaveAttribute('data-distance-cm', '8');
+  await expect(front).toHaveAttribute('data-label', 'beside');
+  // the label does not cover the line: it sits next to it
+  const lineBox = (await front.locator('line').first().boundingBox())!;
+  const textBox = (await front.locator('text').boundingBox())!;
+  expect(textBox.x).toBeGreaterThanOrEqual(lineBox.x + lineBox.width - 1);
+
+  // the back line is moved off the rotate handle (≥ 10 px)
+  const back = plan.locator('[data-testid="clearance"][data-side="back"]');
+  await expect(back).toHaveAttribute('data-shifted', 'true');
+  const p = await getProject(page);
+  const item = p.furniture.find((f: { id: string }) => f.id === table.id);
+  const zoom = await page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { view2d: { zoom: number } } } } }).__wp.useUiStore.getState().view2d.zoom);
+  const h = rotateHandlePoint(item, 1 / zoom);
+  const hs = await planToScreen(page, h.x, h.y);
+  const bb = (await back.locator('line').first().boundingBox())!;
+  const lineX = bb.x + bb.width / 2;
+  expect(Math.abs(lineX - hs.x)).toBeGreaterThanOrEqual(10);
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

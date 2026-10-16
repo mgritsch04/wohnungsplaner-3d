@@ -30,7 +30,7 @@ import { footprintsOverlap, furnitureCorners } from '../editor2d/furnitureGeomet
 import type { DerivedPlan } from './derived';
 import { isTextile } from './placementRules';
 import type { Furniture, Project } from './schema';
-import type { Vec2 } from './vec';
+import { add, closestPointOnSegment, dist, normalize, perp, rotate, scale, sub, type Vec2 } from './vec';
 
 export type ClearanceSide = 'left' | 'right' | 'back' | 'front';
 
@@ -236,4 +236,53 @@ export function furnitureClearances(project: Project, derived: DerivedPlan, furn
 /** "42 cm" – label of a clearance, rounded to whole centimetres. */
 export function clearanceLabel(distance: number): string {
   return `${Math.round(distance * 100)} cm`;
+}
+
+/** Screen size of a clearance label (px): ~0.6 em per character at 11 px plus halo/padding. */
+export const labelWidthPx = (text: string) => text.length * 6.6 + 6;
+/** Distance (px) kept between a dimension line and the rotate handle. */
+const HANDLE_CLEAR_PX = 10;
+/** Parallel shift (px) of a line that would run through the rotate handle. */
+const HANDLE_SHIFT_PX = 14;
+
+export interface ClearanceLayout {
+  /** Drawn line (may be shifted sideways to keep the rotate handle free). */
+  a: Vec2;
+  b: Vec2;
+  /** Label anchor point and alignment. */
+  label: Vec2;
+  anchor: 'middle' | 'start';
+  /** True when the line is too short for the label: the label sits next to the line, not on it. */
+  beside: boolean;
+  shifted: boolean;
+}
+
+/**
+ * Where to draw a clearance (#125). `px` = metres per screen pixel. Short lines get
+ * their label beside the line (above a horizontal line, right of a vertical one), so the
+ * line stays visible. A line that would cross `avoid` (the rotate handle of the selected
+ * item) is shifted parallel, so the handle stays free to grab.
+ */
+export function layoutClearance(c: Pick<Clearance, 'from' | 'to' | 'distance'>, px: number, avoid?: Vec2 | null): ClearanceLayout {
+  let a = c.from;
+  let b = c.to;
+  const d = normalize(sub(b, a));
+  const n = perp(d);
+  let shifted = false;
+  if (avoid && closestPointOnSegment(avoid, a, b).distance < HANDLE_CLEAR_PX * px) {
+    a = add(a, scale(n, HANDLE_SHIFT_PX * px));
+    b = add(b, scale(n, HANDLE_SHIFT_PX * px));
+    shifted = true;
+  }
+  const mid = scale(add(a, b), 0.5);
+  const beside = dist(a, b) / px < labelWidthPx(clearanceLabel(c.distance)) + 10;
+  if (!beside) return { a, b, label: mid, anchor: 'middle', beside, shifted };
+  const horizontal = Math.abs(d.x) >= Math.abs(d.y);
+  const label = horizontal ? { x: mid.x, y: mid.y - 10 * px } : { x: mid.x + 7 * px, y: mid.y };
+  return { a, b, label, anchor: horizontal ? 'middle' : 'start', beside, shifted };
+}
+
+/** Rotate handle of a selected item in plan coordinates (drawn 22 px behind its back edge, see PlanDrawing). */
+export function rotateHandlePoint(f: Pick<Furniture, 'x' | 'y' | 'depth' | 'rotation'>, px: number): Vec2 {
+  return add({ x: f.x, y: f.y }, rotate({ x: 0, y: -f.depth / 2 - 22 * px }, f.rotation));
 }
