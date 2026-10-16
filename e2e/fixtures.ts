@@ -1,5 +1,6 @@
 import { deflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
+import { doorArc, renderSyntheticPlan } from '../src/import/recognition/syntheticPlans';
 
 /** Encode an 8-bit grayscale image as PNG (no external dependencies). */
 export function encodeGrayPng(width: number, height: number, pixel: (x: number, y: number) => number): Buffer {
@@ -134,4 +135,35 @@ export async function worldToScreen3d(page: Page, x: number, y: number, z: numbe
     },
     [x, y, z] as const,
   );
+}
+
+const C30 = Math.cos(Math.PI / 6);
+const S30 = Math.sin(Math.PI / 6);
+const on30 = (d: number) => ({ x: 5 + C30 * d, y: 1 + S30 * d });
+
+/**
+ * Geometry (metres, 100 px = 1 m, 20 cm walls) of a synthetic plan with a sloped wall:
+ * a 2 m × 4 m room on the left and a room whose upper right wall runs at 30° (3 m long),
+ * with a 90 cm door in the sloped wall and a 90 cm passage in the interior wall.
+ */
+export const slopedPlan = {
+  outline: [{ x: 1, y: 1 }, { x: 5, y: 1 }, on30(3), { x: 5 + 3 * C30, y: 5 }, { x: 1, y: 5 }],
+  interiorWall: [{ x: 3, y: 1 }, { x: 3, y: 5 }] as [{ x: number; y: number }, { x: number; y: number }],
+  slopedDoor: [on30(1), on30(1.9)] as [{ x: number; y: number }, { x: number; y: number }],
+  interiorDoor: [{ x: 3, y: 3 }, { x: 3, y: 3.9 }] as [{ x: number; y: number }, { x: number; y: number }],
+};
+
+/** The plan above as PNG, with the door arc of the sloped door drawn as a thin line. */
+export function slopedPlanPng(): Buffer {
+  const img = renderSyntheticPlan({
+    width: 900,
+    height: 600,
+    pxPerM: 100,
+    thickness: 0.2,
+    outline: slopedPlan.outline,
+    walls: [slopedPlan.interiorWall],
+    gaps: [slopedPlan.slopedDoor, slopedPlan.interiorDoor],
+    thinLines: [doorArc(on30(1), 0.9, Math.PI / 6, Math.PI / 6 + Math.PI / 2)],
+  });
+  return encodeGrayPng(img.width, img.height, (x, y) => img.gray[y * img.width + x]);
 }
