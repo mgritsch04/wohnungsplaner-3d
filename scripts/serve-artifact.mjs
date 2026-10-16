@@ -2,6 +2,7 @@
 // Unterpfad aus (Standard /foo/bar/), damit relative Pfade wirklich geprüft werden.
 // Unter /__host liefert er eine Hülle, die das Artefakt in einem iframe einbettet
 // (wie bei einem Claude-Artefakt; über 127.0.0.1 aufgerufen ist das iframe cross-origin).
+// index.html kommt wie bei claude.ai in die Seitenhülle eingepackt (?raw liefert sie ohne).
 //
 //   node scripts/serve-artifact.mjs [--port 4190] [--prefix /foo/bar/] [--dir dist-artifact]
 import { createServer } from 'node:http';
@@ -29,6 +30,16 @@ const TYPES = {
   '.glb': 'model/gltf-binary',
 };
 
+// Seitenhülle, in die claude.ai die veröffentlichte Seite beim Veröffentlichen einpackt
+// (so liefert der Artefakt-Dienst die Seite aus, abgelesen am veröffentlichten Artefakt):
+// das ganze index.html landet im <body> dieser Hülle. Wichtig: body{color:#000;background:#fff}
+// – die App muss Text- und Hintergrundfarbe deshalb selbst auf <body> setzen.
+const HOST_SKELETON_HEAD =
+  '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">' +
+  '<style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}' +
+  'img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>\n';
+const HOST_SKELETON_TAIL = '\n</body></html>\n';
+
 const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 createServer(async (req, res) => {
@@ -55,7 +66,10 @@ createServer(async (req, res) => {
   }
   try {
     if (!(await stat(file)).isFile()) throw new Error('no file');
-    const body = await readFile(file);
+    let body = await readFile(file);
+    if (rel === 'index.html' && !url.searchParams.has('raw')) {
+      body = Buffer.concat([Buffer.from(HOST_SKELETON_HEAD), body, Buffer.from(HOST_SKELETON_TAIL)]);
+    }
     res.writeHead(200, {
       'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
       'cache-control': 'no-store',

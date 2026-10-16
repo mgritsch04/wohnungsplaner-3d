@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
+import { cadFilledPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
@@ -600,6 +600,42 @@ test('imports page 2 of a vector PDF, applies the stated scale and recognises wa
   const draft = await page.evaluate(() => (window as unknown as { __wp: { useImportStore: { getState: () => { draft: { walls: { thickness: number }[] } } } } }).__wp.useImportStore.getState().draft);
   expect(draft.walls).toHaveLength(4);
   for (const w of draft.walls) expect(w.thickness).toBeCloseTo(0.2, 1);
+  expect(errors).toEqual([]);
+});
+
+test('CAD plan with solid dark walls, coloured rooms (as strips) and a tile hatch: real walls only, rooms named from the labels (#114)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'grundriss-a3.pdf', mimeType: 'application/pdf', buffer: cadFilledPlanPdf() });
+  await expect(page.getByRole('button', { name: 'Aus Angabe übernehmen' })).toBeVisible({ timeout: 15000 });
+  await page.locator('.field-row.compact input').fill('75');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const draft = await page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
+  expect(draft.source).toBe('pdf-vector');
+  // 4 outer walls (30 cm) + 3 inner walls (12 cm); no phantom walls from strips or tiles
+  expect(draft.walls).toHaveLength(7);
+  const thick = draft.walls.map((w: { thickness: number }) => w.thickness).sort();
+  expect(thick.filter((t: number) => Math.abs(t - 0.12) < 0.02)).toHaveLength(3);
+  expect(thick.filter((t: number) => Math.abs(t - 0.3) < 0.02)).toHaveLength(4);
+  // entrance + three inner doors are gaps
+  expect(draft.openings.length).toBeGreaterThanOrEqual(4);
+  const rooms = draft.rooms.map((r: { name: string; statedArea?: number }) => [r.name, r.statedArea]).sort();
+  expect(rooms).toEqual([['Bad', 6], ['Kueche', 6], ['Schlafen', 14], ['Wohnen', 32.5]]);
   expect(errors).toEqual([]);
 });
 
@@ -1209,6 +1245,65 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
   expect((await getProject(page)).settings.mouseSensitivity).toBe(1.5);
   await page.getByRole('button', { name: 'Standard' }).click();
   expect((await getProject(page)).settings.mouseSensitivity).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('walk look: a single huge pointer-lock delta does not flip the view; editing while walking keeps the view (#142)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  // start the walk in the second room, so a reset to the default start would be visible
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    wp.useUiStore.getState().setSelection({ type: 'room', id: wp.useProjectStore.getState().project.rooms[1].id });
+  });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await page.waitForTimeout(800);
+  const camYaw = () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    page.evaluate(() => (window as any).__wp.three.camera.rotation.y as number);
+  await page.evaluate(() => {
+    const canvas = document.querySelector('[data-testid="scene3d"] canvas');
+    Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
+  });
+  const y0 = await camYaw();
+  // slow look to the left with one spurious 1400 px event in between (≈ 175° at the default speed)
+  await page.evaluate(() => {
+    for (const dx of [4, 5, 4, 1400, 5, 4, 4]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
+  });
+  await page.waitForTimeout(300);
+  const turned = Math.abs((await camYaw()) - y0);
+  expect(turned).toBeCloseTo(26 * 0.0022, 3); // only the small moves count
+  // a real fast move (several large events in a row) still turns the view
+  await page.evaluate(() => {
+    for (const dx of [250, 260, 270]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
+  });
+  await page.waitForTimeout(300);
+  expect(Math.abs((await camYaw()) - y0)).toBeGreaterThan(turned + 500 * 0.0022);
+
+  // a change to the plan while walking (here: selection cleared, a door opened) keeps position and view direction
+  const pose = () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    page.evaluate(() => { const c = (window as any).__wp.three.camera; return { x: c.position.x, z: c.position.z, yaw: c.rotation.y }; });
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('KeyW');
+  const before = await pose();
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    wp.useUiStore.getState().setSelection(null);
+    const st = wp.useProjectStore.getState();
+    const door = st.project.openings.find((o: { kind: string }) => o.kind === 'door');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    st.apply((d: any) => { const o = d.openings.find((x: { id: string }) => x.id === door.id); o.open = !o.open; });
+  });
+  await page.waitForTimeout(400);
+  const after = await pose();
+  expect(after.yaw).toBeCloseTo(before.yaw, 3);
+  expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeLessThan(0.01);
+  await page.evaluate(() => delete (document as unknown as Record<string, unknown>).pointerLockElement);
   expect(errors).toEqual([]);
 });
 
@@ -3423,3 +3518,45 @@ test('3D overview navigation (#132): keys move the view, middle button turns it,
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test.describe('Handy-Ansicht (#129)', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('Plan/3D füllen den Bildschirm, Panels öffnen sich als Blatt über die untere Leiste', async ({ page }) => {
+    const errors = collectErrors(page);
+    await freshStart(page);
+    // starts in 3D, side panels and status bar are hidden
+    await expect(page.locator('.app.phone')).toBeVisible();
+    await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.panel.left')).toBeHidden();
+    await expect(page.locator('.panel.right')).toBeHidden();
+    await expect(page.locator('.statusbar')).toHaveCount(0);
+    const ws = await page.locator('.workspace').boundingBox();
+    expect(ws!.height).toBeGreaterThan(844 * 0.6);
+    // the toolbar does not take more than a sliver of the screen
+    const tb = await page.locator('.toolbar').boundingBox();
+    expect(tb!.height).toBeLessThan(130);
+
+    const bar = page.getByRole('navigation', { name: 'Panels' });
+    await bar.getByRole('button', { name: 'Werkzeuge' }).click();
+    await expect(page.locator('.panel.left')).toBeVisible();
+    await expect(page.locator('.panel.left').getByRole('button', { name: 'Raum anlegen' })).toBeVisible();
+    await bar.getByRole('button', { name: 'Details' }).click();
+    await expect(page.locator('.panel.left')).toBeHidden();
+    await expect(page.locator('.panel.right').getByRole('button', { name: /Wohnzimmer – 20,00 m²/ })).toBeVisible();
+    await bar.getByRole('button', { name: 'Panel schließen' }).click();
+    await expect(page.locator('.panel.right')).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test('ein normales PC-Fenster bleibt unverändert', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await freshStart(page);
+    await expect(page.locator('.app.phone')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Panels' })).toHaveCount(0);
+    await expect(page.locator('.panel.left')).toBeVisible();
+    await expect(page.locator('.statusbar')).toBeVisible();
+    await expect(page.getByRole('button', { name: '2D + 3D' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});

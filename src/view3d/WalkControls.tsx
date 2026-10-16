@@ -13,6 +13,7 @@ import type { Vec2 } from '../model/vec';
 import { toggleOpening } from '../ui/actions';
 import { registerWalkRig } from './cameraBookmarks';
 import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
+import { createLookFilter } from './lookFilter';
 
 interface Props {
   derived: DerivedPlan;
@@ -198,15 +199,27 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     };
     const onKeyUp = (e: KeyboardEvent) => keys.current.delete(e.code);
-    const clear = () => keys.current.clear();
+    const clear = () => {
+      keys.current.clear();
+      dragLook.current = null;
+    };
     const look = (dx: number, dy: number) => {
       const k = sensitivityRef.current;
       yaw.current -= dx * k;
       pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - dy * k));
     };
+    // drops the occasional huge pointer-lock delta that turned the view by ~180° (#142)
+    const lookFilter = createLookFilter();
     const onMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === el) look(e.movementX, e.movementY);
-      else if (dragLook.current) {
+      if (document.pointerLockElement === el) {
+        const d = lookFilter.next(e.movementX, e.movementY);
+        if (d) look(d[0], d[1]);
+      } else if (dragLook.current) {
+        // the button was released outside the window: stop instead of jumping on return
+        if (e.buttons === 0) {
+          dragLook.current = null;
+          return;
+        }
         look(e.clientX - dragLook.current.x, e.clientY - dragLook.current.y);
         dragLook.current = { x: e.clientX, y: e.clientY };
       }
@@ -229,6 +242,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     };
     const onUp = () => (dragLook.current = null);
     const onLock = () => {
+      if (document.pointerLockElement === el) lookFilter.reset();
       onLockChange(document.pointerLockElement === el);
       if (document.pointerLockElement !== el) keys.current.clear();
     };
