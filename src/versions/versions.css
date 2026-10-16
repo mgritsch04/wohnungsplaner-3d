@@ -1,14 +1,14 @@
 /* Versionen-Dialog (#66, #58) */
 .versions-save {
   display: flex;
-  gap: 8px;
+  gap: var(--space-3);
 }
 .versions-save input {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--control-radius);
 }
 .versions-list {
   max-height: 260px;
@@ -16,71 +16,71 @@
 }
 .version-badge {
   display: inline-block;
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 500;
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 .versions-compare {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+  gap: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
 }
 .versions-pick {
   display: flex;
-  gap: 12px;
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 .versions-pick label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-  color: var(--muted);
+  gap: var(--space-0);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
   flex: 1;
   min-width: 200px;
 }
 .versions-pick select {
-  padding: 5px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fff;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--control-radius);
+  background: var(--color-surface);
 }
 .versions-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 .versions-table th,
 .versions-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
   text-align: right;
   white-space: nowrap;
 }
 .versions-table th[scope='row'] {
   text-align: left;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 .versions-table thead th {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   white-space: normal;
 }
 .versions-table tr.sub th[scope='row'] {
-  padding-left: 20px;
+  padding-left: var(--space-7);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .versions-table tr.room-head th {
   text-align: left;
-  font-weight: 600;
-  padding-top: 8px;
+  font-weight: var(--font-weight-semibold);
+  padding-top: var(--space-3);
 }
 .versions-table td.diff {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }

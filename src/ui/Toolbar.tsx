@@ -38,8 +38,8 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
     <header className="toolbar">
       <div className="toolbar-group brand">
         <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden>
-          <rect width="32" height="32" rx="6" fill="#2563eb" />
-          <path d="M6 26V12l10-7 10 7v14H19v-8h-6v8z" fill="#fff" />
+          <rect width="32" height="32" rx="6" style={{ fill: 'var(--color-accent)' }} />
+          <path d="M6 26V12l10-7 10 7v14H19v-8h-6v8z" style={{ fill: 'var(--color-on-accent)' }} />
         </svg>
         <input
           className="project-name"
