@@ -150,10 +150,16 @@ test('läuft in einem iframe mit fremder Origin (wie ein Artefakt) inkl. Speiche
   const frame = page.frameLocator('#artifact');
   await expect(frame.locator('[data-testid="editor2d"] svg')).toBeVisible({ timeout: 20000 });
   const name = frame.locator('input.project-name');
+  const saved = frame.locator('.save-state.save-saved');
+  // the editor shows before the last project is restored and autosave is on – an edit made that
+  // early would be replaced by the restore, so wait until the app is ready
+  await expect(frame.locator('.app[data-ready="true"]')).toHaveCount(1, { timeout: 20000 });
   await name.fill('Im iframe gespeichert');
   await name.blur();
-  await expect(frame.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
-  await page.waitForTimeout(1200);
+  // "Gespeichert" is already shown before the edit – wait for it to leave and come back
+  await expect(saved).toHaveCount(0, { timeout: 5000 });
+  await expect(saved).toHaveCount(1, { timeout: 10000 });
+  await expect(name).toHaveValue('Im iframe gespeichert');
   await page.reload();
   await expect(frame.locator('input.project-name')).toHaveValue('Im iframe gespeichert');
   await frame.getByRole('button', { name: '3D', exact: true }).click();
@@ -201,4 +207,32 @@ test('startet auch, wenn IndexedDB ganz fehlt', async ({ page }) => {
   page.on('pageerror', (e) => pageErrors.push(e.message));
   await page.goto(APP);
   await expectStartsWithoutStorage(page, page, pageErrors);
+});
+
+// claude.ai packt die Seite in eine Hülle mit body{color:#000;background:#fff} (#129) –
+// der Testserver liefert index.html genauso eingepackt aus.
+test('Text bleibt in der claude.ai-Seitenhülle im Dunkelmodus hell (lesbar)', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'dark' });
+  const page = await context.newPage();
+  await freshStart(page);
+  const colors = await page.evaluate(() => {
+    const label = document.querySelector('.panel.left .tabs button:not(.active)') as HTMLElement;
+    return { body: getComputedStyle(document.body).color, bg: getComputedStyle(document.body).backgroundColor, label: getComputedStyle(label).color };
+  });
+  expect(colors.body).toBe('rgb(229, 233, 239)');
+  expect(colors.bg).toBe('rgb(15, 19, 24)');
+  expect(colors.label).not.toBe('rgb(0, 0, 0)');
+  await context.close();
+});
+
+test('Handy-Ansicht im Artefakt: 3D füllt den Bildschirm, Panels über die untere Leiste', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await freshStart(page);
+  await expect(page.locator('.app.phone')).toBeVisible();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('.panel.left')).toBeHidden();
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Werkzeuge' }).click();
+  await expect(page.locator('.panel.left')).toBeVisible();
+  await context.close();
 });
