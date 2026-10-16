@@ -1,3 +1,4 @@
+import { pickIkeaModel } from './ikeaModels';
 import type { ProductProviderInfo } from './types';
 
 /**
@@ -18,6 +19,9 @@ export const IKEA_AT: ProductProviderInfo = {
     const d = m[2];
     return `${m[1] ? 'S' : ''}${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
   },
+  pickModel: pickIkeaModel,
+  modelFetchNote:
+    'IKEA liefert die 3D-Dateien nur an Seiten von ikea.com aus (Browser-Sicherheit/CORS – geprüft 2026-10-16: andere Herkunft → HTTP 403). Das ist eine bewusste Sperre und wird nicht umgangen.',
   licenseNote: 'Produktbilder und 3D-Modelle sind urheberrechtlich geschützt; nur verlinken bzw. für den privaten Gebrauch nutzen, nicht weiterverbreiten.',
 };
 

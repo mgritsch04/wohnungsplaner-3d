@@ -194,7 +194,7 @@ describe('IKEA Austria product page structure (verified 2026-10-16)', () => {
     expect(r.price).toEqual({ amount: 99, currency: 'EUR', status: 'source' });
     expect(r.quality).toBe('complete-from-source');
     expect(r.modelCandidates).toEqual([M1, M2]);
-    expect(r.modelUrl).toBe(M1);
+    expect(r.modelUrl).toBe(M1); // only iqp3 variants listed: Draco first
     expect(r.sources).toContain('3D-Modell (schema.org 3DModel, 2 Varianten)');
   });
 

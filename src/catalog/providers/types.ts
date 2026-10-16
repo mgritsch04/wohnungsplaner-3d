@@ -54,5 +54,9 @@ export interface ProductProviderInfo {
   liveLookupNote: string;
   /** Extract the article number from a product URL, if the URL format allows it. */
   articleNumberFromUrl?: (url: URL) => string | null;
+  /** Choose one of the 3D models a page declares (default: the first). */
+  pickModel?: (candidates: string[]) => string | null;
+  /** Retailer-specific explanation when a model cannot be fetched from the app. */
+  modelFetchNote?: string;
   licenseNote: string;
 }
