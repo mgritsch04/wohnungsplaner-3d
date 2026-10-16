@@ -8,6 +8,7 @@ import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
 import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import { useWalkPose } from '../store/walkPoseStore';
 import type { Vec2 } from '../model/vec';
 import { toggleOpening } from '../ui/actions';
 
@@ -38,6 +39,10 @@ const PICK_RANGE = 6;
 const CARRY_MIN = 1.1;
 const CARRY_MAX = 4;
 const CENTER = new THREE.Vector2(0, 0);
+/** Crouching (C held, #20): eye height factor, minimum eye height (m), walking speed factor. */
+const DUCK_FACTOR = 0.6;
+const DUCK_MIN_EYE = 0.8;
+const DUCK_SPEED = 0.5;
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
 function furnitureIdOf(o: THREE.Object3D | null): string | null {
@@ -73,6 +78,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   }, [sensitivity]);
   // eye height changes apply immediately, without restarting the walk (pointer lock stays)
   const eyeRef = useRef(eyeHeight);
+  const eyeNow = useRef<number | null>(null);
   useEffect(() => {
     eyeRef.current = eyeHeight;
   }, [eyeHeight]);
@@ -233,6 +239,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       pressed.clear();
       endCarry();
       walkApi.current = null;
+      useWalkPose.getState().setPose(null);
+      useUiStore.getState().setWalkDuck(false);
     };
   }, [gl, onLockChange, camera, scene, raycaster]);
 
@@ -266,7 +274,14 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
-    camera.position.y = eyeRef.current;
+    // crouch while C is held: lower the eyes smoothly (frame-rate independent)
+    const ducking = keys.current.has('KeyC');
+    if (ducking !== useUiStore.getState().walkDuck) useUiStore.getState().setWalkDuck(ducking);
+    const goalEye = ducking ? Math.max(DUCK_MIN_EYE, eyeRef.current * DUCK_FACTOR) : eyeRef.current;
+    eyeNow.current = eyeNow.current === null ? goalEye : eyeNow.current + (goalEye - eyeNow.current) * (1 - Math.exp(-dt / 0.08));
+    if (Math.abs(eyeNow.current - goalEye) < 0.001) eyeNow.current = goalEye;
+    camera.position.y = eyeNow.current;
+    useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
       // carried item: on the floor (or its surface height) where the gaze meets it, 1.1–4 m ahead
@@ -292,7 +307,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     forward.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     right.set(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
     const len = Math.hypot(fx, fz);
-    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * dt) / len;
+    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * (ducking ? DUCK_SPEED : 1) * dt) / len;
     // sub-steps prevent tunnelling through thin walls at high speed
     const steps = Math.max(1, Math.ceil(v / 0.05));
     let p = { x: camera.position.x, y: camera.position.z };
@@ -303,7 +318,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       };
       p = resolveCollisions(p, collidersRef.current);
     }
-    camera.position.set(p.x, eyeRef.current, p.y);
+    camera.position.set(p.x, eyeNow.current, p.y);
   });
 
   return null;

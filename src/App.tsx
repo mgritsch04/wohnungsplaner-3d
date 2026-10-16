@@ -6,6 +6,7 @@ import { Toolbar } from './ui/Toolbar';
 import { StatusBar } from './ui/StatusBar';
 import { ModalHost, Toasts } from './ui/Modals';
 import { FurnitureHoverCard } from './ui/FurnitureHoverCard';
+import { SaveErrorBanner } from './ui/SaveErrorBanner';
 import { useShortcuts } from './ui/useShortcuts';
 import { useAutosave } from './persistence/useAutosave';
 import { lastProjectId, loadProject, saveProject } from './persistence/projects';
@@ -25,7 +26,7 @@ const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.
 export default function App() {
   const [ready, setReady] = useState(false);
   useShortcuts();
-  const saveState = useAutosave(ready);
+  const autosave = useAutosave(ready);
 
   // restore the last project (or keep the sample project on first launch)
   useEffect(() => {
@@ -58,7 +59,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar saveState={saveState} />
+      <div className="app-header">
+        <Toolbar saveState={autosave.state} />
+        {autosave.state === 'error' && autosave.error && <SaveErrorBanner reason={autosave.error} onRetry={autosave.retry} />}
+      </div>
       <div className="main">
         <aside className="panel left" aria-label="Werkzeuge und Katalog">
           <nav className="tabs">

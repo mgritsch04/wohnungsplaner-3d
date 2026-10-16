@@ -35,6 +35,8 @@ export interface Toast {
 
 interface UiStore {
   selection: Selection | null;
+  /** Further selected furniture besides `selection` (multi-select, Shift+click / box). */
+  multi: string[];
   hover: Selection | null;
   tool: Tool;
   viewMode: ViewMode;
@@ -54,8 +56,14 @@ interface UiStore {
   timePreview: number | null;
   /** Furniture currently carried in the first-person walkthrough (#39). */
   walkCarry: string | null;
+  /** Crouching in the walkthrough (#20). */
+  walkDuck: boolean;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
+  /** Shift+click: add/remove a furniture item to/from the selection. */
+  toggleFurnitureSelection: (id: string) => void;
+  /** Select exactly these furniture items (first = primary). */
+  selectFurniture: (ids: string[]) => void;
   setHover: (s: Selection | null) => void;
   setTool: (t: Tool) => void;
   setViewMode: (v: ViewMode) => void;
@@ -70,6 +78,7 @@ interface UiStore {
   setFps: (fps: number | null) => void;
   setTimePreview: (hour: number | null) => void;
   setWalkCarry: (id: string | null) => void;
+  setWalkDuck: (duck: boolean) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -78,6 +87,7 @@ let toastId = 1;
 
 export const useUiStore = create<UiStore>((set, get) => ({
   selection: null,
+  multi: [],
   hover: null,
   tool: 'select',
   viewMode: 'split',
@@ -91,8 +101,23 @@ export const useUiStore = create<UiStore>((set, get) => ({
   fps: null,
   timePreview: null,
   walkCarry: null,
+  walkDuck: false,
   toasts: [],
-  setSelection: (selection) => set({ selection, rightTab: selection ? 'properties' : get().rightTab }),
+  setSelection: (selection) => set({ selection, multi: [], rightTab: selection ? 'properties' : get().rightTab }),
+  toggleFurnitureSelection: (id) => {
+    const { selection, multi } = get();
+    if (selection?.type !== 'furniture') return set({ selection: { type: 'furniture', id }, multi: [], rightTab: 'properties' });
+    if (selection.id === id) {
+      // removing the primary item: the next one becomes primary
+      const [next, ...rest] = multi;
+      return set({ selection: next ? { type: 'furniture', id: next } : null, multi: rest });
+    }
+    set({ multi: multi.includes(id) ? multi.filter((x) => x !== id) : [...multi, id] });
+  },
+  selectFurniture: (ids) => {
+    const [first, ...rest] = ids;
+    set({ selection: first ? { type: 'furniture', id: first } : null, multi: rest, rightTab: first ? 'properties' : get().rightTab });
+  },
   setHover: (hover) => {
     const h = get().hover;
     if (h?.id === hover?.id && h?.type === hover?.type) return;
@@ -111,6 +136,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   setFps: (fps) => set({ fps }),
   setTimePreview: (timePreview) => set({ timePreview }),
   setWalkCarry: (walkCarry) => set({ walkCarry }),
+  setWalkDuck: (walkDuck) => set({ walkDuck }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });
@@ -118,3 +144,9 @@ export const useUiStore = create<UiStore>((set, get) => ({
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 }));
+
+/** All selected furniture ids (primary first). */
+export function selectedFurnitureIds(s: Pick<UiStore, 'selection' | 'multi'>): string[] {
+  return s.selection?.type === 'furniture' ? [s.selection.id, ...s.multi] : [];
+}
+

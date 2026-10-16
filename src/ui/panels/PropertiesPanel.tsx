@@ -385,6 +385,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
 
 function FurnitureProps({ id, project }: { id: string; project: Project }) {
   const apply = useApply();
+  const more = useUiStore((s) => s.multi.length);
   const f = project.furniture.find((x) => x.id === id);
   if (!f) return <Gone />;
   const upd = (fn: (x: Furniture) => void) =>
@@ -395,6 +396,11 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
   const issues = placementIssues(project, derivePlan(project), f);
   return (
     <div className="panel-scroll">
+      {more > 0 && (
+        <p className="multi-note" data-testid="multi-note">
+          <strong>{more + 1} Möbel ausgewählt.</strong> Ziehen verschiebt alle, Pfeiltasten/Entf/Strg+D/Strg+C wirken auf alle. Die Felder unten gelten nur für „{f.name}“.
+        </p>
+      )}
       <Section title="Objekt" actions={f.approximate ? <Badge kind="muted" title="Vereinfachtes 3D-Modell, Maße sind maßgeblich">Näherungsmodell</Badge> : undefined}>
         <TextField label="Name" value={f.name} onChange={(v) => upd((x) => (x.name = v.slice(0, 200)))} />
         <SelectField

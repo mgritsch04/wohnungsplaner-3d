@@ -12,7 +12,8 @@ import { FileFormatError } from '../formats/zodErrors';
 import { db } from '../persistence/db';
 import { loadProject, saveProject } from '../persistence/projects';
 import { useProjectStore } from '../store/projectStore';
-import { useUiStore } from '../store/uiStore';
+import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
+import type { Furniture } from '../model/schema';
 import { confirmDialog } from './dialogStore';
 import { downloadBlob, pickFile, safeFileName } from './fileUtils';
 import { newId } from '../model/ids';
@@ -49,7 +50,9 @@ export async function deleteSelection() {
       d.openings = d.openings.filter((o) => o.id !== sel.id);
     });
   } else if (sel.type === 'furniture') {
-    store().apply((d) => deleteFurniture(d, [sel.id]));
+    const ids = selectedFurnitureIds(ui());
+    store().apply((d) => deleteFurniture(d, ids));
+    ui().setSelection(null);
   } else if (sel.type === 'light') {
     store().apply((d) => {
       d.lights = d.lights.filter((l) => l.id !== sel.id);
@@ -59,13 +62,44 @@ export async function deleteSelection() {
 }
 
 export function duplicateSelection() {
-  const sel = ui().selection;
-  if (sel?.type !== 'furniture') return;
-  let nid: string | null = null;
+  const ids = selectedFurnitureIds(ui());
+  if (!ids.length) return;
+  const created: string[] = [];
   store().apply((d) => {
-    nid = duplicateFurniture(d, sel.id);
+    for (const id of ids) {
+      const nid = duplicateFurniture(d, id);
+      if (nid) created.push(nid);
+    }
   });
-  if (nid) ui().setSelection({ type: 'furniture', id: nid });
+  ui().selectFurniture(created);
+}
+
+/** Furniture copied with Ctrl+C (kept in memory for this tab, pasted with Ctrl+V). */
+let clipboard: Furniture[] = [];
+let pasteCount = 0;
+
+export function copySelection(): number {
+  const ids = new Set(selectedFurnitureIds(ui()));
+  clipboard = store().project.furniture.filter((f) => ids.has(f.id)).map((f) => structuredClone(f));
+  pasteCount = 0;
+  if (clipboard.length) ui().toast(`${clipboard.length} Möbel kopiert – Strg+V fügt ein`, 'info');
+  return clipboard.length;
+}
+
+/** Paste the copied furniture, shifted a bit further on each paste; one undo step. */
+export function pasteClipboard() {
+  if (!clipboard.length) return;
+  pasteCount++;
+  const off = 0.3 * pasteCount;
+  const created: string[] = [];
+  store().apply((d) => {
+    for (const f of clipboard) {
+      const nid = newId('item');
+      d.furniture.push({ ...structuredClone(f), id: nid, x: roundMm(f.x + off), y: roundMm(f.y + off) });
+      created.push(nid);
+    }
+  });
+  ui().selectFurniture(created);
 }
 
 /** Rotate the selected furniture by `deltaRad` (Q/E, panel buttons) – checked like dragging. */
@@ -91,16 +125,17 @@ export function setFurnitureRotation(id: string, rotation: number) {
 }
 
 export function nudgeSelection(dx: number, dy: number) {
-  const sel = ui().selection;
-  if (sel?.type !== 'furniture') return;
+  const ids = selectedFurnitureIds(ui());
+  if (!ids.length) return;
   const p = store().project;
-  const f = p.furniture.find((x) => x.id === sel.id);
-  if (!f || f.locked) return;
   const derived = derivePlan(p);
   const obstacles = buildPlacementObstacles(derived);
-  // nudging respects walls but does not snap (fine positioning)
+  // nudging respects walls but does not snap (fine positioning); all selected items, one undo step
   store().apply((d) => {
-    moveFurnitureTo(d, derived, obstacles, sel.id, { x: roundMm(f.x + dx), y: roundMm(f.y + dy) }, { snap: false, collide: true });
+    for (const id of ids) {
+      const f = p.furniture.find((x) => x.id === id);
+      if (f && !f.locked) moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(f.x + dx), y: roundMm(f.y + dy) }, { snap: false, collide: true });
+    }
   });
 }
 
