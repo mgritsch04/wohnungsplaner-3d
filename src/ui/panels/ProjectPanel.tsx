@@ -8,6 +8,7 @@ import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
+import { ThemeControl } from '../ThemeControl';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
 
@@ -21,6 +22,10 @@ export function ProjectPanel() {
 
   return (
     <div className="panel-scroll">
+      <Section title="Oberfläche">
+        <ThemeControl />
+      </Section>
+
       <Section title="Licht & Darstellung (3D)">
         <div className="field">
           <span className="field-label">Tageszeit (wirkt im Realismusmodus)</span>
