@@ -1256,3 +1256,12 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
   color: #991b1b;
   font-size: 13px;
 }
+
+/* Problem melden (#62) */
+.bug-report-text {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  resize: vertical;
+}

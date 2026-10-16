@@ -6,6 +6,9 @@ import './styles.css';
 import { useProjectStore } from './store/projectStore';
 import { useUiStore } from './store/uiStore';
 import { useImportStore } from './import/importStore';
+import { installErrorCapture } from './ui/bugReport';
+
+installErrorCapture();
 
 // Test/debug hook: exposes the stores for end-to-end tests (?e2e) and during development.
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('e2e')) {

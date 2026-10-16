@@ -1434,3 +1434,25 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('bug report: help › "Problem melden" shows browser/version/state, project data only on request (#62)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByTitle('Hilfe & Tastenkürzel').click();
+  await page.getByRole('button', { name: 'Problem melden …' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Problem melden' });
+  await expect(dialog).toBeVisible();
+  const text = dialog.getByTestId('bug-report-text');
+  await expect(text).toHaveValue(/App-Version: \d+\.\d+\.\d+/);
+  await expect(text).toHaveValue(/Browser: .*Chrome/);
+  await expect(text).toHaveValue(/Projekt: 2 Räume/);
+  await expect(text).not.toHaveValue(/Sofa 3-Sitzer/);
+  await dialog.getByLabel('Was ist passiert?').fill('Sofa springt beim Ziehen');
+  await expect(text).toHaveValue(/Sofa springt beim Ziehen/);
+  await dialog.getByLabel(/Projektdaten anfügen/).check();
+  await expect(text).toHaveValue(/Sofa 3-Sitzer/);
+  await expect(dialog.getByRole('button', { name: /Issue auf GitHub öffnen/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});

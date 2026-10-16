@@ -8,6 +8,7 @@ import { confirmDialog, useDialogStore } from './dialogStore';
 import { importPdfPage } from '../import/underlayImport';
 import { ProductImportModal } from './ProductImportModal';
 import { ModelImportModal } from './ModelImportModal';
+import { BugReportModal } from './BugReportModal';
 
 export function ModalHost() {
   const modal = useDialogStore((s) => s.modal);
@@ -19,6 +20,7 @@ export function ModalHost() {
       {modal === 'pdfPage' && <PdfPageModal />}
       {modal === 'product' && <ProductImportModal />}
       {modal === 'model' && <ModelImportModal />}
+      {modal === 'bugReport' && <BugReportModal />}
       {confirm && (
         <div className="modal-backdrop" onMouseDown={() => confirm.resolve(false)}>
           <div className="modal small" role="alertdialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
@@ -243,6 +245,9 @@ function HelpModal() {
         Plan sind lichte Innenmaße.
       </p>
       <p className="small muted">Entwurfswerkzeug ohne Gewähr – keine Prüfung von Bau-, Elektro- oder Installationsvorschriften.</p>
+      <div className="btn-row end">
+        <button onClick={() => useDialogStore.getState().openModal('bugReport')}>Problem melden …</button>
+      </div>
     </Modal>
   );
 }
