@@ -5,9 +5,10 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
 - **Deine Aufgaben:** #28 Smart-Home-Rückfragen (Erklärungen in `smart-home/DECISIONS.md`) · #30 Routine einrichten (Label `user-task`); #27 und #29 von dir erledigt
-- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Mehrfachauswahl; parallel Agenten für weitere Ready-Aufgaben; Ergebnisse der Hilfsagenten in PR #45 (#10 IKEA-Import) und PR #44 (#27 IKEA-Küche, Empfehlung: nur mit deiner Datei))
+- **In Arbeit (parallel):** Grundriss-Import (#37, Agent), Projektversionen/Varianten (#66/#58, Agent), Mindestbreiten (#68, lokale Sitzung „Hallo“ – Aufträge über Issue #110)
+- **Nächster Schritt:** oberste unblockierte `Ready`-Zeile in [`IDEAS.md`](IDEAS.md), danach UI-Grundlage (#96–#98)
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
@@ -36,6 +37,10 @@ Status je Aufgabe: implementiert · automatisiert getestet · User-Test offen (#
 | Mehrfachauswahl: Umschalt+Klick, Auswahlrahmen (Umschalt+Ziehen auf Boden), Gruppe gemeinsam ziehen (starr, jedes Möbel stoppt an Hindernissen), Pfeiltasten, Strg+C/V/A, Entf, Duplizieren – je ein Undo-Schritt; Hinweis im Panel; Hervorhebung 2D/3D | ✅ | ✅ E2E (Umschalt+Klick, Gruppe ziehen + 1 Undo-Schritt, Kopieren/Einfügen, Löschen/Undo, Rahmen) | 🧪 #94 |
 | Speicherfehler (#60): deutliches Banner unter der Werkzeugleiste mit Ursache (Speicher voll / Speichern blockiert), „Jetzt als Datei exportieren“ und „Erneut speichern“; verschwindet nach Erfolg | ✅ | ✅ E2E (Fehler simuliert → Banner, Wiederholen → weg, „Gespeichert“) | 🧪 (Test-Issue folgt mit Merge) |
 | Nachtlicht-Test robust gemacht: misst nur den Bildbereich der Wohnung (vorher Mittel über das ganze, überwiegend schwarze Bild → im CI zu knapp); Lampen/Raumlicht verstärkt | ✅ | ✅ lokal an 32,2 / aus 12,0 | – |
+| Möbel-Einrasten wählbar (#52): Raster 5 cm / 10 cm / nur Wände / frei (Werkzeug-Panel), gilt in 2D und 3D, Alt = frei in 2D, Kollision immer aktiv | ✅ | ✅ Unit + vorhandene Zieh-E2E; 3D-Zieh-Test toleriert einen Rasterschritt | 🧪 #105 |
+| CSV-Einkaufsliste (#57): Spalte „Maße B × T × H (cm)“, gleiche Möbel als eine Zeile mit Menge | ✅ | ✅ Unit + E2E | 🧪 #106 |
+| Türen/Fenster öffnen (#21, Agent): Doppelklick/O/Klick beim Begehen, Zustand gespeichert, nur geöffnete Flügel sind Hindernis, geschlossene Tür sperrt das Begehen | ✅ | ✅ Unit (11) + E2E | 🧪 #107 · Screenshots vom Agenten |
+| Plan als PNG/PDF + Druckansicht (#71/#72, lokale Sitzung): Plan mit Maßen, Titel, Datum, Maßstabsbalken; Druck A4 hoch/quer auf 1 Seite mit Stückliste, PDF über Druckdialog | ✅ | ✅ Unit + E2E | 🧪 #112 · PDFs (je 1 Seite, 1:75) und PNG von mir angesehen |
 
 ## Diese Runde (Arbeitsauftrag 1–8)
 
@@ -133,5 +138,5 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 Siehe [`IDEAS.md`](IDEAS.md) → `Ready` (Reihenfolge dort).
 
 ## Git
-- Branch `claude/quirky-faraday-0d9uep`; `main` = `438c13b` (PR #17 gemergt: Issue-Workflow + Kollisionssystem). Offener PR #32 mit Runde 6 (#5, #7, #8, #9, #22, #23, #39, Workflow-Regeln).
+- Branch `claude/quirky-faraday-0d9uep`; `main` = `2a0072f` (zuletzt gemergt: PR #48, #108, #109). Offen: PR #111 (#71/#72). Agenten-Branches: `claude/plan-import-37`, `claude/project-versions-66`, lokal `claude/min-widths-68`.
 - Frühere Runden: PR #1 (`5797457`), PR #2 (`a9cc64f`), PR #3 (IKEA/Smart-Home-Doku).
