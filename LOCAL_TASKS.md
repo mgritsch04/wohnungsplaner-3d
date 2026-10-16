@@ -84,3 +84,30 @@ Wenn du daraus Code brauchst, lege dir eine kleine gemeinsame Hilfsfunktion in e
 - auf `claude/glb-export-87` gepusht ist;
 - du mir per Nachricht berichtet hast: Dateien, Tests, Commits, User-Test-Schritte;
 - und, wenn möglich, die exportierte Datei in einem Viewer geprüft ist (Screenshot-Beschreibung).
+
+## Aufgabe 8: Sitzposition beim Begehen (#78), danach Startkarte für leere Projekte (#102)
+
+Bericht zu Aufgabe 7 (#87) ist angekommen, danke. Die Prüfung mit einem lokalen Viewer statt Upload auf eine fremde Seite war genau richtig.
+
+Bitte zwei kleine Aufgaben **nacheinander**, je auf einem eigenen Branch von `origin/main`. Vor jedem finalen Push `git merge origin/main`, kein Rebase.
+
+### 8a: Sitzposition beim Begehen (#78), Branch `claude/sit-position-78`
+- Issue #78 lesen. Beim Begehen einen Umschalter Stehen/Sitzen einbauen.
+- Die Sitz-Augenhöhe ist einstellbar, Standard 120 cm. Sie wird wie die Augenhöhe in Projekt › Steuerung (3D) gespeichert, mit Default, damit alte Projekte unverändert laden.
+- Taste vorschlagen, die noch frei ist (im `src/ui/shortcutCatalog.ts` prüfen und dort eintragen; der Katalog-Test verlangt das). Übergang weich wie beim Ducken (C). Ducken im Sitzen sinnvoll behandeln (z. B. ignorieren).
+- Die Anzeige im Begehen-Overlay zeigt „Sitzen“.
+- Tests: Unit für Höhe/Default/Migration; E2E am Ende von `e2e/app.spec.ts` (Kamera-Höhe ändert sich, gespeichert, nach Neuladen erhalten).
+
+### 8b: Startkarte für leere Projekte (#102), Branch `claude/start-card-102`
+- Issue #102 lesen. In einem leeren Projekt (keine Wände, keine Räume, keine Möbel) erscheint eine Karte mit den ersten Schritten: „Grundriss importieren“, „Raum zeichnen“, „Beispielwohnung laden“. Jede Schaltfläche löst die vorhandene Aktion aus.
+- Die Karte verschwindet, sobald etwas im Projekt ist, und lässt sich schließen. Das Schließen wird pro Projekt gemerkt.
+- Eigene Komponente, nur Design-Tokens, hell und dunkel prüfen.
+- Tests: E2E (neues Projekt → Karte sichtbar → „Raum zeichnen“ wählt das Werkzeug → nach dem ersten Raum ist die Karte weg).
+
+**Nicht anfassen** (dort arbeiten Agents):
+- `src/view3d/Scene3D.tsx`, `src/view3d/FurnitureObject.tsx`, `src/versions/**` (#76)
+- `src/ui/Toolbar.tsx` (Symbolleiste #100 kommt als Nächstes). Einen Einstiegspunkt in der Toolbar, falls nötig, im Bericht vorschlagen.
+
+Ebenfalls nicht anfassen: `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`, Issues.
+
+**Fertig, wenn:** je Branch alle Checks und die volle E2E-Suite grün sind, gepusht ist und du mir **je Teilaufgabe** per Nachricht berichtet hast (Dateien, Tests, Commits, User-Test-Schritte).
