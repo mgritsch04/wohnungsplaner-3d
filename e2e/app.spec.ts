@@ -376,14 +376,20 @@ test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)'
   const expected = await planToScreen(page, cam.x, cam.z);
   const d0 = await dot();
   expect(Math.hypot(d0.x - expected.x, d0.y - expected.y)).toBeLessThan(4);
-  // walk forward: the dot follows live
+  // walk forward: the dot follows live. Hold W until the camera has actually moved – with software
+  // rendering on a busy CI runner a fixed key-down time can cover only a few frames
+  const camNow = () => page.evaluate(() => (window as any).__wp.three.camera.position);
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(700);
+  await expect.poll(async () => { const c = await camNow(); return Math.hypot(c.x - cam.x, c.z - cam.z); }, { timeout: 15000 }).toBeGreaterThan(0.3);
   await page.keyboard.up('KeyW');
   await expect.poll(async () => {
     const d = await dot();
     return Math.hypot(d.x - d0.x, d.y - d0.y);
   }).toBeGreaterThan(5);
+  // … and sits where the camera now is
+  const cam1 = await camNow();
+  const expected1 = await planToScreen(page, cam1.x, cam1.z);
+  await expect.poll(async () => { const d = await dot(); return Math.hypot(d.x - expected1.x, d.y - expected1.y); }).toBeLessThan(4);
   // 3D only or overview: no marker
   await page.getByRole('button', { name: 'Übersicht' }).click();
   await expect(marker).toHaveCount(0);
@@ -1286,6 +1292,9 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
     });
     expect(clip.width).toBeGreaterThan(50);
+    // a lost WebGL context shows the page background instead of the scene – say so instead of measuring it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await page.evaluate(() => (window as any).__wp.three.gl.getContext().isContextLost())).toBe(false);
     const png = await page.screenshot({ clip });
     return page.evaluate(async (b64) => {
       const img = new Image();
