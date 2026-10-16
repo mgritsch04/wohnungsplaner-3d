@@ -13,36 +13,28 @@ import type { Furniture, Project } from './schema';
 import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid, scale, signedArea, sub, type Vec2 } from './vec';
 import { normalizeAngle } from './units';
 import { frontClearance, isRug, isStackable, isSurface, pairRule } from './placementRules';
+import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
 
 export interface Obstacle {
   polygon: Vec2[];
   z0: number;
   z1: number;
+  /** 'door-leaf' = an opened door leaf or window sash (#21). */
   kind: 'wall' | 'door-leaf' | 'furniture';
   refId: string;
 }
-
-/** Thickness of the (open) door leaf used as obstacle. */
-const LEAF_T = 0.045;
-/** Floor clearance under a door leaf (undercut) – rugs may lie below it. */
-const LEAF_UNDERCUT = 0.015;
 
 export function buildPlacementObstacles(d: DerivedPlan): Obstacle[] {
   const out: Obstacle[] = [];
   for (const [wallId, pieces] of d.pieces) for (const pc of pieces) out.push({ polygon: pc.polygon, z0: pc.z0, z1: pc.z1, kind: 'wall', refId: wallId });
   for (const h of d.hubs) out.push({ polygon: h.polygon, z0: 0, z1: h.height, kind: 'wall', refId: h.nodeId });
-  for (const [wallId, list] of d.openings) {
-    const fp = d.footprints.get(wallId);
-    if (!fp) continue;
+  for (const list of d.openings.values()) {
     for (const r of list) {
-      if (r.opening.kind !== 'door') continue;
-      // the leaf is shown opened by 90° along the swing side – it is solid
-      const ds = doorSymbol(fp, r);
-      const along = normalize(sub(ds.openTip, ds.hinge));
-      const side = scale(perp(along), LEAF_T / 2);
-      const a = ds.hinge;
-      const b = ds.openTip;
-      out.push({ polygon: [add(a, side), add(b, side), sub(b, side), sub(a, side)], z0: r.bottom + LEAF_UNDERCUT, z1: r.top, kind: 'door-leaf', refId: r.opening.id });
+      // an opened leaf (door: 90° along the swing side, as in the plan; window sash: into the
+      // room) is solid within its height; a closed one lies in the wall opening and blocks nothing
+      for (const l of d.leaves.get(r.opening.id) ?? []) {
+        if (l.open) out.push({ polygon: leafPolygon(l, LEAF_OPEN_ANGLE), z0: l.z0, z1: l.z1, kind: 'door-leaf', refId: r.opening.id });
+      }
     }
   }
   return out;
@@ -361,19 +353,18 @@ function intersection(item: Pick<Furniture, 'elevation' | 'height'>, fc: Vec2[],
   return { polygon, z0, z1 };
 }
 
-/** Human-readable description of a door: width and the room its leaf opens into. */
-function describeDoor(p: Project, d: DerivedPlan, openingId: string): string {
+/** Human-readable description of a door/window: width and the room its leaf opens into. */
+function describeOpening(p: Project, d: DerivedPlan, openingId: string): string {
   const o = p.openings.find((x) => x.id === openingId);
-  const fp = o ? d.footprints.get(o.wallId) : undefined;
-  const r = fp ? d.openings.get(o!.wallId)?.find((x) => x.opening.id === openingId) : undefined;
-  if (!o || !fp || !r) return 'Tür';
-  const ds = doorSymbol(fp, r);
-  const probe = add(ds.hinge, scale(sub(ds.openTip, ds.hinge), 0.5));
+  const label = o?.kind === 'window' ? 'Fenster' : 'Tür';
+  const leaf = d.leaves.get(openingId)?.[0];
+  if (!o || !leaf) return label;
+  const probe = add(leaf.hinge, scale(leaf.swingDir, leaf.width / 2));
   const room = p.rooms.find((rm) => {
     const g = d.rooms.get(rm.id);
     return g && pointInPolygon(probe, g.interior);
   });
-  return `Tür ${Math.round(o.width * 100)} cm${room?.name ? ` (${room.name})` : ''}`;
+  return `${label} ${Math.round(o.width * 100)} cm${room?.name ? ` (${room.name})` : ''}`;
 }
 
 /** Quarter-circle door swing approximated by its bounding square on the swing side. */
@@ -407,7 +398,13 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
     issues.push(
       o.kind === 'wall'
         ? { kind: 'wall', message: 'Ragt in eine Wand.', refId: o.refId, region, culprit }
-        : { kind: 'door-leaf', message: `Steht im geöffneten Türblatt – ${describeDoor(p, d, o.refId)}.`, refId: o.refId, region, culprit },
+        : {
+            kind: 'door-leaf',
+            message: `Steht im geöffneten ${p.openings.find((x) => x.id === o.refId)?.kind === 'window' ? 'Fensterflügel' : 'Türblatt'} – ${describeOpening(p, d, o.refId)}.`,
+            refId: o.refId,
+            region,
+            culprit,
+          },
     );
   }
   if (item.elevation < 0.05 && item.solid) {
@@ -416,7 +413,7 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
         const culprit = { polygon: s.polygon, z0: 0, z1: s.z1 };
         issues.push({
           kind: 'door-swing',
-          message: `Blockiert den Türaufschlag – ${describeDoor(p, d, s.openingId)} lässt sich nicht ganz öffnen.`,
+          message: `Blockiert den Türaufschlag – ${describeOpening(p, d, s.openingId)} lässt sich nicht ganz öffnen.`,
           refId: s.openingId,
           region: intersection(item, fc, culprit),
           culprit,

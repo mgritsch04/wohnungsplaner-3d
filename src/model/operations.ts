@@ -9,7 +9,7 @@
 import { newId } from './ids';
 import { buildIndex, findWallBetween } from './graph';
 import { computeRoomGeometry } from './geometry/rooms';
-import type { Furniture, Opening, OpeningKind, PlanNode, Project, Provenance, Room, Wall } from './schema';
+import { defaultLeafOpen, type Furniture, type Opening, type OpeningKind, type PlanNode, type Project, type Provenance, type Room, type Wall } from './schema';
 import { closestPointOnSegment, cross, dist, dot, normalize, scale, sub, add, type Vec2 } from './vec';
 import { roundMm } from './units';
 
@@ -448,9 +448,24 @@ export function addOpening(d: Project, wallId: string, kind: OpeningKind, s: num
     sillHeight: overrides.sillHeight ?? def.sillHeight,
     hinge: overrides.hinge ?? 'start',
     swing: overrides.swing ?? 'left',
+    open: overrides.open ?? defaultLeafOpen(kind),
     provenance: overrides.provenance,
   });
   return id;
+}
+
+/** Doors and windows have a leaf/sash that can be opened; passages have none. */
+export const hasLeaf = (o: Pick<Opening, 'kind'>): boolean => o.kind !== 'passage';
+
+/**
+ * Open or close the leaf of door/window `id` (#21); toggles when `open` is omitted.
+ * Returns the new state, or null when there is no such opening or it has no leaf.
+ */
+export function setOpeningOpen(d: Project, id: string, open?: boolean): boolean | null {
+  const o = d.openings.find((x) => x.id === id);
+  if (!o || !hasLeaf(o)) return null;
+  o.open = open ?? !o.open;
+  return o.open;
 }
 
 export function addFurniture(d: Project, f: Omit<Furniture, 'id'> & { id?: string }): string {

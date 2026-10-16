@@ -1294,3 +1294,124 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   expect(nightOff).toBeGreaterThan(2); // but not pitch black (moonlight / sky)
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('3D: doors and windows open/close – double-click, O, click while walking; one undo step each, saved, collision follows (#21)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p0 = await getProject(page);
+  const inner = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'door' && Math.abs(o.width - 0.9) < 1e-6); // living room ↔ bedroom
+  const entrance = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'door' && Math.abs(o.width - 1.0) < 1e-6);
+  const window1 = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'window' && Math.abs(o.width - 1.8) < 1e-6); // living room, north
+  expect([inner.open, entrance.open, window1.open]).toEqual([true, true, false]);
+  const openOf = async (id: string) => (await getProject(page)).openings.find((o: { id: string }) => o.id === id).open as boolean;
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  /** World centre (plan x/y, height) of the first leaf/sash of an opening, as currently drawn. */
+  const leafCenter = (id: string) =>
+    page.evaluate((oid) => {
+      const t = (window as any).__wp.three;
+      const pivot = t.scene.getObjectByName(`leaf:${oid}:0`);
+      const v = pivot.children[0].getWorldPosition(t.camera.position.clone());
+      return { x: v.x as number, y: v.z as number, h: v.y as number };
+    }, id);
+
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
+  await page.waitForTimeout(2000);
+  // the open inner door leaf stands in the living room (wall at x = 5.06)
+  const openLeaf = await leafCenter(inner.id);
+  expect(openLeaf.x).toBeLessThan(4.8);
+  const s = await worldToScreen3d(page, openLeaf.x, 0.8, openLeaf.y);
+  // a single click only selects it …
+  await page.mouse.click(s.x, s.y);
+  await expect.poll(() => getSelection(page)).toEqual({ type: 'opening', id: inner.id });
+  expect(await openOf(inner.id)).toBe(true);
+  // … a double-click closes it: one undo step, the leaf turns into the wall opening
+  const p1 = await past();
+  await page.mouse.dblclick(s.x, s.y);
+  await expect.poll(() => openOf(inner.id)).toBe(false);
+  expect(await past()).toBe(p1 + 1);
+  await expect.poll(async () => (await leafCenter(inner.id)).x).toBeGreaterThan(4.95);
+  await expect(page.getByLabel('Tür geöffnet')).not.toBeChecked();
+  await page.screenshot({ path: 'test-results/doors-3d-closed.png' });
+  // O opens the selected door again
+  await page.keyboard.press('o');
+  await expect.poll(() => openOf(inner.id)).toBe(true);
+  expect(await past()).toBe(p1 + 2);
+  await expect.poll(async () => (await leafCenter(inner.id)).x).toBeLessThan(4.7);
+  await expect(page.getByLabel('Tür geöffnet')).toBeChecked();
+  // undo, step by step
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => openOf(inner.id)).toBe(false);
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => openOf(inner.id)).toBe(true);
+  expect(await past()).toBe(p1);
+
+  // collision follows the leaf: sofa in the opened entrance door leaf → error; door closed → only the swing warning
+  const sofaId: string = await page.evaluate(() => {
+    const st = (window as any).__wp.useProjectStore.getState();
+    const sofa = st.project.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+    st.apply((d: { furniture: { id: string; x: number }[] }) => void (d.furniture.find((f) => f.id === sofa.id)!.x = 1.7));
+    return sofa.id;
+  });
+  await expect.poll(() => collisionMarkers(page)).toContain(`collision-issue:${sofaId}:door-leaf:${entrance.id}`);
+  await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'opening', id }), entrance.id);
+  await page.keyboard.press('o');
+  await expect.poll(() => openOf(entrance.id)).toBe(false);
+  await expect.poll(() => collisionMarkers(page)).not.toContain(`collision-issue:${sofaId}:door-leaf:${entrance.id}`);
+  expect(await collisionMarkers(page)).toContain(`collision-issue:${sofaId}:door-swing:${entrance.id}`);
+
+  // walkthrough: the crosshair aims at a door/window, a click (or O) opens/closes it
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  const lookAt = (x: number, y: number, h: number) =>
+    page.evaluate(
+      ([tx, ty, th]) => {
+        const wp = (window as any).__wp;
+        const c = wp.three.camera.position;
+        const dist = Math.hypot(tx - c.x, ty - c.z);
+        wp.walk.look(Math.atan2(-(tx - c.x), -(ty - c.z)), Math.atan2(th - c.y, dist));
+      },
+      [x, y, h] as const,
+    );
+  const target = () => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null);
+  const leaf = await leafCenter(inner.id);
+  await lookAt(leaf.x, leaf.y, 1.0);
+  await expect.poll(target).toBe(inner.id);
+  const p2 = await past();
+  await page.evaluate(() => (window as any).__wp.walk.pickOrDrop()); // = click with captured mouse
+  await expect.poll(() => openOf(inner.id)).toBe(false);
+  expect(await past()).toBe(p2 + 1);
+  expect(await getSelection(page)).toEqual({ type: 'opening', id: entrance.id }); // the click does not change the selection
+  // the closed door now fills the doorway: aim at it and press O
+  await page.waitForTimeout(800);
+  await lookAt(5.0, 2.0, 1.0);
+  await expect.poll(target).toBe(inner.id);
+  await page.keyboard.press('o');
+  await expect.poll(() => openOf(inner.id)).toBe(true);
+  expect(await past()).toBe(p2 + 2);
+  expect(await openOf(entrance.id)).toBe(false); // O acted on the door in sight, not on the selected one
+  // the living-room window: the sash opens into the room
+  const glass = await leafCenter(window1.id);
+  await lookAt(glass.x, glass.y, 1.6);
+  await expect.poll(target).toBe(window1.id);
+  await page.evaluate(() => (window as any).__wp.walk.pickOrDrop());
+  await expect.poll(() => openOf(window1.id)).toBe(true);
+  await expect.poll(async () => (await leafCenter(window1.id)).y).toBeGreaterThan(0.25);
+  await page.screenshot({ path: 'test-results/doors-3d-walk-window-open.png' });
+  // walking keys and O must not reach the 2D tools
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+
+  // saved with the project
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).openings.find((o: { id: string }) => o.id === entrance.id)?.open).toBe(false);
+  const after = await getProject(page);
+  expect(after.openings.find((o: { id: string }) => o.id === inner.id).open).toBe(true);
+  expect(after.openings.find((o: { id: string }) => o.id === window1.id).open).toBe(true);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */

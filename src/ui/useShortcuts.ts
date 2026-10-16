@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore, type Tool } from '../store/uiStore';
-import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow } from './actions';
+import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure' };
 
@@ -15,8 +15,8 @@ export function useShortcuts() {
       const ps = useProjectStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      // walking keys (G = carry furniture #39, C = crouch #20) belong to the walkthrough, not to the 2D tools
-      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c'].includes(key) && !mod) return;
+      // walking keys (G = carry furniture #39, C = crouch #20, O = open the door/window in sight #21) belong to the walkthrough
+      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'o'].includes(key) && !mod) return;
       if (mod && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         ps.undo();
@@ -62,6 +62,9 @@ export function useShortcuts() {
         ui.setViewMode('3d');
       } else if (!mod && key === 'h') {
         ui.requestFit();
+      } else if (!mod && !e.altKey && key === 'o' && ui.selection?.type === 'opening') {
+        // open/close the selected door or window (#21)
+        toggleOpening(ui.selection.id);
       } else if (!mod && !e.altKey && TOOL_KEYS[key]) {
         ui.setTool(TOOL_KEYS[key]);
       }

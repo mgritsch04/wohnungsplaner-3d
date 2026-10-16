@@ -1,13 +1,23 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Project, QualityMode } from '../model/schema';
 import { add, dist, pointInPolygon, scale } from '../model/vec';
 import { BASEBOARD_HEIGHT, BASEBOARD_THICKNESS, computeBaseboards, computeWindowSills } from '../model/geometry/details';
+import {
+  DOOR_LEAF_UNDERCUT,
+  LEAF_OPEN_ANGLE,
+  leafTurnSign,
+  WINDOW_FRAME,
+  WINDOW_SASH_DEPTH_FACTOR,
+  WINDOW_SASH_PROFILE,
+  windowFrameDepth,
+  type OpeningLeaf,
+} from '../model/geometry/leaves';
 import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MATERIAL_ID, materialById } from '../model/materials';
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
-import { doorSymbol } from '../editor2d/openingSymbols';
 import { blockBehind, isClick, isClippedHit } from './pointer';
 
 interface Props {
@@ -16,6 +26,8 @@ interface Props {
   quality: QualityMode;
   selectedId: string | null;
   onSelect: (type: 'wall' | 'room' | 'opening', id: string) => void;
+  /** Double-click on a door/window opens or closes it (#21); omitted = no toggling (walkthrough). */
+  onToggleOpening?: (id: string) => void;
   showCeilings: boolean;
 }
 
@@ -23,7 +35,7 @@ interface Props {
  * Walls, floors, ceilings, doors and windows generated from the shared model.
  * Geometry is rebuilt only when the architecture key (nodes/walls/openings/rooms/materials) changes.
  */
-export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect, showCeilings }: Props) {
+export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect, onToggleOpening, showCeilings }: Props) {
   const shadows = quality === 'realism';
 
   const wallMeshes = useMemo(() => {
@@ -150,128 +162,188 @@ export const Architecture = memo(function Architecture({ project, derived, quali
         const angle = -Math.atan2(fp.dir.y, fp.dir.x);
         return (derived.openings.get(w.id) ?? []).map((r) => {
           const o = r.opening;
+          if (o.kind === 'passage') return null;
           const width = r.s1 - r.s0;
           const center = add(fp.a, scale(fp.dir, (r.s0 + r.s1) / 2));
           const h = r.top - r.bottom;
           const sel = selectedId === o.id;
-          const select = (e: { stopPropagation: () => void; delta?: number; point: THREE.Vector3 }) => {
+          const leaves = derived.leaves.get(o.id) ?? [];
+          const select = (e: ThreeEvent<MouseEvent>) => {
             if (isClippedHit(e)) return;
             e.stopPropagation();
             if (isClick(e)) onSelect('opening', o.id);
           };
+          // double-click opens/closes the leaf (#21); the first click has already selected it
+          const toggle = (e: ThreeEvent<MouseEvent>) => {
+            if (!onToggleOpening || isClippedHit(e)) return;
+            e.stopPropagation();
+            if (!isClick(e)) return;
+            onSelect('opening', o.id);
+            onToggleOpening(o.id);
+          };
+          const frameM = sel ? highlight : frameMat;
           if (o.kind === 'window') {
-            const ft = 0.07; // outer frame (Blendrahmen)
-            const st = 0.055; // sash (Flügel)
-            const depth = Math.min(0.08, fp.thickness);
-            const sashes = width > 1.3 ? 2 : 1;
-            const innerW = width - 2 * ft;
-            const sashW = innerW / sashes;
-            const innerH = h - 2 * ft;
-            const frameM = sel ? highlight : frameMat;
+            const ft = WINDOW_FRAME; // outer frame (Blendrahmen)
+            const depth = windowFrameDepth(fp.thickness);
             return (
-              <group key={o.id} position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]} onPointerDown={blockBehind} onClick={select}>
-                {[
-                  [0, ft / 2, width, ft],
-                  [0, h - ft / 2, width, ft],
-                  [-width / 2 + ft / 2, h / 2, ft, h],
-                  [width / 2 - ft / 2, h / 2, ft, h],
-                ].map(([x, y, sx, sy], i) => (
-                  <mesh key={i} position={[x, y, 0]} scale={[sx, sy, depth]} material={frameM} castShadow={shadows} receiveShadow={shadows}>
-                    <boxGeometry />
-                  </mesh>
-                ))}
-                {Array.from({ length: sashes }, (_, k) => {
-                  const cx = -innerW / 2 + sashW * (k + 0.5);
-                  const handleX = sashes === 2 ? (k === 0 ? sashW / 2 - st / 2 : -sashW / 2 + st / 2) : sashW / 2 - st / 2;
-                  return (
-                    <group key={k} position={[cx, h / 2, 0]}>
-                      {[
-                        [0, -innerH / 2 + st / 2, sashW, st],
-                        [0, innerH / 2 - st / 2, sashW, st],
-                        [-sashW / 2 + st / 2, 0, st, innerH],
-                        [sashW / 2 - st / 2, 0, st, innerH],
-                      ].map(([x, y, sx, sy], i) => (
-                        <mesh key={i} position={[x, y, 0]} scale={[sx, sy, depth * 0.85]} material={frameM} castShadow={shadows}>
-                          <boxGeometry />
-                        </mesh>
-                      ))}
-                      <mesh scale={[sashW - 2 * st, innerH - 2 * st, 0.012]} material={glassMat}>
-                        <boxGeometry />
-                      </mesh>
-                      {[1, -1].map((side) => (
-                        <mesh key={side} position={[handleX, 0, side * (depth * 0.45 + 0.012)]} scale={[0.02, 0.13, 0.02]} material={metalMat}>
-                          <boxGeometry />
-                        </mesh>
-                      ))}
-                    </group>
-                  );
-                })}
-              </group>
-            );
-          }
-          if (o.kind === 'door') {
-            const ds = doorSymbol(fp, r);
-            const jamb = 0.012; // Zarge in the reveal
-            const casing = 0.065; // Bekleidung on both wall faces
-            const leafW = width - 2 * jamb;
-            const leafH = h - jamb;
-            const leafAngle = -Math.atan2(ds.openTip.y - ds.hinge.y, ds.openTip.x - ds.hinge.x);
-            // the leaf hangs inside the frame: move the hinge inwards by the jamb thickness
-            const hinge = add(ds.hinge, scale(fp.dir, (o.hinge === 'start' ? 1 : -1) * jamb));
-            const frameM = sel ? highlight : frameMat;
-            return (
-              <group key={o.id} onPointerDown={blockBehind} onClick={select}>
-                <group position={[hinge.x, r.bottom, hinge.y]} rotation={[0, leafAngle, 0]}>
-                  <mesh position={[leafW / 2, leafH / 2, 0.02]} scale={[leafW, leafH, 0.04]} material={sel ? highlight : doorMat} castShadow={shadows} receiveShadow={shadows}>
-                    <boxGeometry />
-                  </mesh>
-                  {[1, -1].map((side) => (
-                    <group key={side} position={[leafW - 0.07, 1.05, 0.02 + side * 0.02]}>
-                      <mesh position={[0, 0, side * 0.006]} rotation={[Math.PI / 2, 0, 0]} scale={[0.05, 0.012, 0.05]} material={metalMat}>
-                        <cylinderGeometry args={[0.5, 0.5, 1, 20]} />
-                      </mesh>
-                      <mesh position={[-0.055, 0, side * 0.04]} scale={[0.13, 0.018, 0.018]} material={metalMat} castShadow={shadows}>
-                        <boxGeometry />
-                      </mesh>
-                      <mesh position={[0, 0, side * 0.025]} scale={[0.018, 0.018, 0.04]} material={metalMat}>
-                        <boxGeometry />
-                      </mesh>
-                    </group>
-                  ))}
-                </group>
+              <group key={o.id} userData={{ openingId: o.id }} onPointerDown={blockBehind} onClick={select} onDoubleClick={toggle}>
                 <group position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]}>
-                  {/* jambs and head covering the reveal */}
                   {[
-                    [-width / 2 + jamb / 2, h / 2, jamb, h],
-                    [width / 2 - jamb / 2, h / 2, jamb, h],
-                    [0, h - jamb / 2, width, jamb],
+                    [0, ft / 2, width, ft],
+                    [0, h - ft / 2, width, ft],
+                    [-width / 2 + ft / 2, h / 2, ft, h],
+                    [width / 2 - ft / 2, h / 2, ft, h],
                   ].map(([x, y, sx, sy], i) => (
-                    <mesh key={`j${i}`} position={[x, y, 0]} scale={[sx, sy, fp.thickness + 0.004]} material={frameM} receiveShadow={shadows}>
+                    <mesh key={i} position={[x, y, 0]} scale={[sx, sy, depth]} material={frameM} castShadow={shadows} receiveShadow={shadows}>
                       <boxGeometry />
                     </mesh>
                   ))}
-                  {/* casings on both faces */}
-                  {[1, -1].flatMap((side) =>
-                    [
-                      [-width / 2 - casing / 2 + 0.01, (h + casing) / 2, casing, h + casing],
-                      [width / 2 + casing / 2 - 0.01, (h + casing) / 2, casing, h + casing],
-                      [0, h + casing / 2 - 0.01, width + 2 * casing - 0.02, casing],
-                    ].map(([x, y, sx, sy], i) => (
-                      <mesh key={`c${side}${i}`} position={[x, y, side * (fp.thickness / 2 + 0.006)]} scale={[sx, sy, 0.012]} material={frameM} castShadow={shadows} receiveShadow={shadows}>
-                        <boxGeometry />
-                      </mesh>
-                    )),
-                  )}
                 </group>
+                {leaves.map((l, k) => (
+                  <LeafPivot key={k} leaf={l} name={`leaf:${o.id}:${k}`}>
+                    <WindowSash leaf={l} depth={depth * WINDOW_SASH_DEPTH_FACTOR} frame={frameM} glass={glassMat} metal={metalMat} shadows={shadows} />
+                  </LeafPivot>
+                ))}
               </group>
             );
           }
-          return null;
+          const jamb = 0.012; // Zarge in the reveal
+          const casing = 0.065; // Bekleidung on both wall faces
+          return (
+            <group key={o.id} userData={{ openingId: o.id }} onPointerDown={blockBehind} onClick={select} onDoubleClick={toggle}>
+              {leaves.map((l, k) => (
+                // the leaf hangs inside the frame: its hinge sits the jamb thickness further in
+                <LeafPivot key={k} leaf={l} inset={jamb} name={`leaf:${o.id}:${k}`}>
+                  <DoorLeaf leaf={l} jamb={jamb} material={sel ? highlight : doorMat} metal={metalMat} shadows={shadows} />
+                </LeafPivot>
+              ))}
+              <group position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]}>
+                {/* jambs and head covering the reveal */}
+                {[
+                  [-width / 2 + jamb / 2, h / 2, jamb, h],
+                  [width / 2 - jamb / 2, h / 2, jamb, h],
+                  [0, h - jamb / 2, width, jamb],
+                ].map(([x, y, sx, sy], i) => (
+                  <mesh key={`j${i}`} position={[x, y, 0]} scale={[sx, sy, fp.thickness + 0.004]} material={frameM} receiveShadow={shadows}>
+                    <boxGeometry />
+                  </mesh>
+                ))}
+                {/* casings on both faces */}
+                {[1, -1].flatMap((side) =>
+                  [
+                    [-width / 2 - casing / 2 + 0.01, (h + casing) / 2, casing, h + casing],
+                    [width / 2 + casing / 2 - 0.01, (h + casing) / 2, casing, h + casing],
+                    [0, h + casing / 2 - 0.01, width + 2 * casing - 0.02, casing],
+                  ].map(([x, y, sx, sy], i) => (
+                    <mesh key={`c${side}${i}`} position={[x, y, side * (fp.thickness / 2 + 0.006)]} scale={[sx, sy, 0.012]} material={frameM} castShadow={shadows} receiveShadow={shadows}>
+                      <boxGeometry />
+                    </mesh>
+                  )),
+                )}
+              </group>
+            </group>
+          );
         });
       })}
     </group>
   );
 });
+
+/** Turning speed of a leaf being opened or closed (rad/s): 90° in about 0.6 s. */
+const LEAF_SPEED = 2.6;
+/** Rendered door leaf thickness. */
+const DOOR_LEAF_T = 0.04;
+
+/**
+ * Hinge of a door leaf or window sash (#21). Children are drawn in the leaf frame:
+ * x from the hinge to the free edge, y up from the leaf's lower edge, z across the leaf
+ * (the swing side is +z · leafTurnSign). Opening/closing turns it smoothly about the hinge.
+ */
+function LeafPivot({ leaf, inset = 0, name, children }: { leaf: OpeningLeaf; inset?: number; name: string; children: ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  const target = leaf.open ? LEAF_OPEN_ANGLE : 0;
+  // current angle: starts in the stored state (no animation on load), then follows it
+  const angle = useRef(target);
+  const s = leafTurnSign(leaf);
+  const base = -Math.atan2(leaf.closedDir.y, leaf.closedDir.x);
+  const pivot = add(leaf.hinge, scale(leaf.closedDir, inset));
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.rotation.y = base - s * angle.current;
+  }, [base, s]);
+  useFrame((_, dt) => {
+    const g = ref.current;
+    const diff = target - angle.current;
+    if (!g || diff === 0) return;
+    const step = LEAF_SPEED * Math.min(dt, 0.1);
+    angle.current = Math.abs(diff) <= step ? target : angle.current + Math.sign(diff) * step;
+    g.rotation.y = base - s * angle.current;
+  });
+  return (
+    <group ref={ref} name={name} position={[pivot.x, leaf.z0, pivot.y]}>
+      {children}
+    </group>
+  );
+}
+
+/** Door leaf with lever handles on both faces; closed, it sits in the frame behind the swing-side face. */
+function DoorLeaf({ leaf, jamb, material, metal, shadows }: { leaf: OpeningLeaf; jamb: number; material: THREE.Material; metal: THREE.Material; shadows: boolean }) {
+  const t = DOOR_LEAF_T;
+  const zc = (-leafTurnSign(leaf) * t) / 2;
+  const leafW = leaf.width - 2 * jamb;
+  const leafH = leaf.z1 - leaf.z0 - jamb;
+  // handle 1.05 m above the floor; the leaf starts at its undercut
+  const handleY = 1.05 - DOOR_LEAF_UNDERCUT;
+  return (
+    <>
+      <mesh position={[leafW / 2, leafH / 2, zc]} scale={[leafW, leafH, t]} material={material} castShadow={shadows} receiveShadow={shadows}>
+        <boxGeometry />
+      </mesh>
+      {[1, -1].map((side) => (
+        <group key={side} position={[leafW - 0.07, handleY, zc + (side * t) / 2]}>
+          <mesh position={[0, 0, side * 0.006]} rotation={[Math.PI / 2, 0, 0]} scale={[0.05, 0.012, 0.05]} material={metal}>
+            <cylinderGeometry args={[0.5, 0.5, 1, 20]} />
+          </mesh>
+          <mesh position={[-0.055, 0, side * 0.04]} scale={[0.13, 0.018, 0.018]} material={metal} castShadow={shadows}>
+            <boxGeometry />
+          </mesh>
+          <mesh position={[0, 0, side * 0.025]} scale={[0.018, 0.018, 0.04]} material={metal}>
+            <boxGeometry />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+/** Window sash (profile frame, glass, handles at the free edge); closed, it sits in the middle of the frame. */
+function WindowSash({ leaf, depth, frame, glass, metal, shadows }: { leaf: OpeningLeaf; depth: number; frame: THREE.Material; glass: THREE.Material; metal: THREE.Material; shadows: boolean }) {
+  const st = WINDOW_SASH_PROFILE;
+  const w = leaf.width;
+  const h = leaf.z1 - leaf.z0;
+  const zc = (-leafTurnSign(leaf) * depth) / 2;
+  return (
+    <>
+      {[
+        [w / 2, st / 2, w, st],
+        [w / 2, h - st / 2, w, st],
+        [st / 2, h / 2, st, h],
+        [w - st / 2, h / 2, st, h],
+      ].map(([x, y, sx, sy], i) => (
+        <mesh key={i} position={[x, y, zc]} scale={[sx, sy, depth]} material={frame} castShadow={shadows}>
+          <boxGeometry />
+        </mesh>
+      ))}
+      <mesh position={[w / 2, h / 2, zc]} scale={[w - 2 * st, h - 2 * st, 0.012]} material={glass}>
+        <boxGeometry />
+      </mesh>
+      {[1, -1].map((side) => (
+        <mesh key={side} position={[w - st / 2, h / 2, zc + side * (depth / 2 + 0.014)]} scale={[0.02, 0.13, 0.02]} material={metal}>
+          <boxGeometry />
+        </mesh>
+      ))}
+    </>
+  );
+}
 
 /** Baseboards and window sills, derived from the plan (see model/geometry/details.ts). */
 const ArchitecturalDetails = memo(function ArchitecturalDetails({ project, derived, quality }: { project: Project; derived: DerivedPlan; quality: QualityMode }) {
