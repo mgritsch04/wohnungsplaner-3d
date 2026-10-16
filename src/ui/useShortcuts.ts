@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
-import { useUiStore, type Tool } from '../store/uiStore';
+import { useUiStore } from '../store/uiStore';
+import { useDialogStore } from './dialogStore';
+import { TOOL_KEYS } from './shortcutCatalog';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure' };
 
 /** Global keyboard shortcuts (ignored while typing in form fields). */
 export function useShortcuts() {
@@ -60,6 +61,9 @@ export function useShortcuts() {
         ui.setViewMode('split');
       } else if (!mod && key === '3' && ui.tool !== 'wall') {
         ui.setViewMode('3d');
+      } else if (!mod && e.key === '?') {
+        // keyboard overview (#59)
+        useDialogStore.getState().openModal('help');
       } else if (!mod && key === 'h') {
         ui.requestFit();
       } else if (!mod && !e.altKey && key === 'o' && ui.selection?.type === 'opening') {

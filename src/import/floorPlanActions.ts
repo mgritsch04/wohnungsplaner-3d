@@ -7,6 +7,7 @@ import { reportError } from '../ui/actions';
 import { confirmDialog } from '../ui/dialogStore';
 import { useImportStore } from './importStore';
 import { findDraftConflicts } from './review';
+import { roomsInsideExistingRooms } from './rooms';
 
 export async function importFloorPlanJsonFile() {
   const file = await pickFile('.json,application/json');
@@ -44,9 +45,12 @@ export async function acceptDraft() {
     const ok = await confirmDialog('Der bestehende Grundriss (Wände, Öffnungen, Räume) wird ersetzt. Möbel bleiben erhalten.', { confirmLabel: 'Ersetzen', danger: true });
     if (!ok) return;
   }
+  // recognised room proposals must not rename rooms that already exist (merge mode)
+  const skipped = draft.source === 'json' ? [] : roomsInsideExistingRooms(draft, useProjectStore.getState().project);
+  const toApply = skipped.length ? { ...draft, rooms: draft.rooms.map((r) => (skipped.includes(r.id) ? { ...r, accepted: false } : r)) } : draft;
   let result: ReturnType<typeof applyDraft> | null = null;
   useProjectStore.getState().apply((d) => {
-    result = applyDraft(d, draft);
+    result = applyDraft(d, toApply);
     if (draft.name && d.walls.length === result.wallsAdded) d.name = draft.name;
   });
   useImportStore.getState().setDraft(null);
@@ -56,7 +60,14 @@ export async function acceptDraft() {
   ui.setLeftTab('tools');
   if (r) {
     ui.toast(`Übernommen: ${r.wallsAdded} Wandsegmente, ${r.openingsAdded} Öffnungen, ${r.roomsAdded} Räume.`, 'success');
-    if (r.warnings.length) ui.toast(r.warnings.slice(0, 3).join(' · '), 'error');
+    const skippedNote =
+      skipped.length === 1
+        ? ['Ein vorgeschlagener Raum liegt in einem bestehenden Raum und wurde nicht übernommen.']
+        : skipped.length > 1
+          ? [`${skipped.length} vorgeschlagene Räume liegen in bestehenden Räumen und wurden nicht übernommen.`]
+          : [];
+    const warnings = [...skippedNote, ...r.warnings];
+    if (warnings.length) ui.toast(warnings.slice(0, 3).join(' · '), 'error');
   }
 }
 

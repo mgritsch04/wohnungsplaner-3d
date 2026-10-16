@@ -7,10 +7,11 @@ import { applyScaleNotation, removeUnderlay, startPlanImport } from '../../impor
 import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActions';
 import { useImportStore, useSourceAnalysis } from '../../import/importStore';
 import { dist } from '../../model/vec';
-import { degToRad, formatLength, radToDeg } from '../../model/units';
-import { runRecognition } from '../../import/recognition/runRecognition';
+import { degToRad, formatArea, formatLength, radToDeg } from '../../model/units';
+import { refreshDraftRooms, runRecognition } from '../../import/recognition/runRecognition';
 import type { DraftStatus } from '../../import/draft';
 import { findDraftConflicts } from '../../import/review';
+import { checkScale, scaleCheckMessage } from '../../import/dimensions';
 
 export function ImportPanel() {
   const underlay = useProjectStore((s) => s.project.underlay);
@@ -103,6 +104,10 @@ function UnderlayControls() {
       if (d.underlay) fn(d.underlay);
     });
 
+  // dimension texts of a vector PDF vs. the current scale (only shown once a scale is set; never applied automatically)
+  const dimCheck = analysis && analysis.imageAssetId === u.imageAssetId && analysis.dimensions?.length && (u.calibrated || u.scaleSource === 'notation') ? checkScale(analysis.dimensions, u.metersPerPixel) : null;
+  const dimMessage = dimCheck && scaleCheckMessage(dimCheck);
+
   const scaleBadge = u.calibrated ? (
     <Badge kind="ok">Kalibriert</Badge>
   ) : u.scaleSource === 'notation' ? (
@@ -157,6 +162,11 @@ function UnderlayControls() {
               Aus Angabe übernehmen
             </button>
           </div>
+        )}
+        {dimMessage && (
+          <p className={dimCheck?.status === 'mismatch' ? 'warning small' : 'muted small'} data-testid="dimension-check">
+            {dimMessage}
+          </p>
         )}
       </Section>
 
@@ -226,8 +236,9 @@ function UnderlayControls() {
 
       <Section title="Automatische Erkennung (Beta)">
         <p className="muted small">
-          Versucht Wände {analysis?.kind === 'vector' || analysis?.kind === 'mixed' ? 'aus den Vektordaten des PDFs' : 'aus dem Bild (dunkle, dicke Linien)'} sowie Öffnungen zu erkennen. Das
-          Ergebnis ist ein Vorschlag und muss geprüft werden. Funktioniert am besten bei sauberen, gerade ausgerichteten Plänen.
+          Versucht Wände {analysis?.kind === 'vector' || analysis?.kind === 'mixed' ? 'aus den Vektordaten des PDFs' : 'aus dem Bild (dunkle, dicke Linien)'} sowie Öffnungen zu erkennen – auch schräge
+          Wände – und schlägt für geschlossene Wandzüge Räume vor. Das Ergebnis ist ein Vorschlag und muss geprüft werden. Funktioniert am besten bei sauberen
+          Plänen.
         </p>
         <button className="block" disabled={!u.calibrated || !!progress} onClick={() => void runRecognition()} title={u.calibrated ? '' : 'Erst den Maßstab kalibrieren'}>
           Erkennung starten
@@ -364,6 +375,7 @@ function DraftReview() {
               <input value={selRoom.name} onChange={(e) => st().updateRoom(selRoom.id, { name: e.target.value })} />
             </span>
           </label>
+          {selRoom.area !== undefined && <p className="muted small">Berechnete Fläche (aus den vorgeschlagenen Wänden): {formatArea(selRoom.area)}</p>}
           {selRoom.statedArea !== undefined && <p className="muted small">Angegebene Fläche: {selRoom.statedArea.toFixed(2)} m² (wird nach der Übernahme verglichen)</p>}
           <ElementActions
             accepted={selRoom.accepted}
@@ -385,10 +397,15 @@ function DraftReview() {
               onSelect={() => st().select({ type: 'opening', id: o.id })} onToggle={() => st().updateOpening(o.id, { accepted: !o.accepted })} />
           ))}
           {draft.rooms.map((r) => (
-            <DraftRow key={r.id} label={`Raum „${r.name}“`} status={r.status} accepted={r.accepted} active={sel?.id === r.id}
+            <DraftRow key={r.id} label={`Raum „${r.name}“${r.area !== undefined ? ` · ${formatArea(r.area)}` : ''}`} status={r.status} accepted={r.accepted} active={sel?.id === r.id}
               onSelect={() => st().select({ type: 'room', id: r.id })} onToggle={() => st().updateRoom(r.id, { accepted: !r.accepted })} />
           ))}
         </ul>
+        {draft.source !== 'json' && (
+          <button className="block" onClick={() => refreshDraftRooms()} title="Nach dem Entfernen, Abwählen oder Verschieben von Wänden: Räume aus den ausgewählten Wänden neu ermitteln">
+            Räume neu vorschlagen
+          </button>
+        )}
       </Section>
     </div>
   );

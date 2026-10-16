@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 
@@ -514,6 +515,21 @@ test('exports the shopping list as CSV', async ({ page }) => {
   await page.getByRole('button', { name: 'Einkaufsliste als CSV exportieren' }).click();
   const d = await download;
   expect(d.suggestedFilename()).toMatch(/einkaufsliste\.csv$/);
+
+  // grouped by room (#75): one group per room with its subtotal, CSV with room column and subtotals
+  await page.getByRole('combobox', { name: 'Gruppierung' }).selectOption('room');
+  const heads = page.locator('.budget-group-head');
+  await expect(heads).toHaveCount(2);
+  await expect(heads.nth(0)).toContainText('Schlafzimmer');
+  await expect(heads.nth(1)).toContainText('Wohnzimmer');
+  const download2 = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Einkaufsliste als CSV exportieren (nach Raum)' }).click();
+  const d2 = await download2;
+  expect(d2.suggestedFilename()).toMatch(/einkaufsliste-nach-raum\.csv$/);
+  const csv = (await readFile((await d2.path())!)).toString('utf8');
+  expect(csv).toContain('Raum;Kategorie;Artikel');
+  expect(csv).toContain('Zwischensumme Schlafzimmer');
+  expect(csv).toContain('Zwischensumme Wohnzimmer');
 });
 
 test('imports page 2 of a vector PDF, applies the stated scale and recognises walls', async ({ page }) => {
@@ -976,8 +992,11 @@ test('3D: click vs. drag – threshold, no jump, release over a wall, focus loss
   await page.mouse.up();
   await page.waitForTimeout(300);
   const t2 = await find(table.id);
-  expect(t2.x).toBeCloseTo(table.x - 0.5, 1);
-  expect(t2.y).toBeCloseTo(table.y, 1);
+  // furniture snaps to the 5 cm grid (#52): a pointer that lands a hair off the line may
+  // round to the neighbouring grid line, so allow one grid step – a real jump is far more
+  const step = 0.05 + 1e-6;
+  expect(Math.abs(t2.x - (table.x - 0.5))).toBeLessThanOrEqual(step);
+  expect(Math.abs(t2.y - table.y)).toBeLessThanOrEqual(step);
   expect(await txOpen()).toBe(false);
 
   // 3) dragged towards the north wall and released with the pointer over the wall: stays selected, flush to the wall
@@ -1416,6 +1435,28 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+test('bug report: help › "Problem melden" shows browser/version/state, project data only on request (#62)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByTitle('Hilfe & Tastenkürzel').click();
+  await page.getByRole('button', { name: 'Problem melden …' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Problem melden' });
+  await expect(dialog).toBeVisible();
+  const text = dialog.getByTestId('bug-report-text');
+  await expect(text).toHaveValue(/App-Version: \d+\.\d+\.\d+/);
+  await expect(text).toHaveValue(/Browser: .*Chrome/);
+  await expect(text).toHaveValue(/Projekt: 2 Räume/);
+  await expect(text).not.toHaveValue(/Sofa 3-Sitzer/);
+  await dialog.getByLabel('Was ist passiert?').fill('Sofa springt beim Ziehen');
+  await expect(text).toHaveValue(/Sofa springt beim Ziehen/);
+  await dialog.getByLabel(/Projektdaten anfügen/).check();
+  await expect(text).toHaveValue(/Sofa 3-Sitzer/);
+  await expect(dialog.getByRole('button', { name: /Issue auf GitHub öffnen/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('exports the plan as PNG and prints plan + parts list on one A4 page (#71, #72)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
@@ -1472,5 +1513,262 @@ test('exports the plan as PNG and prints plan + parts list on one A4 page (#71, 
 
   await page.keyboard.press('Escape');
   await expect(view).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('recognises a sloped 30° wall in a raster plan and proposes the rooms (#37)', async ({ page }) => {
+  const { slopedPlan, slopedPlanPng } = await import('./fixtures');
+  const { offsetPolygon, polygonArea } = await import('../src/model/vec');
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'schraege-wand.png', mimeType: 'image/png', buffer: slopedPlanPng() });
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
+  // calibrate on the top wall centerline: x = 100 px … 500 px is 4 m
+  await page.getByRole('button', { name: 'Maßstab kalibrieren (2 Punkte)' }).click();
+  const u = (await getProject(page)).underlay;
+  const toWorld = (px: number, py: number) => ({ x: u.x + px * u.metersPerPixel, y: u.y + py * u.metersPerPixel });
+  const a = toWorld(100, 100);
+  const b = toWorld(500, 100);
+  const sa = await planToScreen(page, a.x, a.y);
+  const sb = await planToScreen(page, b.x, b.y);
+  await page.mouse.click(sa.x, sa.y);
+  await page.mouse.click(sb.x, sb.y);
+  await page.getByLabel('Reale Länge (cm)').fill('400');
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.getByText('Kalibriert', { exact: true })).toBeVisible();
+  const cal = (await getProject(page)).underlay;
+  const toWorldCal = (px: number, py: number) => ({ x: cal.x + px * cal.metersPerPixel, y: cal.y + py * cal.metersPerPixel });
+
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  type P = { x: number; y: number };
+  const draft = await page.evaluate(
+    () =>
+      (window as unknown as { __wp: { useImportStore: { getState: () => { draft: unknown } } } }).__wp.useImportStore.getState().draft as {
+        walls: { a: P; b: P; thickness: number }[];
+        openings: { kind: string; center: P; width: number }[];
+        rooms: { name: string; area: number; status: string; accepted: boolean }[];
+      },
+  );
+  const len = (w: { a: P; b: P }) => Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
+  const angle = (w: { a: P; b: P }) => ((((Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x) * 180) / Math.PI) % 180) + 180) % 180;
+  // the sloped wall: 30°, 3 m long (centerline), 20 cm thick
+  const sloped = draft.walls.filter((w) => Math.abs(angle(w) - 30) < 1);
+  expect(sloped).toHaveLength(1);
+  expect(Math.abs(len(sloped[0]) - 3)).toBeLessThan(0.05);
+  expect(Math.abs(sloped[0].thickness - 0.2)).toBeLessThan(0.03);
+  // the door inside the sloped wall
+  const [d0, d1] = slopedPlan.slopedDoor.map((q) => toWorldCal(q.x * 100, q.y * 100));
+  const doorCenter = { x: (d0.x + d1.x) / 2, y: (d0.y + d1.y) / 2 };
+  const door = draft.openings.find((o) => Math.hypot(o.center.x - doorCenter.x, o.center.y - doorCenter.y) < 0.1);
+  expect(door).toBeDefined();
+  expect(Math.abs(door!.width - 0.9)).toBeLessThan(0.05);
+  // two rooms proposed with their net areas, listed in the review
+  expect(draft.rooms).toHaveLength(2);
+  const areas = draft.rooms.map((r) => r.area).sort((x, y) => x - y);
+  const rightRoom = [slopedPlan.interiorWall[0], ...slopedPlan.outline.slice(1, 4), slopedPlan.interiorWall[1]];
+  expect(Math.abs(areas[0] - 1.8 * 3.8)).toBeLessThan(0.15);
+  expect(Math.abs(areas[1] - polygonArea(offsetPolygon(rightRoom, -0.1)))).toBeLessThan(0.3);
+  await expect(page.getByText(/Raum „Raum 1“ · \d+,\d\d m²/)).toBeVisible();
+  // re-proposing from the (unchanged) walls keeps both rooms
+  await page.getByRole('button', { name: 'Räume neu vorschlagen' }).click();
+  await expect(page.getByText('2 Räume aus den ausgewählten Wänden vorgeschlagen.')).toBeVisible();
+
+  // take it over as the new floor plan
+  await page.locator('.panel.left').getByLabel('Übernahme').selectOption('replace');
+  await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
+  await page.getByRole('button', { name: 'Übernehmen', exact: true }).click(); // uncertain openings
+  await page.getByRole('button', { name: 'Ersetzen' }).click();
+  const p = await getProject(page);
+  expect(p.rooms.map((r: { name: string }) => r.name).sort()).toEqual(['Raum 1', 'Raum 2']);
+  expect(p.openings.length).toBeGreaterThanOrEqual(2);
+  // the result renders in 3D
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.waitForTimeout(800);
+  expect(errors).toEqual([]);
+});
+
+test('checks the scale against dimension texts of a vector PDF without changing it (#37)', async ({ page }) => {
+  const { dimensionedPlanPdf } = await import('./fixtures');
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'bemasst.pdf', mimeType: 'application/pdf', buffer: dimensionedPlanPdf() });
+  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 15000 });
+  // no statement before a scale is set
+  await expect(page.getByTestId('dimension-check')).toHaveCount(0);
+  // stated scale 1:100 matches the drawing: all four dimensions agree
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen zum Maßstab (4 Maße');
+  // a wrong stated scale (1:110) is reported, not corrected
+  await page.getByLabel('Maßstab 1:').fill('110');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen nicht zum Maßstab: Abweichung +10,0 %');
+  const u = (await getProject(page)).underlay;
+  expect(u.pixelsPerPoint * 28.3465 * u.metersPerPixel).toBeCloseTo(1.1, 3); // still 1:110 as entered
+  expect(errors).toEqual([]);
+});
+
+test('project versions: save, move, open restores (one undo step), automatic state, compare, delete, reload (#66, #58)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const openVersions = async () => {
+    await page.getByRole('button', { name: 'Projekt ▾' }).click();
+    await page.getByRole('button', { name: /^Versionen/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Versionen' });
+    await expect(dlg).toBeVisible();
+    return dlg;
+  };
+  const itemById = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id);
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+
+  // 1. save the current state under a name
+  let dlg = await openVersions();
+  await expect(dlg.getByText('Noch keine Stände gespeichert.')).toBeVisible();
+  await dlg.getByLabel('Name des Stands').fill('Couchtisch Mitte');
+  await dlg.getByRole('button', { name: 'Aktuellen Stand speichern' }).click();
+  const items = dlg.getByTestId('version-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Couchtisch Mitte');
+  await expect(dlg.getByTestId('versions-count')).toContainText('1 von höchstens 30');
+  await dlg.getByRole('button', { name: 'Schließen' }).click();
+
+  // 2. move the coffee table
+  const start = await planToScreen(page, table.x, table.y);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 40, start.y + 10, { steps: 5 });
+  await page.mouse.move(start.x + 80, start.y + 20, { steps: 5 });
+  await page.mouse.up();
+  const moved = await itemById(table.id);
+  expect(moved.x).toBeGreaterThan(table.x + 0.3);
+
+  // 3. open the saved state: old position back, current state kept as automatic state
+  dlg = await openVersions();
+  await items.filter({ hasText: 'Couchtisch Mitte' }).getByRole('button', { name: 'Öffnen' }).click();
+  await expect(dlg).toBeHidden();
+  expect((await itemById(table.id)).x).toBeCloseTo(table.x, 6);
+  expect((await itemById(table.id)).y).toBeCloseTo(table.y, 6);
+  // opening is ONE undo step
+  await page.keyboard.press('Control+z');
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+  await page.keyboard.press('Control+y');
+  expect((await itemById(table.id)).x).toBeCloseTo(table.x, 6);
+
+  // 4. the moved state is reachable as automatic state; compare both
+  dlg = await openVersions();
+  await expect(items).toHaveCount(2);
+  const auto = items.filter({ hasText: 'Automatisch vor dem Wechsel zu „Couchtisch Mitte“' });
+  await expect(auto).toHaveCount(1);
+  await expect(auto.locator('.version-badge')).toHaveText('automatisch');
+  const optionLabel = async (select: string, prefix: string) => (await dlg.getByLabel(select).locator('option').allInnerTexts()).find((t) => t.startsWith(prefix))!;
+  await dlg.getByLabel('Stand A').selectOption({ label: await optionLabel('Stand A', 'Couchtisch Mitte') });
+  await dlg.getByLabel('Stand B').selectOption({ label: await optionLabel('Stand B', 'Automatisch') });
+  const cmp = dlg.getByTestId('versions-compare-table');
+  await expect(cmp).toContainText('A: Couchtisch Mitte');
+  await expect(cmp).toContainText('B: Automatisch vor dem Wechsel');
+  await expect(cmp).toContainText('Wohnzimmer');
+  const pieces = p0.furniture.reduce((s: number, f: { quantity: number }) => s + f.quantity, 0);
+  const piecesRow = cmp.getByRole('row', { name: /Anzahl Möbel/ });
+  await expect(piecesRow.getByRole('cell').nth(0)).toHaveText(String(pieces));
+  await expect(piecesRow.getByRole('cell').nth(2)).toHaveText('±0');
+  await expect(cmp.getByRole('row', { name: /Bodenfläche gesamt/ }).getByRole('cell').nth(0)).toContainText('m²');
+  await expect(cmp.getByRole('row', { name: /Gesamtpreis/ }).getByRole('cell').nth(0)).toContainText('€');
+
+  // open the automatic state: moved position back; the current state already exists → no extra state
+  await auto.getByRole('button', { name: 'Öffnen' }).click();
+  await expect(dlg).toBeHidden();
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+
+  // 5. delete a state (with confirmation)
+  dlg = await openVersions();
+  await expect(items).toHaveCount(2);
+  await items.filter({ hasNotText: 'Automatisch' }).getByRole('button', { name: 'Löschen' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Automatisch vor dem Wechsel');
+  await dlg.getByRole('button', { name: 'Schließen' }).click();
+
+  // 6. states survive a reload
+  await expect(page.locator('.save-state')).toHaveText('Gespeichert', { timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  dlg = await openVersions();
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Automatisch vor dem Wechsel zu „Couchtisch Mitte“');
+  await expect(dlg.getByTestId('versions-compare-table')).toBeVisible();
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+  expect(errors).toEqual([]);
+});
+
+test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width (#68)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  const p = await getProject(page);
+  const wardrobe = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const bed = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-bed-160');
+  // select the wardrobe and move it numerically so 60 cm remain between bed and wardrobe
+  const s = await planToScreen(page, wardrobe.x, wardrobe.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: wardrobe.id });
+  const y = bed.y + bed.depth / 2 + 0.6 + wardrobe.depth / 2;
+  const right = page.locator('.panel.right');
+  await right.getByRole('textbox', { name: 'Y cm', exact: true }).fill(String(Math.round(y * 1000) / 10).replace('.', ','));
+  await right.getByRole('textbox', { name: 'Y cm', exact: true }).press('Enter');
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const marker = plan.locator('[data-testid="narrow-passage"][data-width-cm="60"]');
+  await expect(marker.first()).toBeVisible();
+  await expect(marker.first().getByText('60 cm')).toBeVisible();
+  // the 3D view shows floor markers too
+  const markers3d = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scene = (window as any).__wp.three.scene;
+      return scene.getObjectByName('narrow-passages')?.children.length ?? -1;
+    });
+  await expect.poll(markers3d).toBeGreaterThan(0);
+
+  // minimum 60 cm (lowest allowed value): a 60 cm passage is no longer narrower → marker gone
+  const left = page.locator('.panel.left');
+  const min = left.getByRole('textbox', { name: 'Durchgang mindestens cm' });
+  await min.fill('60');
+  await min.press('Enter');
+  expect((await getProject(page)).settings.minPassageWidth).toBeCloseTo(0.6, 6);
+  await expect(marker).toHaveCount(0);
+
+  // switching the display off hides all markers in 2D and 3D
+  await left.getByLabel('Engstellen anzeigen').uncheck();
+  await expect(plan.locator('[data-testid="narrow-passage"]')).toHaveCount(0);
+  await expect.poll(markers3d).toBe(0);
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});
+
+test('keyboard overview: "?" opens all shortcuts (2D, 3D, walking), Esc closes (#59)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => undefined);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Hilfe & Tastenkürzel' });
+  await expect(dialog).toBeVisible();
+  for (const text of ['Werkzeuge', '3D-Begehung', 'Ducken', 'Möbel tragen / absetzen', 'Möbel kopieren / einfügen', 'Diese Übersicht öffnen']) await expect(dialog).toContainText(text);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
   expect(errors).toEqual([]);
 });

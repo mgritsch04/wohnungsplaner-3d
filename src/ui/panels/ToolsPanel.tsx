@@ -149,6 +149,28 @@ export function ToolsPanel() {
         <p className="muted small">Gilt beim Ziehen in 2D und 3D. Alt gedrückt halten = vorübergehend frei platzieren.</p>
       </Section>
 
+      <Section title="Durchgänge">
+        <NumberField
+          label="Durchgang mindestens"
+          value={settings.minPassageWidth}
+          factor={100}
+          digits={0}
+          unit="cm"
+          min={60}
+          max={150}
+          step={5}
+          title="Lichte Breite, ab der ein Durchgang als eng markiert wird (60–150 cm)"
+          onChange={(v) => apply((d) => void (d.settings.minPassageWidth = Math.max(0.6, Math.min(1.5, v))))}
+        />
+        <p className="muted small">Richtwert, keine Norm. Standard 90 cm.</p>
+        <CheckField
+          label="Engstellen anzeigen"
+          checked={settings.showNarrowPassages}
+          onChange={(v) => apply((d) => void (d.settings.showNarrowPassages = v))}
+          title="Lücken zwischen Möbeln, Möbel und Wand sowie Türen schmaler als die Mindestbreite rot markieren (2D und 3D)"
+        />
+      </Section>
+
       <Section title="Beleuchtung">
         <button className="block" onClick={addLight}>
           + Deckenleuchte hinzufügen

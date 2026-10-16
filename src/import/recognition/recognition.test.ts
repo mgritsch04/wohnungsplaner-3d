@@ -60,4 +60,17 @@ describe('vector recognition', () => {
     expect(out.walls.length).toBe(4);
     for (const w of out.walls) expect(w.thickness).toBeCloseTo(20, 5);
   });
+
+  it('finds a door gap even if the two wall pieces differ by rounding noise', () => {
+    const seg = (x1: number, y1: number, x2: number, y2: number) => ({ x1, y1, x2, y2 });
+    const e = 0.004; // PDF coordinates are rounded – the right piece lies a tiny bit higher
+    const segments = [
+      seg(90, 90, 250, 90), seg(350, 90 - e, 610, 90 - e), seg(110, 110, 250, 110), seg(350, 110 - e, 590, 110 - e),
+      seg(90, 510, 610, 510), seg(110, 490, 590, 490), seg(90, 90, 90, 510), seg(110, 110, 110, 490), seg(610, 90, 610, 510), seg(590, 110, 590, 490),
+    ];
+    const out = detectVectorWalls(segments, 0.01);
+    expect(out.walls).toHaveLength(4);
+    expect(out.openings).toHaveLength(1);
+    expect(out.openings[0].width).toBeCloseTo(100, 1);
+  });
 });

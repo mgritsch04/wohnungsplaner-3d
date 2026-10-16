@@ -22,6 +22,7 @@ import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { snapToGrid } from '../model/operations';
 import { CollisionMarkers } from './CollisionMarkers';
+import { NarrowPassageMarkers } from './NarrowPassageMarkers';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 import { toggleOpening } from '../ui/actions';
 
@@ -213,6 +214,7 @@ function SceneContent({
         />
       ))}
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
+      <NarrowPassageMarkers project={project} derived={derived} />
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects />

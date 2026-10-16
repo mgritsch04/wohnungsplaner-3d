@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { deleteProject, listProjects, type ProjectMeta } from '../persistence/projects';
 import { useProjectStore } from '../store/projectStore';
@@ -8,6 +8,9 @@ import { confirmDialog, useDialogStore } from './dialogStore';
 import { importPdfPage } from '../import/underlayImport';
 import { ProductImportModal } from './ProductImportModal';
 import { ModelImportModal } from './ModelImportModal';
+import { BugReportModal } from './BugReportModal';
+import { SHORTCUT_GROUPS } from './shortcutCatalog';
+import { VersionsModal } from '../versions/VersionsModal';
 
 export function ModalHost() {
   const modal = useDialogStore((s) => s.modal);
@@ -19,6 +22,8 @@ export function ModalHost() {
       {modal === 'pdfPage' && <PdfPageModal />}
       {modal === 'product' && <ProductImportModal />}
       {modal === 'model' && <ModelImportModal />}
+      {modal === 'bugReport' && <BugReportModal />}
+      {modal === 'versions' && <VersionsModal />}
       {confirm && (
         <div className="modal-backdrop" onMouseDown={() => confirm.resolve(false)}>
           <div className="modal small" role="alertdialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
@@ -170,72 +175,21 @@ function HelpModal() {
   return (
     <Modal title="Hilfe & Tastenkürzel" wide>
       <div className="help-grid">
-        <section>
-          <h3>Werkzeuge</h3>
-          <dl className="kbd-list">
-            <dt>V</dt>
-            <dd>Auswählen / Verschieben</dd>
-            <dt>W</dt>
-            <dd>Wand zeichnen (Länge in cm tippen + Enter)</dd>
-            <dt>R</dt>
-            <dd>Raum (Rechteck aufziehen oder Fläche anklicken)</dd>
-            <dt>T / F / G</dt>
-            <dd>Tür / Fenster / Durchgang</dd>
-            <dt>M</dt>
-            <dd>Messen</dd>
-            <dt>Esc</dt>
-            <dd>Abbrechen / Auswahl aufheben</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>Bearbeiten</h3>
-          <dl className="kbd-list">
-            <dt>Strg+Z / Strg+Y</dt>
-            <dd>Rückgängig / Wiederholen</dd>
-            <dt>Entf</dt>
-            <dd>Auswahl löschen</dd>
-            <dt>Strg+D</dt>
-            <dd>Objekt duplizieren</dd>
-            <dt>Q / E</dt>
-            <dd>Objekt um 15° drehen</dd>
-            <dt>O / Doppelklick in 3D</dt>
-            <dd>Ausgewählte Tür / ausgewähltes Fenster öffnen oder schließen</dd>
-            <dt>Pfeiltasten</dt>
-            <dd>Objekt 1 cm verschieben (Shift: 10 cm)</dd>
-            <dt>Strg+S</dt>
-            <dd>Speichern</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>Ansicht</h3>
-          <dl className="kbd-list">
-            <dt>1 / 2 / 3</dt>
-            <dd>2D / Geteilt / 3D</dd>
-            <dt>H</dt>
-            <dd>Plan einpassen</dd>
-            <dt>Mausrad</dt>
-            <dd>Zoomen</dd>
-            <dt>Leertaste/rechte Maustaste + Ziehen</dt>
-            <dd>Verschieben</dd>
-            <dt>Shift / Alt</dt>
-            <dd>freier Winkel / ohne Fang</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>3D-Begehung</h3>
-          <dl className="kbd-list">
-            <dt>WASD / Pfeile</dt>
-            <dd>Gehen</dd>
-            <dt>Maus</dt>
-            <dd>Umsehen (nach Klick in die Ansicht)</dd>
-            <dt>Shift</dt>
-            <dd>Schneller gehen</dd>
-            <dt>Klick / O</dt>
-            <dd>Tür oder Fenster im Fadenkreuz öffnen/schließen</dd>
-            <dt>Esc</dt>
-            <dd>Maus freigeben</dd>
-          </dl>
-        </section>
+        {SHORTCUT_GROUPS.map((g) => (
+          <section key={g.title}>
+            <h3>
+              {g.title} <span className="muted small">· {g.where}</span>
+            </h3>
+            <dl className="kbd-list">
+              {g.items.map((it) => (
+                <Fragment key={it.keys}>
+                  <dt>{it.keys}</dt>
+                  <dd>{it.action}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          </section>
+        ))}
       </div>
       <h3>Koordinaten & Einheiten</h3>
       <p className="small">
@@ -243,6 +197,9 @@ function HelpModal() {
         Plan sind lichte Innenmaße.
       </p>
       <p className="small muted">Entwurfswerkzeug ohne Gewähr – keine Prüfung von Bau-, Elektro- oder Installationsvorschriften.</p>
+      <div className="btn-row end">
+        <button onClick={() => useDialogStore.getState().openModal('bugReport')}>Problem melden …</button>
+      </div>
     </Modal>
   );
 }

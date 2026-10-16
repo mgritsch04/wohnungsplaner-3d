@@ -43,7 +43,10 @@ export interface DraftRoom {
   id: string;
   name: string;
   labelPoint: Vec2;
+  /** Area stated by the source (e.g. "12,34 m²" in the plan) – compared after applying. */
   statedArea?: number;
+  /** Net floor area computed from the proposed walls (m²), for display in the review. */
+  area?: number;
   floorMaterialId?: string;
   status: DraftStatus;
   accepted: boolean;

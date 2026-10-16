@@ -9,6 +9,7 @@ import { FurnitureHoverCard } from './ui/FurnitureHoverCard';
 import { SaveErrorBanner } from './ui/SaveErrorBanner';
 import { useShortcuts } from './ui/useShortcuts';
 import { useAutosave } from './persistence/useAutosave';
+import { noteSaveState } from './ui/bugReport';
 import { lastProjectId, loadProject, saveProject } from './persistence/projects';
 import { ToolsPanel } from './ui/panels/ToolsPanel';
 import { CatalogPanel } from './ui/panels/CatalogPanel';
@@ -28,6 +29,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   useShortcuts();
   const autosave = useAutosave(ready);
+  useEffect(() => noteSaveState(autosave.state), [autosave.state]);
 
   // restore the last project (or keep the sample project on first launch)
   useEffect(() => {

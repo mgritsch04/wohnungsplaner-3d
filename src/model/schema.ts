@@ -265,6 +265,10 @@ export const SettingsSchema = z.object({
   eyeHeight: z.number().min(1).max(2.2).default(1.63),
   /** How furniture snaps while dragging (#52): grid steps + wall edges, wall edges only, or free. Alt = free temporarily. */
   furnitureSnap: z.enum(['grid5', 'grid10', 'wall', 'off']).default('grid5'),
+  /** Minimum clear width of passages (#68) in metres – a guideline, not a building code. */
+  minPassageWidth: z.number().min(0.6).max(1.5).default(0.9),
+  /** Mark passages narrower than minPassageWidth in 2D and 3D. */
+  showNarrowPassages: z.boolean().default(true),
 });
 
 export const ProjectSchema = z.object({
