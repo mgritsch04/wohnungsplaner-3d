@@ -1,61 +1,77 @@
 import type { DerivedPlan } from '../derived';
 import type { Project } from '../schema';
-import { findWallBetween } from '../graph';
-import { add, dist, dot, normalize, perp, pointInPolygon, scale, signedArea, sub, type Vec2 } from '../vec';
+import { detectFaces } from '../roomDetection';
+import { add, dist, dot, normalize, pointInPolygon, scale, sub, type Vec2 } from '../vec';
 
 /** Baseboard dimensions (meters). */
 export const BASEBOARD_HEIGHT = 0.06;
 export const BASEBOARD_THICKNESS = 0.015;
 
 export interface BaseboardSegment {
-  roomId: string;
+  /** Wall the board is fixed to (or the room it belongs to). */
+  wallId: string;
   a: Vec2;
   b: Vec2;
-  /** Unit normal pointing into the room. */
+  /** Unit normal pointing away from the wall into the room. */
   inward: Vec2;
 }
 
 /**
- * Baseboards along the clear interior outline of every room, interrupted
- * where doors and passages cut through the wall.
+ * Skirting boards on every wall face that borders an interior space – a room
+ * record or any enclosed wall area – including free-standing wall stubs and
+ * their end faces. Boards are interrupted by doors/passages and windows reaching
+ * the floor, and extended by their thickness at both ends so corners close
+ * without notches (the overhang disappears inside the neighbouring wall).
  */
 export function computeBaseboards(p: Project, d: DerivedPlan): BaseboardSegment[] {
   const out: BaseboardSegment[] = [];
-  for (const room of p.rooms) {
-    const g = d.rooms.get(room.id);
-    if (!g) continue;
-    const poly = g.interior;
-    const n = poly.length;
-    const sign = signedArea(g.centerline) >= 0 ? 1 : -1;
-    for (let i = 0; i < n; i++) {
-      const a = poly[i];
-      const b = poly[(i + 1) % n];
-      const len = dist(a, b);
+  const areas: Vec2[][] = [...[...d.rooms.values()].map((g) => g.interior), ...detectFaces(p).map((f) => f.polygon)];
+  const isInterior = (q: Vec2) => areas.some((poly) => pointInPolygon(q, poly));
+  const T = BASEBOARD_THICKNESS;
+  for (const [wallId, fp] of d.footprints) {
+    const wall = d.index.walls.get(wallId);
+    if (!wall) continue;
+    const ops = (d.openings.get(wallId) ?? []).filter((r) => !(r.opening.kind === 'window' && r.bottom > BASEBOARD_HEIGHT));
+    for (const side of [1, -1] as const) {
+      const inward = scale(fp.normal, side);
+      // face segment of the footprint on this side
+      const [fa, fb] = side === 1 ? [fp.polygon[0], fp.polygon[1]] : [fp.polygon[3], fp.polygon[2]];
+      const len = dist(fa, fb);
       if (len < 0.02) continue;
-      const dir = normalize(sub(b, a));
-      const inward = scale(perp(dir), sign);
-      // cut-outs from openings of the wall behind this edge
-      const wall = findWallBetween(p.walls, room.nodeIds[i], room.nodeIds[(i + 1) % n]);
-      const cuts: [number, number][] = [];
-      if (wall) {
-        const fp = d.footprints.get(wall.id);
-        for (const r of fp ? (d.openings.get(wall.id) ?? []) : []) {
-          if (r.opening.kind === 'window' && r.bottom > BASEBOARD_HEIGHT) continue;
-          const t0 = dot(sub(add(fp!.a, scale(fp!.dir, r.s0)), a), dir);
-          const t1 = dot(sub(add(fp!.a, scale(fp!.dir, r.s1)), a), dir);
-          cuts.push([Math.min(t0, t1), Math.max(t0, t1)]);
-        }
-      }
-      cuts.sort((x, y) => x[0] - y[0]);
-      let cursor = 0;
-      const push = (t0: number, t1: number) => {
-        if (t1 - t0 > 0.02) out.push({ roomId: room.id, a: add(a, scale(dir, t0)), b: add(a, scale(dir, t1)), inward });
-      };
+      const mid = scale(add(fa, fb), 0.5);
+      if (!isInterior(add(mid, scale(inward, 0.05)))) continue;
+      const dir = normalize(sub(fb, fa));
+      // opening intervals in face coordinates
+      const cuts = ops
+        .map((r) => {
+          const t0 = dot(sub(add(fp.a, scale(fp.dir, r.s0)), fa), dir);
+          const t1 = dot(sub(add(fp.a, scale(fp.dir, r.s1)), fa), dir);
+          return [Math.min(t0, t1), Math.max(t0, t1)] as [number, number];
+        })
+        .sort((x, y) => x[0] - y[0]);
+      const ranges: [number, number][] = [];
+      let cursor = -T; // extend into the corner
       for (const [c0, c1] of cuts) {
-        push(cursor, Math.min(len, Math.max(cursor, c0)));
+        if (c0 > cursor) ranges.push([cursor, c0]);
         cursor = Math.max(cursor, c1);
       }
-      push(cursor, len);
+      ranges.push([cursor, len + T]);
+      for (const [t0, t1] of ranges) {
+        if (t1 - t0 > 0.02) out.push({ wallId, a: add(fa, scale(dir, t0)), b: add(fa, scale(dir, t1)), inward });
+      }
+    }
+    // end faces of free wall ends (e.g. a partition stub inside a room)
+    for (const [nodeId, end] of [
+      [wall.a, 'a'],
+      [wall.b, 'b'],
+    ] as const) {
+      if ((d.index.wallsAtNode.get(nodeId)?.length ?? 0) !== 1) continue;
+      const out1 = end === 'a' ? scale(fp.dir, -1) : fp.dir;
+      const [c0, c1] = end === 'a' ? [fp.polygon[3], fp.polygon[0]] : [fp.polygon[1], fp.polygon[2]];
+      const mid = scale(add(c0, c1), 0.5);
+      if (!isInterior(add(mid, scale(out1, 0.05)))) continue;
+      const dir = normalize(sub(c1, c0));
+      out.push({ wallId, a: add(c0, scale(dir, -T)), b: add(c1, scale(dir, T)), inward: out1 });
     }
   }
   return out;

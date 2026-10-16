@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Project, QualityMode } from '../model/schema';
@@ -278,22 +278,7 @@ const ArchitecturalDetails = memo(function ArchitecturalDetails({ project, deriv
   const aluMat = getColorMaterial('#8f9398', quality, { roughness: 0.4, metalness: 0.6 });
   return (
     <group>
-      {baseboards.map((b, i) => {
-        const len = dist(b.a, b.b);
-        const mid = add(scale(add(b.a, b.b), 0.5), scale(b.inward, BASEBOARD_THICKNESS / 2));
-        return (
-          <mesh
-            key={i}
-            position={[mid.x, BASEBOARD_HEIGHT / 2, mid.y]}
-            rotation={[0, -Math.atan2(b.b.y - b.a.y, b.b.x - b.a.x), 0]}
-            scale={[len, BASEBOARD_HEIGHT, BASEBOARD_THICKNESS]}
-            material={boardMat}
-            receiveShadow={shadows}
-          >
-            <boxGeometry />
-          </mesh>
-        );
-      })}
+      <BaseboardInstances boards={baseboards} material={boardMat} shadows={shadows} />
       {sills.map((s, i) => {
         const t = s.side === 'inside' ? 0.02 : 0.015;
         return (
@@ -313,6 +298,32 @@ const ArchitecturalDetails = memo(function ArchitecturalDetails({ project, deriv
     </group>
   );
 });
+
+/** All skirting boards as one instanced mesh (a single draw call). */
+function BaseboardInstances({ boards, material, shadows }: { boards: ReturnType<typeof computeBaseboards>; material: THREE.Material; shadows: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const geometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    boards.forEach((b, i) => {
+      const len = dist(b.a, b.b);
+      const mid = add(scale(add(b.a, b.b), 0.5), scale(b.inward, BASEBOARD_THICKNESS / 2));
+      q.setFromAxisAngle(up, -Math.atan2(b.b.y - b.a.y, b.b.x - b.a.x));
+      m.compose(new THREE.Vector3(mid.x, BASEBOARD_HEIGHT / 2, mid.y), q, new THREE.Vector3(len, BASEBOARD_HEIGHT, BASEBOARD_THICKNESS));
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.count = boards.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [boards]);
+  if (boards.length === 0) return null;
+  return <instancedMesh key={boards.length} ref={ref} args={[geometry, material, boards.length]} receiveShadow={shadows} raycast={() => null} />;
+}
 
 /** A large neutral ground plane under the apartment. */
 export function Ground({ quality }: { quality: QualityMode }) {
