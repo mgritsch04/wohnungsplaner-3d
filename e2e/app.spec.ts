@@ -815,6 +815,8 @@ test('hover info: name, category, size and price after a short delay; hidden whi
 });
 
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
+  // realism rendering with software WebGL takes ~45–55 s alone; under parallel load it overran 60 s
+  test.setTimeout(150_000);
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
