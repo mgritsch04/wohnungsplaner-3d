@@ -2588,12 +2588,23 @@ test('3D tape measure in the walkthrough: crosshair clicks measure, the capture 
   await centre(); // captures the mouse – no point yet
   await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
   const look = (yaw: number, pitch: number) => page.evaluate(([y, p]) => (window as unknown as { __wp: { walk: { look: (a: number, b: number) => void } } }).__wp.walk.look(y, p), [yaw, pitch] as const);
-  await look(0, -0.6);
-  await page.waitForTimeout(200);
+  // the new view is applied on the next rendered frame – on a slow CI runner a fixed wait may not cover one,
+  // so wait until the camera really looks somewhere else before clicking
+  const dir = () => page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cam = (window as any).__wp.three.camera;
+    const m = cam.matrixWorld.elements;
+    return [-m[8], -m[9], -m[10]];
+  });
+  const lookAndWait = async (yaw: number, pitch: number) => {
+    const d0 = await dir();
+    await look(yaw, pitch);
+    await expect.poll(async () => { const d = await dir(); return Math.hypot(d[0] - d0[0], d[1] - d0[1], d[2] - d0[2]); }, { timeout: 15000 }).toBeGreaterThan(0.05);
+  };
+  await lookAndWait(0, -0.6);
   await centre();
   await expect(page.getByRole('status')).toContainText('Zweiten Punkt anklicken');
-  await look(0.4, -0.5);
-  await page.waitForTimeout(200);
+  await lookAndWait(0.4, -0.5);
   await centre();
   await expect(page.getByTestId('tape-label')).toHaveCount(1);
   expect(Number(await page.getByTestId('tape-label').getAttribute('data-length'))).toBeGreaterThan(0.1);
