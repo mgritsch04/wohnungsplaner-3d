@@ -2,7 +2,7 @@ import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import type { CatalogItem } from '../catalog/types';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
-import { deleteFurniture, deleteNode, deleteRoom, deleteWalls, duplicateFurniture } from '../model/operations';
+import { deleteFurniture, deleteNode, deleteRoom, deleteWalls, duplicateFurniture, hasLeaf, setOpeningOpen } from '../model/operations';
 import { createSampleProject } from '../model/sample';
 import { roundMm } from '../model/units';
 import { pointInPolygon } from '../model/vec';
@@ -216,4 +216,17 @@ export async function importProjectFile() {
   } catch (e) {
     reportError(e, 'Import fehlgeschlagen');
   }
+}
+
+/**
+ * Open or close door/window `id` (#21; O key, double-click in 3D, click while walking,
+ * panel): one undo step per toggle. Returns the new state, or null if nothing changed
+ * (no such opening, a passage, or a drag/carry in progress).
+ */
+export function toggleOpening(id: string): boolean | null {
+  const o = store().project.openings.find((x) => x.id === id);
+  if (!o || !hasLeaf(o) || store().txBase) return null;
+  let open: boolean | null = null;
+  store().apply((d) => void (open = setOpeningOpen(d, id)));
+  return open;
 }

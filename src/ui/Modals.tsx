@@ -198,6 +198,8 @@ function HelpModal() {
             <dd>Objekt duplizieren</dd>
             <dt>Q / E</dt>
             <dd>Objekt um 15° drehen</dd>
+            <dt>O / Doppelklick in 3D</dt>
+            <dd>Ausgewählte Tür / ausgewähltes Fenster öffnen oder schließen</dd>
             <dt>Pfeiltasten</dt>
             <dd>Objekt 1 cm verschieben (Shift: 10 cm)</dd>
             <dt>Strg+S</dt>
@@ -228,6 +230,8 @@ function HelpModal() {
             <dd>Umsehen (nach Klick in die Ansicht)</dd>
             <dt>Shift</dt>
             <dd>Schneller gehen</dd>
+            <dt>Klick / O</dt>
+            <dd>Tür oder Fenster im Fadenkreuz öffnen/schließen</dd>
             <dt>Esc</dt>
             <dd>Maus freigeben</dd>
           </dl>

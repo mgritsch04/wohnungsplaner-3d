@@ -5,7 +5,8 @@ import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
 import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
-import type { Furniture, Light, Material, Opening, Project, Provenance, Room } from '../../model/schema';
+import { defaultLeafOpen, type Furniture, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
+import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { deleteSelection, duplicateSelection, setFurnitureRotation } from '../actions';
@@ -311,6 +312,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
           ]}
           onChange={(k) =>
             upd((x) => {
+              if (k !== x.kind) x.open = defaultLeafOpen(k);
               x.kind = k;
               if (k === 'window' && x.sillHeight === 0) {
                 x.sillHeight = 0.9;
@@ -342,6 +344,18 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
             <SelectField label="Anschlag" value={o.hinge} options={[{ value: 'start', label: 'Wandanfang' }, { value: 'end', label: 'Wandende' }]} onChange={(v) => upd((x) => (x.hinge = v))} />
             <SelectField label="Öffnet nach" value={o.swing} options={[{ value: 'left', label: 'Seite A' }, { value: 'right', label: 'Seite B' }]} onChange={(v) => upd((x) => (x.swing = v))} />
           </div>
+        )}
+        {o.kind === 'window' && o.width <= WINDOW_TWO_SASH_WIDTH && (
+          // single-sash window: hinge side; it opens into the room (two sashes hinge at the outer sides)
+          <SelectField label="Anschlag" value={o.hinge} options={[{ value: 'start', label: 'Wandanfang' }, { value: 'end', label: 'Wandende' }]} onChange={(v) => upd((x) => (x.hinge = v))} />
+        )}
+        {o.kind !== 'passage' && (
+          <CheckField
+            label={o.kind === 'door' ? 'Tür geöffnet' : 'Fenster geöffnet'}
+            checked={o.open}
+            title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Klick aufs Fadenkreuz-Ziel"
+            onChange={(v) => upd((x) => (x.open = v))}
+          />
         )}
         {issues.map((i, k) => (
           <p key={k} className="warning small">

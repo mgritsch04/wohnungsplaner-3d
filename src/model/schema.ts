@@ -47,22 +47,36 @@ export const WallSchema = z.object({
 
 export const OpeningKindSchema = z.enum(['door', 'window', 'passage']);
 
-export const OpeningSchema = z.object({
-  id: z.string().min(1),
-  wallId: z.string().min(1),
-  kind: OpeningKindSchema,
-  /** Distance along the wall centerline from node `a` to the CENTER of the opening. */
-  offset: finite().min(0),
-  width: len(0.1, 10),
-  height: len(0.1, 10),
-  /** Height of the lower edge above the floor (0 for doors). */
-  sillHeight: len(0, 10),
-  /** Door hinge position: at the side closer to wall start (`a`) or end (`b`). */
-  hinge: z.enum(['start', 'end']).default('start'),
-  /** Side the door leaf swings to: left (+perp of a→b) or right. */
-  swing: z.enum(['left', 'right']).default('left'),
-  provenance: ProvenanceSchema.optional(),
-});
+/**
+ * Default leaf state of an opening kind (#21): doors are open – as drawn in the plan
+ * and as the collision check has always assumed –, windows closed. Passages have no leaf.
+ */
+export const defaultLeafOpen = (kind: z.infer<typeof OpeningKindSchema>): boolean => kind === 'door';
+
+export const OpeningSchema = z
+  .object({
+    id: z.string().min(1),
+    wallId: z.string().min(1),
+    kind: OpeningKindSchema,
+    /** Distance along the wall centerline from node `a` to the CENTER of the opening. */
+    offset: finite().min(0),
+    width: len(0.1, 10),
+    height: len(0.1, 10),
+    /** Height of the lower edge above the floor (0 for doors). */
+    sillHeight: len(0, 10),
+    /** Door hinge position: at the side closer to wall start (`a`) or end (`b`). Single-sash windows use it too. */
+    hinge: z.enum(['start', 'end']).default('start'),
+    /** Side the door leaf swings to: left (+perp of a→b) or right. */
+    swing: z.enum(['left', 'right']).default('left'),
+    /**
+     * Door leaf / window sash opened (3D view; an opened leaf counts in the collision
+     * check). Projects saved before #21 lack the field: the default depends on the kind
+     * (see defaultLeafOpen), so it is filled in below instead of a plain `.default()`.
+     */
+    open: z.boolean().optional(),
+    provenance: ProvenanceSchema.optional(),
+  })
+  .transform((o) => ({ ...o, open: o.open ?? defaultLeafOpen(o.kind) }));
 
 export const RoomSchema = z.object({
   id: z.string().min(1),

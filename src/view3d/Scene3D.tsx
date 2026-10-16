@@ -22,6 +22,7 @@ import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
 import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
 import { CollisionMarkers } from './CollisionMarkers';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
+import { toggleOpening } from '../ui/actions';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -74,7 +75,7 @@ export function Scene3D() {
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Klick: Möbel auswählen · G: Möbel tragen · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Klick: Möbel auswählen bzw. Tür/Fenster öffnen/schließen (auch O) · G: Möbel tragen · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen.</span>
           )}
@@ -165,6 +166,7 @@ function SceneContent({
   }, [cancelTx]);
   const onSelectFurniture = useCallback((id: string) => setSelection({ type: 'furniture', id }), [setSelection]);
   const onSelectArch = useCallback((type: 'wall' | 'room' | 'opening', id: string) => setSelection({ type, id }), [setSelection]);
+  const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
   const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 4);
 
@@ -182,6 +184,8 @@ function SceneContent({
         quality={quality}
         selectedId={selection?.id ?? null}
         onSelect={onSelectArch}
+        // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
+        onToggleOpening={cameraMode === 'orbit' ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
       />
       {project.furniture.map((f) => (

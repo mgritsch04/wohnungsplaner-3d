@@ -9,6 +9,7 @@ import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import type { Vec2 } from '../model/vec';
+import { toggleOpening } from '../ui/actions';
 
 interface Props {
   derived: DerivedPlan;
@@ -24,8 +25,9 @@ interface Props {
 
 /**
  * First-person walkthrough: WASD/arrow keys to move, mouse to look (pointer lock),
- * Shift to walk faster, Escape releases the mouse. Collides with walls (door
- * openings stay passable) and solid furniture; height is fixed at eye level.
+ * Shift to walk faster, Escape releases the mouse. Collides with walls (open door
+ * openings stay passable, closed doors not) and solid furniture; height is fixed at
+ * eye level. Click/O at the crosshair opens or closes a door or window (#21).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -40,6 +42,12 @@ const CENTER = new THREE.Vector2(0, 0);
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
 function furnitureIdOf(o: THREE.Object3D | null): string | null {
   for (let p = o; p; p = p.parent) if (typeof p.userData.furnitureId === 'string') return p.userData.furnitureId;
+  return null;
+}
+
+/** Id of the door/window whose 3D object contains `o` (Architecture sets userData.openingId). */
+function openingIdOf(o: THREE.Object3D | null): string | null {
+  for (let p = o; p; p = p.parent) if (typeof p.userData.openingId === 'string') return p.userData.openingId;
   return null;
 }
 
@@ -99,15 +107,29 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useEffect(() => {
     const el = gl.domElement;
     const pressed = keys.current;
-    /** Furniture under the crosshair (walls and floor in front of it block the view). */
-    const target = (): string | null => {
+    /** First visible object under the crosshair (walls and floor in front of it block the view). */
+    const aimed = (): THREE.Object3D | null => {
       raycaster.setFromCamera(CENTER, camera);
       raycaster.far = PICK_RANGE;
       for (const h of raycaster.intersectObjects(scene.children, true)) {
         if (!(h.object as THREE.Mesh).isMesh || !h.object.visible) continue;
-        return furnitureIdOf(h.object);
+        return h.object;
       }
       return null;
+    };
+    /** Furniture under the crosshair. */
+    const target = (): string | null => furnitureIdOf(aimed());
+    /** Door/window under the crosshair (#21). */
+    const targetOpening = (): string | null => {
+      const o = aimed();
+      return furnitureIdOf(o) ? null : openingIdOf(o);
+    };
+    /** O: open/close the door/window in sight, else the selected one. */
+    const toggleAimedOpening = () => {
+      if (carry.current) return;
+      const sel = useUiStore.getState().selection;
+      const id = targetOpening() ?? (sel?.type === 'opening' ? sel.id : null);
+      if (id) toggleOpening(id);
     };
     const startCarry = (id: string) => {
       const f = useProjectStore.getState().project.furniture.find((x) => x.id === id);
@@ -133,14 +155,21 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const pickOrDrop = () => {
       if (carry.current) return dropCarry(true);
       const id = target();
-      if (id) useUiStore.getState().setSelection({ type: 'furniture', id });
+      if (id) return useUiStore.getState().setSelection({ type: 'furniture', id });
+      // a door or window in sight is opened or closed (#21)
+      const opening = targetOpening();
+      if (opening) toggleOpening(opening);
     };
-    walkApi.current = { toggleCarry, pickOrDrop, target };
+    walkApi.current = { toggleCarry, pickOrDrop, target, targetOpening, toggleOpening: toggleAimedOpening };
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if (e.code === 'KeyG' && !e.repeat && !e.ctrlKey && !e.metaKey) {
         toggleCarry();
+        return;
+      }
+      if (e.code === 'KeyO' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        toggleAimedOpening();
         return;
       }
       keys.current.add(e.code);
@@ -162,7 +191,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     };
     const onDown = (e: MouseEvent) => {
       if (document.pointerLockElement === el) {
-        // locked: a click selects the furniture under the crosshair, or drops the carried one
+        // locked: a click selects the furniture under the crosshair (or opens/closes the door or
+        // window there), or drops the carried one
         if (e.button === 0) pickOrDrop();
         return;
       }
@@ -207,7 +237,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   }, [gl, onLockChange, camera, scene, raycaster]);
 
   // e2e/debug hook: look in a direction and use the pick/carry actions without pointer lock
-  const walkApi = useRef<{ toggleCarry: () => void; pickOrDrop: () => void; target: () => string | null } | null>(null);
+  const walkApi = useRef<{
+    toggleCarry: () => void;
+    pickOrDrop: () => void;
+    target: () => string | null;
+    targetOpening: () => string | null;
+    toggleOpening: () => void;
+  } | null>(null);
   useEffect(() => {
     const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
     if (!wp) return;
@@ -219,6 +255,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       toggleCarry: () => walkApi.current?.toggleCarry(),
       pickOrDrop: () => walkApi.current?.pickOrDrop(),
       target: () => walkApi.current?.target() ?? null,
+      targetOpening: () => walkApi.current?.targetOpening() ?? null,
+      toggleOpening: () => walkApi.current?.toggleOpening(),
     };
     return () => void delete wp.walk;
   }, []);
