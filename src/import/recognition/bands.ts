@@ -102,7 +102,9 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
   let bands = mergeBands(input, opts.mergeGap);
   const merged: Band[] = [];
   for (const o of ['h', 'v'] as const) {
-    const list = bands.filter((b) => b.o === o).sort((a, b) => a.c - b.c || a.a0 - b.a0);
+    // along the wall first: collinear pieces whose centre lines differ by rounding noise
+    // (common in PDF coordinates) must still be chained from left to right
+    const list = bands.filter((b) => b.o === o).sort((a, b) => a.a0 - b.a0 || a.c - b.c);
     const done = new Array(list.length).fill(false);
     for (let i = 0; i < list.length; i++) {
       if (done[i]) continue;
