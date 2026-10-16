@@ -1689,3 +1689,52 @@ code {
   opacity: 0.5;
   filter: grayscale(0.6);
 }
+
+/* ---------- start card for empty projects (#102) ---------- */
+.start-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: min(440px, calc(100% - 32px));
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+}
+.start-card h2 {
+  font-size: var(--font-size-lg);
+  margin: 0 var(--space-6) var(--space-2) 0;
+}
+.start-card-steps {
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.start-card-steps li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+.start-card-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  border: none;
+  background: none;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+.start-card-reopen {
+  position: absolute;
+  bottom: var(--space-5);
+  left: var(--space-5);
+  z-index: 5;
+}

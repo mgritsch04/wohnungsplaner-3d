@@ -2436,3 +2436,36 @@ test('walkthrough: X switches between standing and sitting, the seated eye heigh
   await expect.poll(async () => (await getProject(page)).settings.sitEyeHeight).toBe(1.05);
   expect(errors).toEqual([]);
 });
+
+test('empty project: start card with first steps, "Raum zeichnen" picks the tool, gone after the first room, can be closed and reopened (#102)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  // the sample apartment is not empty → no card
+  await expect(page.getByTestId('start-card')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Grundriss importieren' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Beispielwohnung laden' })).toBeVisible();
+
+  // close → small "Erste Schritte" button → reopen
+  await card.getByRole('button', { name: 'Startkarte schließen' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByTestId('start-card-reopen').click();
+  await expect(card).toBeVisible();
+
+  // "Raum zeichnen" selects the room tool
+  await card.getByRole('button', { name: 'Raum zeichnen' }).click();
+  expect(await page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { tool: string } } } }).__wp.useUiStore.getState().tool)).toBe('room');
+  await expect(page.locator('.editor-hint')).toContainText('Rechteck');
+
+  // first room → the card disappears
+  await page.locator('.panel.left').getByRole('button', { name: 'Raum anlegen' }).click();
+  await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

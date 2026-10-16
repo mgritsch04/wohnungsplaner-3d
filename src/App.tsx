@@ -23,6 +23,7 @@ import { useImportStore } from './import/importStore';
 import { PrintViewHost } from './export/PrintView';
 import { useCompareStore } from './versions/compareStore';
 import { WalkPostureBadge } from './view3d/WalkPostureBadge';
+import { StartCard } from './ui/StartCard';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -94,6 +95,7 @@ export default function App() {
           {leftTab === 'import' && <ImportPanel />}
         </aside>
         <main className={`workspace view-${viewMode}`}>
+          <StartCard />
           {viewMode !== '3d' && (
             <div className="pane pane-2d">
               <Editor2D />
