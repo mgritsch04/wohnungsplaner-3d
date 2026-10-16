@@ -537,9 +537,12 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   // small items (table lamps, decor) stand on the table/cabinet below them
   let elevation = f.elevation;
   if (opts.snap && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
-  if (opts.collide && !free) {
-    const all = [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
-    const r = constrainMove({ ...f, rotation, elevation }, goal, all, undefined, f);
+  if (opts.collide) {
+    // rugs lie under furniture but stop at walls like everything else (#39)
+    const all = free ? obstacles.filter((o) => o.kind === 'wall') : [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
+    // a flat rug would never overlap a wall in height – test it with the full wall height
+    const pose = free ? { ...f, rotation, elevation: 0, height: 1 } : { ...f, rotation, elevation };
+    const r = constrainMove(pose, goal, all, undefined, free ? { ...f, elevation: 0, height: 1 } : f);
     goal = { x: r.x, y: r.y };
   }
   f.x = Math.round(goal.x * 1000) / 1000;

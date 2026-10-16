@@ -470,3 +470,23 @@ describe('rotating furniture (#5)', () => {
   });
 });
 
+
+describe('rugs (#39)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+  it('stop at walls when dragged, but still lie under furniture', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const rug = createFurnitureFromCatalog(cat('generic-rug-160'), { x: 2, y: 1.5 });
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 1.5 });
+    p.furniture.push(rug, sofa);
+    moveFurnitureTo(p, d, obs, rug.id, { x: 9, y: 1.5 }, { snap: true, collide: true });
+    const r = p.furniture.find((f) => f.id === rug.id)!;
+    expect(r.x + r.width / 2).toBeLessThanOrEqual(4 + 0.002); // inner face of the east wall
+    expect(r.x + r.width / 2).toBeGreaterThan(3.95);
+    // under the sofa is fine
+    moveFurnitureTo(p, d, obs, rug.id, { x: 2, y: 1.5 }, { snap: true, collide: true });
+    expect(p.furniture.find((f) => f.id === rug.id)).toMatchObject({ x: 2, y: 1.5 });
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+});
