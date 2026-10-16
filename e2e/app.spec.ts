@@ -1333,12 +1333,30 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
       const v = pivot.children[0].getWorldPosition(t.camera.position.clone());
       return { x: v.x as number, y: v.z as number, h: v.y as number };
     }, id);
+  /**
+   * Leaf position once its open/close animation has finished. The animation advances at most
+   * 0.1 s per frame, so with software rendering under load (few FPS) it takes noticeably longer
+   * than its nominal ~0.6 s – aiming at a leaf still in motion misses the thin leaf.
+   */
+  const restingLeaf = async (id: string) => {
+    let last = await leafCenter(id);
+    await expect
+      .poll(async () => {
+        await page.waitForTimeout(150);
+        const now = await leafCenter(id);
+        const moved = Math.hypot(now.x - last.x, now.y - last.y);
+        last = now;
+        return moved;
+      })
+      .toBeLessThan(0.001);
+    return last;
+  };
 
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
   await page.waitForTimeout(2000);
   // the open inner door leaf stands in the living room (wall at x = 5.06)
-  const openLeaf = await leafCenter(inner.id);
+  const openLeaf = await restingLeaf(inner.id);
   expect(openLeaf.x).toBeLessThan(4.8);
   const s = await worldToScreen3d(page, openLeaf.x, 0.8, openLeaf.y);
   // a single click only selects it …
@@ -1395,7 +1413,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
       [x, y, h] as const,
     );
   const target = () => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null);
-  const leaf = await leafCenter(inner.id);
+  const leaf = await restingLeaf(inner.id); // the undo above re-opened it – wait until it stands still
   await lookAt(leaf.x, leaf.y, 1.0);
   await expect.poll(target).toBe(inner.id);
   const p2 = await past();
@@ -1404,7 +1422,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(await past()).toBe(p2 + 1);
   expect(await getSelection(page)).toEqual({ type: 'opening', id: entrance.id }); // the click does not change the selection
   // the closed door now fills the doorway: aim at it and press O
-  await page.waitForTimeout(800);
+  await restingLeaf(inner.id);
   await lookAt(5.0, 2.0, 1.0);
   await expect.poll(target).toBe(inner.id);
   await page.keyboard.press('o');
@@ -1412,7 +1430,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(await past()).toBe(p2 + 2);
   expect(await openOf(entrance.id)).toBe(false); // O acted on the door in sight, not on the selected one
   // the living-room window: the sash opens into the room
-  const glass = await leafCenter(window1.id);
+  const glass = await restingLeaf(window1.id);
   await lookAt(glass.x, glass.y, 1.6);
   await expect.poll(target).toBe(window1.id);
   await page.evaluate(() => (window as any).__wp.walk.pickOrDrop());
