@@ -90,6 +90,15 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: 'Vorher-nachher-Vergleich',
+    where: '3D, nach „In 3D vergleichen“ im Dialog „Versionen“',
+    items: [
+      { keys: 'Leertaste', action: 'Zwischen Stand A und Stand B umschalten (gleicher Blickwinkel)', match: [' '] },
+      { keys: 'A / B', action: 'Stand A bzw. Stand B zeigen', match: ['a', 'b'] },
+      { keys: 'Esc', action: 'Vergleich beenden', match: ['escape'] },
+    ],
+  },
+  {
     title: '3D-Begehung',
     where: '3D, Modus „Begehen“',
     items: [
@@ -97,6 +106,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Maus', action: 'Umsehen (nach Klick in die Ansicht)', match: [] },
       { keys: 'Umschalt', action: 'Schneller gehen', match: ['ShiftLeft', 'ShiftRight'] },
       { keys: 'C (halten)', action: 'Ducken', match: ['KeyC'] },
+      { keys: 'X', action: 'Sitzen / Stehen umschalten (Sitzhöhe im Projekt-Panel)', match: ['KeyX'] },
       { keys: 'Klick', action: 'Möbel im Fadenkreuz auswählen bzw. Tür/Fenster öffnen oder schließen', match: [] },
       { keys: 'G', action: 'Möbel tragen / absetzen', match: ['KeyG'] },
       { keys: 'O', action: 'Tür oder Fenster im Fadenkreuz öffnen / schließen', match: ['KeyO'] },

@@ -5,7 +5,7 @@ import { listVersions, loadVersion, type VersionMeta } from '../persistence/vers
 import { useProjectStore } from '../store/projectStore';
 import { confirmDialog, useDialogStore } from '../ui/dialogStore';
 import { pairRooms, summarizeVariant, type VariantSummary } from './compare';
-import { openVersion, removeVersion, saveCurrentVersion } from './versionActions';
+import { compareVersionsIn3d, openVersion, removeVersion, saveCurrentVersion } from './versionActions';
 import { VERSION_LIMIT, VERSION_NAME_MAX, defaultVersionName } from './versions';
 import './versions.css';
 
@@ -130,7 +130,7 @@ export function VersionsModal() {
             </ul>
           )}
 
-          {!!items?.length && <CompareSection items={items} />}
+          {!!items?.length && <CompareSection items={items} onCompare3d={close} />}
         </div>
       </div>
     </div>
@@ -154,7 +154,7 @@ function useVariant(id: string, current: Project): { summary: VariantSummary | n
   return loaded.id === id ? loaded : { summary: null, error: null };
 }
 
-function CompareSection({ items }: { items: VersionMeta[] }) {
+function CompareSection({ items, onCompare3d }: { items: VersionMeta[]; onCompare3d: () => void }) {
   const current = useProjectStore((s) => s.txBase ?? s.project);
   const [aId, setA] = useState<string>(items[0]?.id ?? CURRENT);
   const [bId, setB] = useState<string>(CURRENT);
@@ -163,6 +163,17 @@ function CompareSection({ items }: { items: VersionMeta[] }) {
   const a = useVariant(validA, current);
   const b = useVariant(validB, current);
   const label = (id: string) => (id === CURRENT ? 'Aktueller Stand' : (items.find((m) => m.id === id)?.name ?? '?'));
+  const [starting, setStarting] = useState(false);
+  const same = validA === validB;
+  const compare3d = async () => {
+    setStarting(true);
+    const ok = await compareVersionsIn3d(
+      { id: validA === CURRENT ? null : validA, label: label(validA) },
+      { id: validB === CURRENT ? null : validB, label: label(validB) },
+    );
+    setStarting(false);
+    if (ok) onCompare3d();
+  };
 
   const options = (
     <>
@@ -191,6 +202,16 @@ function CompareSection({ items }: { items: VersionMeta[] }) {
             {options}
           </select>
         </label>
+      </div>
+      <div className="versions-compare-actions">
+        <button type="button" disabled={same || starting} onClick={() => void compare3d()}>
+          In 3D vergleichen
+        </button>
+        <span className="muted small">
+          {same
+            ? 'Bitte zwei verschiedene Stände wählen.'
+            : 'Zeigt A und B abwechselnd aus demselben Blickwinkel, Unterschiede bei den Möbeln sind markiert. Das Projekt bleibt unverändert.'}
+        </span>
       </div>
       {(a.error || b.error) && <p className="warning small">Stand konnte nicht gelesen werden: {a.error ?? b.error}</p>}
       {a.summary && b.summary ? (

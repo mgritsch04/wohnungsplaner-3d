@@ -17,6 +17,7 @@ export function ProjectPanel() {
   const apply = useProjectStore((s) => s.apply);
   const issues = useMemo(() => validateModel(project), [project]);
   const fps = useUiStore((s) => s.fps);
+  const walkSit = useUiStore((s) => s.walkSit);
   const dprCap = usePerformanceStore((s) => s.dprCap);
   const s = project.settings;
 
@@ -72,6 +73,19 @@ export function ProjectPanel() {
           title="Höhe der Kamera über dem Boden im Begehen-Modus (Standard 163 cm)"
           onChange={(v) => apply((d) => void (d.settings.eyeHeight = Math.max(1, Math.min(2.2, v))))}
         />
+        <NumberField
+          label="Augenhöhe im Sitzen"
+          value={s.sitEyeHeight}
+          factor={100}
+          digits={0}
+          unit="cm"
+          min={60}
+          max={160}
+          step={1}
+          title="Kamerahöhe beim Sitzen im Begehen-Modus, z. B. auf dem Sofa (Standard 120 cm)"
+          onChange={(v) => apply((d) => void (d.settings.sitEyeHeight = Math.max(0.6, Math.min(1.6, v))))}
+        />
+        <CheckField label="Beim Begehen sitzen (Taste X)" checked={walkSit} onChange={(v) => useUiStore.getState().setWalkSit(v)} title="Umschalten zwischen Stehen und Sitzen – wirkt sofort beim Begehen" />
       </Section>
 
       <Section title="Leistung">

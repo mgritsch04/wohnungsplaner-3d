@@ -5,10 +5,11 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Grundriss-Import schräge Wände/Räume/Maßtexte (#37 → #114), Projektversionen (#66/#58 → #115), Einkaufsliste nach Räumen + „Problem melden“ (#75/#62 → #116), Engstellen (#68 → #118), Laufwege (#67 → #120), Tastenkürzel-Übersicht (#59), UI-Grundlage (#96–#98) + Ausrichten/Verteilen (#51 → #122), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Grundriss-Import schräge Wände/Räume/Maßtexte (#37 → #114), Projektversionen (#66/#58 → #115), Einkaufsliste nach Räumen + „Problem melden“ (#75/#62 → #116), Engstellen (#68 → #118), Laufwege (#67 → #120), Tastenkürzel-Übersicht (#59), UI-Grundlage (#96–#98) + Ausrichten/Verteilen (#51 → #122), Dunkelmodus + Maßlinien + Kamera-Lesezeichen (#73/#50/#55 → #123), Eigenschaften-Panel in Gruppen + Vorher-nachher-Vergleich in 3D (#99/#76 → #126), Küchen-Arbeitsdreieck + GLB-Export + Sitzen beim Begehen + Startkarte (#82/#87/#78/#102 → #127), Touch-Bedienung (#74) von dir verworfen, Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
 - **Deine Aufgaben:** #28 Smart-Home-Rückfragen (Erklärungen in `smart-home/DECISIONS.md`) · #30 Routine einrichten (Label `user-task`); #27 und #29 von dir erledigt
-- **In Arbeit (parallel):** Dunkelmodus (#73), Maßlinien (#50), Kamera-Lesezeichen (#55) – je ein Opus-Agent; lokale Sitzung „Hallo“: E2E-Fix Türen (Windows) und Nutzung alle 60 s fürs Dashboard (#113, Aufträge in #110). Dashboard: https://claude.ai/artifact/Smc3PMAsNzSgMnFG2WHqK2
-- **Nächster Schritt:** oberste unblockierte `Ready`-Zeile in [`IDEAS.md`](IDEAS.md), danach UI-Grundlage (#96–#98)
+- **In Arbeit (parallel):** Symbolleiste mit Icons (#100/#103) und Möbelgruppen (#65) – je ein Opus-Agent; lokale Sitzung „Hallo“: Sichtlinien vom Eingang (#89, Aufträge in #110)
+- **Dashboard (#113):** https://claude.ai/artifact/Smc3PMAsNzSgMnFG2WHqK2 – breite Übersicht mit Nutzung (5 h/Woche + Hochrechnung), Sitzungen, Agents, Tests, Backlog-Hochrechnung; Nutzung und Sitzungen schreibt ein Cloud-Updater (Haiku-Session, ca. alle 2 min, Ruhemodus ohne aktive Sitzungen, Wegwerf-Helfer pro Lauf hält den Verlauf klein); stündliche Routinen-Sessions haben die nötigen Werkzeuge nicht
+- **Nächster Schritt:** Sammel-PR mit #99/#76/#82/#87/#78/#102, danach die obersten `Ready`-Zeilen in [`IDEAS.md`](IDEAS.md)
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
@@ -95,7 +96,7 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
-- Vitest: ✅ 205/205 · Playwright lokal: ✅ 28/28 vollständiger Lauf (Stand vor #39), #39- und Nachtlicht-Test einzeln ✅ (Headless-Chromium, SwiftShader); CI des PR prüft die ganze Suite
+- Vitest: ✅ 452/452 · Playwright lokal: ✅ 53/53 vollständiger Lauf (Stand mit #78; Lauf mit #102 siehe PR) (Headless-Chromium, SwiftShader); CI des PR prüft die ganze Suite
 
 ## Wartet auf deinen Test
 Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …`):
@@ -113,6 +114,9 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 - Hinweis: #26 und #31 hast du vor dem Merge getestet – nach Merge von PR #32 bitte neu
 - #11 Projekt speichern / erneut öffnen
 - #12 IKEA: Artikelliste → Produktliste, PAX-Planung
+- #105–#107, #112, #114–#116, #118, #120, #122, #123 (siehe Issues)
+- #126 Eigenschaften-Panel in Gruppen, Vorher-nachher-Vergleich in 3D (nach Merge des Sammel-PR)
+- #127 Küchen-Arbeitsdreieck, GLB-Export, Sitzen beim Begehen, Startkarte (nach Merge des Sammel-PR)
 
 ## Automatisierung (geplante Läufe)
 - **Geprüft am 2026-10-16:** Eine Routine „Wohnungsplaner Tageslauf“ (täglich 05:50 Wien) wurde aus dieser Sitzung angelegt und einmal als **Prüflauf ohne Änderungen** gestartet. Ergebnis: Die neue Sitzung hatte **kein Repository und keinen GitHub-Zugang** (leeres Arbeitsverzeichnis, `git clone` ohne Zugangsdaten, keine GitHub-Werkzeuge). Aus einer laufenden Sitzung lässt sich die Routine nicht mit Repository anlegen.

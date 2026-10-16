@@ -1,0 +1,100 @@
+import { useState } from 'react';
+import type { Project } from '../model/schema';
+import { useProjectStore } from '../store/projectStore';
+import { useUiStore } from '../store/uiStore';
+import { newProject } from './actions';
+
+/**
+ * Start card for empty projects (#102): the first steps instead of an empty plan.
+ * Shown while the project has no walls, rooms or furniture; it disappears as soon as
+ * something is placed. Closing it is remembered per project (in this browser);
+ * a small "Erste Schritte" button brings it back while the project is still empty.
+ */
+
+export const isProjectEmpty = (p: Pick<Project, 'walls' | 'rooms' | 'furniture'>) => p.walls.length === 0 && p.rooms.length === 0 && p.furniture.length === 0;
+
+const KEY = 'wohnungsplaner-startcard-closed';
+
+/** localStorage may be missing or throw (privacy mode, blocked site data) – then closing lasts for this session only. */
+function storage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function readClosedIds(s: Storage | null = storage()): string[] {
+  try {
+    const v = JSON.parse(s?.getItem(KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeClosed(projectId: string, closed: boolean, s: Storage | null = storage()): string[] {
+  const ids = readClosedIds(s).filter((id) => id !== projectId);
+  if (closed) ids.push(projectId);
+  const kept = ids.slice(-200); // bounded
+  try {
+    s?.setItem(KEY, JSON.stringify(kept));
+  } catch {
+    // ignore – the in-memory state still hides the card
+  }
+  return kept;
+}
+
+export function StartCard() {
+  const project = useProjectStore((s) => s.project);
+  const [closed, setClosed] = useState<string[]>(() => readClosedIds());
+  if (!isProjectEmpty(project)) return null;
+  const setFor = (v: boolean) => setClosed(writeClosed(project.id, v));
+
+  if (closed.includes(project.id)) {
+    return (
+      <button className="start-card-reopen" onClick={() => setFor(false)} data-testid="start-card-reopen">
+        Erste Schritte
+      </button>
+    );
+  }
+
+  const ui = useUiStore.getState;
+  return (
+    <section className="start-card" role="region" aria-label="Erste Schritte" data-testid="start-card">
+      <button className="start-card-close" onClick={() => setFor(true)} aria-label="Startkarte schließen" title="Schließen">
+        ×
+      </button>
+      <h2>Los geht’s – das Projekt ist noch leer</h2>
+      <p className="muted small">Drei Wege zum ersten Grundriss:</p>
+      <ol className="start-card-steps">
+        <li>
+          <button
+            onClick={() => {
+              ui().setLeftTab('import');
+            }}
+          >
+            Grundriss importieren
+          </button>
+          <span className="muted small">Plan als PDF oder Bild laden, Maßstab setzen, Wände übernehmen.</span>
+        </li>
+        <li>
+          <button
+            className="primary"
+            onClick={() => {
+              ui().setLeftTab('tools');
+              ui().setTool('room');
+            }}
+          >
+            Raum zeichnen
+          </button>
+          <span className="muted small">Rechteck im Plan aufziehen oder Innenmaße links eingeben.</span>
+        </li>
+        <li>
+          <button onClick={() => void newProject(true)}>Beispielwohnung laden</button>
+          <span className="muted small">Fertige Wohnung zum Ausprobieren – dieses Projekt bleibt in der Projektliste.</span>
+        </li>
+      </ol>
+    </section>
+  );
+}

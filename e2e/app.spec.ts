@@ -376,14 +376,20 @@ test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)'
   const expected = await planToScreen(page, cam.x, cam.z);
   const d0 = await dot();
   expect(Math.hypot(d0.x - expected.x, d0.y - expected.y)).toBeLessThan(4);
-  // walk forward: the dot follows live
+  // walk forward: the dot follows live. Hold W until the camera has actually moved – with software
+  // rendering on a busy CI runner a fixed key-down time can cover only a few frames
+  const camNow = () => page.evaluate(() => (window as any).__wp.three.camera.position);
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(700);
+  await expect.poll(async () => { const c = await camNow(); return Math.hypot(c.x - cam.x, c.z - cam.z); }, { timeout: 15000 }).toBeGreaterThan(0.3);
   await page.keyboard.up('KeyW');
   await expect.poll(async () => {
     const d = await dot();
     return Math.hypot(d.x - d0.x, d.y - d0.y);
   }).toBeGreaterThan(5);
+  // … and sits where the camera now is
+  const cam1 = await camNow();
+  const expected1 = await planToScreen(page, cam1.x, cam1.z);
+  await expect.poll(async () => { const d = await dot(); return Math.hypot(d.x - expected1.x, d.y - expected1.y); }).toBeLessThan(4);
   // 3D only or overview: no marker
   await page.getByRole('button', { name: 'Übersicht' }).click();
   await expect(marker).toHaveCount(0);
@@ -673,6 +679,10 @@ test('imports a GLB model into the catalog, places it and attaches a model to an
   // attach a model to an existing procedural item via the properties panel
   const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
   await page.evaluate((id) => (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), sofa.id);
+  // the „3D-Modell“ group of the properties panel is collapsed by default (#99)
+  const modelGroup = page.locator('.panel.right').getByRole('button', { name: '3D-Modell', exact: true });
+  await expect(modelGroup).toHaveAttribute('aria-expanded', 'false');
+  await modelGroup.click();
   await page.getByRole('button', { name: 'Eigenes GLB hinterlegen…' }).click();
   const dlg2 = page.getByRole('dialog', { name: '3D-Modell importieren' });
   await dlg2.getByLabel('Modelldatei').setInputFiles({ name: 'sofa.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(2.1, 0.8, 0.9)) });
@@ -1274,6 +1284,9 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
     });
     expect(clip.width).toBeGreaterThan(50);
+    // a lost WebGL context shows the page background instead of the scene – say so instead of measuring it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(await page.evaluate(() => (window as any).__wp.three.gl.getContext().isContextLost())).toBe(false);
     const png = await page.screenshot({ clip });
     return page.evaluate(async (b64) => {
       const img = new Image();
@@ -1901,6 +1914,54 @@ test('align and distribute several furniture items: top edge, equal gaps, one un
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+test('shows the kitchen work triangle with lengths, follows moved appliances and can be switched off (#82)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  // kitchen run along the north wall of the living room – first module: fridge instead of the tall cabinet
+  const s = await planToScreen(page, 1.0, -0.06);
+  await page.mouse.click(s.x, s.y);
+  expect((await getSelection(page))?.type).toBe('wall');
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Küche' }).click();
+  await left.getByRole('combobox', { name: 'Modul' }).first().selectOption({ label: 'Kühlschrank freistehend' });
+  await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const triangle = plan.getByTestId('kitchen-triangle');
+  await expect(triangle).toBeVisible();
+  const sides = triangle.getByTestId('kitchen-triangle-side');
+  await expect(sides).toHaveCount(3);
+  for (const t of await sides.allTextContents()) expect(t).toMatch(/^\d+,\d{2} m$/);
+  await expect(triangle.getByTestId('kitchen-triangle-sum')).toHaveText(/^Σ \d+,\d{2} m$/);
+  const result = left.getByTestId('kitchen-triangle-result');
+  await expect(result).toContainText('Spüle – Herd');
+  await expect(left.getByText('Richtwert, keine Norm', { exact: false })).toBeVisible();
+
+  // moving the fridge far away updates the check (sum too long)
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { kitchen?: { type: string }; x: number; y: number; rotation: number }[] }) => {
+      const f = d.furniture.find((x) => x.kitchen?.type === 'fridge')!;
+      f.x = 4.6;
+      f.y = 3.2;
+      f.rotation = Math.PI;
+    });
+  });
+  await expect(triangle).toHaveAttribute('data-ok', 'false');
+  await expect(triangle.locator('[data-testid="kitchen-triangle-side"][data-status="long"]').first()).toBeVisible();
+  await expect(result).toContainText('außerhalb');
+
+  // switching it off hides the triangle in the plan (the panel keeps the evaluation)
+  await left.getByLabel('Arbeitsdreieck im Plan anzeigen').uncheck();
+  await expect(plan.getByTestId('kitchen-triangle')).toHaveCount(0);
+  await expect(result).toBeVisible();
+  expect((await getProject(page)).settings.kitchenTriangle.show).toBe(false);
+  expect(errors).toEqual([]);
+});
+
 test('dark mode: light / dark / system switch in the project panel, kept after reload, print sheet stays white (#73)', async ({ page }) => {
   const errors = collectErrors(page);
   await page.emulateMedia({ colorScheme: 'light' });
@@ -2016,6 +2077,7 @@ test('clearances (#50): dimension lines to walls and furniture while dragging an
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {
+  test.setTimeout(120_000); // many 3D transitions; slow under software rendering on a busy CI runner
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -2067,8 +2129,9 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   expect(dist(await camPos(), saved)).toBeGreaterThan(1);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.keyboard.press('Alt+1');
-  await page.waitForTimeout(150);
-  expect(dist(await camPos(), saved)).toBeLessThan(0.05);
+  // with reduced motion the jump has no transition, but it is applied on the next rendered frame –
+  // on a slow CI runner (software rendering, a few fps) that can take longer than a fixed wait, so poll
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   // Alt+1 must not switch the view mode (plain 1 = 2D)
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('3d');
@@ -2126,4 +2189,294 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   await expect(page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Eingang/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('before/after comparison in 3D: A | B with the same camera, moved/removed furniture marked, project unchanged (#76)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const openVersions = async () => {
+    await page.getByRole('button', { name: 'Projekt ▾' }).click();
+    await page.getByRole('button', { name: /^Versionen/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Versionen' });
+    await expect(dlg).toBeVisible();
+    return dlg;
+  };
+  let saved = 0;
+  const saveState = async (name: string) => {
+    const dlg = await openVersions();
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`); // list loaded
+    await dlg.getByLabel('Name des Stands').fill(name);
+    await dlg.getByRole('button', { name: 'Aktuellen Stand speichern' }).click();
+    saved++;
+    await expect(dlg.getByTestId('versions-count')).toContainText(`${saved} von höchstens`);
+    await expect(dlg.getByTestId('version-item').locator('strong').getByText(name, { exact: true })).toHaveCount(1);
+    await dlg.getByRole('button', { name: 'Schließen' }).click();
+  };
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const lamp = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-floor-lamp');
+
+  // state A, then move the coffee table and delete the floor lamp, state B
+  await saveState('A');
+  const start = await planToScreen(page, table.x, table.y);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 40, start.y + 10, { steps: 5 });
+  await page.mouse.move(start.x + 80, start.y + 20, { steps: 5 });
+  await page.mouse.up();
+  const tableX = async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id).x;
+  await expect.poll(tableX).toBeGreaterThan(table.x + 0.3);
+  const lampAt = await planToScreen(page, lamp.x, lamp.y);
+  await page.mouse.click(lampAt.x, lampAt.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe(lamp.id);
+  await page.keyboard.press('Delete');
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { id: string }) => f.id === lamp.id)).toBe(false);
+  // both changes are committed (no gesture left open) before state B is saved
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useProjectStore.getState().txBase === null)).toBe(true);
+  await saveState('B');
+
+  const before = await page.evaluate(() => {
+    const s = (window as any).__wp.useProjectStore.getState();
+    return { json: JSON.stringify(s.project), past: s.past.length, future: s.future.length, revision: s.revision };
+  });
+
+  // pick A and B, compare in 3D
+  const dlg = await openVersions();
+  await expect(dlg.getByTestId('version-item')).toHaveCount(2); // list loaded (the selects are filled from it)
+  const optionLabel = async (select: string, name: string) => (await dlg.getByLabel(select).locator('option').allInnerTexts()).find((t) => t.startsWith(`${name} (`))!;
+  await dlg.getByLabel('Stand A').selectOption({ label: await optionLabel('Stand A', 'A') });
+  await dlg.getByLabel('Stand B').selectOption({ label: await optionLabel('Stand B', 'B') });
+  await dlg.getByRole('button', { name: 'In 3D vergleichen' }).click();
+  await expect(dlg).toBeHidden();
+  const bar = page.getByTestId('compare-bar');
+  await expect(bar).toBeVisible();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-testid="editor2d"]')).toHaveCount(0); // 3D only while comparing
+  await expect(bar.getByTestId('compare-legend')).toHaveText('1 verschoben, 1 entfernt');
+  await expect(bar.getByText('Bearbeiten ist im Vergleich gesperrt')).toBeVisible();
+  await expect(bar.getByRole('button', { name: /^A/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(1500); // canvas resized, camera settled
+
+  type V = { x: number; y: number; z: number };
+  const camPos = (): Promise<V> =>
+    page.evaluate(() => {
+      const c = (window as any).__wp.three.camera.position;
+      return { x: c.x, y: c.y, z: c.z };
+    });
+  const sceneState = () =>
+    page.evaluate(
+      ({ tableId, lampId }) => {
+        const scene = (window as any).__wp.three.scene;
+        const furniture: Record<string, number> = {};
+        const marks: string[] = [];
+        scene.traverse((o: any) => {
+          if (o.userData?.compareMarker) marks.push(`${o.userData.compareMarker}:${o.userData.ghost ? 'ghost' : 'item'}:${o.userData.furnitureId}`);
+          else if (o.userData?.furnitureId) furniture[o.userData.furnitureId] = o.position.x;
+        });
+        return { tableX: furniture[tableId], hasLamp: lampId in furniture, marks: marks.sort() };
+      },
+      { tableId: table.id, lampId: lamp.id },
+    );
+  const dist = (a: V, b: V) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+  const camA = await camPos();
+  const sceneA = await sceneState();
+  expect(sceneA.hasLamp).toBe(true);
+  expect(sceneA.tableX).toBeCloseTo(table.x, 6);
+  expect(sceneA.marks).toEqual([`moved:item:${table.id}`, `removed:item:${lamp.id}`].sort());
+  await page.screenshot({ path: 'test-results/compare-a.png' });
+
+  // Space switches to B: other scene, same camera
+  await page.keyboard.press(' ');
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await sceneState()).hasLamp).toBe(false);
+  const sceneB = await sceneState();
+  expect(sceneB.tableX).toBeGreaterThan(table.x + 0.3);
+  expect(sceneB.marks).toEqual([`moved:item:${table.id}`, `removed:ghost:${lamp.id}`].sort());
+  expect(dist(await camPos(), camA)).toBeLessThan(1e-6);
+  await page.screenshot({ path: 'test-results/compare-b.png' });
+
+  // the buttons switch, too; the camera still does not move
+  await bar.getByRole('button', { name: /^A/ }).click();
+  await expect.poll(async () => (await sceneState()).hasLamp).toBe(true);
+  expect(dist(await camPos(), camA)).toBeLessThan(1e-6);
+  await page.keyboard.press(' '); // the focused A button must not "click" back
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(300);
+  await expect(bar.getByRole('button', { name: /^B/ })).toHaveAttribute('aria-pressed', 'true');
+
+  // editing is locked: Delete / Ctrl+Z change nothing, the toolbar is inert
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Control+z');
+  await expect(page.getByText('Im Vergleichsmodus ist Bearbeiten gesperrt', { exact: false })).toBeVisible();
+  await expect(page.locator('.app-header')).toHaveAttribute('inert', '');
+
+  // end: the project is exactly as before, no undo step was added
+  await bar.getByRole('button', { name: 'Vergleich beenden' }).click();
+  await expect(bar).toBeHidden();
+  await expect(page.locator('[data-testid="editor2d"]')).toBeVisible();
+  const after = await page.evaluate(() => {
+    const s = (window as any).__wp.useProjectStore.getState();
+    return { json: JSON.stringify(s.project), past: s.past.length, future: s.future.length, revision: s.revision };
+  });
+  expect(after).toEqual(before);
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('2d');
+  // Ctrl+Z works again afterwards (restores the deleted lamp)
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { id: string }) => f.id === lamp.id)).toBe(true);
+  expect(errors).toEqual([]);
+});
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('properties panel: groups collapse, keep their state across selections and work with the keyboard (#99)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p = await getProject(page);
+  const wardrobe = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const sofa = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const right = page.locator('.panel.right');
+  const group = (name: string) => right.getByRole('button', { name, exact: true });
+
+  // select a piece of furniture: frequently used groups are open, „Produkt“ is collapsed
+  const w = await planToScreen(page, wardrobe.x, wardrobe.y);
+  await page.mouse.click(w.x, w.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: wardrobe.id });
+  for (const name of ['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis']) await expect(group(name)).toHaveAttribute('aria-expanded', 'true');
+  for (const name of ['3D-Modell', 'Produkt', 'Erweitert']) await expect(group(name)).toHaveAttribute('aria-expanded', 'false');
+  await expect(right.getByLabel('Drehung')).toBeVisible();
+  await expect(right.getByLabel('Marke')).toHaveCount(0);
+
+  // expand „Produkt“, select another piece of furniture: it stays open
+  await group('Produkt').click();
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Marke')).toBeVisible();
+  const s = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofa.id });
+  await expect(right.getByLabel('Name')).toHaveValue(sofa.name);
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Händler')).toBeVisible();
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'false');
+
+  // keyboard: Enter on the heading toggles the group (Space too)
+  await group('Erweitert').focus();
+  await page.keyboard.press('Enter');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Gesperrt (nicht verschiebbar)')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'false');
+  await expect(right.getByLabel('Gesperrt (nicht verschiebbar)')).toHaveCount(0);
+  await page.keyboard.press(' ');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  // toggling a group changes nothing in the plan (no undo step, selection unchanged)
+  expect(await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length)).toBe(0);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofa.id });
+
+  // remembered on this device after a reload
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await page.evaluate((id) => (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), wardrobe.id);
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  await expect(group('3D-Modell')).toHaveAttribute('aria-expanded', 'false');
+  expect(errors).toEqual([]);
+});
+
+test('exports the 3D model as a GLB file from the export menu (#87)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Export/ }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '3D-Modell als GLB …' }).click();
+  const d = await download;
+  expect(d.suggestedFilename()).toBe('Beispielwohnung.glb');
+  const { readFile } = await import('node:fs/promises');
+  const glb = await readFile((await d.path())!);
+  expect(glb.subarray(0, 4).toString('ascii')).toBe('glTF');
+  expect(glb.readUInt32LE(4)).toBe(2); // glTF version 2
+  expect(glb.readUInt32LE(8)).toBe(glb.length); // declared length matches
+  expect(glb.length).toBeGreaterThan(10_000);
+  const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString('utf8'));
+  const names = json.nodes.map((n: { name?: string }) => n.name);
+  expect(names).toEqual(expect.arrayContaining(['Wände', 'Böden', 'Möbel', 'Wohnzimmer', 'Schlafzimmer', 'Sofa 3-Sitzer']));
+  await expect(page.getByText('3D-Modell als GLB exportiert')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('walkthrough: X switches between standing and sitting, the seated eye height is saved (#78)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const eyeY = () => page.evaluate(() => (window as unknown as { __wp: { three: { camera: { position: { y: number } } } } }).__wp.three.camera.position.y);
+  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
+  expect((await getProject(page)).settings.sitEyeHeight).toBe(1.2);
+
+  // X: sit down – immediately, still walking; the overlay says so
+  await page.keyboard.press('x');
+  await expect.poll(eyeY).toBeCloseTo(1.2, 2);
+  await expect(page.getByTestId('walk-sit')).toHaveText(/Sitzen/);
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  // ducking (C) is ignored while seated
+  await page.keyboard.down('c');
+  await page.waitForTimeout(400);
+  expect(await eyeY()).toBeCloseTo(1.2, 2);
+  await page.keyboard.up('c');
+
+  // the seated eye height is adjustable and applies right away
+  await page.locator('.panel.right').getByRole('button', { name: 'Projekt', exact: true }).click();
+  const field = page.locator('.panel.right').getByRole('textbox', { name: 'Augenhöhe im Sitzen cm' });
+  await field.fill('105');
+  await field.press('Enter');
+  await expect.poll(eyeY).toBeCloseTo(1.05, 2);
+  await expect(page.locator('.panel.right').getByLabel('Beim Begehen sitzen (Taste X)')).toBeChecked();
+
+  // X again: stand up
+  await page.locator('[data-testid="scene3d"]').hover();
+  await page.keyboard.press('x');
+  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
+  await expect(page.getByTestId('walk-sit')).toHaveCount(0);
+
+  // saved with the project and kept after reloading
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).settings.sitEyeHeight).toBe(1.05);
+  expect(errors).toEqual([]);
+});
+
+test('empty project: start card with first steps, "Raum zeichnen" picks the tool, gone after the first room, can be closed and reopened (#102)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  // the sample apartment is not empty → no card
+  await expect(page.getByTestId('start-card')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Grundriss importieren' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Beispielwohnung laden' })).toBeVisible();
+
+  // close → small "Erste Schritte" button → reopen
+  await card.getByRole('button', { name: 'Startkarte schließen' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByTestId('start-card-reopen').click();
+  await expect(card).toBeVisible();
+
+  // "Raum zeichnen" selects the room tool
+  await card.getByRole('button', { name: 'Raum zeichnen' }).click();
+  expect(await page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { tool: string } } } }).__wp.useUiStore.getState().tool)).toBe('room');
+  await expect(page.locator('.editor-hint')).toContainText('Rechteck');
+
+  // first room → the card disappears
+  await page.locator('.panel.left').getByRole('button', { name: 'Raum anlegen' }).click();
+  await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

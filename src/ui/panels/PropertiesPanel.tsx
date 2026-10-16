@@ -11,7 +11,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { deleteSelection, duplicateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
-import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../fields';
+import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
 import { placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
@@ -85,7 +85,7 @@ function WallProps({ id, project }: { id: string; project: Project }) {
   const openings = project.openings.filter((o) => o.wallId === w.id);
   return (
     <div className="panel-scroll">
-      <Section title="Wand">
+      <PanelGroup groupKey="wall.object" title="Wand">
         <ProvenanceInfo p={w.provenance} />
         <NumberField
           label="Länge (Achse)"
@@ -128,6 +128,8 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           />
         </div>
         <NumberField label="Winkel" value={angle} unit="°" min={-360} max={360} step={1} onChange={(v) => apply((d) => setWallAngle(d, id, degToRad(v)))} />
+      </PanelGroup>
+      <PanelGroup groupKey="wall.position" title="Position" defaultOpen={false}>
         <div className="field-row">
           <NumberField label="Start X" value={a.x} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.a, { x: v, y: a.y }))} />
           <NumberField label="Start Y" value={a.y} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.a, { x: a.x, y: v }))} />
@@ -136,8 +138,8 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           <NumberField label="Ende X" value={b.x} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.b, { x: v, y: b.y }))} />
           <NumberField label="Ende Y" value={b.y} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.b, { x: b.x, y: v }))} />
         </div>
-      </Section>
-      <Section title="Oberflächen">
+      </PanelGroup>
+      <PanelGroup groupKey="wall.surfaces" title="Oberflächen">
         <MaterialSelect
           label="Seite links"
           value={w.leftMaterialId}
@@ -164,8 +166,8 @@ function WallProps({ id, project }: { id: string; project: Project }) {
             })
           }
         />
-      </Section>
-      <Section title={`Öffnungen (${openings.length})`}>
+      </PanelGroup>
+      <PanelGroup groupKey="wall.openings" title={`Öffnungen (${openings.length})`}>
         {openings.length === 0 ? <p className="muted small">Tür/Fenster-Werkzeug wählen und auf die Wand klicken.</p> : null}
         <ul className="plain">
           {openings.map((o) => (
@@ -176,7 +178,7 @@ function WallProps({ id, project }: { id: string; project: Project }) {
             </li>
           ))}
         </ul>
-      </Section>
+      </PanelGroup>
       <div className="btn-row padded">
         <button
           onClick={() => {
@@ -232,7 +234,7 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
   const furnitureInRoom = area ? project.furniture.filter((f) => pointIn({ x: f.x, y: f.y }, area.interior)).length : 0;
   return (
     <div className="panel-scroll">
-      <Section title="Raum">
+      <PanelGroup groupKey="room.object" title="Raum">
         <ProvenanceInfo p={r.provenance} />
         <TextField label="Name" value={r.name} onChange={(v) => upd((x) => (x.name = v.slice(0, 100)))} />
         {area && (
@@ -248,26 +250,26 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
           </dl>
         )}
         {!area?.closed && <p className="warning small">Der Raum ist nicht vollständig von Wänden umschlossen.</p>}
-      </Section>
+      </PanelGroup>
       {rect && (
-        <Section title="Innenmaße (lichte Weite)">
+        <PanelGroup groupKey="room.size" title="Innenmaße (lichte Weite)">
           <div className="field-row">
             <NumberField label="Breite" value={rect.width} factor={100} unit="cm" min={30} max={10000} onChange={(v) => apply((d) => void setRectRoomSize(d, id, v, rect.depth))} />
             <NumberField label="Tiefe" value={rect.depth} factor={100} unit="cm" min={30} max={10000} onChange={(v) => apply((d) => void setRectRoomSize(d, id, rect.width, v))} />
           </div>
           <p className="muted small">Verschiebt die gegenüberliegenden Wände. Angrenzende Räume passen sich an.</p>
-        </Section>
+        </PanelGroup>
       )}
       {!rect && area && (
-        <Section title="Maße">
+        <PanelGroup groupKey="room.size" title="Maße">
           <p className="muted small">Nicht-rechteckiger Raum: Maße über die Wände oder Ecken ändern (anklicken bzw. ziehen).</p>
-        </Section>
+        </PanelGroup>
       )}
-      <Section title="Oberflächen">
+      <PanelGroup groupKey="room.surfaces" title="Oberflächen">
         <MaterialSelect label="Boden" value={r.floorMaterialId} materials={project.materials} kinds={['wood', 'tile', 'stone', 'carpet', 'concrete']} emptyLabel="Standard (Eiche)" onChange={(m) => upd((x) => (x.floorMaterialId = m))} />
         <MaterialSelect label="Wände" value={r.wallMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'tile', 'wood', 'stone']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.wallMaterialId = m))} />
         <MaterialSelect label="Decke" value={r.ceilingMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'wood']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.ceilingMaterialId = m))} />
-      </Section>
+      </PanelGroup>
       <div className="btn-row padded">
         <button onClick={() => void deleteSelection()}>Raum entfernen (Wände behalten)</button>
         <button
@@ -301,7 +303,16 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
   const issues = validateModel(project).filter((i) => i.elementId === id);
   return (
     <div className="panel-scroll">
-      <Section title={o.kind === 'door' ? 'Tür' : o.kind === 'window' ? 'Fenster' : 'Durchgang'}>
+      {issues.length > 0 && (
+        <div className="panel-issues">
+          {issues.map((i, k) => (
+            <p key={k} className="warning small">
+              {i.message}
+            </p>
+          ))}
+        </div>
+      )}
+      <PanelGroup groupKey="opening.object" title={o.kind === 'door' ? 'Tür' : o.kind === 'window' ? 'Fenster' : 'Durchgang'}>
         <ProvenanceInfo p={o.provenance} />
         <SelectField
           label="Typ"
@@ -323,6 +334,8 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
             })
           }
         />
+      </PanelGroup>
+      <PanelGroup groupKey="opening.size" title="Maße und Lage">
         <div className="field-row">
           <NumberField label="Breite" value={o.width} factor={100} unit="cm" min={10} max={Math.max(10, L * 100)} onChange={(v) => upd((x) => (x.width = v))} />
           <NumberField label="Höhe" value={o.height} factor={100} unit="cm" min={10} max={1000} onChange={(v) => upd((x) => (x.height = v))} />
@@ -340,30 +353,27 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
             onChange={(v) => upd((x) => (x.offset = v + x.width / 2))}
           />
         </div>
-        {o.kind === 'door' && (
-          <div className="field-row">
+      </PanelGroup>
+      {o.kind !== 'passage' && (
+        <PanelGroup groupKey="opening.leaf" title="Flügel">
+          {o.kind === 'door' && (
+            <div className="field-row">
+              <SelectField label="Anschlag" value={o.hinge} options={[{ value: 'start', label: 'Wandanfang' }, { value: 'end', label: 'Wandende' }]} onChange={(v) => upd((x) => (x.hinge = v))} />
+              <SelectField label="Öffnet nach" value={o.swing} options={[{ value: 'left', label: 'Seite A' }, { value: 'right', label: 'Seite B' }]} onChange={(v) => upd((x) => (x.swing = v))} />
+            </div>
+          )}
+          {o.kind === 'window' && o.width <= WINDOW_TWO_SASH_WIDTH && (
+            // single-sash window: hinge side; it opens into the room (two sashes hinge at the outer sides)
             <SelectField label="Anschlag" value={o.hinge} options={[{ value: 'start', label: 'Wandanfang' }, { value: 'end', label: 'Wandende' }]} onChange={(v) => upd((x) => (x.hinge = v))} />
-            <SelectField label="Öffnet nach" value={o.swing} options={[{ value: 'left', label: 'Seite A' }, { value: 'right', label: 'Seite B' }]} onChange={(v) => upd((x) => (x.swing = v))} />
-          </div>
-        )}
-        {o.kind === 'window' && o.width <= WINDOW_TWO_SASH_WIDTH && (
-          // single-sash window: hinge side; it opens into the room (two sashes hinge at the outer sides)
-          <SelectField label="Anschlag" value={o.hinge} options={[{ value: 'start', label: 'Wandanfang' }, { value: 'end', label: 'Wandende' }]} onChange={(v) => upd((x) => (x.hinge = v))} />
-        )}
-        {o.kind !== 'passage' && (
+          )}
           <CheckField
             label={o.kind === 'door' ? 'Tür geöffnet' : 'Fenster geöffnet'}
             checked={o.open}
             title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Klick aufs Fadenkreuz-Ziel"
             onChange={(v) => upd((x) => (x.open = v))}
           />
-        )}
-        {issues.map((i, k) => (
-          <p key={k} className="warning small">
-            {i.message}
-          </p>
-        ))}
-      </Section>
+        </PanelGroup>
+      )}
       <div className="btn-row padded">
         {o.kind === 'door' && (
           <button
@@ -403,7 +413,16 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </p>
       )}
       <ArrangeControls />
-      <Section title="Objekt" actions={f.approximate ? <Badge kind="muted" title="Vereinfachtes 3D-Modell, Maße sind maßgeblich">Näherungsmodell</Badge> : undefined}>
+      {issues.length > 0 && (
+        <div className="panel-issues">
+          {issues.map((i, k) => (
+            <p key={k} className={i.kind === "door-swing" || i.kind === "overlap" ? "warning small" : "warning small error-text"}>
+              {i.message}
+            </p>
+          ))}
+        </div>
+      )}
+      <PanelGroup groupKey="furniture.object" title="Objekt" actions={f.approximate ? <Badge kind="muted" title="Vereinfachtes 3D-Modell, Maße sind maßgeblich">Näherungsmodell</Badge> : undefined}>
         <TextField label="Name" value={f.name} onChange={(v) => upd((x) => (x.name = v.slice(0, 200)))} />
         <SelectField
           label="Kategorie"
@@ -411,6 +430,8 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           options={[...CATEGORIES.map((c) => ({ value: c.id as string, label: c.label })), ...(CATEGORIES.some((c) => c.id === f.category) ? [] : [{ value: f.category, label: categoryLabel(f.category) }])]}
           onChange={(v) => upd((x) => (x.category = v))}
         />
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.position" title="Position" actions={f.locked ? <Badge kind="muted" title="Unter „Erweitert“ entsperren">gesperrt</Badge> : undefined}>
         <div className="field-row">
           <NumberField label="X" value={f.x} factor={100} unit="cm" disabled={f.locked} onChange={(v) => upd((x) => (x.x = v))} />
           <NumberField label="Y" value={f.y} factor={100} unit="cm" disabled={f.locked} onChange={(v) => upd((x) => (x.y = v))} />
@@ -419,34 +440,33 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
           <NumberField label="Über Boden" value={f.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
         </div>
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.size" title="Maße">
         <div className="field-grid three">
           <NumberField label="Breite" value={f.width} factor={100} unit="cm" min={1} max={2000} onChange={(v) => upd((x) => (x.width = v))} />
           <NumberField label="Tiefe" value={f.depth} factor={100} unit="cm" min={1} max={2000} onChange={(v) => upd((x) => (x.depth = v))} />
           <NumberField label="Höhe" value={f.height} factor={100} unit="cm" min={0.1} max={1000} onChange={(v) => upd((x) => (x.height = v))} />
         </div>
-        <label className="field">
-          <span className="field-label">Farbe</span>
-          <span className="field-input">
-            <input type="color" value={f.color} onChange={(e) => upd((x) => (x.color = e.target.value))} />
-          </span>
-        </label>
-        {f.kitchen && (
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.appearance" title="Aussehen">
+        <div className="field-row">
           <label className="field">
-            <span className="field-label">Frontfarbe</span>
+            <span className="field-label">Farbe</span>
             <span className="field-input">
-              <input type="color" value={f.kitchen.frontColor ?? f.color} onChange={(e) => upd((x) => x.kitchen && (x.kitchen.frontColor = e.target.value))} />
+              <input type="color" value={f.color} onChange={(e) => upd((x) => (x.color = e.target.value))} />
             </span>
           </label>
-        )}
-        <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
-        <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
-        {issues.map((i, k) => (
-          <p key={k} className={i.kind === "door-swing" || i.kind === "overlap" ? "warning small" : "warning small error-text"}>
-            {i.message}
-          </p>
-        ))}
-      </Section>
-      <Section title="Preis">
+          {f.kitchen && (
+            <label className="field">
+              <span className="field-label">Frontfarbe</span>
+              <span className="field-input">
+                <input type="color" value={f.kitchen.frontColor ?? f.color} onChange={(e) => upd((x) => x.kitchen && (x.kitchen.frontColor = e.target.value))} />
+              </span>
+            </label>
+          )}
+        </div>
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.price" title="Preis">
         <div className="field-row">
           <NumberField
             label="Preis"
@@ -477,8 +497,8 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             Preis entfernen
           </button>
         )}
-      </Section>
-      <Section title="3D-Modell" actions={f.model.type === 'gltf' ? <Badge kind="ok">GLB</Badge> : <Badge kind="muted">prozedural</Badge>}>
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.model" title="3D-Modell" defaultOpen={false} actions={f.model.type === 'gltf' ? <Badge kind="ok">GLB</Badge> : <Badge kind="muted">prozedural</Badge>}>
         <div className="btn-row">
           <button onClick={() => useDialogStore.getState().openModal('model', { furnitureId: f.id })}>{f.model.type === 'gltf' ? 'Anderes GLB…' : 'Eigenes GLB hinterlegen…'}</button>
           {f.model.type === 'gltf' && (
@@ -494,8 +514,8 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             </button>
           )}
         </div>
-      </Section>
-      <Section title="Produkt">
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.product" title="Produkt" defaultOpen={false}>
         <TextField label="Marke" value={f.brand ?? ''} onChange={(v) => upd((x) => (x.brand = v || undefined))} />
         <TextField label="Händler" value={f.retailer ?? ''} onChange={(v) => upd((x) => (x.retailer = v || undefined))} placeholder="z. B. IKEA Österreich" />
         <TextField label="Produkt-URL" value={f.productUrl ?? ''} onChange={(v) => upd((x) => (x.productUrl = v || undefined))} placeholder="https://…" />
@@ -504,7 +524,11 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             Produktseite öffnen ↗
           </a>
         )}
-      </Section>
+      </PanelGroup>
+      <PanelGroup groupKey="furniture.advanced" title="Erweitert" defaultOpen={false}>
+        <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
+        <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
+      </PanelGroup>
       <div className="btn-row padded">
         <span className="rotate-group" role="group" aria-label="Drehen">
           <button onClick={() => setFurnitureRotation(f.id, f.rotation - Math.PI / 2)} disabled={f.locked} title="90° gegen den Uhrzeigersinn">
@@ -543,14 +567,18 @@ function LightProps({ id, project }: { id: string; project: Project }) {
     });
   return (
     <div className="panel-scroll">
-      <Section title="Leuchte">
+      <PanelGroup groupKey="light.object" title="Leuchte">
         <TextField label="Name" value={l.name} onChange={(v) => upd((x) => (x.name = v))} />
         <CheckField label="Eingeschaltet" checked={l.on} onChange={(v) => upd((x) => (x.on = v))} />
+      </PanelGroup>
+      <PanelGroup groupKey="light.position" title="Position">
         <div className="field-row">
           <NumberField label="X" value={l.x} factor={100} unit="cm" onChange={(v) => upd((x) => (x.x = v))} />
           <NumberField label="Y" value={l.y} factor={100} unit="cm" onChange={(v) => upd((x) => (x.y = v))} />
         </div>
         <NumberField label="Höhe" value={l.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
+      </PanelGroup>
+      <PanelGroup groupKey="light.light" title="Licht">
         <label className="field">
           <span className="field-label">Lichtfarbe {l.temperature} K ({l.temperature < 3300 ? 'warm' : l.temperature < 5000 ? 'neutral' : 'kalt'})</span>
           <input type="range" min={2200} max={6500} step={100} value={l.temperature} onChange={(e) => upd((x) => (x.temperature = Number(e.target.value)))} />
@@ -559,7 +587,7 @@ function LightProps({ id, project }: { id: string; project: Project }) {
           <span className="field-label">Helligkeit {l.intensity.toFixed(1)}</span>
           <input type="range" min={0} max={5} step={0.1} value={l.intensity} onChange={(e) => upd((x) => (x.intensity = Number(e.target.value)))} />
         </label>
-      </Section>
+      </PanelGroup>
       <div className="btn-row padded">
         <button className="danger" onClick={() => void deleteSelection()}>
           Löschen
