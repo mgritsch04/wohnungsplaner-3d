@@ -21,5 +21,6 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     lights: [],
     materials: DEFAULT_MATERIALS.map((m) => ({ ...m })),
     underlay: null,
+    cameraBookmarks: [],
   };
 }

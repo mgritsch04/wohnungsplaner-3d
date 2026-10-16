@@ -271,6 +271,25 @@ export const SettingsSchema = z.object({
   showNarrowPassages: z.boolean().default(true),
 });
 
+/** Point in 3D world coordinates of the 3D view (metres): x = plan x, y = height, z = plan y. */
+export const Vec3Schema = z.object({ x: finite(), y: finite(), z: finite() });
+
+/**
+ * Saved 3D viewpoint (#55). `orbit`: camera position + orbit target. `walk`: eye position +
+ * a point in the viewing direction (yaw/pitch are derived from it) and the eye height.
+ */
+export const CameraBookmarkSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  mode: z.enum(['orbit', 'walk']),
+  position: Vec3Schema,
+  target: Vec3Schema,
+  /** Walkthrough only: eye height (m). */
+  eyeHeight: z.number().min(0.5).max(3).optional(),
+  /** Section view (Schnitt) on/off when the view was saved; absent = leave unchanged. */
+  cutaway: z.boolean().optional(),
+});
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -288,6 +307,8 @@ export const ProjectSchema = z.object({
   lights: z.array(LightSchema),
   materials: z.array(MaterialSchema),
   underlay: UnderlaySchema.nullable().default(null),
+  /** Saved 3D viewpoints (#55); projects saved before lack the field. */
+  cameraBookmarks: z.array(CameraBookmarkSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -307,4 +328,6 @@ export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
+export type Vec3 = z.infer<typeof Vec3Schema>;
+export type CameraBookmark = z.infer<typeof CameraBookmarkSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
