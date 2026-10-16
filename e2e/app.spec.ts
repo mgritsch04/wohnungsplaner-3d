@@ -1809,3 +1809,72 @@ test('measures the walking path from the living room to the bedroom and clears i
   await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('align and distribute several furniture items: top edge, equal gaps, one undo step each (#51)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p0 = await getProject(page);
+  // bedroom: night stand – bed – night stand in a row (different widths)
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const ids: string[] = [bed.id, ...ns.map((n: any) => n.id)];
+  const a = await planToScreen(page, bed.x, bed.y);
+  await page.mouse.click(a.x, a.y);
+  for (const n of ns) {
+    const s = await planToScreen(page, n.x, n.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    await page.keyboard.up('Shift');
+  }
+  const controls = page.locator('.panel.right').getByTestId('arrange-controls');
+  await expect(controls).toBeVisible();
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  // axis-aligned extent of the footprints (rotations here are multiples of 90°)
+  const boxes = async () => {
+    const p = await getProject(page);
+    return ids.map((id) => {
+      const f = p.furniture.find((x: any) => x.id === id);
+      const turned = Math.abs(Math.sin(f.rotation)) > 0.5;
+      const w = turned ? f.depth : f.width;
+      const d = turned ? f.width : f.depth;
+      return { minX: f.x - w / 2, maxX: f.x + w / 2, minY: f.y - d / 2, maxY: f.y + d / 2 };
+    });
+  };
+  const b0 = await boxes();
+  expect(Math.abs(b0[0].minY - b0[1].minY)).toBeGreaterThan(0.05); // not aligned yet
+
+  const before = await past();
+  await controls.getByRole('button', { name: 'Oben ausrichten' }).click();
+  const top = await boxes();
+  for (const b of top) expect(b.minY).toBeCloseTo(top[0].minY, 2);
+  expect(await past()).toBe(before + 1);
+
+  await controls.getByRole('button', { name: 'Waagrecht verteilen' }).click();
+  const dist = (await boxes()).sort((x, y) => x.minX - y.minX);
+  const gaps = dist.slice(1).map((b, i) => b.minX - dist[i].maxX);
+  expect(gaps[0]).toBeCloseTo(gaps[1], 2);
+  expect(gaps[0]).toBeGreaterThanOrEqual(0);
+  expect(await past()).toBe(before + 2);
+
+  // Ctrl+Z undoes exactly the distribution
+  await page.keyboard.press('Control+z');
+  expect(await past()).toBe(before + 1);
+  const back = await boxes();
+  for (let i = 0; i < ids.length; i++) {
+    expect(back[i].minX).toBeCloseTo(top[i].minX, 3);
+    expect(back[i].minY).toBeCloseTo(top[i].minY, 3);
+  }
+  // with two items selected, distributing is disabled, aligning is not
+  const s = await planToScreen(page, ns[1].x, ns[1].y);
+  await page.keyboard.down('Shift');
+  await page.mouse.click(s.x, s.y);
+  await page.keyboard.up('Shift');
+  await expect(controls.getByRole('button', { name: 'Waagrecht verteilen' })).toBeDisabled();
+  await expect(controls.getByRole('button', { name: 'Links ausrichten' })).toBeEnabled();
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
