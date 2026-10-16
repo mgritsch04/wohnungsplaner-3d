@@ -456,3 +456,43 @@ test('realism mode: time-of-day control with presets, one undo step per drag, no
   await page.waitForTimeout(1000);
   expect(errors).toEqual([]);
 });
+
+test('retailer page with a 3D model reference (SIMULATED server): CORS fallback, then direct load', async ({ page }) => {
+  const MODEL = 'https://models.retailer.invalid/glb/testregal_0123.glb';
+  let allowCors = false;
+  await page.route(MODEL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'model/gltf-binary',
+      headers: allowCors ? { 'access-control-allow-origin': '*' } : {},
+      body: Buffer.from(boxGlb(0.8, 2.02, 0.28)),
+    }),
+  );
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Produkt von Händlerseite übernehmen' });
+  await dlg.getByLabel('Produkt-URL').fill('https://www.ikea.com/at/de/p/testregal-weiss-00263850/');
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill(`<html><body><script type="application/ld+json">{"@type":"Product","name":"TESTREGAL","offers":{"price":"59.99","priceCurrency":"EUR"}}</script><script type="text/template" id="pip-xr-viewer-model">{"url":"${MODEL}"}</script><dl><dt>Breite:</dt><dd>80 cm</dd><dt>Tiefe:</dt><dd>28 cm</dd><dt>Höhe:</dt><dd>202 cm</dd></dl></body></html>`);
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(dlg.getByText('Verweis im Quelltext gefunden')).toBeVisible();
+  // 1) server without CORS permission → clear message, fallback via file picker
+  await dlg.getByRole('button', { name: 'Modell direkt laden' }).click();
+  await expect(dlg.getByText(/CORS/)).toBeVisible();
+  await dlg.getByLabel('Modelldatei für das Produkt').setInputFiles({ name: 'testregal.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(0.8, 2.02, 0.28)) });
+  await expect(dlg.getByText('Modell geprüft')).toBeVisible();
+  await expect(dlg.getByText('passt')).toBeVisible();
+  // 2) server with CORS permission → direct load works
+  await dlg.getByRole('button', { name: 'entfernen' }).click();
+  allowCors = true;
+  await dlg.getByRole('button', { name: 'Modell direkt laden' }).click();
+  await expect(dlg.getByText('Modell direkt geladen.')).toBeVisible();
+  await dlg.getByRole('button', { name: 'Hinzufügen und platzieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'TESTREGAL')).toBe(true);
+  const item = (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'TESTREGAL');
+  expect(item.model.type).toBe('gltf');
+  expect(item.approximate).toBe(false);
+  expect(item.width).toBeCloseTo(0.8, 6);
+});

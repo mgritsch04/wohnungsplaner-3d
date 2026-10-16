@@ -60,6 +60,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   let visibleText = '';
   let embeddedText = '';
   let simple: Json | null = null;
+  let modelUrl: string | null = null;
 
   if (kind === 'empty') errors.push('Bitte den Seitenquelltext oder JSON-Daten einfügen.');
   if (kind === 'url') {
@@ -80,6 +81,8 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   }
   if (kind === 'html') {
     const doc = new DOMParser().parseFromString(input, 'text/html');
+    modelUrl = findModelUrl(doc, input);
+    if (modelUrl) sources.push('3D-Modell-Verweis (experimentell)');
     const scripts = [...doc.querySelectorAll('script')];
     let block = 0;
     for (const s of scripts) {
@@ -178,7 +181,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     price,
     productUrl: url && /^https?:\/\//i.test(url) ? url : null,
     imageUrl: image && /^https?:\/\//i.test(image) ? image : null,
-    modelUrl: null,
+    modelUrl: modelUrl ?? (str(simple?.modelUrl) && /^https:\/\//i.test(String(simple?.modelUrl)) ? String(simple?.modelUrl) : null),
     variant: str(p?.color) ?? null,
     availability: (str(offer?.availability) ?? meta.availability ?? null)?.replace(/^https?:\/\/schema\.org\//, '') ?? null,
     retrievedAt: new Date().toISOString(),
@@ -257,6 +260,27 @@ function collectProducts(root: unknown): Json[] {
   visit(root);
   // prefer concrete products over groups
   return out.sort((a, b) => Number(typeNames(a).includes('ProductGroup')) - Number(typeNames(b).includes('ProductGroup')));
+}
+
+/**
+ * Reference to a 3D model in the page source. IKEA product pages with a "3D view"
+ * reportedly embed `<script id="pip-xr-viewer-model">{"url": "…glb"}</script>`
+ * (observed in third-party open-source code, UNVERIFIED against live pages).
+ * Generic fallback: an https URL ending in .glb/.gltf anywhere in the source.
+ */
+export function findModelUrl(doc: Document, raw: string): string | null {
+  const el = doc.getElementById('pip-xr-viewer-model');
+  if (el?.textContent) {
+    try {
+      const v = JSON.parse(el.textContent) as Json;
+      const u = str(v.url) ?? str((v.model as Json | undefined)?.url);
+      if (u && /^https:\/\//i.test(u)) return u;
+    } catch {
+      /* fall through */
+    }
+  }
+  const m = raw.replace(/\\\//g, '/').match(/https:\/\/[^\s"'<>()]+?\.(?:glb|gltf)(?:\?[^\s"'<>()]*)?(?=["'\s<)]|$)/i);
+  return m ? m[0] : null;
 }
 
 /** Kept for the provider tests/API: products from HTML or JSON-LD text. */

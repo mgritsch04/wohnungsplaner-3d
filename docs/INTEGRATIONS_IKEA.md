@@ -1,6 +1,6 @@
 # Integration echter Produkte: IKEA Österreich & Möbelix Österreich
 
-_Stand: 2026-10-16. Kennzeichnung: `VERIFIED` (selbst geprüft) · `PARTIALLY VERIFIED` · `UNVERIFIED` (nur aus Sekundärquellen) · `UNAVAILABLE` (Test nicht möglich)._
+_Stand: 2026-10-16 (2. Untersuchungsrunde ergänzt)._  Kennzeichnung: `VERIFIED` (selbst geprüft) · `PARTIALLY VERIFIED` · `UNVERIFIED` (nur aus Sekundärquellen) · `UNAVAILABLE` (Test nicht möglich)._
 
 ## Kurzfazit
 - Für **keinen** der beiden Händler gibt es eine offiziell dokumentierte, öffentliche Produkt-API. (`UNVERIFIED` – Recherche, keine Herstellerbestätigung)
@@ -67,3 +67,55 @@ Kurzfristig: eingefügte Produktseiten + Produktlisten (umgesetzt). Langfristig:
 
 ## Architektur
 `src/catalog/providers/types.ts` (normalisiertes Modell mit Feldstatus `source`/`user`/`missing`, Abrufzeitpunkt, Qualität, Lizenzhinweis) · `registry.ts` (Händler, Hosts, Live-Status, Artikelnummer aus URL) · `structuredData.ts` (Parser) · `toCatalog.ts` (Katalogeintrag, Preisstatus „eigene Angabe“ mit Datum). Der Geometrie-Kern kennt keine Händler.
+
+
+---
+
+## Runde 2 (2026-10-16): inoffizielle Schnittstellen, 3D-Viewer, GLB
+
+### Erneuter Zugriffstest
+| Ziel | Ergebnis | Status |
+|---|---|---|
+| `www.ikea.com/robots.txt`, `www.ikea.com/at/de/`, `sik.search.blue.cdtapps.com`, `web-api.ikea.com` | Verbindung abgelehnt (Status 000, Proxy) | UNAVAILABLE |
+| `www.moebelix.at/robots.txt`, `api.moebelix.at` | Verbindung abgelehnt | UNAVAILABLE |
+
+Eigene Tests gegen IKEA/Möbelix-Server, Netzwerk-Mitschnitte und Modell-Downloads waren in dieser Umgebung **nicht möglich**. Nichts davon wurde simuliert oder angenommen.
+
+### IKEA 3D-Viewer → GLB (Recherche)
+| Befund | Quelle | Status |
+|---|---|---|
+| Mehrere Browser-Erweiterungen/Skripte laden GLB-Modelle von IKEA-Produktseiten mit „3D-Ansicht“ herunter | [Firefox-Add-on IMD](https://addons.mozilla.org/addon/imd-3d/), [Chrome-Erweiterung](https://chromewebstore.google.com/detail/kihdhjecfjagoplfnnpdbbnhkjhnlfeg), [Bericht korben.info](https://korben.info/en/download-ikea-3d-models-blender-unity-maya.html) | UNVERIFIED |
+| Ein Open-Source-Skript liest das Element `<script id="pip-xr-viewer-model">` aus; dessen JSON-Feld `url` ist die GLB-Adresse. Keine Anmeldung, keine Cookies, keine speziellen Header | [ikea-glb-downloader.py](https://github.com/apinanaivot/IKEA-3d-model-batch-downloader) (GPL-3.0, nur an der finnischen Seite getestet) | UNVERIFIED (Fremdcode gelesen, nicht live geprüft) |
+| Die Modelle bleiben Eigentum von IKEA; Nutzung nur privat/zu Lernzwecken, keine Weitergabe/Wiederverkauf (Aussage eines Leitfadens) | [korben.info](https://korben.info/en/download-ikea-3d-models-blender-unity-maya.html) | UNVERIFIED – AGB von ikea.com/at nicht einsehbar |
+| Ob die GLB-Adresse dauerhaft gültig oder zeitlich begrenzt ist, ob der Server CORS erlaubt, Maßstab/Ausrichtung/Ursprung der Modelle | – | UNAVAILABLE |
+
+### Möbelix
+Kein 3D-Viewer, keine Modell-Assets und keine öffentliche API gefunden (`UNVERIFIED`). Produktdaten nur über eingefügten Seitenquelltext bzw. Produktlisten.
+
+### Umgesetzter End-to-End-Weg (ohne Umgehung, ohne Entwicklertools)
+1. Seitenquelltext einer Produktseite (Strg+U) in „Produkt von Händlerseite übernehmen“ einfügen.
+2. Die App liest JSON-LD/Meta-Angaben, Maßzeilen **und** eine Modell-Adresse (`pip-xr-viewer-model` bzw. eine `https://…glb`-Adresse im Quelltext).
+3. **„Modell direkt laden“**: normaler `fetch` mit CORS-Prüfung, 15 s Zeitlimit. Wird der Abruf vom Server nicht erlaubt, erklärt die App das und bietet …
+4. **Rückfall**: „Modell-Link im Browser öffnen“ → Browser lädt die `.glb` → im Dialog auswählen.
+5. Das Modell wird geprüft (Format, Version, Geometrie), gemessen und mit den Produktmaßen verglichen (Abweichung in %, Erkennung einer 90°-Drehung), lokal gespeichert und am Katalogobjekt hinterlegt.
+
+| Prüfung | Ergebnis | Status |
+|---|---|---|
+| Parser für `pip-xr-viewer-model` und `.glb`-Adressen (synthetische Seiten) | Unit-Tests grün | VERIFIED (synthetisch) |
+| Ablauf mit simuliertem Händlerserver: ohne CORS-Freigabe → verständliche Meldung + Dateiauswahl; mit Freigabe → Direktabruf; Modell erscheint am Produkt im Plan | Playwright grün (Chromium setzt CORS real durch) | VERIFIED (simuliert) |
+| Dasselbe mit einer echten IKEA-Seite und einem echten IKEA-GLB | nicht möglich (Netz) | NEEDS USER TEST |
+
+### Untersuchte, aber bewusst nicht genutzte Wege
+| Weg | Grund | Status |
+|---|---|---|
+| Inoffizielle Such-/Produkt-JSON-Endpunkte (z. B. von `ikea_api` genutzt) | Nicht erreichbar; undokumentiert, ändern sich laut Berichten; Nutzung nicht ausdrücklich erlaubt. Bei Netzfreigabe könnte ich die Antworten einzelner Artikel stichprobenartig prüfen | UNAVAILABLE |
+| Massen-Download ganzer Kategorien (wie im Batch-Skript) | Nicht im Sinne „wenige, zurückhaltende Anfragen“; Lizenz unklar | abgelehnt |
+| Proxy-Server, um CORS zu umgehen | Wäre technisch ein Umgehen der Browser-Schutzregel für fremde Inhalte; nur denkbar mit Erlaubnis des Händlers | abgelehnt |
+
+### Was ich von dir brauche (kleinster sinnvoller Beitrag)
+1. **Eine IKEA-Österreich-Produkt-URL mit „3D-Ansicht“** (z. B. ein Regal).
+2. In deinem Browser: Seite öffnen → Strg+U → Strg+F nach `pip-xr-viewer-model` suchen → **nur diese eine Zeile** (das `<script …>…</script>`-Element) kopieren und mir schicken – oder melden, dass es sie nicht gibt.
+3. Optional: Den ganzen Quelltext in den Dialog einfügen, „Modell direkt laden“ klicken und mir die angezeigte Meldung schicken (sagt, ob CORS erlaubt ist). Falls blockiert: „Modell-Link im Browser öffnen“, Datei wählen, und mir die angezeigte Maßabweichung nennen.
+4. Alternativ: In den Umgebungseinstellungen (Network access) `www.ikea.com` und `www.moebelix.at` freigeben – dann prüfe ich robots.txt, Produktseiten-Struktur und einzelne Anfragen selbst (zurückhaltend, keine Massenabfragen).
+
+Die übrige Arbeit hängt nicht davon ab.

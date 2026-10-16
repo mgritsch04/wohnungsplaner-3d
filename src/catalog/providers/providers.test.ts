@@ -159,3 +159,16 @@ describe('robust page-source import (regressions)', () => {
     expect(performance.now() - t0).toBeLessThan(8000);
   });
 });
+
+describe('3D model references in page source', () => {
+  it('reads the IKEA viewer embed (pip-xr-viewer-model) – synthetic fixture', () => {
+    const html = '<html><body><script type="application/ld+json">{"@type":"Product","name":"X","offers":{"price":"1","priceCurrency":"EUR"}}</script><script type="text/template" id="pip-xr-viewer-model">{"url":"https://example.com/models/x_0123.glb","type":"glb"}</script></body></html>';
+    const r = parseProductPage(html, 'https://www.ikea.com/at/de/p/x-00263850/');
+    expect(r.modelUrl).toBe('https://example.com/models/x_0123.glb');
+    expect(r.sources).toContain('3D-Modell-Verweis (experimentell)');
+  });
+  it('finds JSON-escaped .glb URLs and ignores non-https ones', () => {
+    expect(parseProductPage('<html><body><script>var a={"m":"https:\\/\\/cdn.example.com\\/a\\/b.glb?v=2"}</script></body></html>').modelUrl).toBe('https://cdn.example.com/a/b.glb?v=2');
+    expect(parseProductPage('<html><body><a href="http://example.com/a.glb">x</a></body></html>').modelUrl).toBeNull();
+  });
+});

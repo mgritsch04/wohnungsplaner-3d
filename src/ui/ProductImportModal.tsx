@@ -9,11 +9,109 @@ import { addCatalogItem } from './actions';
 import { useDialogStore } from './dialogStore';
 import { Badge } from './fields';
 import { useUiStore } from '../store/uiStore';
+import { checkModelBlob, compareDimensions, fetchModel, type FetchedModel } from '../catalog/providers/modelFetch';
+import { db } from '../persistence/db';
+import { newId } from '../model/ids';
 
 const SHAPES: Record<string, string> = {
   sofa: 'sofa', bed: 'bed', table: 'table', chair: 'chair', storage: 'shelf', desk: 'desk', lighting: 'floor-lamp',
   textile: 'rug', kitchen: 'k-base', appliance: 'box', bathroom: 'box', decor: 'box',
 };
+
+function ModelSection({
+  url,
+  model,
+  state,
+  dims,
+  onState,
+  onModel,
+}: {
+  url: string | null;
+  model: FetchedModel | null;
+  state: { busy: boolean; message: string | null; failed: boolean };
+  dims: { width: number; depth: number; height: number } | null;
+  onState: (s: { busy: boolean; message: string | null; failed: boolean }) => void;
+  onModel: (m: FetchedModel | null) => void;
+}) {
+  const tryDirect = async () => {
+    if (!url) return;
+    onState({ busy: true, message: 'Lade Modell…', failed: false });
+    const r = await fetchModel(url);
+    if (r.ok) {
+      onModel(r.model);
+      onState({ busy: false, message: 'Modell direkt geladen.', failed: false });
+    } else {
+      const why =
+        r.error === 'cors-or-network'
+          ? 'Der Server des Händlers erlaubt keinen direkten Abruf aus dieser App (Browser-Sicherheit/CORS) oder ist nicht erreichbar.'
+          : r.error === 'timeout'
+            ? 'Zeitüberschreitung beim Abruf.'
+            : r.error === 'http'
+              ? `Die Adresse ist nicht (mehr) gültig (${r.detail}) – Modell-Links können ablaufen; ggf. Seitenquelltext neu kopieren.`
+              : `Die Datei ist kein gültiges Modell (${r.detail}).`;
+      onState({ busy: false, message: why, failed: true });
+    }
+  };
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    onState({ busy: true, message: 'Prüfe Datei…', failed: false });
+    try {
+      onModel(await checkModelBlob(f));
+      onState({ busy: false, message: `„${f.name}“ geprüft.`, failed: false });
+    } catch (e) {
+      onState({ busy: false, message: e instanceof Error ? e.message : String(e), failed: true });
+    }
+  };
+  const cmp = model && dims ? compareDimensions(model.info.size, dims) : null;
+  return (
+    <div className="model-section">
+      <p className="small">
+        <strong>3D-Modell:</strong>{' '}
+        {url ? (
+          <>
+            Verweis im Quelltext gefunden <Badge kind="warn">experimentell</Badge>
+          </>
+        ) : (
+          'kein Verweis im Quelltext gefunden'
+        )}
+      </p>
+      <div className="btn-row">
+        {url && (
+          <button disabled={state.busy} onClick={() => void tryDirect()}>
+            Modell direkt laden
+          </button>
+        )}
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="small">
+            Modell-Link im Browser öffnen ↗
+          </a>
+        )}
+        <label className="small file-pick">
+          {url ? 'Heruntergeladene .glb wählen:' : 'Eigene .glb wählen:'}{' '}
+          <input type="file" accept=".glb,.gltf" aria-label="Modelldatei für das Produkt" onChange={(e) => void pick(e.target.files?.[0])} />
+        </label>
+      </div>
+      {state.message && <p className={`small ${state.failed ? 'warning' : 'muted'}`}>{state.message}{state.failed && url ? ' Alternative: „Modell-Link im Browser öffnen“ – der Browser lädt die .glb herunter – und die Datei hier wählen.' : ''}</p>}
+      {model && (
+        <p className="small">
+          <Badge kind="ok">Modell geprüft</Badge> {model.info.meshes} Mesh(es), {model.info.triangles.toLocaleString('de-AT')} Dreiecke · Modellmaße{' '}
+          {Math.round(model.info.size.x * 1000) / 10} × {Math.round(model.info.size.z * 1000) / 10} × {Math.round(model.info.size.y * 1000) / 10} cm
+          {cmp && (
+            <>
+              {' '}
+              · Abweichung zu den Produktmaßen max. {(cmp.maxDeviation * 100).toFixed(1)} %{' '}
+              <Badge kind={cmp.maxDeviation <= 0.03 ? 'ok' : cmp.maxDeviation <= 0.1 ? 'warn' : 'error'}>{cmp.maxDeviation <= 0.03 ? 'passt' : 'prüfen'}</Badge>
+              {cmp.rotated && ' (Modell um 90° gedreht)'}
+            </>
+          )}{' '}
+          <button className="link-btn" onClick={() => onModel(null)}>
+            entfernen
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
 
 const KIND_LABEL: Record<InputKind, string> = {
   empty: 'leer',
@@ -35,11 +133,15 @@ export function ProductImportModal() {
   const [source, setSource] = useState('');
   const [product, setProduct] = useState<ParsedProductPage | null>(null);
   const [form, setForm] = useState({ name: '', category: 'storage', width: '', depth: '', height: '' });
+  const [model, setModel] = useState<FetchedModel | null>(null);
+  const [modelState, setModelState] = useState<{ busy: boolean; message: string | null; failed: boolean }>({ busy: false, message: null, failed: false });
   const provider = providerForUrl(url);
 
   const parse = () => {
     const p = parseProductPage(source, url || undefined);
     setProduct(p);
+    setModel(null);
+    setModelState({ busy: false, message: null, failed: false });
     const cm = (v: number | null) => (v === null ? '' : String(Math.round(v * 10) / 10).replace('.', ','));
     setForm({ name: p.name ?? '', category: form.category, width: cm(p.dimensions.width), depth: cm(p.dimensions.depth), height: cm(p.dimensions.height) });
   };
@@ -55,7 +157,18 @@ export function ProductImportModal() {
 
   const save = async (place: boolean) => {
     if (!product || !w || !d || !h) return;
-    const item = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape: SHAPES[form.category] ?? 'box' });
+    const base = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape: SHAPES[form.category] ?? 'box' });
+    let item = base;
+    if (model) {
+      const assetId = newId('asset');
+      await db.putAsset(assetId, model.blob);
+      item = {
+        ...base,
+        model: { type: 'gltf', assetId, fallbackShape: base.model.type === 'procedural' ? base.model.shape : 'box' },
+        approximate: false,
+        description: `${base.description ?? ''} · 3D-Modell vom Händler (nur privater Gebrauch, nicht weitergeben)`,
+      };
+    }
     await useCatalogStore.getState().addItems([item]);
     close();
     if (place) addCatalogItem(item);
@@ -193,7 +306,17 @@ export function ProductImportModal() {
                 ))}
               </div>
               {product.dimensions.sourceText && <p className="muted small">Gefundene Maßangabe: „{product.dimensions.sourceText}“</p>}
-              <p className="muted small">{product.licenseNote} Das 3D-Modell ist eine maßstäbliche Näherung; ein eigenes GLB kann danach beim Objekt hinterlegt werden.</p>
+              <ModelSection
+                url={product.modelUrl}
+                model={model}
+                state={modelState}
+                dims={w && d && h ? { width: w, depth: d, height: h } : null}
+                onState={setModelState}
+                onModel={setModel}
+              />
+              <p className="muted small">
+                {product.licenseNote} {model ? '' : 'Ohne Händlermodell wird eine maßstäbliche Näherung verwendet.'}
+              </p>
               <div className="btn-row end">
                 <button disabled={!ready} onClick={() => void save(false)}>
                   Zum Katalog hinzufügen

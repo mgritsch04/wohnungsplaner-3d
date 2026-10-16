@@ -1128,3 +1128,4 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
   font-size: 12px;
   min-width: 52px;
 }
+.model-section { border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; } .file-pick input { width: auto; }
