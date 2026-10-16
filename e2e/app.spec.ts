@@ -1263,6 +1263,46 @@ test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the s
   expect(errors).toEqual([]);
 });
 
+test('3D: Alt while dragging places freely (no collision stop), without Alt the item stops at the sofa (#16)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // walls cut at 1.2 m: furniture visible
+  await page.waitForTimeout(2500);
+  const p0 = await getProject(page);
+  const sofa = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const find = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id);
+  const overlapsSofa = (t: { x: number; y: number; width: number; depth: number }) =>
+    Math.abs(t.x - sofa.x) < (sofa.width + t.width) / 2 - 0.005 && Math.abs(t.y - sofa.y) < (sofa.depth + t.depth) / 2 - 0.005;
+  const drag = async (alt: boolean) => {
+    const t = await find(table.id);
+    const a = await worldToScreen3d(page, t.x + 0.2, t.height, t.y);
+    const b = await worldToScreen3d(page, t.x + 0.2, t.height, t.y + 0.75);
+    await page.mouse.move(a.x, a.y);
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 10 });
+    await page.mouse.up();
+    if (alt) await page.keyboard.up('Alt');
+    await page.waitForTimeout(400);
+    return find(table.id);
+  };
+  // without Alt: the table stops at the sofa
+  const t1 = await drag(false);
+  expect(t1.y).toBeGreaterThan(table.y + 0.1);
+  expect(overlapsSofa(t1)).toBe(false);
+  expect(await collisionMarkers(page)).not.toContain(`collision:${table.id}`);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await find(table.id)).y).toBeCloseTo(table.y, 6);
+  // with Alt: placed freely into the sofa, the overlap is marked in 3D (as in 2D)
+  const t2 = await drag(true);
+  expect(overlapsSofa(t2)).toBe(true);
+  await expect.poll(() => collisionMarkers(page)).toContain(`collision:${table.id}`);
+  expect((await collisionMarkers(page)).some((m) => m.includes(':overlap:') && m.includes(table.id) && m.includes(sofa.id))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
   test.setTimeout(600000);
   const errors = collectErrors(page);

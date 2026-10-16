@@ -63,7 +63,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Umschalt+Ziehen', action: 'Auswahlrahmen im 2D-Plan (auf dem Boden beginnen)', match: [] },
       { keys: 'Q / E', action: 'Auswahl um 15° drehen (beim Begehen öffnet E stattdessen Türen und Fenster)', match: ['q', 'e'] },
       { keys: 'Pfeiltasten', action: 'Möbel 1 cm verschieben (Umschalt: 10 cm)', match: ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'] },
-      { keys: 'Alt beim Ziehen', action: 'Frei platzieren, ohne Einrasten (2D)', match: [] },
+      { keys: 'Alt beim Ziehen', action: 'Frei platzieren, ohne Einrasten und ohne Kollisionsstopp (2D und 3D)', match: [] },
       { keys: 'Alt halten', action: 'Abstände der Auswahl zu Wänden und Möbeln zeigen (2D; beim Ziehen immer sichtbar; Mehrfachauswahl und Gruppen als Ganzes)', match: [] },
       { keys: 'O / Doppelklick in 3D', action: 'Ausgewählte Tür / ausgewähltes Fenster öffnen oder schließen', match: ['o'] },
       { keys: 'Strg+S', action: 'Speichern', match: ['s'] },

@@ -202,19 +202,19 @@ function SceneContent({
     [furnitureKey, derived, obstacles],
   );
   const onDrag = useCallback(
-    (id: string, x: number, y: number) =>
+    (id: string, x: number, y: number, free: boolean) =>
       updateTx((d) => {
-        // same snapping choice as in 2D (#52)
-        const fs = furnitureSnapOptions(d.settings.furnitureSnap);
+        // same snapping choice as in 2D (#52); Alt = free placement, as in 2D (#16)
+        const fs = furnitureSnapOptions(d.settings.furnitureSnap, free);
         const p = fs.grid ? snapToGrid({ x, y }, fs.grid) : { x, y };
         // a selected furniture group (#65) moves rigidly, collision-checked as a whole
         const ids = selectedFurnitureIds(useUiStore.getState());
         const cur = d.furniture.find((f) => f.id === id);
         if (cur && ids.includes(id) && selectedGroup(d, ids)) {
-          moveGroupBy(d, obstacles, ids, { x: roundMm(p.x) - cur.x, y: roundMm(p.y) - cur.y }, { collide: true });
+          moveGroupBy(d, obstacles, ids, { x: roundMm(p.x) - cur.x, y: roundMm(p.y) - cur.y }, { collide: !free });
           return;
         }
-        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: true });
+        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: !free });
       }),
     [updateTx, derived, obstacles],
   );
