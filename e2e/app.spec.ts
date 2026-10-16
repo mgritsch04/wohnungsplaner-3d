@@ -976,8 +976,11 @@ test('3D: click vs. drag – threshold, no jump, release over a wall, focus loss
   await page.mouse.up();
   await page.waitForTimeout(300);
   const t2 = await find(table.id);
-  expect(t2.x).toBeCloseTo(table.x - 0.5, 1);
-  expect(t2.y).toBeCloseTo(table.y, 1);
+  // furniture snaps to the 5 cm grid (#52): a pointer that lands a hair off the line may
+  // round to the neighbouring grid line, so allow one grid step – a real jump is far more
+  const step = 0.05 + 1e-6;
+  expect(Math.abs(t2.x - (table.x - 0.5))).toBeLessThanOrEqual(step);
+  expect(Math.abs(t2.y - table.y)).toBeLessThanOrEqual(step);
   expect(await txOpen()).toBe(false);
 
   // 3) dragged towards the north wall and released with the pointer over the wall: stays selected, flush to the wall
