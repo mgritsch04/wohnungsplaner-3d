@@ -23,6 +23,7 @@ import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, move
 import { snapToGrid } from '../model/operations';
 import { CollisionMarkers } from './CollisionMarkers';
 import { NarrowPassageMarkers } from './NarrowPassageMarkers';
+import { WalkPathMarkers } from './WalkPathMarkers';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 import { toggleOpening } from '../ui/actions';
 
@@ -215,6 +216,7 @@ function SceneContent({
       ))}
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
+      <WalkPathMarkers />
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects />

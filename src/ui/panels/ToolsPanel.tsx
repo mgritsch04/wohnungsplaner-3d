@@ -15,6 +15,7 @@ const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
   { id: 'window', label: 'Fenster', key: 'F', hint: 'Fenster in eine Wand setzen' },
   { id: 'passage', label: 'Durchgang', key: 'G', hint: 'Türlose Öffnung in eine Wand setzen' },
   { id: 'measure', label: 'Messen', key: 'M', hint: 'Abstand zwischen zwei Punkten messen' },
+  { id: 'walkpath', label: 'Laufweg', key: 'L', hint: 'Kürzesten begehbaren Weg zwischen zwei Punkten messen' },
 ];
 
 export function ToolsPanel() {
@@ -227,6 +228,14 @@ function ToolIcon({ id }: { id: Tool }) {
         <svg {...common}>
           <path d="M4 16L16 4l4 4L8 20z" />
           <path d="M7 13l2 2M10 10l2 2M13 7l2 2" />
+        </svg>
+      );
+    case 'walkpath':
+      return (
+        <svg {...common}>
+          <circle cx="5" cy="19" r="2" />
+          <circle cx="19" cy="5" r="2" />
+          <path d="M7 19h5a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h8" strokeDasharray="2 2" />
         </svg>
       );
     default:
