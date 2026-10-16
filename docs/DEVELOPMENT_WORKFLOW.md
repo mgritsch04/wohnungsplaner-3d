@@ -95,6 +95,10 @@ Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kon
 | normale Feature-Arbeit (UI, Komponenten), Tests, übliche Fehlersuche, Recherche im Code | Sonnet |
 | Kern-Geometrie/Datenmodell (`src/model`, `derivePlan()`, Kollision/Platzierung, Schema-Migrationen), schwierige Fehlersuche (z. B. Rendering-Ursachen), Entscheidungen mit weitreichenden Folgen | Opus |
 
+**Entscheidung:** Die Hauptsession wählt das Modell für Hilfsagenten selbst nach dieser Tabelle (dein Auftrag vom 2026-10-16).
+
+**Paralleler Coding-Agent (auf deinen Wunsch):** Für eine klar abgegrenzte Aufgabe, die kaum Dateien mit der Hauptsession teilt, kann ein zweiter Agent in einem eigenen Git-Worktree auf eigenem Branch `claude/…` arbeiten (Modell nach Tabelle, meist Sonnet). Regeln: eigener E2E-Port (`PW_PORT=4174`), nie fremde Server/Prozesse beenden, keine Änderungen an `docs/IDEAS.md`/`docs/PROJECT_STATUS.md` (pflegt die Hauptsession beim Integrieren), kein PR/keine Issue-Änderungen durch den Agenten – die Hauptsession prüft sein Ergebnis, öffnet den PR und integriert nach grüner CI. Kosten: verbraucht dein Kontingent entsprechend schneller.
+
 **Was tatsächlich steuerbar ist:**
 - Eine laufende Sitzung kann ihr **eigenes** Modell nicht selbst wechseln; das Modell wird beim Start festgelegt (bei dir: Modellauswahl bzw. `/model`, bei Routinen in deren Einstellungen).
 - Die Hauptsession **delegiert** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
