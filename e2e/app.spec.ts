@@ -428,3 +428,31 @@ test('2D: dragging furniture into a wall stops flush (no tunnelling), Alt allows
   const t3 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
   expect(t3.y).toBeLessThan(-1);
 });
+
+test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByLabel('Tageszeit', { exact: true })).toHaveCount(0); // only in realism mode
+  await page.getByRole('button', { name: 'Realismus' }).click();
+  const slider = page.getByLabel('Tageszeit', { exact: true });
+  await expect(slider).toBeVisible();
+  await page.getByLabel('Tageszeit-Voreinstellung').selectOption({ label: 'Nacht (23:30)' });
+  expect((await getProject(page)).settings.timeOfDay).toBe(23.5);
+  const pastBefore = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length);
+  const b = (await slider.boundingBox())!;
+  await page.mouse.move(b.x + b.width * 0.3, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * 0.5, b.y + b.height / 2, { steps: 8 });
+  await page.mouse.move(b.x + b.width * 0.55, b.y + b.height / 2, { steps: 4 });
+  await page.mouse.up();
+  const after = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[]; project: { settings: { timeOfDay: number } } } } } }).__wp.useProjectStore.getState());
+  expect(after.project.settings.timeOfDay).toBeGreaterThan(10);
+  expect(after.project.settings.timeOfDay).toBeLessThan(15);
+  expect(after.past.length).toBe(pastBefore + 1);
+  await page.waitForTimeout(2500);
+  // switching back to planning keeps everything working
+  await page.getByRole('button', { name: 'Planung' }).click();
+  await page.waitForTimeout(1000);
+  expect(errors).toEqual([]);
+});

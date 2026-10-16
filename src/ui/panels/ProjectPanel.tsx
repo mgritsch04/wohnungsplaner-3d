@@ -6,6 +6,7 @@ import { CheckField, NumberField, Section, Badge } from '../fields';
 import { usePerformanceStore } from '../../view3d/performanceStore';
 import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
+import { TimeOfDayControl } from '../TimeOfDayControl';
 
 export function ProjectPanel() {
   const project = useProjectStore((s) => s.project);
@@ -14,29 +15,14 @@ export function ProjectPanel() {
   const fps = useUiStore((s) => s.fps);
   const dprCap = usePerformanceStore((s) => s.dprCap);
   const s = project.settings;
-  const hour = Math.floor(s.timeOfDay);
-  const minute = Math.round((s.timeOfDay - hour) * 60);
 
   return (
     <div className="panel-scroll">
       <Section title="Licht & Darstellung (3D)">
-        <label className="field">
-          <span className="field-label">
-            Tageszeit {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')} Uhr
-          </span>
-          <input
-            type="range"
-            min={5}
-            max={21}
-            step={0.25}
-            value={s.timeOfDay}
-            onChange={(e) =>
-              apply((d) => {
-                d.settings.timeOfDay = Number(e.target.value);
-              })
-            }
-          />
-        </label>
+        <div className="field">
+          <span className="field-label">Tageszeit (wirkt im Realismusmodus)</span>
+          <TimeOfDayControl />
+        </div>
         <label className="field">
           <span className="field-label">Belichtung {s.exposure.toFixed(2)}</span>
           <input

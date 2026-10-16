@@ -1,13 +1,13 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerformanceMonitor, Sky } from '@react-three/drei';
+import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { architectureKey, derivePlan } from '../model/derived';
-import type { Light, Project, QualityMode } from '../model/schema';
+import type { Project, QualityMode } from '../model/schema';
 import { boundsOf } from '../model/vec';
 import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
@@ -16,7 +16,7 @@ import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { WalkControls } from './WalkControls';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
-import { kelvinToColor, sunDirection } from './lighting';
+import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX } from './pointer';
 import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
@@ -150,10 +150,8 @@ function SceneContent({
   return (
     <>
       <color attach="background" args={[quality === 'realism' ? '#dfe7ee' : '#eef1f4']} />
-      {quality === 'realism' && !(cutaway && cameraMode === 'orbit') && <RealismSky timeOfDay={project.settings.timeOfDay} />}
-      <Lights project={project} quality={quality} center={center} span={span} />
-      {quality === 'realism' && <EnvironmentLight intensity={0.55} />}
-      <ExposureSync exposure={project.settings.exposure} />
+      <LightingRig project={project} derived={derived} quality={quality} center={center} span={span} showSky={!(cutaway && cameraMode === 'orbit')} />
+      {quality === 'realism' && <EnvironmentLight />}
       <FpsMeter />
       <AdaptiveQuality />
       <Ground quality={quality} />
@@ -177,7 +175,11 @@ function SceneContent({
           onDragEnd={onDragEnd}
         />
       ))}
-      {quality === 'realism' && <RealismEffects />}
+      {quality === 'realism' && (
+        <EffectsBoundary>
+          <RealismEffects />
+        </EffectsBoundary>
+      )}
       {cameraMode === 'orbit' ? (
         <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} />
       ) : (
@@ -185,12 +187,6 @@ function SceneContent({
       )}
     </>
   );
-}
-
-/** Physically based sky matching the sun position (realism mode). */
-function RealismSky({ timeOfDay }: { timeOfDay: number }) {
-  const sun = sunDirection(timeOfDay);
-  return <Sky distance={450} sunPosition={[sun.x * 100, sun.y * 100, sun.z * 100]} turbidity={6} rayleigh={1.2} mieCoefficient={0.005} mieDirectionalG={0.85} />;
 }
 
 /**
@@ -260,86 +256,20 @@ function OrbitCamera({ controlsRef, center, span }: { controlsRef: React.RefObje
   );
 }
 
-function Lights({ project, quality, center, span }: { project: Project; quality: QualityMode; center: { x: number; y: number }; span: number }) {
-  const sun = sunDirection(project.settings.timeOfDay);
-  const realism = quality === 'realism';
-  const dist = span * 1.5 + 10;
-  const ref = useRef<THREE.DirectionalLight>(null);
-  useEffect(() => {
-    const l = ref.current;
-    if (!l) return;
-    l.target.position.set(center.x, 0, center.y);
-    l.target.updateMatrixWorld();
-    const cam = l.shadow.camera as THREE.OrthographicCamera;
-    const s = span * 0.8 + 2;
-    cam.left = -s;
-    cam.right = s;
-    cam.top = s;
-    cam.bottom = -s;
-    cam.near = 0.5;
-    cam.far = dist * 2.5;
-    cam.updateProjectionMatrix();
-  }, [center.x, center.y, span, dist]);
-  const daylight = Math.max(0, sun.y);
-  // limit interior point lights for performance
-  const lights = project.lights.filter((l) => l.on).slice(0, realism ? 8 : 4);
-  return (
-    <>
-      {/* realism relies on the environment map for soft fill light; planning needs a bright, even fill */}
-      <hemisphereLight args={['#f4f6ff', '#b8a990', realism ? 0.18 + 0.25 * daylight : 0.55 + 0.6 * daylight]} />
-      <ambientLight intensity={realism ? 0.03 : 0.15} />
-      <directionalLight
-        ref={ref}
-        position={[center.x + sun.x * dist, Math.max(0.5, sun.y * dist), center.y + sun.z * dist]}
-        intensity={(realism ? 3.2 : 1.4) * daylight + 0.05}
-        color={daylight < 0.3 ? '#ffc58a' : '#fff6e8'}
-        castShadow={realism}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-bias={-0.0004}
-        shadow-normalBias={0.02}
-      />
-      {lights.map((l) => (
-        <InteriorLight key={l.id} light={l} />
-      ))}
-    </>
-  );
-}
-
-function InteriorLight({ light }: { light: Light }) {
-  return (
-    <group position={[light.x, light.elevation, light.y]}>
-      <pointLight color={kelvinToColor(light.temperature)} intensity={light.intensity * 1.5} distance={8} decay={1.5} />
-      <mesh>
-        <sphereGeometry args={[0.06, 12, 8]} />
-        <meshBasicMaterial color={kelvinToColor(light.temperature)} />
-      </mesh>
-    </group>
-  );
-}
-
-function EnvironmentLight({ intensity }: { intensity: number }) {
+/** Neutral image-based fill light; its strength is driven by the lighting rig (time of day). */
+function EnvironmentLight() {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
     const envScene = new RoomEnvironment();
     const tex = pmrem.fromScene(envScene, 0.04).texture;
     scene.environment = tex;
-    scene.environmentIntensity = intensity;
     return () => {
       scene.environment = null;
       tex.dispose();
       pmrem.dispose();
     };
-  }, [gl, scene, intensity]);
-  return null;
-}
-
-function ExposureSync({ exposure }: { exposure: number }) {
-  const { gl } = useThree();
-  useEffect(() => {
-    gl.toneMappingExposure = exposure;
-  }, [gl, exposure]);
+  }, [gl, scene]);
   return null;
 }
 
@@ -368,6 +298,21 @@ function AdaptiveQuality() {
   const onDecline = usePerformanceStore((s) => s.decline);
   const onIncline = usePerformanceStore((s) => s.incline);
   return <PerformanceMonitor bounds={() => [28, 55]} flipflops={3} onDecline={onDecline} onIncline={onIncline} />;
+}
+
+/** If post-processing is unsupported on this device, keep rendering without it. */
+class EffectsBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.warn('Nachbearbeitungseffekte nicht verfügbar – Darstellung ohne Effekte', err);
+    useUiStore.getState().toast('Erweiterte Effekte werden von diesem Gerät nicht unterstützt – Realismus ohne Umgebungsverdeckung.', 'info');
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }
 
 class WebGLBoundary extends Component<{ onError: (msg: string) => void; children: ReactNode }, { failed: boolean }> {

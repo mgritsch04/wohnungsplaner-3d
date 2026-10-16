@@ -1109,3 +1109,22 @@ textarea {
 }
 .error-text { color: var(--danger); background: #fef2f2; border-color: #fecaca; }
 code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f9; padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+.time-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.time-control input[type='range'] {
+  width: 140px;
+}
+.time-control.compact input[type='range'] {
+  width: 110px;
+}
+.time-control select {
+  width: auto;
+}
+.time-label {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  min-width: 52px;
+}

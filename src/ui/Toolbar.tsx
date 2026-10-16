@@ -7,6 +7,7 @@ import { exportPackage, importProjectFile, newProject, saveNow } from './actions
 import type { SaveState } from '../persistence/useAutosave';
 import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPlanActions';
 import { exportShoppingCsv } from '../budget/budgetActions';
+import { TimeOfDayControl } from './TimeOfDayControl';
 
 export function Toolbar({ saveState }: { saveState: SaveState }) {
   const name = useProjectStore((s) => s.project.name);
@@ -121,6 +122,12 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {show3d && quality === 'realism' && (
+        <div className="toolbar-group">
+          <TimeOfDayControl compact />
         </div>
       )}
 
