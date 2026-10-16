@@ -1,78 +1,81 @@
 # Projektstatus – Wohnungsplaner 3D
 
-_Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep`_
+_Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
 
 ## Aktuell
-- **Phase:** 8 (Stabilisierung) – Fehlerbehebungen aus deinem Praxistest
-- **Zuletzt erledigt (Runde 3):** Auswahl-Bug 3D, Kollision Möbel/Wand/Tür, Wandfang, Quelltext-Import, Sockelleisten, Tageszeit-Licht, Händlermodell-Weg (GLB), Controller-Bewertung
-- **Nächster Schritt:** dein Praxistest der Fixes + eine echte IKEA-Seite (siehe unten)
+- **Phase:** 8 (Stabilisierung) – Arbeitsauftrag „Complete Project Work Order“ (Aufgaben 1–8)
+- **Erledigt in dieser Runde:** Git-Workflow + CI + Integration nach `main`, Kollisionen im 3D-Raum, Mausempfindlichkeit, Klick vs. Ziehen (inkl. Fix: 3D-Ziehen startete nicht), Wandfang/-durchdringung, Tageszeit-Regler ohne Verzögerung, echte IKEA-Seiten + Planer-Recherche
+- **Nächster Schritt:** dein Praxistest (Liste unten); danach Stücklisten-Import bzw. allgemeiner Quelltext-Import (zurückgestellt)
 
 ## Legende
-`DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant ·
-`BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
+`DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
 
-Prüfstufen: **Impl.** Code vorhanden · **Auto** automatischer Test/Build grün ·
-**Manuell** von Claude in laufender App (Headless-Chromium, Software-Rendering) geprüft · **Nutzer** von dir bestätigt
+Prüfstufen: **Impl.** Code vorhanden · **Auto** automatischer Test/Build grün · **Manuell** von Claude in der laufenden App (Headless-Chromium, Software-Rendering) angesehen · **Nutzer** von dir bestätigt
 
-## Funktionen
+## Diese Runde (Arbeitsauftrag 1–8)
+
+| # | Aufgabe | Status | Was sich geändert hat / was nachweislich funktioniert | Auto | Manuell (visuell) |
+|---|---|---|---|---|---|
+| 1 | Git/GitHub-Workflow | DONE | `docs/DEVELOPMENT_WORKFLOW.md`, CI `.github/workflows/ci.yml` (Lint, tsc, Unit, Build, E2E). PR #1 nach grüner CI mit Merge-Commit in `main` integriert (`5797457`) | ✅ CI grün (checks + e2e) | – |
+| 2 | Kollisionen im 3D-Raum | NEEDS USER TEST | Betroffenes Objekt rot (Wand/Türblatt) bzw. orange (Türaufschlag/außerhalb) umrandet + getönt, Überschneidungsvolumen als roter Block, verantwortliches Türblatt/Aufschlag markiert; Meldung nennt die Tür („Tür 90 cm (Wohnzimmer)“). Nur bei Möbel-/Grundrissänderung berechnet, kein Raycasting auf Markern | ✅ Unit (Schnittpolygon, Regionen, keine Fehlalarme bei bündiger Wand/Ecke, Beispielwohnung ohne Konflikte) + E2E (Sofa im Türblatt → Marker → Wegziehen → Marker weg → Undo → wieder da) | ✅ Screenshots Planung + Realismus |
+| 3 | Mausempfindlichkeit | NEEDS USER TEST | Projekt › Steuerung (3D): 0,20–3,00×, Standard 1,00× = bisheriges Gefühl; wirkt auf Begehen-Umsehen und Orbit-Drehung, sofort, ohne Listener-Neuaufbau; Regler = 1 Undo-Schritt; alte Projekte laden mit 1 | ✅ Unit (Schema-Migration) + E2E (0,5×/1×/2× proportional, Orbit skaliert, Speichern) | – (Gefühl nur von dir prüfbar) |
+| 4 | Klick vs. Ziehen | NEEDS USER TEST | **Ursache gefunden:** 3D-Ziehen startete nie (R3F liefert `e.delta` nur bei Klicks). Jetzt eigener 5-px-Schwellwert, Greifversatz bleibt, kein Sprung; pointercancel/lostpointercapture setzt zurück, Fokusverlust beendet den Drag (2D+3D); Schnittansicht: weggeschnittene Wandteile fangen keine Klicks mehr | ✅ E2E (Zittern < Schwelle wählt nur aus, Ziehen folgt Zeiger, Loslassen über Wand behält Auswahl, Fokusverlust, Druck auf UI-Knopf startet keinen Drag) | ✅ im Testlauf |
+| 5 | Wandfang & Wanddurchdringung | NEEDS USER TEST | Ursachen: Fang an Türöffnungen/Durchgängen („virtuelle“ Wandfläche), Flackern an der Fangschwelle, falscher Ausschubvektor wenn ein Hindernis das Objekt durchsetzt (SAT-Enthaltensein), Springen bei schon kollidierenden Objekten, Tunnelgefahr bei sehr dünnen Wänden. Alle behoben; Sockelleisten unverändert | ✅ Unit (dünne 2-cm-Wand, Öffnung, Hysterese, Herausziehen ohne Sprung) + Performance (Drag-Update 25 Räume ≈ 16 ms inkl. Konfliktprüfung) | – |
+| 6 | Tageszeit-Regler träge | NEEDS USER TEST | Ursachen: Licht folgte mit fester Rate (10 h/s → 1,2 s für 12 h) und jeder Reglerschritt klonte das Projekt + renderte die App neu. Jetzt Vorschaukanal ohne React-Render, bildratenunabhängige Glättung (50 ms), 1 Undo-Schritt beim Loslassen. Gemessen: 5,9 ms (max. 18 ms) → 0,2 ms pro Schritt; Licht nach 1–2 Frames aktuell | ✅ Unit + E2E (Projekt bleibt während Ziehen unverändert, Licht holt auf, 1 Undo-Schritt) | ⚠️ Software-Rendering ~0,3 FPS – Flüssigkeit nur auf echter GPU beurteilbar |
+| 7 | IKEA/Möbelix-Import | PARTIAL | Echte IKEA-AT-Produktseiten liefern schema.org `Product` + `3DModel`; Parser liest jetzt das deklarierte 3D-Modell; echter E2E-Lauf (KALLAX) bis zur Platzierung. Planer: DEXF-Dienst mit App-Schlüssel/Konto → kompletter Planimport nicht legitim möglich. Möbelix: Cloudflare-Challenge → `BLOCKED`. Details: [`PLANNER_IMPORT_RESEARCH.md`](PLANNER_IMPORT_RESEARCH.md) | ✅ Unit mit Auszug echter Seitenstruktur | ✅ echter Lauf mit Screenshot (GLB-Abruf hier gesperrt) |
+| 8 | Allgemeiner Quelltext-Import | PLANNED (zurückgestellt) | Nicht umgebaut, nicht verschlechtert – bekannte Grenzen siehe unten | bestehende Tests grün | – |
+
+## Funktionen (Gesamtüberblick)
 
 | Bereich | Status | Impl. | Auto | Manuell | Nutzer |
 |---|---|---|---|---|---|
 | Datenmodell, Einheiten, Schema v1, Validierung | DONE | ✅ | ✅ Unit | – | – |
 | 2D-Editor (Wände, Räume, Öffnungen, Fang, Bemaßung, Undo) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ | – |
-| Numerische Maße (Raum, Wand, Öffnung, Möbel) | NEEDS USER TEST | ✅ | ✅ E2E | ✅ | – |
-| 3D-Ansicht (Wände/Öffnungen/Böden, Orbit, Schnitt) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ Screenshots | – |
-| Realismus: AO, SMAA, Tonemapping, Himmel, Texturen/Relief, Lampenlicht | NEEDS USER TEST | ✅ | ✅ Build+E2E ohne Fehler | ✅ Screenshots | – |
-| Architektur-Details (Sockelleisten, Fensterbänke, Fensterflügel, Zargen, Drücker) | NEEDS USER TEST | ✅ | ✅ Unit | ✅ Screenshots | – |
-| Auswahl in 3D/2D (bleibt nach Loslassen, Klick vs. Ziehen) | NEEDS USER TEST | ✅ | ✅ E2E-Regression (schlägt ohne Fix fehl) + Unit | ✅ | – |
-| Kollision Möbel ↔ Wand/Türblatt, kein Durchtunneln, Gleiten | NEEDS USER TEST | ✅ | ✅ 12 Unit + E2E | ✅ | – |
-| Wandfang (Rückseite bündig, Ecken, Alt = frei) | NEEDS USER TEST | ✅ | ✅ Unit + E2E | ✅ | – |
-| Platzierungswarnungen (Türaufschlag, außerhalb, Überschneidung) | NEEDS USER TEST | ✅ | ✅ Unit | – | – |
-| Sockelleisten (alle Innenwandflächen, Instanced) | NEEDS USER TEST | ✅ | ✅ 6 Unit (Rechteck, L, Wandstück, ohne Raum, Fenster) | ✅ Screenshot | – |
-| Tageszeit-Licht (Sonne, Himmel, Fensterlicht, Nacht, Überblendung) | NEEDS USER TEST | ✅ | ✅ Unit + E2E | ✅ Screenshots 4 Zeiten | – |
-| Möbelmodelle (abgerundet, Polster, Kissen …) | NEEDS USER TEST | ✅ | ✅ Maßtest aller 53 Modelle | ✅ Screenshots | – |
-| Begehung mit Kollision, Decken | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ⚠️ nur Software-Rendering | – |
-| PDF/PNG/JPG-Underlay, Kalibrierung, Kontrollmaße | NEEDS USER TEST | ✅ | ✅ E2E (inkl. mehrseitiges Vektor-PDF) | ✅ | – |
-| Erkennung (Beta, achsparallele Wände) | PARTIAL | ✅ | ✅ Unit+E2E (synthetische Pläne) | – echte Pläne ungetestet | – |
-| `apartment-plan.json` Import/Export + Prüfung | DONE | ✅ | ✅ Unit+E2E | ✅ | – |
-| GLB/glTF-Import (Katalog + pro Objekt, Draco lokal) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ | – |
-| Produkt von Händlerseite übernehmen (robuster Parser, Fehlermeldungen) | NEEDS USER TEST | ✅ | ✅ 18 Unit + E2E (synthetische Seiten) | – echte Seiten | – |
-| Händler-3D-Modell aus Quelltext (Direktabruf/Datei-Rückfall, Maßabgleich) | NEEDS USER TEST | ✅ | ✅ Unit + E2E (simulierter Server) | – echte IKEA-Seite | – |
-| Gamepad-Steuerung | PLANNED (wartet auf Freigabe) | Bewertung `docs/CONTROLLER_ASSESSMENT.md` | – | – | – |
-| IKEA/Möbelix Live-Abfrage | BLOCKED | – | – | – | – |
-| Produktlisten-Import (CSV/JSON) | DONE | ✅ | ✅ Unit | – | – |
-| Küchenplaner | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ | – |
-| Autosave, Projektliste, Projektpaket | DONE | ✅ | ✅ Unit+E2E | ✅ | – |
-| Budget, CSV-Einkaufsliste | DONE | ✅ | ✅ Unit+E2E | ✅ | – |
+| 3D-Ansicht (Orbit, Schnitt, Begehen) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ Screenshots | – |
+| Realismus (AO, SMAA, Tonemapping, Himmel, Texturen, Tageszeit) | NEEDS USER TEST | ✅ | ✅ Build+E2E | ✅ Screenshots | – |
+| Möbel: Auswahl, Ziehen, Kollision, Wandfang, Konfliktanzeige 2D/3D | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ | – |
+| Sockelleisten, Fensterbänke, Zargen | NEEDS USER TEST | ✅ | ✅ Unit | ✅ | – |
+| PDF/PNG/JPG-Underlay, Kalibrierung, Erkennung (Beta) | PARTIAL | ✅ | ✅ Unit+E2E (synthetisch) | – echte Pläne | – |
+| `apartment-plan.json`, Projektpaket, Autosave | DONE | ✅ | ✅ Unit+E2E | ✅ | – |
+| GLB/glTF-Import (Katalog + pro Objekt) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ | – |
+| Produkt von Händlerseite (IKEA AT) | NEEDS USER TEST | ✅ | ✅ Unit+E2E | ✅ echte Seite (lokal) | – |
+| Händler-3D-Modell laden | NEEDS USER TEST | ✅ | ✅ E2E (simulierter Server) | ⚠️ echter Abruf hier gesperrt | – |
+| Möbelix | BLOCKED (Bot-Schutz) | – | – | – | – |
+| Planer-Pläne (IKEA Küche/PAX …) | BLOCKED (kein legitimer Zugang) | – | – | – | – |
+| Gamepad | PLANNED (wartet auf Freigabe) | Bewertung `CONTROLLER_ASSESSMENT.md` | – | – | – |
+| Küchenplaner, Budget, CSV | NEEDS USER TEST / DONE | ✅ | ✅ | ✅ | – |
 
-**Von dir bestätigt:** noch nichts. Deine Rückmeldungen bisher: „viel zu unrealistisch“ (→ Realismus-Stufen 1–4), „was ist mit .glb import“ (→ umgesetzt).
+**Von dir bestätigt:** noch nichts.
 
-## Automatische Prüfungen (letzter Lauf, Commit `63bf64b`)
+## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
-- Vitest: ✅ 161/161 · Playwright: ✅ 17/17 (Headless-Chromium, SwiftShader)
+- Vitest: ✅ 174/174 · Playwright: ✅ 20/20 (Headless-Chromium, SwiftShader)
 
 ## Wartet auf deinen Test
-0. Die gemeldeten Fehler: Möbel anklicken (bleibt ausgewählt?), Sofa an Tür/Wand schieben, an Wand fangen, Sockelleisten, Tageszeit-Regler (oben in der Leiste im Realismusmodus).
-1. Realismusmodus auf deinem Rechner (echte Grafikkarte): Bildeindruck und flüssige Bedienung?
-2. „Produkt von Händlerseite übernehmen“ mit einer echten IKEA- und einer Möbelix-Seite: stimmen Name, Preis, Maße?
-3. Eigenes GLB-Modell importieren (z. B. von einem Hersteller, sofern erlaubt).
-4. Einen echten Grundriss (PDF/Foto) kalibrieren und nachzeichnen bzw. erkennen lassen.
+1. 3D: Möbel anklicken (bleibt ausgewählt, bewegt sich nicht) und ziehen (folgt der Maus, kein Sprung) – auch in der Schnittansicht.
+2. Sofa an die Eingangstür schieben: rote Markierung im Raum, Türblatt markiert, verschwindet beim Wegziehen.
+3. Möbel an Wände/Ecken ziehen: rastet ruhig ein, nicht an Türöffnungen, löst sich erst bei deutlichem Wegziehen.
+4. Tageszeit-Regler im Realismusmodus: folgt das Licht direkt?
+5. Mausempfindlichkeit (Projekt › Steuerung) beim Begehen und Drehen.
+6. Echte IKEA-Seite übernehmen + „Modell direkt laden“ (zeigt, ob IKEA den Abruf erlaubt); eine Möbelix-Seite einfügen.
 
 ## Blocker
-- **IKEA/Möbelix live:** Die Cloud-Umgebung blockiert `www.ikea.com` und `www.moebelix.at` (Proxy 403/DNS). Keine offizielle öffentliche API bekannt. Details: `docs/INTEGRATIONS_IKEA.md`.
+- **3D-Modelle von IKEA laden / Planer beobachten:** Netzwerkrichtlinie dieser Umgebung sperrt `web-api.ikea.com`, `api.dexf.ikea.com`, `kitchen.planner.ikea.com` (Freigabe: Umgebung › Network access › Allowed domains).
+- **Möbelix:** Cloudflare-Bot-Challenge – wird respektiert.
+- **Komplette Planer-Pläne:** nur über nicht öffentlichen IKEA-Dienst mit App-Schlüssel bzw. Konto → nicht umsetzbar ohne offizielle Freigabe.
 
 ## Bekannte Grenzen
-- Erkennung nur für achsparallele, gefüllte Wände; Tür/Fenster-Typ heuristisch.
-- 3D-Leistung auf echter GPU nicht gemessen (Cloud: ~1 FPS mit Software-Rendering im Realismusmodus).
-- Möbel ohne GLB sind maßstäbliche Näherungen.
-- Speicherung nur browserlokal (Export als Projektpaket für andere Geräte).
+- **Allgemeiner Website-/Quelltext-Import (zurückgestellt, Aufgabe 8):** zuverlässig nur bei Seiten mit schema.org-Daten (JSON-LD/Microdata/Meta). Bei per JavaScript nachgeladenen Shops enthält der Quelltext oft keine Produktdaten; reiner Seitentext liefert nur Maße (heuristisch, kann Zusatzmaße wie Sitzhöhe verwechseln); mehrere Produkte auf einer Seite → das erste wird genommen; die App ruft Seiten nie selbst ab (CORS). Wird nach den Händler-/Planer-Themen überarbeitet.
+- Konfliktanzeige zeigt Überschneidungen von Möbeln untereinander nur als Hinweis (nicht im 3D-Raum), weil z. B. Stühle unter Tischen gewollt sind.
+- Erkennung nur für achsparallele, gefüllte Wände.
+- 3D-Leistung auf echter GPU nicht gemessen (Cloud: Software-Rendering).
+- Speicherung browserlokal (Export als Projektpaket für andere Geräte).
 
 ## Als Nächstes (Vorschlag)
-1. Nach deinem Test: Realismus feinjustieren (Lichtstimmung, Farben, Belichtung)
-2. Mehrfachauswahl und Kopieren/Einfügen
-3. Schräge Wände in der Erkennung, Bemaßungstexte aus PDFs zur Maßstabsprüfung
+1. Nach deinem Test: Feinschliff (Farben der Kollisionsanzeige, Fangabstände)
+2. Stücklisten-Import aus IKEA-Planer-Zusammenfassung (braucht Beispieltext)
+3. Allgemeinen Quelltext-Import überarbeiten (Aufgabe 8)
 
 ## Git
-- Branch: `claude/quirky-faraday-0d9uep` · Push geprüft · kein Pull Request
-- Runde 3: `0b02fdb` Auswahl · `9778ace` Kollision/Fang · `618c820` Quelltext-Import · `8389f0d` Sockelleisten · `50bb075` Tageszeit · `5feffeb` Händlermodell · `63bf64b` Controller-Bewertung
-- Runde 2: `e912086` Texturen · `c637aae` Möbelmodelle · `0fe74dd` Architektur-Details · `0c59496` Realismus-Effekte · `8ee9471` GLB-Import · `94b7ef4` Produkt-Provider/PoC · Doku `f7cbcd3` + Dashboard
+- Branch `claude/quirky-faraday-0d9uep`; `main` = `5797457` (PR #1 gemergt nach grüner CI)
+- Diese Runde: `2918525` CI/Workflow · `34551bd` Kollisionen 3D + Drag-Fix · `485726b` Mausempfindlichkeit · `004c716` Wandfang/Durchdringung · `1a6ce1f` Tageszeit-Regler · `e25da43` 3DModel/Recherche

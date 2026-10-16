@@ -20,6 +20,7 @@ const SHAPES: Record<string, string> = {
 
 function ModelSection({
   url,
+  declared,
   model,
   state,
   dims,
@@ -27,6 +28,8 @@ function ModelSection({
   onModel,
 }: {
   url: string | null;
+  /** Number of models the page declares as schema.org 3DModel (0 = heuristic find). */
+  declared: number;
   model: FetchedModel | null;
   state: { busy: boolean; message: string | null; failed: boolean };
   dims: { width: number; depth: number; height: number } | null;
@@ -67,7 +70,12 @@ function ModelSection({
     <div className="model-section">
       <p className="small">
         <strong>3D-Modell:</strong>{' '}
-        {url ? (
+        {url && declared > 0 ? (
+          <>
+            von der Produktseite angegeben (schema.org 3DModel{declared > 1 ? `, ${declared} Varianten – die erste wird verwendet` : ''}){' '}
+            <Badge kind="ok" title="Die Seite deklariert das Modell selbst in ihren strukturierten Daten">deklariert</Badge>
+          </>
+        ) : url ? (
           <>
             Verweis im Quelltext gefunden <Badge kind="warn">experimentell</Badge>
           </>
@@ -308,6 +316,7 @@ export function ProductImportModal() {
               {product.dimensions.sourceText && <p className="muted small">Gefundene Maßangabe: „{product.dimensions.sourceText}“</p>}
               <ModelSection
                 url={product.modelUrl}
+                declared={product.modelCandidates.length}
                 model={model}
                 state={modelState}
                 dims={w && d && h ? { width: w, depth: d, height: h } : null}

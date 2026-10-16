@@ -1,4 +1,4 @@
-import { Component, memo, Suspense, useMemo, useRef, type ReactNode } from 'react';
+import { Component, memo, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
@@ -7,7 +7,7 @@ import { planRotationToWorldY, roundMm } from '../model/units';
 import { ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
 import { DRACO_PATH } from '../import/gltf';
-import { isClick } from './pointer';
+import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 
 interface Props {
   item: Furniture;
@@ -17,12 +17,28 @@ interface Props {
   onDragStart: () => void;
   onDrag: (id: string, x: number, y: number) => void;
   onDragEnd: () => void;
+  /** Drag aborted by the browser: restore the position from before the drag. */
+  onDragCancel: () => void;
 }
 
 /** One furniture object in 3D. Can be dragged on the floor plane. */
 export const FurnitureObject = memo(
-  function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd }: Props) {
-    const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean } | null>(null);
+  function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd, onDragCancel }: Props) {
+    const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean; sx: number; sy: number; onBlur: () => void } | null>(null);
+    // never leave an open transaction behind if the item disappears mid-drag
+    useEffect(
+      () => () => {
+        const dr = dragging.current;
+        if (dr) window.removeEventListener('blur', dr.onBlur);
+        if (dr?.started) onDragEndRef.current();
+        dragging.current = null;
+      },
+      [],
+    );
+    const onDragEndRef = useRef(onDragEnd);
+    useEffect(() => {
+      onDragEndRef.current = onDragEnd;
+    });
     const shape = item.model.type === 'procedural' ? item.model.shape : item.model.fallbackShape;
     const accent = item.kitchen?.frontColor;
     const castShadow = quality === 'realism' && item.height > 0.05;
@@ -31,15 +47,36 @@ export const FurnitureObject = memo(
       <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} quality={quality} castShadow={castShadow} />
     );
 
+    /** End the current gesture; `commit` keeps the moved position, otherwise it is reverted. */
+    const endDrag = (commit: boolean) => {
+      const dr = dragging.current;
+      if (!dr) return;
+      dragging.current = null;
+      window.removeEventListener('blur', dr.onBlur);
+      if (dr.started) (commit ? onDragEnd : onDragCancel)();
+    };
+
     const onDown = (e: ThreeEvent<PointerEvent>) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || isClippedHit(e)) return;
       e.stopPropagation();
       onSelect(item.id);
       if (item.locked) return;
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -item.elevation);
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(plane, hit)) return;
-      dragging.current = { grab: hit.sub(new THREE.Vector3(item.x, item.elevation, item.y)), plane, started: false };
+      endDrag(true);
+      // focus loss (Alt+Tab, dialog) never delivers a pointerup: finish the drag there
+      const onBlur = () => endDrag(true);
+      window.addEventListener('blur', onBlur);
+      dragging.current = {
+        // offset between the grabbed point and the item origin – kept during the whole drag
+        grab: hit.sub(new THREE.Vector3(item.x, item.elevation, item.y)),
+        plane,
+        started: false,
+        sx: e.nativeEvent.clientX,
+        sy: e.nativeEvent.clientY,
+        onBlur,
+      };
       (e.target as unknown as Element).setPointerCapture?.(e.pointerId);
     };
     const onMove = (e: ThreeEvent<PointerEvent>) => {
@@ -47,8 +84,9 @@ export const FurnitureObject = memo(
       if (!dr) return;
       e.stopPropagation();
       // only start moving after a small threshold so a click never nudges the object
+      // (R3F's e.delta is only set for click events, so measure the travel ourselves)
       if (!dr.started) {
-        if (isClick(e)) return;
+        if (Math.hypot(e.nativeEvent.clientX - dr.sx, e.nativeEvent.clientY - dr.sy) <= CLICK_THRESHOLD_PX) return;
         dr.started = true;
         onDragStart();
       }
@@ -59,14 +97,15 @@ export const FurnitureObject = memo(
     const onUp = (e: ThreeEvent<PointerEvent>) => {
       if (!dragging.current) return;
       e.stopPropagation();
-      const started = dragging.current.started;
-      dragging.current = null;
+      endDrag(true);
       (e.target as unknown as Element).releasePointerCapture?.(e.pointerId);
-      if (started) onDragEnd();
     };
+    // the browser aborted the gesture (touch interrupted, capture lost): revert the move
+    const onCancel = () => endDrag(false);
     // The click that follows pointerup must stop here; otherwise R3F hands it to the
     // next object behind (e.g. a wall), which would steal the selection.
     const onClick = (e: ThreeEvent<MouseEvent>) => {
+      if (isClippedHit(e)) return;
       e.stopPropagation();
     };
 
@@ -77,6 +116,8 @@ export const FurnitureObject = memo(
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
+        onPointerCancel={onCancel}
+        onLostPointerCapture={onCancel}
         onClick={onClick}
       >
         {item.model.type === 'gltf' ? (

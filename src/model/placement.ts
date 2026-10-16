@@ -10,7 +10,7 @@ import { doorSymbol } from '../editor2d/openingSymbols';
 import { furnitureCorners, footprintsOverlap } from '../editor2d/furnitureGeometry';
 import type { DerivedPlan } from './derived';
 import type { Furniture, Project } from './schema';
-import { add, dot, normalize, perp, pointInPolygon, polygonArea, scale, sub, type Vec2 } from './vec';
+import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid, scale, signedArea, sub, type Vec2 } from './vec';
 import { normalizeAngle } from './units';
 
 export interface Obstacle {
@@ -60,14 +60,17 @@ export function mtv(a: Vec2[], b: Vec2[], eps = 1e-6): Vec2 | null {
       if (axis.x === 0 && axis.y === 0) continue;
       const pa = a.map((v) => dot(v, axis));
       const pb = b.map((v) => dot(v, axis));
-      const overlap = Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb));
-      if (overlap <= eps) return null;
-      if (!best || overlap < best.depth) {
-        // push A away from B along this axis
-        const ca = pa.reduce((s, v) => s + v, 0) / pa.length;
-        const cb = pb.reduce((s, v) => s + v, 0) / pb.length;
-        best = { axis: ca >= cb ? axis : scale(axis, -1), depth: overlap };
-      }
+      const minA = Math.min(...pa);
+      const maxA = Math.max(...pa);
+      const minB = Math.min(...pb);
+      const maxB = Math.max(...pb);
+      if (Math.min(maxA, maxB) - Math.max(minA, minB) <= eps) return null;
+      // distance A has to travel along ±axis to be clear of B (also correct if one
+      // interval contains the other – a plain overlap length would be too short then)
+      const pos = maxB - minA;
+      const neg = maxA - minB;
+      const depth = Math.min(pos, neg);
+      if (!best || depth < best.depth) best = { axis: pos <= neg ? axis : scale(axis, -1), depth };
     }
   }
   return best ? scale(best.axis, best.depth + eps) : null;
@@ -75,21 +78,62 @@ export function mtv(a: Vec2[], b: Vec2[], eps = 1e-6): Vec2 | null {
 
 export type Pose = Pick<Furniture, 'x' | 'y' | 'rotation' | 'width' | 'depth' | 'elevation' | 'height'>;
 
+/** Cheap pre-test: do the bounding boxes of the footprint and the obstacle overlap? */
+function boxesOverlap(fc: Vec2[], o: Obstacle): boolean {
+  const b = obstacleInfo(o);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const c of fc) {
+    if (c.x < minX) minX = c.x;
+    if (c.x > maxX) maxX = c.x;
+    if (c.y < minY) minY = c.y;
+    if (c.y > maxY) maxY = c.y;
+  }
+  return maxX >= b.minX && minX <= b.maxX && maxY >= b.minY && minY <= b.maxY;
+}
+
 export function collidingObstacles(pose: Pose, obstacles: Obstacle[]): Obstacle[] {
   const fc = furnitureCorners(pose);
-  return obstacles.filter((o) => heightOverlap(pose, o) && footprintsOverlap(fc, o.polygon, 1e-4));
+  return obstacles.filter((o) => heightOverlap(pose, o) && boxesOverlap(fc, o) && footprintsOverlap(fc, o.polygon, 1e-4));
 }
+
+const boundsCache = new WeakMap<Obstacle, { minX: number; maxX: number; minY: number; maxY: number; thickness: number }>();
+function obstacleInfo(o: Obstacle) {
+  let b = boundsCache.get(o);
+  if (!b) {
+    const xs = o.polygon.map((q) => q.x);
+    const ys = o.polygon.map((q) => q.y);
+    // minimum width of the convex polygon: smallest extent perpendicular to one of its edges
+    let thickness = Infinity;
+    for (let i = 0; i < o.polygon.length; i++) {
+      const a = o.polygon[i];
+      const n = normalize(perp(sub(o.polygon[(i + 1) % o.polygon.length], a)));
+      if (n.x === 0 && n.y === 0) continue;
+      const proj = o.polygon.map((q) => dot(sub(q, a), n));
+      thickness = Math.min(thickness, Math.max(...proj) - Math.min(...proj));
+    }
+    b = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys), thickness };
+    boundsCache.set(o, b);
+  }
+  return b;
+}
+const obstacleBounds = obstacleInfo;
+const obstacleThickness = (o: Obstacle) => obstacleInfo(o).thickness;
 
 /** Push a pose out of all overlapping obstacles (a few iterations handle corners). */
 function resolve(pose: Pose, obstacles: Obstacle[]): Pose {
   let p = { ...pose };
   for (let it = 0; it < 6; it++) {
     let moved = false;
+    let fc = furnitureCorners(p);
     for (const o of obstacles) {
-      if (!heightOverlap(p, o)) continue;
-      const m = mtv(furnitureCorners(p), o.polygon);
+      if (!heightOverlap(p, o) || !boxesOverlap(fc, o)) continue;
+      const m = mtv(fc, o.polygon);
       if (!m) continue;
       p = { ...p, x: p.x + m.x, y: p.y + m.y };
+      fc = furnitureCorners(p);
       moved = true;
     }
     if (!moved) break;
@@ -101,23 +145,67 @@ function resolve(pose: Pose, obstacles: Obstacle[]): Pose {
  * Move a furniture item from its current pose towards a target, step by step,
  * so it can never tunnel through a wall; blocked movement slides along walls.
  * Returns the reachable position.
+ *
+ * `current` is the pose before this move (default: `start`). Obstacles it already
+ * intersects (an item placed into a door leaf earlier, or with Alt) are not used
+ * to push it around – that would make it jump – so it can be dragged out freely;
+ * they count again as soon as the item is clear of them.
  */
-export function constrainMove(start: Pose, target: { x: number; y: number }, obstacles: Obstacle[], maxStep = 0.02): { x: number; y: number; blocked: boolean } {
-  const relevant = obstacles.filter((o) => heightOverlap(start, o));
+export function constrainMove(
+  start: Pose,
+  target: { x: number; y: number },
+  obstacles: Obstacle[],
+  maxStep = 0.02,
+  current: Pose = start,
+): { x: number; y: number; blocked: boolean } {
+  // only obstacles near the swept area matter (cheap bounding-box test)
+  const reach = Math.hypot(start.width, start.depth) / 2 + 0.05;
+  const sweep = {
+    minX: Math.min(start.x, target.x, current.x) - reach,
+    maxX: Math.max(start.x, target.x, current.x) + reach,
+    minY: Math.min(start.y, target.y, current.y) - reach,
+    maxY: Math.max(start.y, target.y, current.y) + reach,
+  };
+  const relevant = obstacles.filter((o) => {
+    if (!heightOverlap(start, o)) return false;
+    const b = obstacleBounds(o);
+    return b.maxX >= sweep.minX && b.minX <= sweep.maxX && b.maxY >= sweep.minY && b.minY <= sweep.maxY;
+  });
+  // a step must stay well below the thinnest obstacle, otherwise the push-out could
+  // resolve to the far side of a thin partition (tunnelling)
+  const thinnest = relevant.reduce((m, o) => Math.min(m, obstacleThickness(o)), Infinity);
+  maxStep = Math.max(0.004, Math.min(maxStep, thinnest / 3));
+  const stuck = new Set(collidingObstacles(current, relevant));
+  const active = () => relevant.filter((o) => !stuck.has(o));
   const dx = target.x - start.x;
   const dy = target.y - start.y;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / maxStep));
   let p: Pose = { ...start };
-  // if the item starts inside an obstacle (legacy placement), first push it out
-  if (collidingObstacles(p, relevant).length) p = resolve(p, relevant);
+  // e.g. after snapping rotated the item: push it out of obstacles it newly touches
+  p = resolve(p, active());
   for (let i = 1; i <= steps; i++) {
     const desired = { x: start.x + (dx * i) / steps, y: start.y + (dy * i) / steps };
     // keep accumulated sliding offsets: move by the step delta from the current pose
     const prevDesired = { x: start.x + (dx * (i - 1)) / steps, y: start.y + (dy * (i - 1)) / steps };
-    p = resolve({ ...p, x: p.x + desired.x - prevDesired.x, y: p.y + desired.y - prevDesired.y }, relevant);
+    const before = p;
+    p = { ...p, x: p.x + desired.x - prevDesired.x, y: p.y + desired.y - prevDesired.y };
+    const freed = stuck.size > 0 && [...stuck].some((o) => !collidingObstacles(p, [o]).length && stuck.delete(o));
+    p = resolve(p, active());
+    // completely blocked: every further step would end in the same place
+    if (!freed && Math.abs(p.x - before.x) < 1e-9 && Math.abs(p.y - before.y) < 1e-9) break;
   }
   const blocked = Math.hypot(p.x - target.x, p.y - target.y) > 1e-3;
   return { x: p.x, y: p.y, blocked };
+}
+
+/** Length of [t0, t1] ∩ [0, L] that is not inside one of the open ranges. */
+function solidLength(t0: number, t1: number, L: number, open: [number, number][]): number {
+  const a = Math.max(0, t0);
+  const b = Math.min(L, t1);
+  if (b <= a) return 0;
+  let len = b - a;
+  for (const [o0, o1] of open) len -= Math.max(0, Math.min(b, o1) - Math.max(a, o0));
+  return len;
 }
 
 export interface WallSnap {
@@ -132,15 +220,26 @@ export interface WallSnap {
  * `distance` of a wall face it faces (±`angleTol`), rotate it parallel and move it flush.
  * Applied to the raw drag target each time, so it is deterministic (no jitter build-up).
  */
-export function snapToWalls(pose: Pose, d: DerivedPlan, distance = 0.12, angleTol = (20 * Math.PI) / 180, gap = 0.003): WallSnap {
+export function snapToWalls(
+  pose: Pose,
+  d: DerivedPlan,
+  distance = 0.12,
+  angleTol = (20 * Math.PI) / 180,
+  gap = 0.003,
+  /** Walls the item is attached to right now: they hold it up to `releaseDistance` (hysteresis). */
+  attachedTo: readonly string[] = [],
+  releaseDistance = 0.2,
+): WallSnap {
   let p = { ...pose };
   const wallIds: string[] = [];
-  const faces: { wallId: string; point: Vec2; n: Vec2; dir: Vec2; a: Vec2; b: Vec2 }[] = [];
+  const faces: { wallId: string; point: Vec2; n: Vec2; dir: Vec2; a: Vec2; b: Vec2; open: [number, number][] }[] = [];
   for (const [wallId, fp] of d.footprints) {
+    // door openings and passages are no wall to stand against
+    const open = (d.openings.get(wallId) ?? []).filter((r) => r.opening.kind !== 'window').map((r) => [r.s0, r.s1] as [number, number]);
     for (const s of [1, -1] as const) {
       const n = scale(fp.normal, s);
       const off = scale(n, fp.thickness / 2);
-      faces.push({ wallId, point: add(fp.a, off), n, dir: fp.dir, a: add(fp.a, off), b: add(fp.b, off) });
+      faces.push({ wallId, point: add(fp.a, off), n, dir: fp.dir, a: add(fp.a, off), b: add(fp.b, off), open });
     }
   }
   const back = (r: number) => ({ x: Math.sin(r), y: -Math.cos(r) }); // rotate((0,-1), r)
@@ -149,17 +248,17 @@ export function snapToWalls(pose: Pose, d: DerivedPlan, distance = 0.12, angleTo
       const c = { x: p.x, y: p.y };
       const side = dot(sub(c, f.point), f.n);
       if (side <= 0) return null; // object is behind this face
-      // object's projection along the face must overlap the face extent
+      // the item (once aligned, its width runs along the face) must have solid wall behind it
       const L = dot(sub(f.b, f.a), f.dir);
       const t = dot(sub(c, f.a), f.dir);
-      const half = Math.max(p.width, p.depth) / 2;
-      if (t < -half || t > L + half) return null;
+      const solid = solidLength(t - p.width / 2, t + p.width / 2, L, f.open);
+      if (solid < Math.min(0.2, 0.3 * p.width)) return null;
       const bdir = back(p.rotation);
       const angle = Math.acos(Math.max(-1, Math.min(1, -dot(bdir, f.n))));
       if (angle > angleTol) return null;
       // distance of the rear side to the face if the item were aligned
       const g = side - p.depth / 2;
-      if (g < -p.depth / 2 || g > distance) return null;
+      if (g < -p.depth / 2 || g > (attachedTo.includes(f.wallId) ? releaseDistance : distance)) return null;
       return { f, g };
     })
     .filter((x): x is NonNullable<typeof x> => !!x)
@@ -191,14 +290,92 @@ export function snapToWalls(pose: Pose, d: DerivedPlan, distance = 0.12, angleTo
   return { x: p.x, y: p.y, rotation: p.rotation, wallIds };
 }
 
+/** A vertical prism in plan coordinates (used for collision feedback). */
+export interface CollisionRegion {
+  polygon: Vec2[];
+  z0: number;
+  z1: number;
+}
+
 export interface PlacementIssue {
   kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap';
   message: string;
   refId?: string;
+  /** Where the item intersects the obstacle (footprint ∩ obstacle, common height range). */
+  region?: CollisionRegion;
+  /** The responsible obstacle area itself (wall piece, door leaf, door swing, other item). */
+  culprit?: CollisionRegion;
+}
+
+/** Wall/door-leaf intersections are errors; swing/outside are warnings; overlaps are informational. */
+export function issueLevel(kind: PlacementIssue['kind']): 'error' | 'warn' | 'info' {
+  return kind === 'wall' || kind === 'door-leaf' ? 'error' : kind === 'door-swing' || kind === 'outside' ? 'warn' : 'info';
+}
+
+/**
+ * Intersection of two convex polygons (Sutherland–Hodgman). Works for either
+ * winding; returns [] if they do not overlap (or only touch).
+ */
+export function clipConvex(subject: Vec2[], clip: Vec2[]): Vec2[] {
+  if (subject.length < 3 || clip.length < 3) return [];
+  const orient = Math.sign(signedArea(clip)) || 1;
+  // inside = on the inner side of edge a→b
+  const inside = (p: Vec2, a: Vec2, b: Vec2) => orient * ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) >= -1e-12;
+  const cut = (p: Vec2, q: Vec2, a: Vec2, b: Vec2): Vec2 => {
+    const r = sub(q, p);
+    const e = sub(b, a);
+    const den = r.x * e.y - r.y * e.x;
+    if (Math.abs(den) < 1e-15) return p;
+    const t = ((a.x - p.x) * e.y - (a.y - p.y) * e.x) / den;
+    return { x: p.x + r.x * t, y: p.y + r.y * t };
+  };
+  let out = subject;
+  for (let i = 0; i < clip.length && out.length; i++) {
+    const a = clip[i];
+    const b = clip[(i + 1) % clip.length];
+    const input = out;
+    out = [];
+    for (let j = 0; j < input.length; j++) {
+      const p = input[j];
+      const q = input[(j + 1) % input.length];
+      const pin = inside(p, a, b);
+      const qin = inside(q, a, b);
+      if (pin) out.push(p);
+      if (pin !== qin) out.push(cut(p, q, a, b));
+    }
+  }
+  return out.length >= 3 && polygonArea(out) > 1e-8 ? out : [];
+}
+
+/** Intersection region of an item with an obstacle prism (null if only touching). */
+function intersection(item: Pick<Furniture, 'elevation' | 'height'>, fc: Vec2[], other: CollisionRegion): CollisionRegion | undefined {
+  const polygon = clipConvex(fc, other.polygon);
+  const z0 = Math.max(item.elevation, other.z0);
+  const z1 = Math.min(item.elevation + item.height, other.z1);
+  if (!polygon.length || z1 <= z0) return undefined;
+  return { polygon, z0, z1 };
+}
+
+/** Human-readable description of a door: width and the room its leaf opens into. */
+function describeDoor(p: Project, d: DerivedPlan, openingId: string): string {
+  const o = p.openings.find((x) => x.id === openingId);
+  const fp = o ? d.footprints.get(o.wallId) : undefined;
+  const r = fp ? d.openings.get(o!.wallId)?.find((x) => x.opening.id === openingId) : undefined;
+  if (!o || !fp || !r) return 'Tür';
+  const ds = doorSymbol(fp, r);
+  const probe = add(ds.hinge, scale(sub(ds.openTip, ds.hinge), 0.5));
+  const room = p.rooms.find((rm) => {
+    const g = d.rooms.get(rm.id);
+    return g && pointInPolygon(probe, g.interior);
+  });
+  return `Tür ${Math.round(o.width * 100)} cm${room?.name ? ` (${room.name})` : ''}`;
 }
 
 /** Quarter-circle door swing approximated by its bounding square on the swing side. */
+const swingCache = new WeakMap<DerivedPlan, { polygon: Vec2[]; openingId: string; z1: number }[]>();
 function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z1: number }[] {
+  const cached = swingCache.get(d);
+  if (cached) return cached;
   const out: { polygon: Vec2[]; openingId: string; z1: number }[] = [];
   for (const [wallId, list] of d.openings) {
     const fp = d.footprints.get(wallId);
@@ -212,6 +389,7 @@ function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z
       out.push({ polygon: [r0, r1, add(r1, scale(n, ds.radius)), add(r0, scale(n, ds.radius))], openingId: r.opening.id, z1: r.top });
     }
   }
+  swingCache.set(d, out);
   return out;
 }
 
@@ -219,12 +397,25 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
   const issues: PlacementIssue[] = [];
   const fc = furnitureCorners(item);
   for (const o of collidingObstacles(item, obstacles)) {
-    issues.push(o.kind === 'wall' ? { kind: 'wall', message: 'Ragt in eine Wand.', refId: o.refId } : { kind: 'door-leaf', message: 'Steht im geöffneten Türblatt.', refId: o.refId });
+    const culprit = { polygon: o.polygon, z0: o.z0, z1: o.z1 };
+    const region = intersection(item, fc, culprit);
+    issues.push(
+      o.kind === 'wall'
+        ? { kind: 'wall', message: 'Ragt in eine Wand.', refId: o.refId, region, culprit }
+        : { kind: 'door-leaf', message: `Steht im geöffneten Türblatt – ${describeDoor(p, d, o.refId)}.`, refId: o.refId, region, culprit },
+    );
   }
   if (item.elevation < 0.05 && item.solid) {
     for (const s of doorSwingAreas(d)) {
       if (footprintsOverlap(fc, s.polygon, 1e-3) && !issues.some((i) => i.refId === s.openingId)) {
-        issues.push({ kind: 'door-swing', message: 'Blockiert den Türaufschlag – die Tür lässt sich nicht ganz öffnen.', refId: s.openingId });
+        const culprit = { polygon: s.polygon, z0: 0, z1: s.z1 };
+        issues.push({
+          kind: 'door-swing',
+          message: `Blockiert den Türaufschlag – ${describeDoor(p, d, s.openingId)} lässt sich nicht ganz öffnen.`,
+          refId: s.openingId,
+          region: intersection(item, fc, culprit),
+          culprit,
+        });
       }
     }
   }
@@ -240,9 +431,38 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
   for (const o of p.furniture) {
     if (o.id === item.id || o.category === 'textile' || item.category === 'textile') continue;
     if (Math.min(o.elevation + o.height, item.elevation + item.height) - Math.max(o.elevation, item.elevation) <= 0.005) continue;
-    if (footprintsOverlap(fc, furnitureCorners(o), 0.003)) issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, refId: o.id });
+    const oc = furnitureCorners(o);
+    if (footprintsOverlap(fc, oc, 0.003)) {
+      const culprit = { polygon: oc, z0: o.elevation, z1: o.elevation + o.height };
+      issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, refId: o.id, region: intersection(item, fc, culprit), culprit });
+    }
   }
   return issues;
+}
+
+export interface FurnitureConflict {
+  level: 'error' | 'warn';
+  issues: PlacementIssue[];
+}
+
+/**
+ * Placement conflicts of all furniture (errors: wall/door leaf; warnings: door
+ * swing/outside). Shared by the 2D plan and the 3D collision markers.
+ */
+export function furnitureConflicts(p: Project, d: DerivedPlan, obstacles: Obstacle[]): Map<string, FurnitureConflict> {
+  const m = new Map<string, FurnitureConflict>();
+  for (const f of p.furniture) {
+    const issues = placementIssues(p, d, f, obstacles).filter((i) => issueLevel(i.kind) !== 'info');
+    if (!issues.length) continue;
+    m.set(f.id, { level: issues.some((i) => issueLevel(i.kind) === 'error') ? 'error' : 'warn', issues });
+  }
+  return m;
+}
+
+/** Centre of a region (for labels/markers). */
+export function regionCenter(r: CollisionRegion): { x: number; y: number; z: number } {
+  const c = polygonCentroid(r.polygon);
+  return { x: c.x, y: c.y, z: (r.z0 + r.z1) / 2 };
 }
 
 export interface MoveOptions {
@@ -266,7 +486,9 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   // rugs and wall-mounted items (curtains, mirrors…) are not snapped/blocked the same way
   const free = f.category === 'textile' && f.height < 0.05;
   if (opts.snap && !free) {
-    const s = snapToWalls({ ...f, x: goal.x, y: goal.y }, derived);
+    // walls the item stands flush against now keep holding it a bit longer (no flicker)
+    const attached = snapToWalls(f, derived, 0.01).wallIds;
+    const s = snapToWalls({ ...f, x: goal.x, y: goal.y }, derived, undefined, undefined, undefined, attached);
     if (s.wallIds.length) {
       goal = { x: s.x, y: s.y };
       rotation = s.rotation;
@@ -274,7 +496,7 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
     }
   }
   if (opts.collide && !free) {
-    const r = constrainMove({ ...f, rotation }, goal, obstacles);
+    const r = constrainMove({ ...f, rotation }, goal, obstacles, undefined, f);
     goal = { x: r.x, y: r.y };
   }
   f.x = Math.round(goal.x * 1000) / 1000;

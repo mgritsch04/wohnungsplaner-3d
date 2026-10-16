@@ -47,6 +47,11 @@ interface UiStore {
   measurements: Measurement[];
   cursor: Vec2 | null;
   fps: number | null;
+  /**
+   * Time of day shown while the slider is being dragged (not yet in the project).
+   * Kept outside the project so dragging does not clone/re-render the whole app.
+   */
+  timePreview: number | null;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   setHover: (s: Selection | null) => void;
@@ -61,6 +66,7 @@ interface UiStore {
   clearMeasurements: () => void;
   setCursor: (p: Vec2 | null) => void;
   setFps: (fps: number | null) => void;
+  setTimePreview: (hour: number | null) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -80,6 +86,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   measurements: [],
   cursor: null,
   fps: null,
+  timePreview: null,
   toasts: [],
   setSelection: (selection) => set({ selection, rightTab: selection ? 'properties' : get().rightTab }),
   setHover: (hover) => {
@@ -98,6 +105,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   clearMeasurements: () => set({ measurements: [] }),
   setCursor: (cursor) => set({ cursor }),
   setFps: (fps) => set({ fps }),
+  setTimePreview: (timePreview) => set({ timePreview }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });

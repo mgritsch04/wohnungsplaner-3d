@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
-import { addOpening, addPolygonRoom, addRectRoom, closestWall } from './operations';
+import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
-import { buildPlacementObstacles, collidingObstacles, constrainMove, placementIssues, snapToWalls, type Pose } from './placement';
+import { buildPlacementObstacles, clipConvex, moveFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
-import { pointInPolygon, rotate } from './vec';
+import { pointInPolygon, polygonArea, rotate } from './vec';
 
 const T = 0.12;
 function roomProject() {
@@ -133,6 +133,36 @@ describe('doors', () => {
   });
 });
 
+describe('items that already intersect an obstacle', () => {
+  it('mtv pushes far enough when one projection contains the other', () => {
+    const thin = [
+      { x: 1.68, y: 3 },
+      { x: 1.72, y: 3 },
+      { x: 1.72, y: 4 },
+      { x: 1.68, y: 4 },
+    ];
+    const m = mtv(furnitureCorners(pose(1.7, 3.5, 2.1, 0.5)), thin)!;
+    const moved = furnitureCorners(pose(1.7 + m.x, 3.5 + m.y, 2.1, 0.5));
+    expect(mtv(moved, thin)).toBeNull();
+  });
+
+  it('can be dragged out of a door leaf it stands in, without jumping', () => {
+    const p = roomProject();
+    const obs = buildPlacementObstacles(derivePlan(p));
+    // a thin vertical "leaf" through the middle of the item
+    const leaf = { polygon: [{ x: 1.98, y: 1 }, { x: 2.02, y: 1 }, { x: 2.02, y: 2 }, { x: 1.98, y: 2 }], z0: 0.015, z1: 2.0, kind: 'door-leaf' as const, refId: 'd' };
+    const start = pose(2, 1.5, 1.6, 0.6);
+    const small = constrainMove(start, { x: 2.01, y: 1.5 }, [...obs, leaf]);
+    expect(small.x).toBeCloseTo(2.01, 6); // no jump on a tiny move
+    const out = constrainMove(start, { x: 3.1, y: 1.5 }, [...obs, leaf]);
+    expect(out.x).toBeCloseTo(3.1, 3);
+    expect(collidingObstacles({ ...start, x: out.x }, [leaf])).toHaveLength(0);
+    // once clear, the leaf blocks again
+    const back = constrainMove({ ...start, x: 3.1 }, { x: 2, y: 1.5 }, [...obs, leaf]);
+    expect(back.x - 0.8).toBeGreaterThanOrEqual(2.02 - 1e-3);
+  });
+});
+
 describe('wall snapping', () => {
   it('snaps the rear side flush to a nearby wall and aligns rotation', () => {
     const p = roomProject();
@@ -173,5 +203,126 @@ describe('wall snapping', () => {
     expect(s.wallIds).toHaveLength(2);
     expect(s.x - 0.5).toBeCloseTo(0.003, 6);
     expect(s.y - 0.3).toBeCloseTo(0.003, 6);
+  });
+});
+
+describe('collision feedback regions', () => {
+  it('clips convex polygons in either winding and ignores mere contact', () => {
+    const sq = (x: number, y: number, s: number) => [
+      { x, y },
+      { x: x + s, y },
+      { x: x + s, y: y + s },
+      { x, y: y + s },
+    ];
+    const a = sq(0, 0, 2);
+    const b = sq(1, 1, 2);
+    expect(polygonArea(clipConvex(a, b))).toBeCloseTo(1, 9);
+    expect(polygonArea(clipConvex(a, [...b].reverse()))).toBeCloseTo(1, 9);
+    expect(clipConvex(a, sq(2, 0, 1))).toEqual([]); // touching edge
+    expect(clipConvex(a, sq(5, 5, 1))).toEqual([]);
+  });
+
+  it('reports intersection region and responsible door leaf for a sofa in the opened door', () => {
+    const p = createEmptyProject();
+    addRectRoom(p, { x: 0, y: 0, width: 4, depth: 3, name: 'Wohnen', thickness: T, height: 2.6 });
+    addRectRoom(p, { x: 4 + T, y: 0, width: 3, depth: 3, name: 'Flur', thickness: T, height: 2.6 });
+    const w = closestWall(p, { x: 4.06, y: 1.5 })!;
+    addOpening(p, w.wall.id, 'door', w.s, { width: 0.9, swing: 'left' });
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const leaf = obs.find((o) => o.kind === 'door-leaf')!;
+    const lc = { x: leaf.polygon.reduce((s, q) => s + q.x, 0) / 4, y: leaf.polygon.reduce((s, q) => s + q.y, 0) / 4 };
+    const sofa = createFurnitureFromCatalog(findCatalogItem('generic-sofa-3')!, { x: lc.x, y: lc.y, rotation: 0 });
+    p.furniture.push(sofa);
+    const issues = placementIssues(p, d, sofa, obs);
+    const hit = issues.find((i) => i.kind === 'door-leaf')!;
+    expect(hit.refId).toBe(p.openings[0].id);
+    expect(hit.message).toMatch(/Tür 90 cm \((Wohnen|Flur)\)/);
+    // the region lies inside both the leaf and the sofa footprint
+    expect(polygonArea(hit.region!.polygon)).toBeGreaterThan(0.01);
+    const bx = leaf.polygon.map((q) => q.x);
+    const by = leaf.polygon.map((q) => q.y);
+    for (const q of hit.region!.polygon) {
+      expect(q.x).toBeGreaterThanOrEqual(Math.min(...bx) - 1e-6);
+      expect(q.x).toBeLessThanOrEqual(Math.max(...bx) + 1e-6);
+      expect(q.y).toBeGreaterThanOrEqual(Math.min(...by) - 1e-6);
+      expect(q.y).toBeLessThanOrEqual(Math.max(...by) + 1e-6);
+    }
+    expect(hit.region!.z0).toBeCloseTo(0.015, 6);
+    expect(hit.region!.z1).toBeCloseTo(sofa.height, 6);
+    expect(hit.culprit!.polygon).toBe(leaf.polygon);
+    const conflicts = furnitureConflicts(p, d, obs);
+    expect(conflicts.get(sofa.id)?.level).toBe('error');
+    // moved away into the free room: no conflict left
+    const free = { ...sofa, x: 1.5, y: 1.5 };
+    p.furniture[0] = free;
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('does not flag items standing flush against a wall or in a corner (no false positives)', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const item = createFurnitureFromCatalog(findCatalogItem('generic-sofa-3')!, { x: 2, y: 1.5, rotation: 0 });
+    const s = snapToWalls({ ...item, y: item.depth / 2 + 0.05 }, d);
+    p.furniture.push({ ...item, x: s.x, y: s.y, rotation: s.rotation });
+    const small = { ...item, id: 'corner', width: 1 };
+    const c = snapToWalls({ ...small, x: 0.55, y: item.depth / 2 + 0.05 }, d);
+    expect(c.wallIds).toHaveLength(2);
+    p.furniture[0] = { ...p.furniture[0], x: 4 - item.width / 2 - 0.003 };
+    p.furniture.push({ ...small, x: c.x, y: c.y, rotation: c.rotation });
+    expect(placementIssues(p, d, p.furniture[1], obs)).toEqual([]);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+});
+
+describe('wall penetration and snapping robustness', () => {
+  it('cannot tunnel through a very thin (2 cm) partition with a fast drag', () => {
+    const p = roomProject();
+    insertWall(p, { x: 2, y: 0 }, { x: 2, y: 3 }, { thickness: 0.02, height: 2.6 });
+    const obs = buildPlacementObstacles(derivePlan(p));
+    for (const target of [3.5, 2.6, 2.45, 2.31]) {
+      const r = constrainMove(pose(1.0, 1.5, 1.2, 0.5), { x: target, y: 1.5 }, obs);
+      expect(r.x + 0.6).toBeLessThanOrEqual(1.99 + 1e-3);
+    }
+    // also when the item is rotated and moved diagonally
+    const r = constrainMove(pose(1.0, 1.5, 1.2, 0.5, 0.4), { x: 3.4, y: 2.2 }, obs);
+    for (const c of furnitureCorners({ ...pose(0, 0, 1.2, 0.5, 0.4), x: r.x, y: r.y })) expect(c.x).toBeLessThan(2.0);
+  });
+
+  it('does not snap to the open part of a wall (door opening / passage)', () => {
+    const p = roomProject();
+    const w = closestWall(p, { x: 2, y: -0.06 })!;
+    addOpening(p, w.wall.id, 'passage', w.s, { width: 2.4 });
+    const d = derivePlan(p);
+    // a 60 cm cabinet in front of the 2.4 m wide passage: no wall behind it
+    const s = snapToWalls(pose(2, 0.2 + 0.06, 0.6, 0.4, 0), d);
+    expect(s.wallIds).toHaveLength(0);
+    // a 1.6 m item overlapping the remaining wall on one side still snaps
+    const s2 = snapToWalls(pose(1.0, 0.2 + 0.06, 1.6, 0.4, 0), d);
+    expect(s2.wallIds).toHaveLength(1);
+  });
+
+  it('keeps a snapped item attached until it is pulled clearly away (no flicker at the threshold)', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    p.furniture.push(createFurnitureFromCatalog(findCatalogItem('generic-tv-sideboard')!, { x: 2, y: 1.5, rotation: 0.1 }));
+    const id = p.furniture[0].id;
+    const depth = p.furniture[0].depth;
+    // approach the wall: snaps flush and aligns
+    moveFurnitureTo(p, d, obs, id, { x: 2, y: depth / 2 + 0.1 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.003, 4);
+    expect(p.furniture[0].rotation).toBeCloseTo(0, 6);
+    // moving the pointer just past the snap distance keeps it at the wall
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.14 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.003, 4);
+    expect(p.furniture[0].x).toBeCloseTo(2.2, 6);
+    // pulled clearly away: released, follows the pointer
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.4 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.4, 4);
+    // and the same pointer position near the threshold does not snap back when approaching from far
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.14 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.14, 4);
   });
 });

@@ -87,12 +87,15 @@ export function lightingAt(hourRaw: number): LightingState {
   };
 }
 
-/** Move `current` towards `target` on the 24 h circle (shortest way) by at most `maxStep` hours. */
-export function stepHour(current: number, target: number, maxStep: number): number {
-  let diff = (((target - current) % 24) + 36) % 24 - 12; // −12..12
-  if (Math.abs(diff) <= maxStep) return target;
-  diff = Math.sign(diff) * maxStep;
-  return (((current + diff) % 24) + 24) % 24;
+/**
+ * Frame-rate independent smoothing towards the target hour along the shorter way
+ * round the clock: after `tau` seconds ~63 % of the gap is closed. Snaps when close.
+ */
+export function approachHour(current: number, target: number, dt: number, tau: number): number {
+  const diff = (((target - current) % 24) + 36) % 24 - 12; // −12..12
+  if (Math.abs(diff) < 0.002) return target;
+  const k = 1 - Math.exp(-Math.max(0, dt) / tau);
+  return (((current + diff * k) % 24) + 24) % 24;
 }
 
 export const TIME_PRESETS: { label: string; hour: number }[] = [

@@ -11,6 +11,8 @@ _Stand 2026-10-16 – beschreibt, was in diesem Repository und dieser Umgebung t
 - Entwicklung durch Claude Code (Cloud) auf dem sitzungsgebundenen Branch `claude/quirky-faraday-0d9uep` (Push-Rechte dieser Umgebung sind darauf ausgelegt).
 - Integration nach `main` per **Pull Request mit Merge-Commit**, sobald ein Stand lokal vollständig geprüft ist (Lint, `tsc -b`, `npm test`, `npm run build`, `npx playwright test`). Der Nutzer hat autonome Integration getesteter Stände erlaubt.
 - Kein Branch pro Kleinigkeit; neue Branches nur für riskante/experimentelle Arbeiten.
+- Merge erst, wenn auch die GitHub-CI des PR grün ist; danach `main` per `git fetch` prüfen und den Arbeits-Branch per Fast-Forward auf `main` nachziehen (keine History-Umschreibung).
+- Verlauf: PR #1 (Stand bis CI-Einführung) am 2026-10-16 nach grüner CI gemergt (`5797457`).
 
 ## Commits
 - Klein und thematisch: `feat:`, `fix:`, `test:`, `perf:`, `docs:`, `ci:`.

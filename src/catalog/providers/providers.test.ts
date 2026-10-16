@@ -172,3 +172,34 @@ describe('3D model references in page source', () => {
     expect(parseProductPage('<html><body><a href="http://example.com/a.glb">x</a></body></html>').modelUrl).toBeNull();
   });
 });
+
+describe('IKEA Austria product page structure (verified 2026-10-16)', () => {
+  // Reduced excerpt of the public structured data of a real IKEA AT product page
+  // (KALLAX Regal weiß, 104.099.32): Product + 3DModel JSON-LD blocks, reviews/images
+  // shortened. The 3D model URLs point to IKEA's asset host (web-api.ikea.com).
+  const M1 = 'https://web-api.ikea.com/dimma/assets/1.2/10409932/PS01_S01_NV01/iqp3/glb_draco/588d0372891641b3afc1606b1ba5745b-10409932_PS01_S01_NV01_iqp3_v1.4.11.glb?cn=pip';
+  const M2 = 'https://web-api.ikea.com/dimma/assets/1.2/10409932/PS01_S01_NV01/iqp3/glb/ffae96a5324b4a5c8f03678d6ef1b5c6-10409932_PS01_S01_NV01_iqp3_v1.4.11.glb?cn=pip';
+  const page = `<!doctype html><html><head>
+<script type="application/ld+json" id="pip-range-json-ld">{"@context":"http://schema.org/","@type":"Product","brand":{"@type":"Brand","name":"IKEA"},"category":"Regale","color":"weiß","depth":"39 cm","height":"146.5 cm","image":[{"@type":"ImageObject","contentUrl":"https://www.ikea.com/at/de/images/products/kallax-regal-weiss__0601747_pe681619_s5.jpg"}],"material":"Holz (inkl. Verbundmaterial)","mpn":"104.099.32","name":"KALLAX Regal - weiß 112x147 cm","offers":{"@type":"Offer","availability":"https://schema.org/InStock","price":"99","priceCurrency":"EUR","url":"https://www.ikea.com/at/de/p/kallax-regal-weiss-10409932/"},"sku":"104.099.32","url":"https://www.ikea.com/at/de/p/kallax-regal-weiss-10409932/","width":"111.5 cm"}</script>
+<script type="application/ld+json">{"@context":"http://schema.org/","@type":"3DModel","encoding":[{"@type":"MediaObject","contentUrl":"${M1}","encodingFormat":"model/gltf-binary"},{"@type":"MediaObject","contentUrl":"${M2}","encodingFormat":"model/gltf-binary"}],"name":"KALLAX Regal"}</script>
+</head><body><h1>KALLAX</h1></body></html>`;
+
+  it('reads name, article number, dimensions, price and the declared 3D models', () => {
+    const r = parseProductPage(page, 'https://www.ikea.com/at/de/p/kallax-regal-weiss-10409932/');
+    expect(r.provider).toBe('ikea-at');
+    expect(r.name).toBe('KALLAX Regal - weiß 112x147 cm');
+    expect(r.articleNumber).toBe('104.099.32');
+    expect([r.dimensions.width, r.dimensions.depth, r.dimensions.height]).toEqual([111.5, 39, 146.5]);
+    expect(r.dimensions.status).toEqual({ width: 'source', depth: 'source', height: 'source' });
+    expect(r.price).toEqual({ amount: 99, currency: 'EUR', status: 'source' });
+    expect(r.quality).toBe('complete-from-source');
+    expect(r.modelCandidates).toEqual([M1, M2]);
+    expect(r.modelUrl).toBe(M1);
+    expect(r.sources).toContain('3D-Modell (schema.org 3DModel, 2 Varianten)');
+  });
+
+  it('also accepts the 3DModel block alone pasted as JSON-LD, and ignores non-glTF encodings', () => {
+    const r = parseProductPage(`[{"@type":"3DModel","encoding":[{"contentUrl":"https://x.example/a.usdz","encodingFormat":"model/vnd.usdz+zip"},{"contentUrl":"${M2}","encodingFormat":"model/gltf-binary"}]},{"@type":"Product","name":"X","width":"10 cm","depth":"10 cm","height":"10 cm"}]`);
+    expect(r.modelCandidates).toEqual([M2]);
+  });
+});
