@@ -398,21 +398,43 @@ test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)'
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-test('walkthrough: hold C to crouch (lower camera, slower), release to stand up (#20)', async ({ page }) => {
+test('walkthrough: C toggles crouching (lower camera, slower), C again stands up; X and leaving end it (#20, #47)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
   await expect.poll(camY).toBeCloseTo(1.63, 3);
-  await page.keyboard.down('KeyC');
+  // one press crouches – and the camera stays down after releasing C (toggle, #47)
+  await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeLessThan(1.0);
+  await expect(page.getByTestId('walk-duck')).toBeVisible();
+  await page.waitForTimeout(400);
+  expect(await camY()).toBeLessThan(1.0);
   await expect(page.getByTestId('walk-duck')).toBeVisible();
   // C must not trigger anything in the 2D tools while walking
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
-  await page.keyboard.up('KeyC');
+  // crouched, walking is slower (same factor as seated)
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().walkDuck)).toBe(true);
+  // pressing C again stands up
+  await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeCloseTo(1.63, 3);
   await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  // sitting down (X) ends crouching; standing up again (X) does not crouch
+  await page.keyboard.press('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await page.keyboard.press('KeyX');
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  await expect.poll(camY).toBeCloseTo(1.2, 3);
+  await page.keyboard.press('KeyX');
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  // leaving the walkthrough resets crouching
+  await page.keyboard.press('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

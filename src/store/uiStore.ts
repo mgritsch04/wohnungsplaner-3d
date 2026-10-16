@@ -56,7 +56,7 @@ interface UiStore {
   timePreview: number | null;
   /** Furniture currently carried in the first-person walkthrough (#39). */
   walkCarry: string | null;
-  /** Crouching in the walkthrough (#20). */
+  /** Crouching in the walkthrough (#20); C toggles it (#47). */
   walkDuck: boolean;
   /** Seated in the walkthrough (#78) – eyes at settings.sitEyeHeight. */
   walkSit: boolean;
@@ -81,6 +81,8 @@ interface UiStore {
   setTimePreview: (hour: number | null) => void;
   setWalkCarry: (id: string | null) => void;
   setWalkDuck: (duck: boolean) => void;
+  /** C in the walkthrough (#47): crouch / stand up again; ignored while seated. */
+  toggleWalkDuck: () => void;
   setWalkSit: (sit: boolean) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
@@ -141,7 +143,9 @@ export const useUiStore = create<UiStore>((set, get) => ({
   setTimePreview: (timePreview) => set({ timePreview }),
   setWalkCarry: (walkCarry) => set({ walkCarry }),
   setWalkDuck: (walkDuck) => set({ walkDuck }),
-  setWalkSit: (walkSit) => set({ walkSit }),
+  toggleWalkDuck: () => set((s) => (s.walkSit ? {} : { walkDuck: !s.walkDuck })),
+  // sitting down or standing up (X, buttons, project panel) always ends crouching (#47)
+  setWalkSit: (walkSit) => set({ walkSit, walkDuck: false }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });
