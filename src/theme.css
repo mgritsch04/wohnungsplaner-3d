@@ -75,6 +75,10 @@
   --color-legend-confirmed: #16a34a;
   --color-legend-estimated: #d97706;
   --color-legend-uncertain: #dc2626;
+  /* Vorher-nachher-Vergleich (#76): Legende und 3D-Markierungen (3D-Hintergrund ist in beiden Themen hell) */
+  --color-diff-added: #16a34a;
+  --color-diff-moved: #d97706;
+  --color-diff-removed: #dc2626;
 
   /* ---------- Farben: Überlagerungen ---------- */
   --color-overlay: rgba(15, 23, 42, 0.82); /* Hinweis-Pillen über Plan/3D */
@@ -210,6 +214,9 @@
   --color-legend-confirmed: #22c55e;
   --color-legend-estimated: #f59e0b;
   --color-legend-uncertain: #ef4444;
+  --color-diff-added: #16a34a;
+  --color-diff-moved: #d97706;
+  --color-diff-removed: #dc2626;
   /* Überlagerungen */
   --color-overlay: rgba(8, 11, 16, 0.86);
   --color-on-overlay: #ffffff;
@@ -287,6 +294,9 @@
     --color-legend-confirmed: #22c55e;
     --color-legend-estimated: #f59e0b;
     --color-legend-uncertain: #ef4444;
+    --color-diff-added: #16a34a;
+    --color-diff-moved: #d97706;
+    --color-diff-removed: #dc2626;
     /* Überlagerungen */
     --color-overlay: rgba(8, 11, 16, 0.86);
     --color-on-overlay: #ffffff;
