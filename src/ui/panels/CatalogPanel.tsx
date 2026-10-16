@@ -7,6 +7,7 @@ import { addCatalogItem } from '../actions';
 import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
 import { useDialogStore } from '../dialogStore';
+import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
 
 export function CatalogPanel() {
   const imported = useCatalogStore((s) => s.items);
@@ -98,7 +99,14 @@ export function CatalogPanel() {
 function CatalogRow({ item }: { item: CatalogItem }) {
   return (
     <li>
-      <button className="catalog-item" onClick={() => addCatalogItem(item)} title="Zum Plan hinzufügen">
+      <button
+        className="catalog-item"
+        onClick={() => addCatalogItem(item)}
+        draggable
+        onDragStart={(e) => startCatalogDrag(e.dataTransfer, item)}
+        onDragEnd={endCatalogDrag}
+        title="Klicken zum Hinzufügen oder in den Plan ziehen"
+      >
         <span className="swatch" style={{ background: item.color }} />
         <span className="catalog-main">
           <span className="catalog-name">{item.name}</span>

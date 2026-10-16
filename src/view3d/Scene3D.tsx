@@ -28,6 +28,7 @@ import { CollisionMarkers } from './CollisionMarkers';
 import { NarrowPassageMarkers } from './NarrowPassageMarkers';
 import { WalkPathMarkers } from './WalkPathMarkers';
 import { TapeMeasure3D } from './TapeMeasure3D';
+import { CatalogDrop3D } from './CatalogDrop3D';
 import { TapeMeasureButton } from './TapeMeasureButton';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 import { toggleOpening } from '../ui/actions';
@@ -304,6 +305,7 @@ function SceneContent({
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
       <TapeMeasure3D />
+      {!readOnly && cameraMode === 'orbit' && <CatalogDrop3D />}
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects />

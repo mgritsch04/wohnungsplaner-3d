@@ -694,3 +694,27 @@ export function furnitureSnapOptions(mode: 'grid5' | 'grid10' | 'wall' | 'off', 
   return { grid: mode === 'grid10' ? 0.1 : 0.05, walls: true };
 }
 
+
+/** Whether a catalog item may be dropped at a plan point (#131): inside a room, or anywhere while there are no rooms. */
+export function canDropAt(derived: DerivedPlan, point: Vec2): boolean {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+  const rooms = [...derived.rooms.values()];
+  return !rooms.length || rooms.some((g) => pointInPolygon(point, g.interior));
+}
+
+/**
+ * Places a newly created item (catalog drag and drop, #131) at a dropped plan point: snapped to
+ * the grid and to walls as chosen under „Möbel einrasten“ (#52; Alt = free). Returns false and
+ * leaves the project unchanged when the point lies outside every room (if there are rooms).
+ */
+export function placeDroppedFurniture(d: Project, derived: DerivedPlan, f: Furniture, point: Vec2, altKey = false): boolean {
+  if (!canDropAt(derived, point)) return false;
+  const fs = furnitureSnapOptions(d.settings.furnitureSnap, altKey);
+  let c = point;
+  if (fs.grid) c = { x: Math.round(c.x / fs.grid) * fs.grid, y: Math.round(c.y / fs.grid) * fs.grid };
+  f.x = Math.round(c.x * 1000) / 1000;
+  f.y = Math.round(c.y * 1000) / 1000;
+  d.furniture.push(f);
+  moveFurnitureTo(d, derived, [], f.id, f, { snap: fs.walls, collide: false });
+  return true;
+}
