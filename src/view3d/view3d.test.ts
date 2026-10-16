@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { regionGeometry } from './CollisionMarkers';
 import { createSampleProject } from '../model/sample';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
@@ -110,5 +111,28 @@ describe('lighting helpers', () => {
     const warm = parseInt(kelvinToColor(2700).slice(5, 7), 16);
     const cool = parseInt(kelvinToColor(6500).slice(5, 7), 16);
     expect(cool).toBeGreaterThan(warm);
+  });
+});
+
+describe('collision marker geometry', () => {
+  it('extrudes a plan region to the right world box (plan y → world Z, height → world Y)', () => {
+    const geo = regionGeometry({
+      polygon: [
+        { x: 1, y: 2 },
+        { x: 1.5, y: 2 },
+        { x: 1.5, y: 2.2 },
+        { x: 1, y: 2.2 },
+      ],
+      z0: 0.1,
+      z1: 0.8,
+    });
+    geo.computeBoundingBox();
+    const b = geo.boundingBox!;
+    expect(b.min.x).toBeCloseTo(1, 6);
+    expect(b.max.x).toBeCloseTo(1.5, 6);
+    expect(b.min.z).toBeCloseTo(2, 6);
+    expect(b.max.z).toBeCloseTo(2.2, 6);
+    expect(b.min.y).toBeCloseTo(0.1, 6);
+    expect(b.max.y).toBeCloseTo(0.8, 6);
   });
 });

@@ -17,7 +17,7 @@ import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
 import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
-import { buildPlacementObstacles, moveFurnitureTo, placementIssues } from '../model/placement';
+import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -51,6 +51,7 @@ export function Editor2D() {
   const beginTx = useProjectStore((s) => s.beginTransaction);
   const updateTx = useProjectStore((s) => s.updateTransient);
   const commitTx = useProjectStore((s) => s.commitTransaction);
+  const cancelTx = useProjectStore((s) => s.cancelTransaction);
 
   const selection = useUiStore((s) => s.selection);
   const hover = useUiStore((s) => s.hover);
@@ -64,11 +65,7 @@ export function Editor2D() {
   const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
   const conflicts = useMemo(() => {
     const m = new Map<string, 'error' | 'warn'>();
-    for (const f of project.furniture) {
-      const issues = placementIssues(project, derived, f, obstacles);
-      if (issues.some((i) => i.kind === 'wall' || i.kind === 'door-leaf')) m.set(f.id, 'error');
-      else if (issues.some((i) => i.kind === 'door-swing' || i.kind === 'outside')) m.set(f.id, 'warn');
-    }
+    for (const [id, c] of furnitureConflicts(project, derived, obstacles)) m.set(id, c.level);
     return m;
   }, [project, derived, obstacles]);
   const draft = useImportStore((s) => s.draft);
@@ -458,6 +455,28 @@ export function Editor2D() {
     }
   };
 
+  /**
+   * The browser aborted the gesture (pointercancel) or the window lost focus mid-drag
+   * (no pointerup will arrive): end the drag so nothing keeps following the pointer.
+   * A cancel reverts to the state before the drag, focus loss keeps the result.
+   */
+  const abortDrag = useCallback(
+    (commit: boolean) => {
+      if (!drag.current) return;
+      drag.current = null;
+      dragStarted.current = false;
+      setPreview({});
+      if (commit) commitTx();
+      else cancelTx();
+    },
+    [commitTx, cancelTx],
+  );
+  useEffect(() => {
+    const onBlur = () => abortDrag(true);
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [abortDrag]);
+
   const onPointerUp = (e: React.PointerEvent) => {
     const dr = drag.current;
     drag.current = null;
@@ -600,6 +619,7 @@ export function Editor2D() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={() => abortDrag(false)}
         onPointerLeave={() => {
           ui().setCursor(null);
           ui().setHover(null);

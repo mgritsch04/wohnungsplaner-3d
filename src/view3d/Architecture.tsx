@@ -8,7 +8,7 @@ import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MA
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { doorSymbol } from '../editor2d/openingSymbols';
-import { isClick } from './pointer';
+import { blockBehind, isClick, isClippedHit } from './pointer';
 
 interface Props {
   project: Project;
@@ -110,7 +110,9 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             material={mats}
             castShadow={shadows}
             receiveShadow={shadows}
+            onPointerDown={blockBehind}
             onClick={(e) => {
+              if (isClippedHit(e)) return;
               e.stopPropagation();
               if (isClick(e)) onSelect('wall', wall.id);
             }}
@@ -123,6 +125,8 @@ export const Architecture = memo(function Architecture({ project, derived, quali
           material={[highlight, highlight, getSurfaceMaterial(materialById(project.materials, undefined, DEFAULT_WALL_MATERIAL_ID), quality)]}
           castShadow={shadows}
           receiveShadow={shadows}
+          onPointerDown={blockBehind}
+          onClick={blockBehind}
         />
       )}
       {floors.map((f) => (
@@ -150,7 +154,8 @@ export const Architecture = memo(function Architecture({ project, derived, quali
           const center = add(fp.a, scale(fp.dir, (r.s0 + r.s1) / 2));
           const h = r.top - r.bottom;
           const sel = selectedId === o.id;
-          const select = (e: { stopPropagation: () => void; delta?: number }) => {
+          const select = (e: { stopPropagation: () => void; delta?: number; point: THREE.Vector3 }) => {
+            if (isClippedHit(e)) return;
             e.stopPropagation();
             if (isClick(e)) onSelect('opening', o.id);
           };
@@ -164,7 +169,7 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             const innerH = h - 2 * ft;
             const frameM = sel ? highlight : frameMat;
             return (
-              <group key={o.id} position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]} onClick={select}>
+              <group key={o.id} position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]} onPointerDown={blockBehind} onClick={select}>
                 {[
                   [0, ft / 2, width, ft],
                   [0, h - ft / 2, width, ft],
@@ -215,7 +220,7 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             const hinge = add(ds.hinge, scale(fp.dir, (o.hinge === 'start' ? 1 : -1) * jamb));
             const frameM = sel ? highlight : frameMat;
             return (
-              <group key={o.id} onClick={select}>
+              <group key={o.id} onPointerDown={blockBehind} onClick={select}>
                 <group position={[hinge.x, r.bottom, hinge.y]} rotation={[0, leafAngle, 0]}>
                   <mesh position={[leafW / 2, leafH / 2, 0.02]} scale={[leafW, leafH, 0.04]} material={sel ? highlight : doorMat} castShadow={shadows} receiveShadow={shadows}>
                     <boxGeometry />

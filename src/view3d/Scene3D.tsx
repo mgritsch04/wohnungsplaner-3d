@@ -18,8 +18,9 @@ import { WalkControls } from './WalkControls';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
-import { CLICK_THRESHOLD_PX } from './pointer';
-import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
+import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
+import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
+import { CollisionMarkers } from './CollisionMarkers';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -96,12 +97,12 @@ function SceneContent({
   const selection = useUiStore((s) => s.selection);
   const setSelection = useUiStore((s) => s.setSelection);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
-  const { gl, camera } = useThree();
-  // e2e/debug hook: lets tests project world points to screen coordinates
+  const { gl, camera, scene } = useThree();
+  // e2e/debug hook: lets tests project world points to screen coordinates and inspect the scene
   useEffect(() => {
     const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
-    if (wp) wp.three = { camera, canvas: gl.domElement };
-  }, [camera, gl]);
+    if (wp) wp.three = { camera, canvas: gl.domElement, scene };
+  }, [camera, gl, scene]);
 
   const bounds = useMemo(() => {
     const pts = [...project.nodes, ...project.furniture.flatMap((f) => furnitureCorners(f))];
@@ -113,6 +114,7 @@ function SceneContent({
   // section cut: clip everything above 1.2 m to look into rooms from above
   useEffect(() => {
     gl.clippingPlanes = cutaway && cameraMode === 'orbit' ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), 1.2)] : [];
+    setPickClipping(gl.clippingPlanes);
   }, [gl, cutaway, cameraMode]);
 
   // walk start: center of the selected room, else of the first room, else bounds center
@@ -126,11 +128,20 @@ function SceneContent({
   const beginTx = useProjectStore((s) => s.beginTransaction);
   const updateTx = useProjectStore((s) => s.updateTransient);
   const commitTx = useProjectStore((s) => s.commitTransaction);
+  const cancelTx = useProjectStore((s) => s.cancelTransaction);
   const onDragStart = useCallback(() => {
     beginTx();
     if (orbitRef.current) orbitRef.current.enabled = false;
   }, [beginTx]);
   const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
+  // collision feedback: recomputed only when furniture or architecture change (not per frame,
+  // not for settings changes such as the time of day)
+  const furnitureKey = JSON.stringify(project.furniture);
+  const conflicts = useMemo(
+    () => furnitureConflicts(project, derived, obstacles),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [furnitureKey, derived, obstacles],
+  );
   const onDrag = useCallback(
     (id: string, x: number, y: number) =>
       updateTx((d) => {
@@ -142,6 +153,10 @@ function SceneContent({
     commitTx();
     if (orbitRef.current) orbitRef.current.enabled = true;
   }, [commitTx]);
+  const onDragCancel = useCallback(() => {
+    cancelTx();
+    if (orbitRef.current) orbitRef.current.enabled = true;
+  }, [cancelTx]);
   const onSelectFurniture = useCallback((id: string) => setSelection({ type: 'furniture', id }), [setSelection]);
   const onSelectArch = useCallback((type: 'wall' | 'room' | 'opening', id: string) => setSelection({ type, id }), [setSelection]);
 
@@ -173,8 +188,10 @@ function SceneContent({
           onDragStart={onDragStart}
           onDrag={onDrag}
           onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
         />
       ))}
+      <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects />

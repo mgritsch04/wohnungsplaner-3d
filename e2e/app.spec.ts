@@ -496,3 +496,141 @@ test('retailer page with a 3D model reference (SIMULATED server): CORS fallback,
   expect(item.approximate).toBe(false);
   expect(item.width).toBeCloseTo(0.8, 6);
 });
+
+/** Names of the collision marker objects currently in the 3D scene. */
+async function collisionMarkers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    type Obj = { name: string; traverse: (f: (o: Obj) => void) => void };
+    const t = (window as unknown as { __wp: { three: { scene: { getObjectByName: (n: string) => Obj | undefined } } } }).__wp.three;
+    const out: string[] = [];
+    t.scene.getObjectByName('collision-markers')?.traverse((o) => {
+      if (o.name.startsWith('collision') && o.name !== 'collision-markers') out.push(o.name);
+    });
+    return out;
+  });
+}
+
+test('3D: collision with the opened entrance door is shown in the room and disappears when dragged free', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  // reproduce the reported situation: sofa standing in the opened entrance door leaf
+  const sofaId: string = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    const sofa = st.project.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+    st.apply((d: { furniture: { id: string; x: number }[] }) => {
+      d.furniture.find((f) => f.id === sofa.id)!.x = 1.7;
+    });
+    return sofa.id;
+  });
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: 'test-results/collision-3d-before.png' });
+  const markers = await collisionMarkers(page);
+  expect(markers).toContain(`collision:${sofaId}`);
+  const leaf = markers.find((n) => n.startsWith(`collision-issue:${sofaId}:door-leaf:`));
+  expect(leaf, markers.join(', ')).toBeTruthy();
+  const doorId = leaf!.split(':')[3];
+  expect((await getProject(page)).openings.find((o: { id: string }) => o.id === doorId)?.kind).toBe('door');
+  // a click selects the sofa (the cut-away part of the wall in front must not catch it) without moving it
+  const sofa = (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofaId);
+  const s = await worldToScreen3d(page, sofa.x + 0.5, 0.46, sofa.y - 0.35);
+  await page.mouse.click(s.x, s.y);
+  await page.waitForTimeout(400);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofaId });
+  expect((await getProject(page)).furniture.find((f: { id: string }) => f.id === sofaId).x).toBe(sofa.x);
+  await expect(page.getByText(/Steht im geöffneten Türblatt – Tür \d+ cm/)).toBeVisible();
+  // drag it to the right, out of the door leaf: markers follow and disappear
+  await page.mouse.move(s.x, s.y);
+  await page.mouse.down();
+  const to = await worldToScreen3d(page, sofa.x + 0.5 + 1.2, 0.46, sofa.y - 0.35);
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(600);
+  const moved = (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofaId);
+  expect(moved.x).toBeGreaterThan(2.5);
+  expect(Math.abs(moved.y - sofa.y)).toBeLessThan(0.15);
+  expect(await collisionMarkers(page)).toEqual([]);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofaId });
+  await page.screenshot({ path: 'test-results/collision-3d-after.png' });
+  // one undo step restores the colliding position (and its markers)
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(500);
+  expect((await getProject(page)).furniture.find((f: { id: string }) => f.id === sofaId).x).toBe(sofa.x);
+  expect(await collisionMarkers(page)).toContain(`collision:${sofaId}`);
+  expect(errors).toEqual([]);
+});
+
+test('3D: click vs. drag – threshold, no jump, release over a wall, focus loss, UI clicks', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // walls cut at 1.2 m: furniture visible
+  await page.waitForTimeout(2500);
+  const find = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txOpen = () => page.evaluate(() => !!(window as any).__wp.useProjectStore.getState().txBase);
+  const table = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const top = table.height; // grab the table top
+  const a = await worldToScreen3d(page, table.x + 0.2, top, table.y);
+
+  // 1) jitter below the threshold: selects, does not move
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 3, a.y + 2);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  expect([(await find(table.id)).x, (await find(table.id)).y]).toEqual([table.x, table.y]);
+
+  // 2) a real drag moves it by the pointer's world offset (grab offset kept, no jump)
+  const b = await worldToScreen3d(page, table.x + 0.2 - 0.5, top, table.y);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 8 });
+  expect(await txOpen()).toBe(true);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const t2 = await find(table.id);
+  expect(t2.x).toBeCloseTo(table.x - 0.5, 1);
+  expect(t2.y).toBeCloseTo(table.y, 1);
+  expect(await txOpen()).toBe(false);
+
+  // 3) dragged towards the north wall and released with the pointer over the wall: stays selected, flush to the wall
+  const c = await worldToScreen3d(page, t2.x + 0.2, top, t2.y);
+  const wall = await worldToScreen3d(page, t2.x + 0.2, 1.0, -0.06);
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.down();
+  await page.mouse.move(wall.x, wall.y, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  const t3 = await find(table.id);
+  expect(t3.y - t3.depth / 2).toBeGreaterThanOrEqual(-0.002);
+
+  // 4) focus loss mid-drag ends the drag: later pointer moves no longer move the item
+  const d = await worldToScreen3d(page, t3.x, top, t3.y + 0.1);
+  await page.mouse.move(d.x, d.y);
+  await page.mouse.down();
+  await page.mouse.move(d.x - 40, d.y, { steps: 5 });
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  expect(await txOpen()).toBe(false);
+  const t4 = await find(table.id);
+  await page.mouse.move(d.x - 120, d.y + 30, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect([(await find(table.id)).x, (await find(table.id)).y]).toEqual([t4.x, t4.y]);
+
+  // 5) pressing on a UI button and releasing over the canvas starts no drag
+  const before = await getProject(page);
+  const btn = await page.getByRole('button', { name: 'Schnitt' }).boundingBox();
+  await page.mouse.move(btn!.x + 5, btn!.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(d.x, d.y, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect((await getProject(page)).furniture).toEqual(before.furniture);
+  expect(await txOpen()).toBe(false);
+  expect(errors).toEqual([]);
+});
