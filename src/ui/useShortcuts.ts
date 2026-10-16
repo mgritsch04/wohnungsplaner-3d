@@ -4,6 +4,7 @@ import { useUiStore } from '../store/uiStore';
 import { useDialogStore } from './dialogStore';
 import { TOOL_KEYS } from './shortcutCatalog';
 import { BOOKMARK_KEYS, jumpToBookmarkIndex } from '../view3d/cameraBookmarks';
+import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, useCompareStore } from '../versions/compareStore';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 
@@ -26,6 +27,28 @@ export function useShortcuts() {
         e.preventDefault();
         const n = Number(digit[1]);
         if (ui.viewMode !== '2d' && n <= BOOKMARK_KEYS && !jumpToBookmarkIndex(n - 1)) ui.toast(`Keine gespeicherte Ansicht ${n} (Menü „Ansichten“ in der 3D-Ansicht)`, 'info');
+        return;
+      }
+      // before/after comparison (#76): read-only preview – only the comparison keys work
+      if (useCompareStore.getState().session) {
+        if (useDialogStore.getState().modal) return; // e.g. the keyboard overview is open
+        if (e.key === ' ' && !mod && !e.altKey) {
+          e.preventDefault();
+          // a focused button would also "click" on key release – take the focus away first
+          if (t?.tagName === 'BUTTON') t.blur();
+          toggleCompareSide();
+        } else if (!mod && !e.altKey && (key === 'a' || key === 'b')) {
+          showCompareSide(key);
+        } else if (e.key === 'Escape') {
+          stopCompare();
+        } else if (!mod && e.key === '?') {
+          useDialogStore.getState().openModal('help');
+        } else if (mod && key === 's') {
+          e.preventDefault(); // nothing to save: the project is unchanged
+        } else if ((mod && ['z', 'y', 'd', 'v'].includes(key)) || e.key === 'Delete' || e.key === 'Backspace' || (!mod && (key === 'q' || key === 'e'))) {
+          if (mod) e.preventDefault();
+          notifyCompareLocked();
+        }
         return;
       }
       if (mod && key === 'z' && !e.shiftKey) {
