@@ -76,6 +76,8 @@ export interface PdfSegment {
   areaFill?: boolean;
   /** Edge of an area filled in a dark tone – how CAD programs draw solid walls (#114). */
   darkFill?: boolean;
+  /** Stroke in a light tone (white masking lines, faint guides) – never a wall face. */
+  faint?: boolean;
 }
 
 
@@ -114,7 +116,8 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
   const stack: Matrix[] = [];
   let lineWidth = 1;
   let fillColor = '#000000';
-  const lwStack: { lineWidth: number; fillColor: string }[] = [];
+  let strokeColor = '#000000';
+  const lwStack: { lineWidth: number; fillColor: string; strokeColor: string }[] = [];
   let pathCount = 0;
   let imageCount = 0;
   const segments: PdfSegment[] = [];
@@ -127,13 +130,15 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
     const args = ops.argsArray[i] as unknown[];
     if (fn === O.save) {
       stack.push(ctm);
-      lwStack.push({ lineWidth, fillColor });
+      lwStack.push({ lineWidth, fillColor, strokeColor });
     } else if (fn === O.restore) {
       ctm = stack.pop() ?? ctm;
       const g = lwStack.pop();
-      if (g) ({ lineWidth, fillColor } = g);
+      if (g) ({ lineWidth, fillColor, strokeColor } = g);
     } else if (fn === O.setFillRGBColor) {
       fillColor = typeof args[0] === 'string' ? args[0] : fillColor;
+    } else if (fn === O.setStrokeRGBColor) {
+      strokeColor = typeof args[0] === 'string' ? args[0] : strokeColor;
     } else if (fn === O.transform) {
       ctm = mul(ctm, args as Matrix);
     } else if (fn === O.setLineWidth) {
@@ -154,8 +159,9 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
       const light = isAreaTone(fillColor);
       const areaFill = !stroked && light;
       const darkFill = filled && !light;
+      const faint = stroked && !darkFill && isAreaTone(strokeColor);
       const seg = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(darkFill ? { darkFill } : {}) });
+        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(darkFill ? { darkFill } : {}), ...(faint ? { faint } : {}) });
       let cur: { x: number; y: number } | null = null;
       let start: { x: number; y: number } | null = null;
       for (let k = 0; k < data.length; ) {
