@@ -4,7 +4,10 @@ import { generateCountertops, kitchenChecksForItem, kitchenComponents, placeKitc
 import { formatEuro, formatLength } from '../../model/units';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
-import { Badge, NumberField, Section, SelectField } from '../fields';
+import { Badge, CheckField, NumberField, Section, SelectField } from '../fields';
+import { derivePlan } from '../../model/derived';
+import { formatM, ROLE_LABEL } from '../../kitchen/workTriangle';
+import { useKitchenTriangles } from '../useKitchenTriangles';
 
 const MODULES = GENERIC_CATALOG.filter((c) => c.kitchen && c.kitchen.type !== 'countertop');
 
@@ -117,6 +120,7 @@ export function KitchenPanel() {
         </button>
         <p className="muted small">Oberschränke, Hauben und Kochfelder hängen über der Zeile und verlängern sie nicht. Tipp: falsche Seite? „Wandseite“ wechseln und mit Strg+Z zurück.</p>
       </Section>
+      <WorkTriangleSection />
       <Section title="Arbeitsplatten">
         <button
           className="block"
@@ -181,4 +185,57 @@ function swap<T>(arr: T[], i: number, j: number): T[] {
   const c = [...arr];
   [c[i], c[j]] = [c[j], c[i]];
   return c;
+}
+
+/** Kitchen work triangle (#82): display switch, adjustable limits and the evaluation per room. */
+function WorkTriangleSection() {
+  const project = useProjectStore((s) => s.project);
+  const apply = useProjectStore((s) => s.apply);
+  const derived = useMemo(() => derivePlan(project), [project]);
+  const results = useKitchenTriangles(project, derived, { respectShow: false });
+  const kt = project.settings.kitchenTriangle;
+  const set = (patch: Partial<typeof kt>) => apply((d) => void Object.assign(d.settings.kitchenTriangle, patch));
+  return (
+    <Section title="Arbeitsdreieck">
+      <CheckField label="Arbeitsdreieck im Plan anzeigen" checked={kt.show} onChange={(v) => set({ show: v })} />
+      <div className="field-row">
+        <NumberField label="Seite min" value={kt.sideMin} factor={100} digits={0} unit="cm" min={30} max={500} onChange={(v) => set({ sideMin: Math.min(v, kt.sideMax) })} />
+        <NumberField label="Seite max" value={kt.sideMax} factor={100} digits={0} unit="cm" min={50} max={600} onChange={(v) => set({ sideMax: Math.max(v, kt.sideMin) })} />
+      </div>
+      <div className="field-row">
+        <NumberField label="Summe min" value={kt.sumMin} digits={1} unit="m" min={1} max={15} step={0.5} onChange={(v) => set({ sumMin: Math.min(v, kt.sumMax) })} />
+        <NumberField label="Summe max" value={kt.sumMax} digits={1} unit="m" min={2} max={20} step={0.5} onChange={(v) => set({ sumMax: Math.max(v, kt.sumMin) })} />
+      </div>
+      <p className="muted small">Richtwert, keine Norm (Faustregel: jede Seite 1,2–2,7 m, Summe 4–8 m). Gemessen von Mitte Vorderkante zu Mitte Vorderkante von Spüle, Herd/Kochfeld und Kühlschrank.</p>
+      {results.length === 0 ? (
+        <p className="muted small">Noch keine Spüle, kein Herd und kein Kühlschrank im Plan.</p>
+      ) : (
+        results.map((r) => (
+          <div key={r.roomId} className="small" data-testid="kitchen-triangle-result">
+            <p>
+              <strong>{r.roomName}</strong>{' '}
+              {r.sides ? <Badge kind={r.ok ? 'ok' : 'warn'}>{r.ok ? 'im Richtwert' : 'außerhalb'}</Badge> : <Badge kind="muted">unvollständig</Badge>}
+            </p>
+            {r.sides && (
+              <ul className="plain">
+                {r.sides.map((s) => (
+                  <li key={`${s.from}-${s.to}`}>
+                    {ROLE_LABEL[s.from]} – {ROLE_LABEL[s.to]}: {formatM(s.length)} {s.status !== 'ok' && <Badge kind="warn">{s.status === 'short' ? 'zu kurz' : 'zu lang'}</Badge>}
+                  </li>
+                ))}
+                <li>
+                  Summe: <strong>{formatM(r.sum!)}</strong> {r.sumStatus !== 'ok' && <Badge kind="warn">{r.sumStatus === 'short' ? 'zu kurz' : 'zu lang'}</Badge>}
+                </li>
+              </ul>
+            )}
+            {r.messages.map((m, i) => (
+              <p key={i} className={r.sides ? 'warning small' : 'muted small'}>
+                {m}
+              </p>
+            ))}
+          </div>
+        ))
+      )}
+    </Section>
+  );
 }

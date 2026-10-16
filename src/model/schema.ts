@@ -269,6 +269,16 @@ export const SettingsSchema = z.object({
   minPassageWidth: z.number().min(0.6).max(1.5).default(0.9),
   /** Mark passages narrower than minPassageWidth in 2D and 3D. */
   showNarrowPassages: z.boolean().default(true),
+  /** Kitchen work triangle (#82): display + limits (rule of thumb, not a standard), metres. */
+  kitchenTriangle: z
+    .object({
+      show: z.boolean().default(true),
+      sideMin: z.number().min(0.3).max(5).default(1.2),
+      sideMax: z.number().min(0.5).max(6).default(2.7),
+      sumMin: z.number().min(1).max(15).default(4),
+      sumMax: z.number().min(2).max(20).default(8),
+    })
+    .default({ show: true, sideMin: 1.2, sideMax: 2.7, sumMin: 4, sumMax: 8 }),
 });
 
 /** Point in 3D world coordinates of the 3D view (metres): x = plan x, y = height, z = plan y. */
