@@ -4,7 +4,9 @@ import { useUiStore } from '../store/uiStore';
 import { useDialogStore } from './dialogStore';
 import { TOOL_KEYS } from './shortcutCatalog';
 import { BOOKMARK_KEYS, jumpToBookmarkIndex } from '../view3d/cameraBookmarks';
+import { useTapeStore } from '../view3d/tapeStore';
 import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, useCompareStore } from '../versions/compareStore';
+import { groupSelection, ungroupSelection } from './groupActions';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 
@@ -45,7 +47,7 @@ export function useShortcuts() {
           useDialogStore.getState().openModal('help');
         } else if (mod && key === 's') {
           e.preventDefault(); // nothing to save: the project is unchanged
-        } else if ((mod && ['z', 'y', 'd', 'v'].includes(key)) || e.key === 'Delete' || e.key === 'Backspace' || (!mod && (key === 'q' || key === 'e'))) {
+        } else if ((mod && ['z', 'y', 'd', 'v', 'g'].includes(key)) || e.key === 'Delete' || e.key === 'Backspace' || (!mod && (key === 'q' || key === 'e'))) {
           if (mod) e.preventDefault();
           notifyCompareLocked();
         }
@@ -66,6 +68,11 @@ export function useShortcuts() {
         // select all furniture
         e.preventDefault();
         ui.selectFurniture(ps.project.furniture.map((f) => f.id));
+      } else if (mod && key === 'g') {
+        // furniture groups (#65): Strg+G groups the selection, Strg+Umschalt+G dissolves it
+        e.preventDefault();
+        if (e.shiftKey) ungroupSelection();
+        else groupSelection();
       } else if (mod && key === 'd') {
         e.preventDefault();
         duplicateSelection();
@@ -78,8 +85,13 @@ export function useShortcuts() {
           void deleteSelection();
         }
       } else if (e.key === 'Escape') {
-        if (ui.tool !== 'select') ui.setTool('select');
+        const tape = useTapeStore.getState();
+        // 3D tape measure (#88): Esc first removes the measurements
+        if (tape.items.length || tape.pending) tape.clear();
+        else if (ui.tool !== 'select') ui.setTool('select');
         else ui.setSelection(null);
+      } else if (!mod && !e.altKey && key === 'k' && ui.viewMode !== '2d') {
+        useTapeStore.getState().toggle();
       } else if (!mod && key === 'q') {
         rotateSelection(-Math.PI / 12);
       } else if (!mod && key === 'e') {

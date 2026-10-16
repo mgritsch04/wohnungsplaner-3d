@@ -1,5 +1,7 @@
 node_modules
 dist
+dist-artifact
+artifact-manifest.json
 *.local
 .DS_Store
 coverage

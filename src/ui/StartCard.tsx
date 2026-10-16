@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
@@ -8,7 +8,8 @@ import { newProject } from './actions';
  * Start card for empty projects (#102): the first steps instead of an empty plan.
  * Shown while the project has no walls, rooms or furniture; it disappears as soon as
  * something is placed. Closing it is remembered per project (in this browser);
- * a small "Erste Schritte" button brings it back while the project is still empty.
+ * a small "Erste Schritte" button (and "Projekt ▾ › Erste Schritte") brings it back while
+ * the project is still empty.
  */
 
 export const isProjectEmpty = (p: Pick<Project, 'walls' | 'rooms' | 'furniture'>) => p.walls.length === 0 && p.rooms.length === 0 && p.furniture.length === 0;
@@ -45,11 +46,20 @@ export function writeClosed(projectId: string, closed: boolean, s: Storage | nul
   return kept;
 }
 
+/** Closed state shared by the card and the toolbar's "Projekt ▾ › Erste Schritte" entry (#100). */
+const useStartCardStore = create<{ closed: string[]; setClosed: (projectId: string, closed: boolean) => void }>((set) => ({
+  closed: readClosedIds(),
+  setClosed: (projectId, closed) => set({ closed: writeClosed(projectId, closed) }),
+}));
+
+/** Shows the start card of this project again (it only appears while the project is empty). */
+export const reopenStartCard = (projectId: string) => useStartCardStore.getState().setClosed(projectId, false);
+
 export function StartCard() {
   const project = useProjectStore((s) => s.project);
-  const [closed, setClosed] = useState<string[]>(() => readClosedIds());
+  const closed = useStartCardStore((s) => s.closed);
   if (!isProjectEmpty(project)) return null;
-  const setFor = (v: boolean) => setClosed(writeClosed(project.id, v));
+  const setFor = (v: boolean) => useStartCardStore.getState().setClosed(project.id, v);
 
   if (closed.includes(project.id)) {
     return (

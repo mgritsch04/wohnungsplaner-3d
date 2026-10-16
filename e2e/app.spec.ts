@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
-import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
 import { derivePlan } from '../src/model/derived';
+import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -720,7 +720,7 @@ test('3D: clicking furniture keeps it selected after release; walls stay selecta
   await page.waitForTimeout(400);
   expect(await getSelection(page)).toEqual({ type: 'furniture', id: bed.id });
   // clicking the exposed top of a wall selects that wall
-  await page.getByRole('button', { name: '⟲ Kamera' }).click();
+  await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
   await page.waitForTimeout(800);
   const w = await worldToScreen3d(page, 4.0, 2.6, -0.06);
   await page.mouse.click(w.x, w.y);
@@ -834,8 +834,12 @@ test('realism mode: time-of-day control with presets, one undo step per drag, no
   await page.getByRole('button', { name: 'Realismus' }).click();
   const slider = page.getByLabel('Tageszeit', { exact: true });
   await expect(slider).toBeVisible();
+  // presets are in the toolbar's "Mehr" menu (#100)
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click();
   await page.getByLabel('Tageszeit-Voreinstellung').selectOption({ label: 'Nacht (23:30)' });
   expect((await getProject(page)).settings.timeOfDay).toBe(23.5);
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Tageszeit-Voreinstellung')).toHaveCount(0);
   const pastBefore = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length);
   const b = (await slider.boundingBox())!;
   await page.mouse.move(b.x + b.width * 0.3, b.y + b.height / 2);
@@ -1105,7 +1109,7 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
     });
   const orbitTurn = async (sens: number) => {
     await setSens(sens);
-    await page.getByRole('button', { name: '⟲ Kamera' }).click();
+    await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
     await page.waitForTimeout(600);
     const a0 = await azimuth();
     await page.mouse.move(cx, cy + 150);
@@ -1244,7 +1248,11 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Realismus' }).click();
   const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
+    // the lamp switch is in the toolbar's "Mehr" menu (#100)
+    await page.getByRole('button', { name: 'Mehr', exact: true }).click();
     await page.getByLabel('Lampen', { exact: true }).selectOption(lamps);
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Lampen', { exact: true })).toHaveCount(0);
     await page.evaluate((h) => {
       const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { settings: { timeOfDay: number } }) => void) => void } } } }).__wp;
       wp.useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = h));
@@ -2000,7 +2008,7 @@ test('dark mode: light / dark / system switch in the project panel, kept after r
   expect(await lum('html')).toBeLessThan(0.15);
 
   // the print sheet stays white in dark mode
-  await page.getByRole('button', { name: 'Export ▾' }).click();
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click(); // exports are in the "Mehr" menu (#100)
   await page.getByRole('button', { name: /Plan drucken/ }).click();
   await expect(page.locator('.print-page')).toBeVisible();
   expect(await lum('.print-page')).toBeGreaterThan(0.99);
@@ -2386,7 +2394,7 @@ test('properties panel: groups collapse, keep their state across selections and 
 test('exports the 3D model as a GLB file from the export menu (#87)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
-  await page.getByRole('button', { name: /^Export/ }).click();
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click(); // exports are in the "Mehr" menu (#100)
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '3D-Modell als GLB …' }).click();
   const d = await download;
@@ -2478,5 +2486,438 @@ test('empty project: start card with first steps, "Raum zeichnen" picks the tool
   await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('sight lines: from the entrance, draggable viewpoint updates the visible area, can be switched off (#89)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const right = page.locator('.panel.right');
+  await right.getByRole('button', { name: 'Projekt', exact: true }).click();
+  await right.getByLabel('Sichtlinien anzeigen').check();
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const sight = plan.getByTestId('sightlines');
+  await expect(sight).toBeVisible();
+  await expect(plan.getByTestId('sight-visible')).toBeVisible();
+  const share0 = Number(await sight.getAttribute('data-share'));
+  expect(share0).toBeGreaterThan(0.1);
+  expect(share0).toBeLessThan(1);
+  await expect(right.getByTestId('sight-share-panel')).toContainText(`${Math.round(share0 * 100)} %`);
+  // default viewpoint: just inside the entrance door (living room, south wall)
+  const vp = plan.getByTestId('sight-viewpoint');
+  const x0 = Number(await vp.getAttribute('data-x'));
+  const y0 = Number(await vp.getAttribute('data-y'));
+  expect(y0).toBeCloseTo(3.7, 1);
+
+  // drag the viewpoint into the bedroom: the visible area changes, nothing gets selected
+  const from = await planToScreen(page, x0, y0);
+  const to = await planToScreen(page, 7.2, 2.8);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 5 });
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await vp.getAttribute('data-x'))).toBeGreaterThan(6.5);
+  const share1 = Number(await sight.getAttribute('data-share'));
+  expect(Math.abs(share1 - share0)).toBeGreaterThan(0.05);
+  expect(await getSelection(page)).toBeNull();
+  // back to the entrance
+  await right.getByRole('button', { name: 'Blickpunkt auf den Eingang zurücksetzen' }).click();
+  await expect.poll(async () => Number(await vp.getAttribute('data-y'))).toBeCloseTo(3.7, 1);
+
+  await right.getByLabel('Sichtlinien anzeigen').uncheck();
+  await expect(plan.getByTestId('sightlines')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('3D tape measure: two clicks on the floor give the distance, nothing gets selected, Esc clears (#88)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
+  await page.waitForTimeout(1500);
+  await page.getByRole('button', { name: 'Maßband' }).click();
+  await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
+
+  // two floor points in the living room, 1.40 m apart (world: x, height, plan y)
+  for (const [x, z] of [
+    [0.6, 0.7],
+    [0.6, 2.1],
+  ]) {
+    const s = await worldToScreen3d(page, x, 0, z);
+    await page.mouse.click(s.x, s.y);
+  }
+  const label = page.getByTestId('tape-label');
+  await expect(label).toHaveCount(1);
+  expect(Math.abs(Number(await label.getAttribute('data-length')) - 1.4)).toBeLessThanOrEqual(0.01);
+  await expect(label).toContainText('1,40 m');
+  await expect(label).toContainText('↕ 0,00 m');
+  expect(await getSelection(page)).toBeNull(); // measuring never selects
+
+  // a click on furniture while measuring does not select or move it either
+  const p = await getProject(page);
+  const sofa = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const s = await worldToScreen3d(page, sofa.x, 0.4, sofa.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toBeNull();
+  const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id);
+  expect([after.x, after.y]).toEqual([sofa.x, sofa.y]);
+
+  // Esc removes the measurements; K switches the tool off
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('tape-label')).toHaveCount(0);
+  await page.keyboard.press('k');
+  await expect(page.getByRole('button', { name: 'Maßband' })).toHaveAttribute('aria-pressed', 'false');
+  expect(errors).toEqual([]);
+});
+
+test('3D tape measure in the walkthrough: crosshair clicks measure, the capture click does not (#88)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  await page.keyboard.press('k');
+  const c = (await page.locator('[data-testid="scene3d"] canvas').boundingBox())!;
+  const centre = () => page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
+  await centre(); // captures the mouse – no point yet
+  await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
+  const look = (yaw: number, pitch: number) => page.evaluate(([y, p]) => (window as unknown as { __wp: { walk: { look: (a: number, b: number) => void } } }).__wp.walk.look(y, p), [yaw, pitch] as const);
+  await look(0, -0.6);
+  await page.waitForTimeout(200);
+  await centre();
+  await expect(page.getByRole('status')).toContainText('Zweiten Punkt anklicken');
+  await look(0.4, -0.5);
+  await page.waitForTimeout(200);
+  await centre();
+  await expect(page.getByTestId('tape-label')).toHaveCount(1);
+  expect(Number(await page.getByTestId('tape-label').getAttribute('data-length'))).toBeGreaterThan(0.1);
+  expect(await getSelection(page)).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('clearances (#125): short distance gets its label beside the line, the rotate handle stays free', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId: string }) => f.catalogId === 'generic-coffee-table');
+  // select the coffee table, then push it to 8 cm in front of the sofa (sofa back edge at y = 3.097)
+  const s = await planToScreen(page, table.x, table.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  await page.evaluate((id) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__wp.useProjectStore.getState().apply((d: { furniture: { id: string; y: number; depth: number }[] }) => {
+      const f = d.furniture.find((x) => x.id === id)!;
+      f.y = 3.097 - 0.08 - f.depth / 2;
+    });
+  }, table.id);
+  await page.keyboard.down('Alt');
+  const front = plan.locator('[data-testid="clearance"][data-side="front"]');
+  await expect(front).toHaveAttribute('data-distance-cm', '8');
+  await expect(front).toHaveAttribute('data-label', 'beside');
+  // the label does not cover the line: it sits next to it
+  const lineBox = (await front.locator('line').first().boundingBox())!;
+  const textBox = (await front.locator('text').boundingBox())!;
+  expect(textBox.x).toBeGreaterThanOrEqual(lineBox.x + lineBox.width - 1);
+
+  // the back line is moved off the rotate handle (≥ 10 px)
+  const back = plan.locator('[data-testid="clearance"][data-side="back"]');
+  await expect(back).toHaveAttribute('data-shifted', 'true');
+  const p = await getProject(page);
+  const item = p.furniture.find((f: { id: string }) => f.id === table.id);
+  const zoom = await page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { view2d: { zoom: number } } } } }).__wp.useUiStore.getState().view2d.zoom);
+  const h = rotateHandlePoint(item, 1 / zoom);
+  const hs = await planToScreen(page, h.x, h.y);
+  const bb = (await back.locator('line').first().boundingBox())!;
+  const lineX = bb.x + bb.width / 2;
+  expect(Math.abs(lineX - hs.x)).toBeGreaterThanOrEqual(10);
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('2D plan: wall outlines keep their screen-pixel width at every zoom, plan colours come from the tokens (#104)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const wall = page.locator('[data-testid="editor2d"] [data-layer="wall"]').first();
+  const strokeAt = async (zoom: number) => {
+    await page.evaluate((z) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ui = (window as any).__wp.useUiStore.getState();
+      ui.setView2d({ ...ui.view2d, zoom: z });
+    }, zoom);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { view2d: { zoom: number } } } } }).__wp.useUiStore.getState().view2d.zoom)).toBe(zoom);
+    return wall.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { width: cs.strokeWidth, effect: cs.getPropertyValue('vector-effect'), stroke: cs.stroke, fill: cs.fill };
+    });
+  };
+  const near = await strokeAt(220);
+  const far = await strokeAt(40);
+  expect(near.effect).toBe('non-scaling-stroke');
+  expect(near.width).toBe('1.5px');
+  expect(far).toEqual(near); // same width in screen pixels and same colours, zoomed in or out
+  // colours resolve from the plan tokens (theme.css) – identical in light and dark
+  expect(near.fill).toBe('rgb(59, 65, 71)'); // --color-plan-wall #3b4147
+  expect(near.stroke).toBe('rgb(31, 35, 38)'); // --color-plan-wall-line #1f2326
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await wall.evaluate((el) => getComputedStyle(el).fill)).toBe('rgb(59, 65, 71)');
+  expect(errors).toEqual([]);
+});
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('furniture groups: Strg+G groups, click selects the group, drag moves all (one undo step), second click picks one, rename, kept after reload, Strg+Umschalt+G dissolves (#65)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const sel = () =>
+    page.evaluate(() => {
+      const s = (window as any).__wp.useUiStore.getState();
+      return s.selection?.type === 'furniture' ? [s.selection.id, ...s.multi] : [];
+    });
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  const click = async (f: { x: number; y: number }) => {
+    const s = await planToScreen(page, f.x, f.y);
+    await page.mouse.click(s.x, s.y);
+  };
+  const p0 = await getProject(page);
+  expect(p0.groups).toEqual([]);
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const ids: string[] = [bed.id, ...ns.map((n: any) => n.id)];
+
+  // select bed + night stands, Strg+G → one group (one undo step)
+  await click(bed);
+  for (const n of ns) {
+    await page.keyboard.down('Shift');
+    await click(n);
+    await page.keyboard.up('Shift');
+  }
+  const beforeGroup = await past();
+  await page.keyboard.press('Control+g');
+  const p1 = await getProject(page);
+  expect(p1.groups).toHaveLength(1);
+  const gid = p1.groups[0].id;
+  expect(p1.furniture.filter((f: any) => f.groupId === gid).map((f: any) => f.id).sort()).toEqual([...ids].sort());
+  expect(await past()).toBe(beforeGroup + 1);
+  const panel = page.locator('.panel.right');
+  await expect(panel.getByTestId('group-controls')).toBeVisible();
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'true');
+
+  // a click on one night stand selects the whole group
+  await page.keyboard.press('Escape');
+  expect(await sel()).toEqual([]);
+  await click(ns[0]);
+  expect((await sel()).sort()).toEqual([...ids].sort());
+  expect((await sel())[0]).toBe(ns[0].id);
+  await expect(page.getByTestId('multi-note')).toContainText('Gruppe „Gruppe 1“ ausgewählt (3 Möbel)');
+
+  // dragging the bed moves all three by the same amount – one undo step
+  const beforeDrag = await past();
+  const a = await planToScreen(page, bed.x, bed.y);
+  const b = await planToScreen(page, bed.x, bed.y + 0.5);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 6 });
+  await page.mouse.up();
+  const p2 = await getProject(page);
+  const dy = (p: any, id: string) => p.furniture.find((f: any) => f.id === id).y - p0.furniture.find((f: any) => f.id === id).y;
+  const dx = (p: any, id: string) => p.furniture.find((f: any) => f.id === id).x - p0.furniture.find((f: any) => f.id === id).x;
+  expect(dy(p2, bed.id)).toBeGreaterThan(0.3);
+  for (const id of ids) {
+    expect(dy(p2, id)).toBeCloseTo(dy(p2, bed.id), 3);
+    expect(dx(p2, id)).toBeCloseTo(dx(p2, bed.id), 3);
+  }
+  expect(await past()).toBe(beforeDrag + 1);
+  expect((await sel()).sort()).toEqual([...ids].sort()); // still the group
+
+  // Strg+Z once restores all three positions
+  await page.keyboard.press('Control+z');
+  const p3 = await getProject(page);
+  for (const id of ids) {
+    expect(dy(p3, id)).toBeCloseTo(0, 6);
+    expect(dx(p3, id)).toBeCloseTo(0, 6);
+  }
+  expect(p3.groups).toHaveLength(1);
+
+  // E turns the group about its centre – one undo step, distances between the members kept
+  const dist = (p: any, i: string, j: string) => {
+    const f = p.furniture.find((x: any) => x.id === i);
+    const g = p.furniture.find((x: any) => x.id === j);
+    return Math.hypot(f.x - g.x, f.y - g.y);
+  };
+  const beforeTurn = await past();
+  await page.keyboard.press('e');
+  const p4 = await getProject(page);
+  expect(await past()).toBe(beforeTurn + 1);
+  expect(p4.furniture.find((f: any) => f.id === bed.id).rotation).not.toBeCloseTo(bed.rotation, 3);
+  expect(dist(p4, bed.id, ns[0].id)).toBeCloseTo(dist(p0, bed.id, ns[0].id), 2);
+  expect(dist(p4, ns[0].id, ns[1].id)).toBeCloseTo(dist(p0, ns[0].id, ns[1].id), 2);
+  await page.keyboard.press('Control+z');
+
+  // a second click (no drag) selects just the clicked item; the group stays outlined faintly
+  await click(bed);
+  expect(await sel()).toEqual([bed.id]);
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'false');
+  await expect(panel.getByTestId('group-controls')).toContainText('Teil der Gruppe „Gruppe 1“');
+  // back to the whole group via the panel, rename it there
+  await panel.getByRole('button', { name: 'Ganze Gruppe auswählen' }).click();
+  expect((await sel()).sort()).toEqual([...ids].sort());
+  const nameField = panel.getByTestId('group-controls').getByLabel('Name der Gruppe');
+  await nameField.fill('Schlafbereich');
+  await nameField.press('Enter');
+  await expect.poll(async () => (await getProject(page)).groups[0]?.name).toBe('Schlafbereich');
+  await expect(page.getByTestId('group-label')).toHaveText('Schlafbereich');
+
+  // kept after reload
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p5 = await getProject(page);
+  expect(p5.groups).toEqual([{ id: gid, name: 'Schlafbereich' }]);
+  expect(p5.furniture.filter((f: any) => f.groupId === gid)).toHaveLength(3);
+  await click(bed);
+  expect((await sel()).sort()).toEqual([...ids].sort());
+
+  // Strg+Umschalt+G dissolves the group – the items stay where they are; one undo step
+  const beforeUngroup = await past();
+  await page.keyboard.press('Control+Shift+G');
+  const p6 = await getProject(page);
+  expect(p6.groups).toEqual([]);
+  expect(p6.furniture.every((f: any) => !f.groupId)).toBe(true);
+  for (const id of ids) expect(dy(p6, id)).toBeCloseTo(0, 6);
+  expect(await past()).toBe(beforeUngroup + 1);
+  await page.keyboard.press('Escape');
+  await click(bed);
+  expect(await sel()).toEqual([bed.id]);
+  await expect(page.getByTestId('group-outline')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and light, keyboard operation, stand/sit, "Erste Schritte" (#100, #103)', async ({ page }) => {
+  test.setTimeout(240_000); // realism rendering with software WebGL is slow, more so under load
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const toolbar = page.locator('header.toolbar');
+
+  // icon-only buttons: no visible text, a name (aria-label) and a tooltip that starts with it
+  const icons = toolbar.locator('button.icon-btn');
+  expect(await icons.count()).toBeGreaterThanOrEqual(8);
+  for (const b of await icons.all()) {
+    const label = (await b.getAttribute('aria-label')) ?? '';
+    expect(label.length, 'icon button without aria-label').toBeGreaterThan(1);
+    expect((await b.getAttribute('title')) ?? '').toContain(label.split(' ')[0]);
+    expect((await b.innerText()).trim()).toBe('');
+  }
+  // every toolbar button has a name
+  for (const b of await toolbar.locator('button').all()) {
+    const name = (await b.getAttribute('aria-label')) ?? (await b.innerText()).trim();
+    expect(name, 'toolbar button without a name').not.toBe('');
+  }
+  await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveAttribute('title', /Strg\+Z/);
+  await expect(page.getByRole('button', { name: 'Hilfe & Tastenkürzel' })).toHaveAttribute('aria-keyshortcuts', '?');
+  // rarely used: the separate "Export ▾" button is gone, its entries are in "Mehr"
+  await expect(page.getByRole('button', { name: 'Export ▾' })).toHaveCount(0);
+
+  // keyboard: Enter opens "Mehr", the focus goes to the first entry, arrows move, Esc closes and returns
+  const more = page.getByRole('button', { name: 'Mehr', exact: true });
+  await more.focus();
+  await page.keyboard.press('Enter');
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const menu = page.locator('#toolbar-menu-more');
+  for (const entry of ['Projektpaket (.wohnplan.json)', 'Grundriss (apartment-plan.json)', 'Einkaufsliste (CSV)', 'Plan drucken / PDF / PNG…', '3D-Modell als GLB …']) {
+    await expect(menu.getByRole('button', { name: entry })).toBeVisible();
+  }
+  await expect(menu.getByRole('button', { name: 'Projektpaket (.wohnplan.json)' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('button', { name: 'Grundriss (apartment-plan.json)' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('button', { name: '3D-Modell als GLB …' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('button', { name: 'Projektpaket (.wohnplan.json)' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
+  // keyboard focus shows the name as a tooltip, too (the native title only appears on hover)
+  expect(await more.evaluate((el) => getComputedStyle(el, '::after').content)).toBe('"Mehr: Export"');
+  // Enter on "Projekt ▾" opens it with the focus inside
+  await page.getByRole('button', { name: 'Projekt ▾' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Neues leeres Projekt' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
+  // a click outside closes a menu
+  await more.click();
+  await expect(menu).toBeVisible();
+  await page.locator('.save-state').click();
+  await expect(menu).toHaveCount(0);
+
+  // 3D realism: only the slider stays in the toolbar; presets and lamps are in "Mehr"
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Realismus' }).click();
+  await expect(toolbar.getByLabel('Tageszeit', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Lampen', { exact: true })).toHaveCount(0);
+  await more.click();
+  await expect(menu.getByText('Licht (Realismus)')).toBeVisible();
+  await expect(menu.getByLabel('Tageszeit-Voreinstellung')).toBeVisible();
+  await menu.getByLabel('Lampen', { exact: true }).selectOption('on');
+  expect((await getProject(page)).settings.lamps).toBe('on');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  // the toolbar stays on one row – also in a narrow window
+  expect((await toolbar.boundingBox())!.height).toBeLessThan(52);
+  await page.screenshot({ path: 'test-results/toolbar-1440-realism.png', clip: { x: 0, y: 0, width: 1440, height: 60 } });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  expect((await toolbar.boundingBox())!.height).toBeLessThan(52);
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeAttached(); // still there for screen readers
+  await page.screenshot({ path: 'test-results/toolbar-1024-realism.png', clip: { x: 0, y: 0, width: 1024, height: 60 } });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Planung', exact: true }).click();
+
+  // walkthrough: stand / sit next to "Begehen", same state as key X; orbit-only tools hidden
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByRole('button', { name: 'Schnitt' })).toHaveCount(0);
+  const stand = page.getByRole('button', { name: 'Stehen', exact: true });
+  const sit = page.getByRole('button', { name: 'Sitzen', exact: true });
+  await expect(stand).toHaveAttribute('aria-pressed', 'true');
+  await sit.click();
+  await expect(sit).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('walk-sit')).toBeVisible();
+  await page.locator('[data-testid="scene3d"]').hover();
+  await page.keyboard.press('x');
+  await expect(stand).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('walk-sit')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByRole('group', { name: 'Haltung beim Begehen' })).toHaveCount(0);
+
+  // "Projekt ▾ › Erste Schritte": disabled for a non-empty project, reopens the start card of an empty one
+  await page.getByRole('button', { name: 'Projekt ▾' }).click();
+  await expect(page.getByRole('button', { name: /^Erste Schritte/ })).toBeDisabled();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Startkarte schließen' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('button', { name: 'Projekt ▾' }).click();
+  await page.locator('#toolbar-menu-project').getByRole('button', { name: /^Erste Schritte/ }).click();
+  await expect(card).toBeVisible();
+  await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

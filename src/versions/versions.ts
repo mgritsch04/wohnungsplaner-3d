@@ -1,3 +1,4 @@
+import { pruneGroups } from '../model/groups';
 import { ProjectSchema, type Project } from '../model/schema';
 
 /**
@@ -25,6 +26,9 @@ type ContentKey = (typeof CONTENT_KEYS)[number];
 export function restoreVersionContent(draft: Project, snapshot: Project): void {
   const target = draft as Record<ContentKey, unknown>;
   for (const k of CONTENT_KEYS) target[k] = structuredClone(snapshot[k]);
+  // furniture groups (#65) belong to the furniture: their names come along (states saved before lack them)
+  draft.groups = structuredClone(snapshot.groups ?? []);
+  pruneGroups(draft);
 }
 
 /** JSON with sorted object keys and without undefined values. */
@@ -47,7 +51,9 @@ function stableStringify(v: unknown): string {
 export function contentKey(p: Project): string {
   const parsed = ProjectSchema.safeParse(p);
   const src = parsed.success ? parsed.data : p;
-  return stableStringify(CONTENT_KEYS.map((k) => src[k]));
+  // furniture group names (#65) only when there are any – keeps the keys of earlier states unchanged
+  const groups = src.groups?.length ? [src.groups] : [];
+  return stableStringify([...CONTENT_KEYS.map((k) => src[k]), ...groups]);
 }
 
 /** 64-bit (two 32-bit FNV-1a variants) hex hash – used to skip duplicate automatic states. */

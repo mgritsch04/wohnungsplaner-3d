@@ -15,6 +15,8 @@ interface Props {
   quality: QualityMode;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Pointer released without dragging (a click) – second click on a selected group picks one member (#65). */
+  onClickRelease?: (id: string) => void;
   onDragStart: () => void;
   onDrag: (id: string, x: number, y: number) => void;
   onDragEnd: () => void;
@@ -26,7 +28,7 @@ interface Props {
 
 /** One furniture object in 3D. Can be dragged on the floor plane. */
 export const FurnitureObject = memo(
-  function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd, onDragCancel, readOnly = false }: Props) {
+  function FurnitureObject({ item, quality, selected, onSelect, onClickRelease, onDragStart, onDrag, onDragEnd, onDragCancel, readOnly = false }: Props) {
     const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean; sx: number; sy: number; onBlur: () => void } | null>(null);
     // never leave an open transaction behind if the item disappears mid-drag
     useEffect(
@@ -100,7 +102,9 @@ export const FurnitureObject = memo(
     const onUp = (e: ThreeEvent<PointerEvent>) => {
       if (!dragging.current) return;
       e.stopPropagation();
+      const clicked = !dragging.current.started;
       endDrag(true);
+      if (clicked) onClickRelease?.(item.id);
       (e.target as unknown as Element).releasePointerCapture?.(e.pointerId);
     };
     // the browser aborted the gesture (touch interrupted, capture lost): revert the move

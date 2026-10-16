@@ -8,13 +8,15 @@ import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import { defaultLeafOpen, type Furniture, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
-import { useUiStore } from '../../store/uiStore';
-import { deleteSelection, duplicateSelection, setFurnitureRotation } from '../actions';
+import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
+import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
 import { placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
+import { GroupControls } from './GroupControls';
+import { groupName, selectedGroup } from '../../model/groups';
 
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
@@ -397,8 +399,10 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
 function FurnitureProps({ id, project }: { id: string; project: Project }) {
   const apply = useApply();
   const more = useUiStore((s) => s.multi.length);
+  const multi = useUiStore((s) => s.multi);
   const f = project.furniture.find((x) => x.id === id);
   if (!f) return <Gone />;
+  const group = more > 0 ? selectedGroup(project, selectedFurnitureIds({ selection: { type: 'furniture', id }, multi })) : null;
   const upd = (fn: (x: Furniture) => void) =>
     apply((d) => {
       const x = d.furniture.find((q) => q.id === id);
@@ -409,9 +413,21 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
     <div className="panel-scroll">
       {more > 0 && (
         <p className="multi-note" data-testid="multi-note">
-          <strong>{more + 1} Möbel ausgewählt.</strong> Ziehen verschiebt alle, Pfeiltasten/Entf/Strg+D/Strg+C wirken auf alle. Die Felder unten gelten nur für „{f.name}“.
+          {group ? (
+            <>
+              <strong>
+                Gruppe „{groupName(project, group)}“ ausgewählt ({more + 1} Möbel).
+              </strong>{' '}
+              Ziehen, Drehen, Pfeiltasten, Entf, Strg+D und Strg+C wirken auf die ganze Gruppe. Die Felder unten gelten nur für „{f.name}“.
+            </>
+          ) : (
+            <>
+              <strong>{more + 1} Möbel ausgewählt.</strong> Ziehen verschiebt alle, Pfeiltasten/Entf/Strg+D/Strg+C wirken auf alle. Die Felder unten gelten nur für „{f.name}“.
+            </>
+          )}
         </p>
       )}
+      <GroupControls />
       <ArrangeControls />
       {issues.length > 0 && (
         <div className="panel-issues">
@@ -531,16 +547,16 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       </PanelGroup>
       <div className="btn-row padded">
         <span className="rotate-group" role="group" aria-label="Drehen">
-          <button onClick={() => setFurnitureRotation(f.id, f.rotation - Math.PI / 2)} disabled={f.locked} title="90° gegen den Uhrzeigersinn">
+          <button onClick={() => (group ? rotateSelection(-Math.PI / 2) : setFurnitureRotation(f.id, f.rotation - Math.PI / 2))} disabled={f.locked} title="90° gegen den Uhrzeigersinn">
             ⟲ 90°
           </button>
-          <button onClick={() => setFurnitureRotation(f.id, f.rotation - Math.PI / 12)} disabled={f.locked} title="15° gegen den Uhrzeigersinn (Taste Q)">
+          <button onClick={() => (group ? rotateSelection(-Math.PI / 12) : setFurnitureRotation(f.id, f.rotation - Math.PI / 12))} disabled={f.locked} title="15° gegen den Uhrzeigersinn (Taste Q)">
             ⟲ 15°
           </button>
-          <button onClick={() => setFurnitureRotation(f.id, f.rotation + Math.PI / 12)} disabled={f.locked} title="15° im Uhrzeigersinn (Taste E)">
+          <button onClick={() => (group ? rotateSelection(Math.PI / 12) : setFurnitureRotation(f.id, f.rotation + Math.PI / 12))} disabled={f.locked} title="15° im Uhrzeigersinn (Taste E)">
             ⟳ 15°
           </button>
-          <button onClick={() => setFurnitureRotation(f.id, f.rotation + Math.PI / 2)} disabled={f.locked} title="90° im Uhrzeigersinn">
+          <button onClick={() => (group ? rotateSelection(Math.PI / 2) : setFurnitureRotation(f.id, f.rotation + Math.PI / 2))} disabled={f.locked} title="90° im Uhrzeigersinn">
             ⟳ 90°
           </button>
         </span>

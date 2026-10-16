@@ -9,6 +9,7 @@ import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
+import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
 
@@ -58,6 +59,8 @@ export function ProjectPanel() {
           title="Decken sind nur von unten sichtbar (z. B. beim Begehen)"
         />
       </Section>
+
+      <SightlineSection />
 
       <Section title="Steuerung (3D)">
         <MouseSensitivityControl />
@@ -171,5 +174,28 @@ function MaterialRow({ m }: { m: Material }) {
       <input className="material-name" value={m.name} onChange={(e) => upd((x) => (x.name = e.target.value.slice(0, 100)))} aria-label="Materialname" />
       <span className="muted small">{m.kind}</span>
     </li>
+  );
+}
+
+/** Sight lines (#89): switch, visible share, back to the entrance. */
+function SightlineSection() {
+  const { show, point, share, setShow, setPoint } = useSightStore();
+  return (
+    <Section title="Sichtlinien (2D)">
+      <CheckField label="Sichtlinien anzeigen" checked={show} onChange={setShow} title="Zeigt im 2D-Plan, was man vom Blickpunkt aus sieht" />
+      <p className="muted small">
+        Grün: von dort sichtbar, grau: verdeckt. Wände verdecken, offene Türen und Durchgänge nicht, Möbel werden nicht berücksichtigt. Den Blickpunkt im Plan ziehen; Start ist der Eingang.
+      </p>
+      {show && share !== null && (
+        <p className="small" data-testid="sight-share-panel">
+          Sichtbar: <strong>{Math.round(share * 100)} %</strong> der Wohnfläche
+        </p>
+      )}
+      {show && point && (
+        <button className="link-btn" onClick={() => setPoint(null)}>
+          Blickpunkt auf den Eingang zurücksetzen
+        </button>
+      )}
+    </Section>
   );
 }

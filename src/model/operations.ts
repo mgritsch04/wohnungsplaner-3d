@@ -12,6 +12,7 @@ import { computeRoomGeometry } from './geometry/rooms';
 import { defaultLeafOpen, type Furniture, type Opening, type OpeningKind, type PlanNode, type Project, type Provenance, type Room, type Wall } from './schema';
 import { closestPointOnSegment, cross, dist, dot, normalize, scale, sub, add, type Vec2 } from './vec';
 import { roundMm } from './units';
+import { pruneGroups } from './groups';
 
 /** Points closer than this are considered the same node. */
 export const NODE_MERGE_TOLERANCE = 0.005;
@@ -478,13 +479,18 @@ export function duplicateFurniture(d: Project, id: string, offset: Vec2 = { x: 0
   const f = d.furniture.find((x) => x.id === id);
   if (!f) return null;
   const nid = newId('item');
-  d.furniture.push({ ...structuredClone(f), id: nid, x: roundMm(f.x + offset.x), y: roundMm(f.y + offset.y) });
+  // a copy is not part of the source's group; copying a whole group forms a new one (groups.regroupCopies)
+  const { groupId: _group, ...rest } = structuredClone(f);
+  void _group;
+  d.furniture.push({ ...rest, id: nid, x: roundMm(f.x + offset.x), y: roundMm(f.y + offset.y) });
   return nid;
 }
 
 export function deleteFurniture(d: Project, ids: string[]) {
   const set = new Set(ids);
   d.furniture = d.furniture.filter((f) => !set.has(f.id));
+  // a group left with a single item dissolves (#65)
+  pruneGroups(d);
 }
 
 /** Snap a point to (0°, 45°, 90°, …) directions around an origin. */
