@@ -2469,3 +2469,34 @@ test('empty project: start card with first steps, "Raum zeichnen" picks the tool
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('2D plan: wall outlines keep their screen-pixel width at every zoom, plan colours come from the tokens (#104)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const wall = page.locator('[data-testid="editor2d"] [data-layer="wall"]').first();
+  const strokeAt = async (zoom: number) => {
+    await page.evaluate((z) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ui = (window as any).__wp.useUiStore.getState();
+      ui.setView2d({ ...ui.view2d, zoom: z });
+    }, zoom);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { view2d: { zoom: number } } } } }).__wp.useUiStore.getState().view2d.zoom)).toBe(zoom);
+    return wall.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { width: cs.strokeWidth, effect: cs.getPropertyValue('vector-effect'), stroke: cs.stroke, fill: cs.fill };
+    });
+  };
+  const near = await strokeAt(220);
+  const far = await strokeAt(40);
+  expect(near.effect).toBe('non-scaling-stroke');
+  expect(near.width).toBe('1.5px');
+  expect(far).toEqual(near); // same width in screen pixels and same colours, zoomed in or out
+  // colours resolve from the plan tokens (theme.css) – identical in light and dark
+  expect(near.fill).toBe('rgb(59, 65, 71)'); // --color-plan-wall #3b4147
+  expect(near.stroke).toBe('rgb(31, 35, 38)'); // --color-plan-wall-line #1f2326
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await wall.evaluate((el) => getComputedStyle(el).fill)).toBe('rgb(59, 65, 71)');
+  expect(errors).toEqual([]);
+});
