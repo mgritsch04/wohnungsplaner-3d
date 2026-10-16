@@ -2127,3 +2127,47 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('walkthrough: X switches between standing and sitting, the seated eye height is saved (#78)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const eyeY = () => page.evaluate(() => (window as unknown as { __wp: { three: { camera: { position: { y: number } } } } }).__wp.three.camera.position.y);
+  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
+  expect((await getProject(page)).settings.sitEyeHeight).toBe(1.2);
+
+  // X: sit down – immediately, still walking; the overlay says so
+  await page.keyboard.press('x');
+  await expect.poll(eyeY).toBeCloseTo(1.2, 2);
+  await expect(page.getByTestId('walk-sit')).toHaveText(/Sitzen/);
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  // ducking (C) is ignored while seated
+  await page.keyboard.down('c');
+  await page.waitForTimeout(400);
+  expect(await eyeY()).toBeCloseTo(1.2, 2);
+  await page.keyboard.up('c');
+
+  // the seated eye height is adjustable and applies right away
+  await page.locator('.panel.right').getByRole('button', { name: 'Projekt', exact: true }).click();
+  const field = page.locator('.panel.right').getByRole('textbox', { name: 'Augenhöhe im Sitzen cm' });
+  await field.fill('105');
+  await field.press('Enter');
+  await expect.poll(eyeY).toBeCloseTo(1.05, 2);
+  await expect(page.locator('.panel.right').getByLabel('Beim Begehen sitzen (Taste X)')).toBeChecked();
+
+  // X again: stand up
+  await page.locator('[data-testid="scene3d"]').hover();
+  await page.keyboard.press('x');
+  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
+  await expect(page.getByTestId('walk-sit')).toHaveCount(0);
+
+  // saved with the project and kept after reloading
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).settings.sitEyeHeight).toBe(1.05);
+  expect(errors).toEqual([]);
+});
