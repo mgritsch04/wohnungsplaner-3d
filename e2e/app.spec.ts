@@ -2515,3 +2515,71 @@ test('sight lines: from the entrance, draggable viewpoint updates the visible ar
   await expect(plan.getByTestId('sightlines')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('3D tape measure: two clicks on the floor give the distance, nothing gets selected, Esc clears (#88)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
+  await page.waitForTimeout(1500);
+  await page.getByRole('button', { name: 'Maßband' }).click();
+  await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
+
+  // two floor points in the living room, 1.40 m apart (world: x, height, plan y)
+  for (const [x, z] of [
+    [0.6, 0.7],
+    [0.6, 2.1],
+  ]) {
+    const s = await worldToScreen3d(page, x, 0, z);
+    await page.mouse.click(s.x, s.y);
+  }
+  const label = page.getByTestId('tape-label');
+  await expect(label).toHaveCount(1);
+  expect(Math.abs(Number(await label.getAttribute('data-length')) - 1.4)).toBeLessThanOrEqual(0.01);
+  await expect(label).toContainText('1,40 m');
+  await expect(label).toContainText('↕ 0,00 m');
+  expect(await getSelection(page)).toBeNull(); // measuring never selects
+
+  // a click on furniture while measuring does not select or move it either
+  const p = await getProject(page);
+  const sofa = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const s = await worldToScreen3d(page, sofa.x, 0.4, sofa.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toBeNull();
+  const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id);
+  expect([after.x, after.y]).toEqual([sofa.x, sofa.y]);
+
+  // Esc removes the measurements; K switches the tool off
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('tape-label')).toHaveCount(0);
+  await page.keyboard.press('k');
+  await expect(page.getByRole('button', { name: 'Maßband' })).toHaveAttribute('aria-pressed', 'false');
+  expect(errors).toEqual([]);
+});
+
+test('3D tape measure in the walkthrough: crosshair clicks measure, the capture click does not (#88)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  await page.keyboard.press('k');
+  const c = (await page.locator('[data-testid="scene3d"] canvas').boundingBox())!;
+  const centre = () => page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
+  await centre(); // captures the mouse – no point yet
+  await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
+  const look = (yaw: number, pitch: number) => page.evaluate(([y, p]) => (window as unknown as { __wp: { walk: { look: (a: number, b: number) => void } } }).__wp.walk.look(y, p), [yaw, pitch] as const);
+  await look(0, -0.6);
+  await page.waitForTimeout(200);
+  await centre();
+  await expect(page.getByRole('status')).toContainText('Zweiten Punkt anklicken');
+  await look(0.4, -0.5);
+  await page.waitForTimeout(200);
+  await centre();
+  await expect(page.getByTestId('tape-label')).toHaveCount(1);
+  expect(Number(await page.getByTestId('tape-label').getAttribute('data-length'))).toBeGreaterThan(0.1);
+  expect(await getSelection(page)).toBeNull();
+  expect(errors).toEqual([]);
+});
