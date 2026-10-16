@@ -7,6 +7,7 @@ import { usePerformanceStore } from '../../view3d/performanceStore';
 import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
+import { MouseSensitivityControl } from '../MouseSensitivityControl';
 
 export function ProjectPanel() {
   const project = useProjectStore((s) => s.project);
@@ -48,6 +49,10 @@ export function ProjectPanel() {
           }
           title="Decken sind nur von unten sichtbar (z. B. beim Begehen)"
         />
+      </Section>
+
+      <Section title="Steuerung (3D)">
+        <MouseSensitivityControl />
       </Section>
 
       <Section title="Leistung">

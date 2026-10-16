@@ -634,3 +634,79 @@ test('3D: click vs. drag – threshold, no jump, release over a wall, focus loss
   expect(await txOpen()).toBe(false);
   expect(errors).toEqual([]);
 });
+
+test('mouse sensitivity: setting scales walk look and orbit rotation, persists in the project', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
+  const slider = page.getByLabel('Mausempfindlichkeit');
+  await expect(slider).toHaveValue('1');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const setSens = (v: number) => page.evaluate((x) => (window as any).__wp.useProjectStore.getState().apply((d: any) => (d.settings.mouseSensitivity = x)), v);
+  const camYaw = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (window as any).__wp.three.camera.rotation.y as number;
+    });
+  const canvas = (await page.locator('[data-testid="scene3d"] canvas').boundingBox())!;
+  const cx = canvas.x + canvas.width / 2;
+  const cy = canvas.y + canvas.height / 2;
+
+  // walk mode: the same mouse movement turns the view proportionally to the setting
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await page.waitForTimeout(800);
+  // headless Chromium reports no movementX for synthetic moves under pointer lock, so emulate
+  // a locked pointer and send the same relative mouse movement for every setting
+  await page.evaluate(() => {
+    const canvas = document.querySelector('[data-testid="scene3d"] canvas');
+    Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
+  });
+  const lookTurn = async (sens: number) => {
+    await setSens(sens);
+    await page.waitForTimeout(200);
+    const y0 = await camYaw();
+    await page.evaluate(() => document.dispatchEvent(new MouseEvent('mousemove', { movementX: 100, movementY: 0 })));
+    await page.waitForTimeout(300);
+    return Math.abs((await camYaw()) - y0);
+  };
+  const low = await lookTurn(0.5);
+  const def = await lookTurn(1);
+  const high = await lookTurn(2);
+  await page.evaluate(() => delete (document as unknown as Record<string, unknown>).pointerLockElement);
+  expect(def).toBeCloseTo(100 * 0.0022, 3); // unchanged default feel
+  expect(low / def).toBeCloseTo(0.5, 1);
+  expect(high / def).toBeCloseTo(2, 1);
+
+  // orbit: azimuth change scales as well
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.waitForTimeout(800);
+  const azimuth = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = (window as any).__wp.three.camera.position;
+      return Math.atan2(c.x - 4.3, c.z - 2);
+    });
+  const orbitTurn = async (sens: number) => {
+    await setSens(sens);
+    await page.getByRole('button', { name: '⟲ Kamera' }).click();
+    await page.waitForTimeout(600);
+    const a0 = await azimuth();
+    await page.mouse.move(cx, cy + 150);
+    await page.mouse.down();
+    await page.mouse.move(cx + 60, cy + 150, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(1500); // damping settles
+    return Math.abs((await azimuth()) - a0);
+  };
+  const oLow = await orbitTurn(0.5);
+  const oHigh = await orbitTurn(2);
+  expect(oHigh).toBeGreaterThan(oLow * 2.5);
+
+  // the UI slider writes the setting; one undo step per drag; it is saved with the project
+  await slider.fill('1.5');
+  expect((await getProject(page)).settings.mouseSensitivity).toBe(1.5);
+  await page.getByRole('button', { name: 'Standard' }).click();
+  expect((await getProject(page)).settings.mouseSensitivity).toBe(1);
+  expect(errors).toEqual([]);
+});

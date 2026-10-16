@@ -14,7 +14,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
-import { WalkControls } from './WalkControls';
+import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
@@ -198,9 +198,16 @@ function SceneContent({
         </EffectsBoundary>
       )}
       {cameraMode === 'orbit' ? (
-        <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} />
+        <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
       ) : (
-        <WalkControls key="walk" derived={derived} furniture={project.furniture} start={walkStart} onLockChange={onLockChange} />
+        <WalkControls
+          key="walk"
+          derived={derived}
+          furniture={project.furniture}
+          start={walkStart}
+          sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
+          onLockChange={onLockChange}
+        />
       )}
     </>
   );
@@ -232,7 +239,18 @@ function RealismEffects() {
   );
 }
 
-function OrbitCamera({ controlsRef, center, span }: { controlsRef: React.RefObject<OrbitControlsImpl | null>; center: { x: number; y: number }; span: number }) {
+function OrbitCamera({
+  controlsRef,
+  center,
+  span,
+  rotateSpeed,
+}: {
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  center: { x: number; y: number };
+  span: number;
+  /** Orbit rotation speed (OrbitControls default = 1). */
+  rotateSpeed: number;
+}) {
   const { camera, get } = useThree();
   const resetRequest = usePerformanceStore((s) => s.cameraReset);
   const viewMode = useUiStore((s) => s.viewMode);
@@ -269,6 +287,7 @@ function OrbitCamera({ controlsRef, center, span }: { controlsRef: React.RefObje
       maxDistance={200}
       enableDamping
       dampingFactor={0.12}
+      rotateSpeed={rotateSpeed}
     />
   );
 }

@@ -243,6 +243,8 @@ export const SettingsSchema = z.object({
   exposure: z.number().min(0.1).max(4).default(1),
   /** Show ceilings in the 3D view (off by default for better overview). */
   showCeilings: z.boolean().default(false),
+  /** Mouse sensitivity factor for looking around (walk) and orbiting; 1 = default feel. */
+  mouseSensitivity: z.number().min(0.2).max(3).default(1),
 });
 
 export const ProjectSchema = z.object({

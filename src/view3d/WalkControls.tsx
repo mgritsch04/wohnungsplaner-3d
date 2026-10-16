@@ -11,6 +11,7 @@ interface Props {
   furniture: Furniture[];
   start: Vec2;
   speed?: number;
+  /** Radians per pixel of mouse movement. */
   sensitivity?: number;
   onLockChange: (locked: boolean) => void;
 }
@@ -20,12 +21,20 @@ interface Props {
  * Shift to walk faster, Escape releases the mouse. Collides with walls (door
  * openings stay passable) and solid furniture; height is fixed at eye level.
  */
-export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = 0.0022, onLockChange }: Props) {
+/** Look speed at sensitivity factor 1 (radians per pixel). */
+export const BASE_LOOK_SENSITIVITY = 0.0022;
+
+export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, onLockChange }: Props) {
   const { camera, gl } = useThree();
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
   const pitch = useRef(0);
   const dragLook = useRef<{ x: number; y: number } | null>(null);
+  // read through a ref: changing the sensitivity must not re-register listeners (or drop pointer lock)
+  const sensitivityRef = useRef(sensitivity);
+  useEffect(() => {
+    sensitivityRef.current = sensitivity;
+  }, [sensitivity]);
   const colliders = useMemo(() => buildColliders(derived, furniture), [derived, furniture]);
   const collidersRef = useRef(colliders);
   useEffect(() => {
@@ -65,8 +74,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const onKeyUp = (e: KeyboardEvent) => keys.current.delete(e.code);
     const clear = () => keys.current.clear();
     const look = (dx: number, dy: number) => {
-      yaw.current -= dx * sensitivity;
-      pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - dy * sensitivity));
+      const k = sensitivityRef.current;
+      yaw.current -= dx * k;
+      pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - dy * k));
     };
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement === el) look(e.movementX, e.movementY);
@@ -111,7 +121,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (document.pointerLockElement === el) document.exitPointerLock();
       pressed.clear();
     };
-  }, [gl, sensitivity, onLockChange]);
+  }, [gl, onLockChange]);
 
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);

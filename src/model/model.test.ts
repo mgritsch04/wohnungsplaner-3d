@@ -189,3 +189,13 @@ describe('sample project', () => {
     expect(p.furniture.length).toBeGreaterThan(3);
   });
 });
+
+describe('settings', () => {
+  it('older projects without mouseSensitivity load with the default (1 = unchanged feel)', () => {
+    const p = createEmptyProject();
+    const raw = structuredClone(p) as unknown as { settings: Record<string, unknown> };
+    delete raw.settings.mouseSensitivity;
+    expect(ProjectSchema.parse(raw).settings.mouseSensitivity).toBe(1);
+    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, mouseSensitivity: 10 } })).toThrow();
+  });
+});
