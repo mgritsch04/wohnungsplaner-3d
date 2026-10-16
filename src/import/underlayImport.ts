@@ -6,6 +6,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { reportError } from '../ui/actions';
 import { confirmDialog, useDialogStore } from '../ui/dialogStore';
+import { matchDimensions } from './dimensions';
 import { MAX_IMAGE_PIXELS, PlanFileError, validatePlanFile, type PlanFileKind } from './fileValidation';
 import { useImportStore, useSourceAnalysis } from './importStore';
 
@@ -66,7 +67,10 @@ export async function importPdfPage(file: File, pdf: PDFDocumentProxy, pageNumbe
       pixelWidth: rendered.width,
       pixelHeight: rendered.height,
     });
-    if (analysis) useSourceAnalysis.getState().set({ imageAssetId, kind: analysis.kind, segments: analysis.segments, texts: analysis.texts });
+    if (analysis) {
+      const dimensions = matchDimensions(analysis.texts, analysis.segments);
+      useSourceAnalysis.getState().set({ imageAssetId, kind: analysis.kind, segments: analysis.segments, texts: analysis.texts, dimensions });
+    }
     const kindLabel = analysis?.kind === 'vector' ? 'Vektor-PDF' : analysis?.kind === 'raster' ? 'gescanntes PDF (Rasterbild)' : analysis?.kind === 'mixed' ? 'gemischtes PDF' : 'PDF';
     useUiStore.getState().toast(`${kindLabel} importiert (${rendered.width}×${rendered.height} px). Bitte jetzt den Maßstab kalibrieren.`, 'success');
     void pdf.loadingTask.destroy();

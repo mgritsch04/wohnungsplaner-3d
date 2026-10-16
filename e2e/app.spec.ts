@@ -1515,3 +1515,106 @@ test('exports the plan as PNG and prints plan + parts list on one A4 page (#71, 
   await expect(view).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('recognises a sloped 30° wall in a raster plan and proposes the rooms (#37)', async ({ page }) => {
+  const { slopedPlan, slopedPlanPng } = await import('./fixtures');
+  const { offsetPolygon, polygonArea } = await import('../src/model/vec');
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'schraege-wand.png', mimeType: 'image/png', buffer: slopedPlanPng() });
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
+  // calibrate on the top wall centerline: x = 100 px … 500 px is 4 m
+  await page.getByRole('button', { name: 'Maßstab kalibrieren (2 Punkte)' }).click();
+  const u = (await getProject(page)).underlay;
+  const toWorld = (px: number, py: number) => ({ x: u.x + px * u.metersPerPixel, y: u.y + py * u.metersPerPixel });
+  const a = toWorld(100, 100);
+  const b = toWorld(500, 100);
+  const sa = await planToScreen(page, a.x, a.y);
+  const sb = await planToScreen(page, b.x, b.y);
+  await page.mouse.click(sa.x, sa.y);
+  await page.mouse.click(sb.x, sb.y);
+  await page.getByLabel('Reale Länge (cm)').fill('400');
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.getByText('Kalibriert', { exact: true })).toBeVisible();
+  const cal = (await getProject(page)).underlay;
+  const toWorldCal = (px: number, py: number) => ({ x: cal.x + px * cal.metersPerPixel, y: cal.y + py * cal.metersPerPixel });
+
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  type P = { x: number; y: number };
+  const draft = await page.evaluate(
+    () =>
+      (window as unknown as { __wp: { useImportStore: { getState: () => { draft: unknown } } } }).__wp.useImportStore.getState().draft as {
+        walls: { a: P; b: P; thickness: number }[];
+        openings: { kind: string; center: P; width: number }[];
+        rooms: { name: string; area: number; status: string; accepted: boolean }[];
+      },
+  );
+  const len = (w: { a: P; b: P }) => Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
+  const angle = (w: { a: P; b: P }) => ((((Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x) * 180) / Math.PI) % 180) + 180) % 180;
+  // the sloped wall: 30°, 3 m long (centerline), 20 cm thick
+  const sloped = draft.walls.filter((w) => Math.abs(angle(w) - 30) < 1);
+  expect(sloped).toHaveLength(1);
+  expect(Math.abs(len(sloped[0]) - 3)).toBeLessThan(0.05);
+  expect(Math.abs(sloped[0].thickness - 0.2)).toBeLessThan(0.03);
+  // the door inside the sloped wall
+  const [d0, d1] = slopedPlan.slopedDoor.map((q) => toWorldCal(q.x * 100, q.y * 100));
+  const doorCenter = { x: (d0.x + d1.x) / 2, y: (d0.y + d1.y) / 2 };
+  const door = draft.openings.find((o) => Math.hypot(o.center.x - doorCenter.x, o.center.y - doorCenter.y) < 0.1);
+  expect(door).toBeDefined();
+  expect(Math.abs(door!.width - 0.9)).toBeLessThan(0.05);
+  // two rooms proposed with their net areas, listed in the review
+  expect(draft.rooms).toHaveLength(2);
+  const areas = draft.rooms.map((r) => r.area).sort((x, y) => x - y);
+  const rightRoom = [slopedPlan.interiorWall[0], ...slopedPlan.outline.slice(1, 4), slopedPlan.interiorWall[1]];
+  expect(Math.abs(areas[0] - 1.8 * 3.8)).toBeLessThan(0.15);
+  expect(Math.abs(areas[1] - polygonArea(offsetPolygon(rightRoom, -0.1)))).toBeLessThan(0.3);
+  await expect(page.getByText(/Raum „Raum 1“ · \d+,\d\d m²/)).toBeVisible();
+  // re-proposing from the (unchanged) walls keeps both rooms
+  await page.getByRole('button', { name: 'Räume neu vorschlagen' }).click();
+  await expect(page.getByText('2 Räume aus den ausgewählten Wänden vorgeschlagen.')).toBeVisible();
+
+  // take it over as the new floor plan
+  await page.locator('.panel.left').getByLabel('Übernahme').selectOption('replace');
+  await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
+  await page.getByRole('button', { name: 'Übernehmen', exact: true }).click(); // uncertain openings
+  await page.getByRole('button', { name: 'Ersetzen' }).click();
+  const p = await getProject(page);
+  expect(p.rooms.map((r: { name: string }) => r.name).sort()).toEqual(['Raum 1', 'Raum 2']);
+  expect(p.openings.length).toBeGreaterThanOrEqual(2);
+  // the result renders in 3D
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.waitForTimeout(800);
+  expect(errors).toEqual([]);
+});
+
+test('checks the scale against dimension texts of a vector PDF without changing it (#37)', async ({ page }) => {
+  const { dimensionedPlanPdf } = await import('./fixtures');
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'bemasst.pdf', mimeType: 'application/pdf', buffer: dimensionedPlanPdf() });
+  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 15000 });
+  // no statement before a scale is set
+  await expect(page.getByTestId('dimension-check')).toHaveCount(0);
+  // stated scale 1:100 matches the drawing: all four dimensions agree
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen zum Maßstab (4 Maße');
+  // a wrong stated scale (1:110) is reported, not corrected
+  await page.getByLabel('Maßstab 1:').fill('110');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen nicht zum Maßstab: Abweichung +10,0 %');
+  const u = (await getProject(page)).underlay;
+  expect(u.pixelsPerPoint * 28.3465 * u.metersPerPixel).toBeCloseTo(1.1, 3); // still 1:110 as entered
+  expect(errors).toEqual([]);
+});

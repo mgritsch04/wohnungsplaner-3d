@@ -8,6 +8,8 @@ import { reportError } from '../../ui/actions';
 import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
+import { checkScale, scaleCheckMessage } from '../dimensions';
+import { proposeRooms, refreshRoomProposals, type PlacedText } from '../rooms';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
@@ -44,14 +46,42 @@ export async function runRecognition() {
       useUiStore.getState().toast('Es wurden keine Wände erkannt. Bitte die Wände manuell nachzeichnen (Werkzeug „Wand“).', 'info');
       return;
     }
+    // rooms: closed areas of the proposed walls; names/areas only from the plan's own text layer
+    draft.rooms = proposeRooms(draft.walls, { texts: planTextsInWorld() });
+    if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
+    // dimension texts of a vector PDF that contradict the scale
+    if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
+      const check = checkScale(analysis.dimensions, u.metersPerPixel);
+      if (check.status === 'mismatch') draft.warnings.push(scaleCheckMessage(check)!);
+    }
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
-    useUiStore.getState().toast(`${draft.walls.length} Wände und ${draft.openings.length} Öffnungen vorgeschlagen – bitte prüfen.`, 'success');
+    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume vorgeschlagen – bitte prüfen.`, 'success');
   } catch (e) {
     reportError(e, 'Erkennung fehlgeschlagen');
   } finally {
     progress(null);
   }
+}
+
+/** Texts of the current PDF underlay (centre of each text) in plan metres, if available. */
+function planTextsInWorld(): PlacedText[] | undefined {
+  const u = useProjectStore.getState().project.underlay;
+  const analysis = useSourceAnalysis.getState().analysis;
+  if (!u || !analysis || analysis.imageAssetId !== u.imageAssetId) return undefined;
+  return analysis.texts.map((t) => {
+    const c = t.dir && t.width ? { x: t.x + (t.dir.x * t.width) / 2, y: t.y + (t.dir.y * t.width) / 2 } : t;
+    return { str: t.str, ...imageToWorld(u, c) };
+  });
+}
+
+/** Re-propose rooms in the review after walls were removed, deselected or moved. */
+export function refreshDraftRooms() {
+  const draft = useImportStore.getState().draft;
+  if (!draft) return;
+  const rooms = refreshRoomProposals(draft, { texts: draft.source === 'json' ? undefined : planTextsInWorld() });
+  useImportStore.getState().patchDraft({ rooms });
+  useUiStore.getState().toast(`${rooms.length} Räume aus den ausgewählten Wänden vorgeschlagen.`, 'info');
 }
 
 export function outputToDraft(out: RasterOutput, u: Underlay, source: ReconstructionDraft['source'], label: string): ReconstructionDraft {
