@@ -81,7 +81,7 @@ Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kon
 
 ## Geplante Durchläufe (Routine)
 - Offizielle Funktion: Claude-Code-**Routines** (Research Preview, auch Pro) starten eine neue Cloud-Session nach Zeitplan, frühestens stündlich. Läufe zählen gegen dein Nutzungskontingent. Ist das Limit erreicht, werden Läufe **abgelehnt** (nicht nachgeholt); der nächste planmäßige Lauf nach dem Zurücksetzen startet normal. Zusatznutzung nur, wenn du „usage credits“ selbst einschaltest. Quelle: https://code.claude.com/docs/en/routines (abgerufen 2026-10-16).
-- Eingerichtet: siehe [`PROJECT_STATUS.md`](PROJECT_STATUS.md) › „Automatisierung“ (Name, Zeitplan, Inhalt). Ein Lauf: (1) offenen PR des vorigen Laufs prüfen – CI grün und konfliktfrei → mit Merge-Commit integrieren; rot → zuerst beheben; (2) User-Test-Rückmeldungen und neue Ideen übernehmen; (3) **höchstens eine** Aufgabe umsetzen, Checks, PR öffnen; (4) beenden. Kein direkter Push auf `main`, kein Warten/Pollen auf CI, keine Wiederholungsschleifen.
+- Stand und Einrichtung: [`PROJECT_STATUS.md`](PROJECT_STATUS.md) › „Automatisierung“; fertiger Prompt und Schritte: [`ROUTINE_PROMPT.md`](ROUTINE_PROMPT.md). Ein Lauf: (1) offenen PR des vorigen Laufs prüfen – CI grün und konfliktfrei → mit Merge-Commit integrieren; rot → zuerst beheben; (2) User-Test-Rückmeldungen und neue Ideen übernehmen; (3) **höchstens eine** Aufgabe umsetzen, Checks, PR öffnen; (4) beenden. Kein direkter Push auf `main`, kein Warten/Pollen auf CI, keine Wiederholungsschleifen.
 - Verwalten/abschalten: https://claude.ai/code/routines
 
 ## Sitzungsübergreifend

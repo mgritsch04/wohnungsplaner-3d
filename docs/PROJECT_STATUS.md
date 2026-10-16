@@ -6,7 +6,7 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
 - **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
-- **Deine Aufgaben:** #27 IKEA-Küche · #28 Smart-Home-Entscheidungen · #29 Gamepad (Label `user-task`)
+- **Deine Aufgaben:** #27 IKEA-Küche · #28 Smart-Home-Entscheidungen · #29 Gamepad · #30 Routine einrichten (Label `user-task`)
 - **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Drehen & Objektinteraktion #5)
 
 ## Legende
@@ -88,6 +88,12 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 - #26 Möbelix: richtiger Produkttyp (mit echtem Seitenquelltext)
 - #11 Projekt speichern / erneut öffnen
 - #12 IKEA: Artikelliste → Produktliste, PAX-Planung
+
+## Automatisierung (geplante Läufe)
+- **Geprüft am 2026-10-16:** Eine Routine „Wohnungsplaner Tageslauf“ (täglich 05:50 Wien) wurde aus dieser Sitzung angelegt und einmal als **Prüflauf ohne Änderungen** gestartet. Ergebnis: Die neue Sitzung hatte **kein Repository und keinen GitHub-Zugang** (leeres Arbeitsverzeichnis, `git clone` ohne Zugangsdaten, keine GitHub-Werkzeuge). Aus einer laufenden Sitzung lässt sich die Routine nicht mit Repository anlegen.
+- **Konsequenz:** Routine **deaktiviert** (sie hätte täglich Kontingent verbraucht, ohne etwas zu tun). Es ist **keine** automatische Fortsetzung aktiv.
+- **So wird es aktiv (deine Aufgabe, einmalig):** unter https://claude.ai/code/routines eine Routine mit ausgewähltem Repository `mgritsch04/wohnungsplaner-3d` anlegen (oder die deaktivierte Routine dort bearbeiten, Repository hinzufügen, aktivieren) – Issue #30; Prompt, Zeitplan und Modell-Empfehlung: [`ROUTINE_PROMPT.md`](ROUTINE_PROMPT.md).
+- **Grenzen:** frühestens stündlich; Läufe zählen gegen dein Kontingent; bei erschöpftem Kontingent wird ein Lauf abgelehnt und nicht nachgeholt (kein automatischer Neustart „nach dem Limit“ – der nächste planmäßige Lauf startet normal); keine Zusatzkosten, solange du keine „usage credits“ aktivierst. Ein Lauf merged nur den CI-grünen PR des Vorlaufs und öffnet selbst höchstens einen PR – nie direkt auf `main`.
 
 ## Blocker
 - **IKEA-Küchenplaner, Suche, Verfügbarkeit, Planer-Modelle:** von der Netzwerkrichtlinie der Umgebung gesperrt (`api.kitchen.planner.ikea.com`, `sik.search.blue.cdtapps.com`, `api.salesitem.ingka.com`, `content.dexf.ikea.com`).

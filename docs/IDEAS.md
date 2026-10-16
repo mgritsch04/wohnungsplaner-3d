@@ -33,6 +33,7 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 | 16 | IKEA-Küchenplanung importieren (#27) | Format unbekannt, Backend aus der Umgebung gesperrt | Küche aus IKEA übernehmen | P2 | deine Aufgabe #27 | Format dokumentiert, Import oder begründete Ablehnung | Blocked |
 | 17 | Smart Home P5/P6: Live-Anbindung (#24, Teil 3) | Home Assistant lesend/steuernd | echte Geräte | P3 | deine Aufgabe #28; **nicht freigegeben** | [ROADMAP](smart-home/ROADMAP.md) | Blocked |
 | 18 | Gamepad-Steuerung (#29) | Begehen mit Controller | – | P3 | deine Aufgabe #29 | [CONTROLLER_ASSESSMENT.md](CONTROLLER_ASSESSMENT.md) | Blocked |
+| 18a | Geplante Routine (automatische Fortsetzung) (#30) | tägliche Läufe mit je einer Aufgabe | Fortschritt ohne manuelles Starten | P2 | deine Aufgabe #30 (Routine mit Repository anlegen) | [`ROUTINE_PROMPT.md`](ROUTINE_PROMPT.md) | Blocked |
 | 19 | Nachtbeleuchtung (#7) | Dunkelwerden bis ~22:30, Lampenschalter automatisch/an/aus | glaubwürdige Abend-/Nachtwirkung | P1 | – | 🧪 User-Test offen #25 | Done |
 | 20 | Möbelix: falscher Produkttyp (#8) | Typ aus Name/Seitenkategorie mit Sicherheitsstufe; Hauptprodukt statt Empfehlung | keine falschen Möbel | P1 | – | 🧪 User-Test offen #26 | Done |
 | 21 | Einheitliches Kollisionssystem (#4) | Möbel blockieren sich; erlaubt: Teppich, Stuhl unter Tisch, Küche; Tischlampe auf Tisch; Platz vor Fronten | – | P1 | – | 🧪 User-Test offen #16 | Done |
@@ -54,4 +55,4 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 - Neue Inbox-Issues #15, #18–#24 übernommen (Label `planned`, bzw. `done` für die erledigten #15 und #18). #24 aufgeteilt: simulierte Geräte (Zeilen 9, 12) und Live-Anbindung (Zeile 17, blockiert).
 - „IKEA-Küchenplanung“ steht nur noch einmal (Zeile 16); #14 war bereits geschlossen, die Aufgabe für dich ist jetzt #27.
 - Frühere Inbox-Notizen: „Möbelix-Seiten mit echten Quelltexten testen“ → User-Test #26; „Anleitung PAX-JSON“ → Zeile 8 (#10); „Mehrfachauswahl“ und „schräge Wände“ bewertet (Zeilen 7, 13).
-- Aufgaben für dich als `user-task`-Issues: #27 (IKEA-Küche), #28 (Smart-Home-Entscheidungen), #29 (Gamepad).
+- Aufgaben für dich als `user-task`-Issues: #27 (IKEA-Küche), #28 (Smart-Home-Entscheidungen), #29 (Gamepad), #30 (Routine einrichten).
