@@ -827,3 +827,44 @@ test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the s
   expect(Math.abs(l1.x - sofa.x) < sofa.width / 2 + l1.width / 2 - 0.005 && Math.abs(l1.y - sofa.y) < sofa.depth / 2 + l1.depth / 2 - 0.005).toBe(false);
   expect(errors).toEqual([]);
 });
+
+test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
+  test.setTimeout(240000);
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Realismus' }).click();
+  const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
+    await page.getByLabel('Lampen', { exact: true }).selectOption(lamps);
+    await page.evaluate((h) => {
+      const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { settings: { timeOfDay: number } }) => void) => void } } } }).__wp;
+      wp.useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = h));
+    }, hour);
+    await page.waitForTimeout(4000); // a few frames in software rendering
+    const png = await page.locator('canvas').first().screenshot();
+    return page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d')!;
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      return s / (d.length / 4);
+    }, png.toString('base64'));
+  };
+  const noon = await brightness(13, 'auto');
+  const evening = await brightness(21, 'auto');
+  const night = await brightness(23.5, 'auto');
+  const nightOff = await brightness(23.5, 'off');
+  expect((await getProject(page)).settings.lamps).toBe('off');
+  expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
+  expect(night).toBeLessThan(evening * 0.85); // and it keeps getting darker after 21:00 (was identical)
+  expect(nightOff).toBeLessThan(night * 0.8); // switching the lamps off is visible
+  expect(nightOff).toBeGreaterThan(2); // but not pitch black (moonlight / sky)
+  expect(errors).toEqual([]);
+});

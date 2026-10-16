@@ -198,4 +198,11 @@ describe('settings', () => {
     expect(ProjectSchema.parse(raw).settings.mouseSensitivity).toBe(1);
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, mouseSensitivity: 10 } })).toThrow();
   });
+
+  it('older projects without a lamp setting load with automatic lamps', () => {
+    const raw = structuredClone(createEmptyProject()) as unknown as { settings: Record<string, unknown> };
+    delete raw.settings.lamps;
+    expect(ProjectSchema.parse(raw).settings.lamps).toBe('auto');
+    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, lamps: 'dim' } })).toThrow();
+  });
 });

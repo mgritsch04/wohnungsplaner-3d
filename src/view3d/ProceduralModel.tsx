@@ -1,9 +1,13 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { QualityMode } from '../model/schema';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
+import { registerLampLight, registerLampShade } from './lampRegistry';
+
+/** Light of one lamp at full brightness (candela-like, physically based lights). */
+const LAMP_INTENSITY = 3;
 
 /**
  * Procedural, primitive-based furniture models. All models are built in a local
@@ -421,6 +425,16 @@ export const ProceduralModel = memo(function ProceduralModel({
 }) {
   const parts = useMemo(() => buildParts(shape, width, depth, height, color, accent), [shape, width, depth, height, color, accent]);
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
+  const materials = useMemo(
+    () =>
+      parts.map((p) => {
+        const m = getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat });
+        // in realism mode, glowing shades follow the lamp switch / time of day
+        if (p.emissive && quality === 'realism') registerLampShade(m);
+        return m;
+      }),
+    [parts, quality],
+  );
   return (
     <group>
       {parts.map((p, i) => (
@@ -430,12 +444,19 @@ export const ProceduralModel = memo(function ProceduralModel({
           position={p.p}
           scale={p.s}
           rotation={p.r ?? [0, 0, 0]}
-          material={getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat })}
+          material={materials[i]}
           castShadow={castShadow && (p.opacity ?? 1) === 1 && !p.emissive}
           receiveShadow={castShadow}
         />
       ))}
-      {quality === 'realism' && LIGHT_SHAPES.has(shape) && <pointLight position={[0, lampY, 0]} color={kelvinToColor(2700)} intensity={1.2} distance={5} decay={2} />}
+      {quality === 'realism' && LIGHT_SHAPES.has(shape) && <LampBulb y={lampY} />}
     </group>
   );
 });
+
+/** The (shadowless) light of a lamp; its brightness follows the lamp switch / time of day. */
+function LampBulb({ y }: { y: number }) {
+  const ref = useRef<THREE.PointLight>(null);
+  useEffect(() => (ref.current ? registerLampLight(ref.current, LAMP_INTENSITY) : undefined), []);
+  return <pointLight ref={ref} position={[0, y, 0]} color={kelvinToColor(2700)} intensity={0} distance={5} decay={2} />;
+}
