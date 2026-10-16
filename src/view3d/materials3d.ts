@@ -113,14 +113,18 @@ export function getSurfaceMaterial(m: Material, quality: QualityMode): THREE.Mat
   return mat;
 }
 
-export function getColorMaterial(color: string, quality: QualityMode, opts: { roughness?: number; metalness?: number; emissive?: string; opacity?: number } = {}): THREE.Material {
-  const key = `c|${color}|${quality}|${opts.roughness ?? 0.7}|${opts.metalness ?? 0}|${opts.emissive ?? ''}|${opts.opacity ?? 1}`;
+export function getColorMaterial(
+  color: string,
+  quality: QualityMode,
+  opts: { roughness?: number; metalness?: number; emissive?: string; opacity?: number; doubleSide?: boolean } = {},
+): THREE.Material {
+  const key = `c|${color}|${quality}|${opts.roughness ?? 0.7}|${opts.metalness ?? 0}|${opts.emissive ?? ''}|${opts.opacity ?? 1}|${opts.doubleSide ? 2 : 1}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const transparent = (opts.opacity ?? 1) < 1;
   const mat =
     quality === 'planning'
-      ? new THREE.MeshLambertMaterial({ color, emissive: opts.emissive ?? '#000000', transparent, opacity: opts.opacity ?? 1, depthWrite: !transparent })
+      ? new THREE.MeshLambertMaterial({ color, emissive: opts.emissive ?? '#000000', transparent, opacity: opts.opacity ?? 1, depthWrite: !transparent, side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide })
       : new THREE.MeshStandardMaterial({
           color,
           roughness: opts.roughness ?? 0.7,
@@ -130,6 +134,7 @@ export function getColorMaterial(color: string, quality: QualityMode, opts: { ro
           transparent,
           opacity: opts.opacity ?? 1,
           depthWrite: !transparent,
+          side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
         });
   cache.set(key, mat);
   return mat;
