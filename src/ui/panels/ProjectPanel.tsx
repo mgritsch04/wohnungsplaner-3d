@@ -53,6 +53,18 @@ export function ProjectPanel() {
 
       <Section title="Steuerung (3D)">
         <MouseSensitivityControl />
+        <NumberField
+          label="Augenhöhe beim Begehen"
+          value={s.eyeHeight}
+          factor={100}
+          digits={0}
+          unit="cm"
+          min={100}
+          max={220}
+          step={1}
+          title="Höhe der Kamera über dem Boden im Begehen-Modus (Standard 163 cm)"
+          onChange={(v) => apply((d) => void (d.settings.eyeHeight = Math.max(1, Math.min(2.2, v))))}
+        />
       </Section>
 
       <Section title="Leistung">

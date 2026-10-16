@@ -13,6 +13,7 @@ const fmt = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${Str
 export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
   const saved = useProjectStore((s) => s.project.settings.timeOfDay);
   const preview = useUiStore((s) => s.timePreview);
+  const lamps = useProjectStore((s) => s.project.settings.lamps);
   const hour = preview ?? saved;
   const dragging = useRef(false);
   const set = (h: number) => {
@@ -65,6 +66,19 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
             {p.label} ({fmt(p.hour)})
           </option>
         ))}
+      </select>
+      <select
+        value={lamps}
+        aria-label="Lampen"
+        title="Lampen (Stehlampen, Tischlampen, platzierte Lichtquellen, Raumlicht): automatisch ab der Dämmerung, immer an oder aus"
+        onChange={(e) => {
+          const v = e.target.value as typeof lamps;
+          useProjectStore.getState().apply((d) => void (d.settings.lamps = v));
+        }}
+      >
+        <option value="auto">💡 Lampen: automatisch</option>
+        <option value="on">💡 Lampen: an</option>
+        <option value="off">💡 Lampen: aus</option>
       </select>
     </div>
   );

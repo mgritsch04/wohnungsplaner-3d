@@ -537,9 +537,12 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   // small items (table lamps, decor) stand on the table/cabinet below them
   let elevation = f.elevation;
   if (opts.snap && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
-  if (opts.collide && !free) {
-    const all = [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
-    const r = constrainMove({ ...f, rotation, elevation }, goal, all, undefined, f);
+  if (opts.collide) {
+    // rugs lie under furniture but stop at walls like everything else (#39)
+    const all = free ? obstacles.filter((o) => o.kind === 'wall') : [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
+    // a flat rug would never overlap a wall in height – test it with the full wall height
+    const pose = free ? { ...f, rotation, elevation: 0, height: 1 } : { ...f, rotation, elevation };
+    const r = constrainMove(pose, goal, all, undefined, free ? { ...f, elevation: 0, height: 1 } : f);
     goal = { x: r.x, y: r.y };
   }
   f.x = Math.round(goal.x * 1000) / 1000;
@@ -547,6 +550,41 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   f.rotation = rotation;
   f.elevation = Math.round(elevation * 1000) / 1000;
   return snapped;
+}
+
+/**
+ * Rotate furniture `id` in the project draft to `rotation` (radians), checked with the
+ * same rules as dragging: if the rotated footprint now reaches into a wall, door leaf
+ * or other furniture, the item is pushed back into free space (e.g. a wardrobe
+ * turned at a wall moves away from it). The push never carries it into another room.
+ * Returns 'ok', 'moved' (pushed into free space) or 'conflict' (no free spot nearby –
+ * rotated anyway, the conflict is marked like any other).
+ */
+export function rotateFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obstacle[], id: string, rotation: number): 'ok' | 'moved' | 'conflict' {
+  const f = d.furniture.find((x) => x.id === id);
+  if (!f || f.locked) return 'ok';
+  const before: Pose = { ...f };
+  f.rotation = normalizeAngle(rotation);
+  if (f.category === 'textile' && f.height < 0.05) return 'ok';
+  const all = [...obstacles, ...furnitureObstacles(d, f)];
+  // obstacles the item already overlapped before turning (placed with Alt) do not push it
+  const already = new Set(collidingObstacles(before, all));
+  const relevant = all.filter((o) => !already.has(o));
+  const hits = collidingObstacles(f, relevant);
+  if (!hits.length) return 'ok';
+  const pushed = resolve({ ...f }, relevant);
+  const reach = Math.max(f.width, f.depth) / 2 + 0.05;
+  const room = [...derived.rooms.values()].find((g) => pointInPolygon(before, g.interior));
+  const sameRoom = !room || pointInPolygon(pushed, room.interior);
+  if (Math.hypot(pushed.x - f.x, pushed.y - f.y) <= reach && sameRoom && !collidingObstacles(pushed, relevant).length) {
+    // millimetre rounding must not turn "touching" into a tiny overlap
+    const rounded = { ...pushed, x: Math.round(pushed.x * 1000) / 1000, y: Math.round(pushed.y * 1000) / 1000 };
+    const final = collidingObstacles(rounded, relevant).length ? pushed : rounded;
+    f.x = final.x;
+    f.y = final.y;
+    return 'moved';
+  }
+  return 'conflict';
 }
 
 /** Other furniture the item must not move into (intended combinations excluded). */

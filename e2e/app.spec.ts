@@ -233,6 +233,128 @@ test('walkthrough mode can be entered and left', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('walkthrough: eye height 163 cm by default, adjustable live and saved; crosshair only while walking (#23, #22)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByTestId('crosshair')).toHaveCount(0); // not in the overview
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const camY = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (window as any).__wp.three.camera.position.y as number;
+    });
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
+  const field = page.getByLabel('Augenhöhe beim Begehen');
+  await expect(field).toHaveValue('163');
+  await field.fill('180');
+  await field.press('Enter');
+  await expect.poll(camY).toBeCloseTo(1.8, 3); // immediately, still walking
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByTestId('crosshair')).toHaveCount(0);
+  // saved with the project
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).settings.eyeHeight).toBeCloseTo(1.8, 6);
+  expect(errors).toEqual([]);
+});
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: look at furniture, select it, carry it with G and put it down (#39)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const before = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  // stand still and look straight at the coffee table (yaw from the camera position)
+  const look = await page.evaluate(
+    ([tx, ty]) => {
+      const wp = (window as any).__wp;
+      const c = wp.three.camera.position;
+      const yaw = Math.atan2(-(tx - c.x), -(ty - c.z));
+      const dist = Math.hypot(tx - c.x, ty - c.z);
+      wp.walk.look(yaw, -Math.atan2(c.y - 0.3, dist));
+      return { dist };
+    },
+    [before.x, before.y],
+  );
+  expect(look.dist).toBeLessThan(6);
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.target())).toBe(before.id);
+  // G picks it up …
+  await page.keyboard.press('g');
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBe(before.id);
+  await expect(page.locator('.walk-overlay')).toContainText('trägst');
+  // … turn a bit: it follows the gaze (with the usual collision rules)
+  await page.evaluate(() => {
+    const wp = (window as any).__wp;
+    const e = wp.three.camera.rotation;
+    wp.walk.look(e.y + 0.35, e.x);
+  });
+  await expect
+    .poll(async () => {
+      const t = (await getProject(page)).furniture.find((f: { id: string }) => f.id === before.id);
+      return Math.hypot(t.x - before.x, t.y - before.y);
+    })
+    .toBeGreaterThan(0.2);
+  const pastBefore = await page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length);
+  // G again puts it down: one undo step
+  await page.keyboard.press('g');
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBeNull();
+  expect(await page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length)).toBe(pastBefore + 1);
+  // G must not switch the 2D tool while walking
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('zoom slider at the bottom of 2D and 3D, synchronised with the mouse wheel (#6)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  const zoom2d = () => page.evaluate(() => (window as any).__wp.useUiStore.getState().view2d.zoom as number);
+  const slider2d = page.getByLabel('Zoom 2D', { exact: true });
+  await expect(slider2d).toBeVisible();
+  const z0 = await zoom2d();
+  await page.getByRole('button', { name: 'Zoom 2D: hineinzoomen' }).click();
+  expect(await zoom2d()).toBeGreaterThan(z0 * 1.1);
+  // mouse wheel → slider follows
+  const before = Number(await slider2d.inputValue());
+  const box = (await page.getByTestId('editor2d').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(async () => Number(await slider2d.inputValue())).toBeLessThan(before);
+  await slider2d.fill('900');
+  expect(await zoom2d()).toBeGreaterThan(300);
+
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const slider3d = page.getByLabel('Zoom 3D', { exact: true });
+  await expect(slider3d).toBeVisible();
+  const dist = () =>
+    page.evaluate(() => {
+      const wp = (window as any).__wp;
+      return wp.three.camera.position.length() as number;
+    });
+  const d0 = await dist();
+  await page.getByRole('button', { name: 'Zoom 3D: hineinzoomen' }).click();
+  await expect.poll(dist).toBeLessThan(d0 - 0.2);
+  const s0 = Number(await slider3d.inputValue());
+  const cbox = (await page.getByTestId('scene3d').boundingBox())!;
+  await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 3);
+  await page.mouse.wheel(0, 800); // zoom out with the wheel
+  await expect.poll(async () => Number(await slider3d.inputValue()), { timeout: 15000 }).toBeLessThan(s0);
+  // not shown while walking
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(slider3d).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();
@@ -325,6 +447,38 @@ test('takes over a product from a pasted retailer page (synthetic sample) and pl
   expect(item.height).toBeCloseTo(2.02, 6);
   expect(item.retailer).toBe('IKEA Österreich');
   expect(item.price.amount).toBe(59.99);
+});
+
+test('product type comes from the page (armchair stays an armchair); unknown type must be chosen (#8)', async ({ page }) => {
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Produkt von Händlerseite übernehmen' });
+  const category = dlg.getByLabel('Kategorie');
+  // synthetic shop page: unknown model name, breadcrumb says "Sessel"
+  const crumbs = '{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Wohnzimmer"},{"@type":"ListItem","position":2,"name":"Sessel"}]}';
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill(`<script type="application/ld+json">${crumbs}</script><script type="application/ld+json">{"@type":"Product","name":"Aurora","offers":{"price":"299","priceCurrency":"EUR"}}</script><p>Breite: 80 cm</p><p>Tiefe: 85 cm</p><p>Höhe: 95 cm</p>`);
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(category).toHaveValue('sofa');
+  await expect(dlg.getByTestId('category-guess')).toContainText('sicher');
+  await dlg.getByRole('button', { name: 'Hinzufügen und platzieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'Aurora')).toBe(true);
+  const item = (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'Aurora');
+  expect(item.category).toBe('sofa');
+  expect(item.model).toMatchObject({ type: 'procedural', shape: 'armchair' });
+  // nothing recognisable → no silent default, adding stays disabled until a category is chosen
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill('<script type="application/ld+json">{"@type":"Product","name":"Modell Nova","offers":{"price":"99","priceCurrency":"EUR"}}</script><p>Breite: 50 cm</p><p>Tiefe: 50 cm</p><p>Höhe: 50 cm</p>');
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(dlg.getByTestId('category-guess')).toContainText('nicht erkannt');
+  await expect(category).toHaveValue('');
+  await expect(dlg.getByRole('button', { name: 'Hinzufügen und platzieren' })).toBeDisabled();
+  await category.selectOption('decor');
+  await expect(dlg.getByRole('button', { name: 'Hinzufügen und platzieren' })).toBeEnabled();
 });
 
 test('imports a GLB model into the catalog, places it and attaches a model to an item', async ({ page }) => {
@@ -434,6 +588,61 @@ test('2D: dragging furniture into a wall stops flush (no tunnelling), Alt allows
   await page.keyboard.up('Alt');
   const t3 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
   expect(t3.y).toBeLessThan(-1);
+});
+
+test('rotating the selected item (panel buttons, Q/E): collision-checked, one undo step each (#5)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const before = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const s = await planToScreen(page, before.x, before.y);
+  await page.mouse.click(s.x, s.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe(before.id);
+  const turned = async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === before.id);
+  const delta = (r: number) => Math.atan2(Math.sin(r - before.rotation), Math.cos(r - before.rotation));
+  // wardrobe stands with its back at the south wall: turning it 90° must push it into the room, not into the wall
+  await page.getByRole('group', { name: 'Drehen' }).getByRole('button', { name: '⟳ 90°' }).click();
+  let w = await turned();
+  expect(delta(w.rotation)).toBeCloseTo(Math.PI / 2, 5);
+  expect(w.y + w.width / 2).toBeLessThanOrEqual(4.0 + 0.002); // inner face of the south wall (sample: 4 m deep)
+  await expect(page.getByText('gedreht und etwas verschoben')).toBeVisible();
+  // one undo step restores rotation and position
+  await page.keyboard.press('Control+z');
+  w = await turned();
+  expect([w.x, w.y, w.rotation]).toEqual([before.x, before.y, before.rotation]);
+  // keyboard: E = +15°, Q = −15°
+  await page.mouse.click(s.x, s.y);
+  await page.keyboard.press('e');
+  expect(delta((await turned()).rotation)).toBeCloseTo(Math.PI / 12, 5);
+  await page.keyboard.press('q');
+  expect(delta((await turned()).rotation)).toBeCloseTo(0, 5);
+  expect(errors).toEqual([]);
+});
+
+test('hover info: name, category, size and price after a short delay; hidden while dragging (#9)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const s = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.move(s.x, s.y);
+  const card = page.getByTestId('furniture-hover');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(sofa.name);
+  await expect(card).toContainText('Sofas & Sessel');
+  await expect(card).toContainText('210 × 90 × 82 cm');
+  await expect(card).toContainText('Schätzung'); // generic items carry estimated prices
+  // dragging: the card goes away and does not interfere
+  await page.mouse.down();
+  await expect(card).toHaveCount(0);
+  await page.mouse.up();
+  // away from furniture → no card
+  const empty = await planToScreen(page, 1.0, 1.0);
+  await page.mouse.move(empty.x, empty.y);
+  await expect(card).toHaveCount(0);
+  expect(errors).toEqual([]);
 });
 
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
@@ -825,5 +1034,96 @@ test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the s
   const l1 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === lamp.id);
   expect([l1.x, l1.y]).not.toEqual([l0.x, l0.y]);
   expect(Math.abs(l1.x - sofa.x) < sofa.width / 2 + l1.width / 2 - 0.005 && Math.abs(l1.y - sofa.y) < sofa.depth / 2 + l1.depth / 2 - 0.005).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
+  test.setTimeout(600000);
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Realismus' }).click();
+  const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
+    await page.getByLabel('Lampen', { exact: true }).selectOption(lamps);
+    await page.evaluate((h) => {
+      const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { settings: { timeOfDay: number } }) => void) => void } } } }).__wp;
+      wp.useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = h));
+    }, hour);
+    // software rendering in CI can be very slow: wait until the lighting has reached the hour
+    // and several frames were actually rendered with the new state (not a fixed time)
+    const frames = () =>
+      page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const wp = (window as any).__wp;
+        return { frame: wp.three.gl.info.render.frame as number, hour: wp.lightingHour() as number };
+      });
+    await expect.poll(async () => Math.abs((await frames()).hour - hour), { timeout: 60000 }).toBeLessThan(0.01);
+    const f0 = (await frames()).frame;
+    await expect.poll(async () => (await frames()).frame - f0, { timeout: 90000 }).toBeGreaterThanOrEqual(12);
+    // measure only where the apartment is on screen (the dark sky around it and UI overlays
+    // would dilute the difference depending on how large the apartment is framed)
+    const clip = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wp = (window as any).__wp;
+      const p = wp.useProjectStore.getState().project;
+      const xs = p.nodes.map((n: { x: number }) => n.x);
+      const ys = p.nodes.map((n: { y: number }) => n.y);
+      const cam = wp.three.camera;
+      const r = wp.three.canvas.getBoundingClientRect();
+      const pts: { x: number; y: number }[] = [];
+      for (const x of [Math.min(...xs), Math.max(...xs)])
+        for (const y of [Math.min(...ys), Math.max(...ys)])
+          for (const z of [0, p.settings.defaultWallHeight]) {
+            const v = cam.position.clone().set(x, z, y).project(cam);
+            pts.push({ x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height });
+          }
+      const x0 = Math.max(r.left, Math.min(...pts.map((q) => q.x)));
+      const y0 = Math.max(r.top, Math.min(...pts.map((q) => q.y)));
+      const x1 = Math.min(r.right, Math.max(...pts.map((q) => q.x)));
+      const y1 = Math.min(r.bottom, Math.max(...pts.map((q) => q.y)));
+      return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+    });
+    expect(clip.width).toBeGreaterThan(50);
+    const png = await page.screenshot({ clip });
+    return page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d')!;
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      return s / (d.length / 4);
+    }, png.toString('base64'));
+  };
+  // diagnostics for the CI log: which lights exist and how strong they are right now
+  const lightReport = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wp = (window as any).__wp;
+      const out: string[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      wp.three.scene.traverse((o: any) => {
+        if (o.isLight) out.push(`${o.type}:${o.intensity.toFixed(2)}${o.visible ? '' : '(hidden)'}`);
+      });
+      const gl = wp.three.gl.getContext();
+      return `${out.join(' ')} | exposure ${wp.three.gl.toneMappingExposure.toFixed(2)} | maxFragUniforms ${gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)} | renderer ${gl.getParameter(gl.RENDERER)}`;
+    });
+  const noon = await brightness(13, 'auto');
+  const evening = await brightness(21, 'auto');
+  const night = await brightness(23.5, 'auto');
+  const nightLights = await lightReport();
+  const nightOff = await brightness(23.5, 'off');
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  lamps off: ${await lightReport()}`);
+  expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
+  expect((await getProject(page)).settings.lamps).toBe('off');
+  expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
+  expect(night).toBeLessThan(evening * 0.85); // and it keeps getting darker after 21:00 (was identical)
+  expect(nightOff).toBeLessThan(night * 0.8); // switching the lamps off is visible
+  expect(nightOff).toBeGreaterThan(2); // but not pitch black (moonlight / sky)
   expect(errors).toEqual([]);
 });

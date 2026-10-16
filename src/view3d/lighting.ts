@@ -43,11 +43,13 @@ export interface LightingState {
   sunColor: string;
   skyColor: string;
   groundColor: string;
-  /** Relative strength of diffuse sky/environment light (0..1). */
+  /** Relative strength of diffuse sky/environment light (0..1); keeps falling after dusk. */
   ambientStrength: number;
+  /** 0 = dusk … 1 = deep night (from about 22:30). */
+  night: number;
   /** 0..1 – how much artificial interior light is needed (night). */
   artificial: number;
-  /** Exposure multiplier (eye adaptation): brighter at night so interiors stay readable. */
+  /** Exposure multiplier: slight eye adaptation at night, but never enough to make night look like day. */
   exposure: number;
   background: string;
 }
@@ -70,6 +72,8 @@ export function lightingAt(hourRaw: number): LightingState {
   const sky = mixHex(mixHex(nightSky, daySky, daylight), duskSky, twilight * 0.6);
   const ground = mixHex('#1c1d22', '#b9ad98', daylight);
   const artificial = 1 - smoothstep(-4, 8, elev);
+  // after sunset the sky keeps darkening until about 22:30 (this simplified sun path drops faster than the real one), so 21:00 and 23:30 differ
+  const night = 1 - smoothstep(-30, -4, elev);
   return {
     hour,
     sun: sunDirection(hour),
@@ -80,11 +84,21 @@ export function lightingAt(hourRaw: number): LightingState {
     sunColor: kelvinToColor(kelvin),
     skyColor: sky,
     groundColor: ground,
-    ambientStrength: 0.06 + 0.94 * daylight,
+    ambientStrength: 0.01 + 0.05 * (1 - night) + 0.94 * daylight,
+    night,
     artificial,
-    exposure: 1 + 0.5 * artificial,
-    background: mixHex(mixHex('#0d1220', '#dfe7ee', daylight), '#ecd2bd', twilight * 0.5),
+    exposure: 1 + 0.12 * artificial,
+    background: mixHex(mixHex(mixHex('#141a2a', '#05070d', night), '#dfe7ee', daylight), '#ecd2bd', twilight * 0.5),
   };
+}
+
+export type LampMode = 'auto' | 'on' | 'off';
+
+/** Brightness factor (0..1) of lamps: 'auto' switches them on during dusk. */
+export function lampLevel(mode: LampMode, st: Pick<LightingState, 'artificial'>): number {
+  if (mode === 'on') return 1;
+  if (mode === 'off') return 0;
+  return smoothstep(0.1, 0.7, st.artificial);
 }
 
 /**

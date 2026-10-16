@@ -8,6 +8,7 @@ import { ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
 import { DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
+import { useUiStore } from '../store/uiStore';
 
 interface Props {
   item: Furniture;
@@ -113,12 +114,22 @@ export const FurnitureObject = memo(
       <group
         position={[item.x, item.elevation, item.y]}
         rotation={[0, planRotationToWorldY(item.rotation), 0]}
+        userData={{ furnitureId: item.id }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onCancel}
         onLostPointerCapture={onCancel}
         onClick={onClick}
+        onPointerOver={(e) => {
+          if (isClippedHit(e)) return;
+          e.stopPropagation();
+          useUiStore.getState().setHover({ type: 'furniture', id: item.id });
+        }}
+        onPointerOut={() => {
+          const h = useUiStore.getState().hover;
+          if (h?.type === 'furniture' && h.id === item.id) useUiStore.getState().setHover(null);
+        }}
       >
         {item.model.type === 'gltf' ? (
           <ModelErrorBoundary fallback={fallback}>

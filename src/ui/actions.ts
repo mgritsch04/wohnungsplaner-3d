@@ -4,9 +4,9 @@ import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
 import { deleteFurniture, deleteNode, deleteRoom, deleteWalls, duplicateFurniture } from '../model/operations';
 import { createSampleProject } from '../model/sample';
-import { normalizeAngle, roundMm } from '../model/units';
+import { roundMm } from '../model/units';
 import { pointInPolygon } from '../model/vec';
-import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
+import { buildPlacementObstacles, moveFurnitureTo, rotateFurnitureTo } from '../model/placement';
 import { buildPackage, parsePackageOrProject } from '../formats/project/packageFile';
 import { FileFormatError } from '../formats/zodErrors';
 import { db } from '../persistence/db';
@@ -68,13 +68,26 @@ export function duplicateSelection() {
   if (nid) ui().setSelection({ type: 'furniture', id: nid });
 }
 
+/** Rotate the selected furniture by `deltaRad` (Q/E, panel buttons) – checked like dragging. */
 export function rotateSelection(deltaRad: number) {
   const sel = ui().selection;
   if (sel?.type !== 'furniture') return;
-  store().apply((d) => {
-    const f = d.furniture.find((x) => x.id === sel.id);
-    if (f && !f.locked) f.rotation = normalizeAngle(f.rotation + deltaRad);
-  });
+  const f = store().project.furniture.find((x) => x.id === sel.id);
+  if (f) setFurnitureRotation(f.id, f.rotation + deltaRad);
+}
+
+/** Set an absolute rotation (radians) for furniture `id`: one undo step, collision-checked. */
+export function setFurnitureRotation(id: string, rotation: number) {
+  const p = store().project;
+  const f = p.furniture.find((x) => x.id === id);
+  if (!f || f.locked) return;
+  const derived = derivePlan(p);
+  const obstacles = buildPlacementObstacles(derived);
+  const out: { result: ReturnType<typeof rotateFurnitureTo> } = { result: 'ok' };
+  store().apply((d) => void (out.result = rotateFurnitureTo(d, derived, obstacles, id, rotation)));
+  const result = out.result;
+  if (result === 'moved') ui().toast(`„${f.name}“ gedreht und etwas verschoben, damit es nicht in Wand oder Möbel ragt.`, 'info');
+  if (result === 'conflict') ui().toast(`„${f.name}“ gedreht – überschneidet sich jetzt (rot markiert). Bitte verschieben oder zurückdrehen (Strg+Z).`, 'error');
 }
 
 export function nudgeSelection(dx: number, dy: number) {

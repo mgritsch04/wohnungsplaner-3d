@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Light, Project, QualityMode } from '../model/schema';
 import { add, pointInPolygon, scale } from '../model/vec';
-import { approachHour, kelvinToColor, lightingAt, type LightingState } from './lighting';
+import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState } from './lighting';
+import { setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
 
 /**
@@ -15,6 +16,8 @@ import { useUiStore } from '../store/uiStore';
 const BLEND_TAU = 0.05;
 const MAX_WINDOW_LIGHTS = 10;
 const MAX_ROOM_LIGHTS = 12;
+/** Automatic ceiling light of rooms without own lamps (when lamps are on). */
+const ROOM_LIGHT_INTENSITY = 5;
 
 interface Props {
   project: Project;
@@ -38,6 +41,8 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   const { scene, gl } = useThree();
   const sunRef = useRef<THREE.DirectionalLight>(null);
   const hemiRef = useRef<THREE.HemisphereLight>(null);
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+  const configuredRefs = useRef<(THREE.PointLight | null)[]>([]);
   const skyRef = useRef<THREE.Mesh>(null);
   const windowRefs = useRef<(THREE.PointLight | null)[]>([]);
   const roomRefs = useRef<(THREE.PointLight | null)[]>([]);
@@ -46,6 +51,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   const dist = span * 1.5 + 10;
   const target = project.settings.timeOfDay;
   const exposure = project.settings.exposure;
+  const lampMode = project.settings.lamps;
 
   // shadow camera covering the apartment
   useEffect(() => {
@@ -82,7 +88,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
 
   // rooms without any own light source get an automatic ceiling light (used at dusk/night)
   const roomLights = useMemo(() => {
-    const out: { pos: [number, number, number] }[] = [];
+    const out: { pos: [number, number, number]; reach: number }[] = [];
     const lampShapes = new Set(['floor-lamp', 'table-lamp', 'pendant']);
     for (const room of project.rooms) {
       const g = derived.rooms.get(room.id);
@@ -91,10 +97,15 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
         project.lights.some((l) => l.on && pointInPolygon(l, g.interior)) ||
         project.furniture.some((f) => f.model.type === 'procedural' && lampShapes.has(f.model.shape) && pointInPolygon(f, g.interior));
       if (hasLight) continue;
-      out.push({ pos: [g.centroid.x, project.settings.defaultWallHeight - 0.35, g.centroid.y] });
+      // reach ≈ distance to the farthest room corner, so little light leaks through walls (point lights cast no shadows here)
+      const reach = Math.max(...g.interior.map((p) => Math.hypot(p.x - g.centroid.x, p.y - g.centroid.y))) + 0.8;
+      out.push({ pos: [g.centroid.x, project.settings.defaultWallHeight - 0.35, g.centroid.y], reach });
     }
     return out.slice(0, MAX_ROOM_LIGHTS);
   }, [project.rooms, project.lights, project.furniture, project.settings.defaultWallHeight, derived]);
+
+  const configured = project.lights.filter((l) => l.on).slice(0, realism ? 8 : 4);
+  const configuredKey = configured.map((l) => `${l.id}:${l.intensity}`).join(',');
 
   const apply = (st: LightingState) => {
     const sun = sunRef.current;
@@ -108,9 +119,17 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     if (hemi) {
       hemi.color.set(realism ? st.skyColor : '#f4f6ff');
       hemi.groundColor.set(realism ? st.groundColor : '#b8a990');
-      hemi.intensity = realism ? 0.05 + 0.3 * st.ambientStrength : 1.0;
+      hemi.intensity = realism ? 0.35 * st.ambientStrength : 1.0;
     }
-    scene.environmentIntensity = realism ? 0.04 + 0.55 * st.ambientStrength : 0;
+    if (ambientRef.current) ambientRef.current.intensity = realism ? 0.02 * st.ambientStrength : 0.15;
+    scene.environmentIntensity = realism ? 0.6 * st.ambientStrength : 0;
+    // lamps (lamp furniture, placed lights, automatic room lights) share one switch
+    const lamps = realism ? lampLevel(lampMode, st) : 1;
+    setLampLevel(lamps);
+    configured.forEach((l, i) => {
+      const pl = configuredRefs.current[i];
+      if (pl) pl.intensity = interiorIntensity(l) * lamps;
+    });
     if (realism) {
       windowLights.forEach((w, i) => {
         const l = windowRefs.current[i];
@@ -118,7 +137,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       });
       roomLights.forEach((_, i) => {
         const l = roomRefs.current[i];
-        if (l) l.intensity = 2.2 * st.artificial;
+        if (l) l.intensity = ROOM_LIGHT_INTENSITY * lamps;
       });
       const sky = skyRef.current;
       const uniforms = (sky?.material as THREE.ShaderMaterial | undefined)?.uniforms;
@@ -136,7 +155,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
     current.current = approachHour(current.current, goal, dt, BLEND_TAU);
-    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${windowLights.length}|${roomLights.length}`;
+    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${roomLights.length}|${configuredKey}`;
     if (key === applied.current) return;
     applied.current = key;
     apply(lightingAt(current.current));
@@ -153,11 +172,10 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     applied.current = '';
   }, [realism, windowLights, roomLights]);
 
-  const configured = project.lights.filter((l) => l.on).slice(0, realism ? 8 : 4);
   return (
     <>
       <hemisphereLight ref={hemiRef} args={['#f4f6ff', '#b8a990', 1]} />
-      <ambientLight intensity={realism ? 0.02 : 0.15} />
+      <ambientLight ref={ambientRef} intensity={0.15} />
       <directionalLight
         ref={sunRef}
         intensity={1.4}
@@ -174,19 +192,21 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
         ))}
       {realism &&
         roomLights.map((r, i) => (
-          <pointLight key={`r${i}`} ref={(el) => void (roomRefs.current[i] = el)} position={r.pos} color={kelvinToColor(3000)} intensity={0} distance={9} decay={2} />
+          <pointLight key={`r${i}`} ref={(el) => void (roomRefs.current[i] = el)} position={r.pos} color={kelvinToColor(3000)} intensity={0} distance={r.reach} decay={2} />
         ))}
-      {configured.map((l) => (
-        <InteriorLight key={l.id} light={l} />
+      {configured.map((l, i) => (
+        <InteriorLight key={l.id} light={l} lightRef={(el) => void (configuredRefs.current[i] = el)} />
       ))}
     </>
   );
 }
 
-function InteriorLight({ light }: { light: Light }) {
+const interiorIntensity = (l: Light) => l.intensity * 1.5;
+
+function InteriorLight({ light, lightRef }: { light: Light; lightRef: (el: THREE.PointLight | null) => void }) {
   return (
     <group position={[light.x, light.elevation, light.y]}>
-      <pointLight color={kelvinToColor(light.temperature)} intensity={light.intensity * 1.5} distance={8} decay={1.5} />
+      <pointLight ref={lightRef} color={kelvinToColor(light.temperature)} intensity={0} distance={8} decay={1.5} />
       <mesh>
         <sphereGeometry args={[0.06, 12, 8]} />
         <meshBasicMaterial color={kelvinToColor(light.temperature)} />

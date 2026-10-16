@@ -12,6 +12,7 @@ import { hitTest } from './hitTest';
 import { PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
 import { fitView, niceGridStep, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { ZoomSlider } from '../ui/ZoomSlider';
 import { UnderlayImage } from './UnderlayImage';
 import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
@@ -773,6 +774,16 @@ export function Editor2D() {
           )}
         </g>
       </svg>
+
+      <ZoomSlider
+        testId="zoom-2d"
+        label="Zoom 2D"
+        value={view.zoom}
+        min={10}
+        max={800}
+        onChange={(z) => ui().setView2d(zoomAt(view, vp, { x: vp.width / 2, y: vp.height / 2 }, z / view.zoom))}
+        onFit={() => ui().requestFit()}
+      />
 
       {tool === 'wall' && (
         <div className="editor-hint">

@@ -25,6 +25,8 @@ export interface ParsedProductPage extends NormalizedProduct {
   sources: string[];
   /** All 3D model files the page declares (schema.org 3DModel), in the page's order. */
   modelCandidates: string[];
+  /** The page's own category labels (schema.org `category`, breadcrumb, meta), most general first. */
+  categoryHints: string[];
 }
 
 export const MAX_INPUT_CHARS = 15_000_000;
@@ -58,12 +60,14 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   if (input.length > MAX_INPUT_CHARS) errors.push(`Die Eingabe ist zu groß (${(input.length / 1e6).toFixed(1)} Mio. Zeichen, max. ${MAX_INPUT_CHARS / 1e6}).`);
 
   let products: Json[] = [];
-  let meta: Partial<Record<'name' | 'image' | 'url' | 'price' | 'currency' | 'sku' | 'brand' | 'availability', string>> = {};
+  let meta: Partial<Record<'name' | 'image' | 'url' | 'price' | 'currency' | 'sku' | 'brand' | 'availability' | 'category', string>> = {};
   let visibleText = '';
   let embeddedText = '';
   let simple: Json | null = null;
   let modelUrl: string | null = null;
   const models: string[] = [];
+  const breadcrumbs: string[] = [];
+  let heading: string | null = null;
 
   if (kind === 'empty') errors.push('Bitte den Seitenquelltext oder JSON-Daten einfügen.');
   if (kind === 'url') {
@@ -76,6 +80,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     const r = parseJsonLdText(input, 'Eingabe');
     products = r.products;
     models.push(...r.models);
+    breadcrumbs.push(...r.breadcrumbs);
     errors.push(...r.errors);
     if (products.length) sources.push('JSON-LD');
   }
@@ -95,6 +100,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
         const r = parseJsonLdText(text, `JSON-LD-Block ${block}`);
         products.push(...r.products);
         models.push(...r.models);
+        breadcrumbs.push(...r.breadcrumbs);
         errors.push(...r.errors);
       } else if (type === 'application/json' || type === '' || type === 'text/javascript' || type === 'module') {
         // embedded page state – used only as a secondary source for dimension lines
@@ -108,6 +114,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
       if (modelUrl) sources.push('3D-Modell-Verweis (experimentell)');
     }
     meta = readMeta(doc);
+    heading = doc.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || null;
     if (Object.keys(meta).length) sources.push('Meta-Angaben');
     visibleText = visibleTextOf(doc);
     if (!products.length && block === 0 && !meta.name) {
@@ -124,8 +131,17 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     modelUrl = providerForUrl(pageUrl?.trim() || str(products[0]?.url) || meta.url || null).pickModel?.(models) ?? models[0];
     sources.push(`3D-Modell (schema.org 3DModel${models.length > 1 ? `, ${models.length} Varianten` : ''})`);
   }
-  if (products.length > 1) warnings.push(`${products.length} Produkte in den strukturierten Daten – das erste wird verwendet.`);
-  const p = products[0] ?? null;
+  // several products (e.g. recommendations on the same page): take the one the page is about
+  let p = products[0] ?? null;
+  if (products.length > 1) {
+    const main = primaryProduct(products, pageUrl?.trim() || meta.url || null, [meta.name, heading]);
+    if (main) {
+      p = main.product;
+      warnings.push(`${products.length} Produkte in den strukturierten Daten – verwendet wird „${str(p.name) ?? '?'}“ (passt zu ${main.by}).`);
+    } else {
+      warnings.push(`${products.length} Produkte in den strukturierten Daten – das erste („${str(p?.name) ?? '?'}“) wird verwendet; es könnte ein empfohlenes Produkt sein. Bitte Name und Maße prüfen.`);
+    }
+  }
 
   const url = pageUrl?.trim() || str(p?.url) || meta.url || str(simple?.url) || null;
   const provider = providerForUrl(url);
@@ -205,7 +221,46 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     errors,
     sources,
     modelCandidates: models,
+    categoryHints: [...new Set([...breadcrumbs, ...categoryLabels(p?.category), ...(meta.category ? [meta.category] : [])])],
   };
+}
+
+/** schema.org `category`: text ("Möbel > Sessel"), a Thing with name, or a list. */
+function categoryLabels(v: unknown): string[] {
+  if (Array.isArray(v)) return v.flatMap(categoryLabels);
+  const t = str(v) ?? str((v as Json | null)?.name);
+  return t ? t.split(/\s*(?:>|›|\/|\|)\s*/).filter(Boolean) : [];
+}
+
+const normUrl = (u: string) => {
+  try {
+    const x = new URL(u);
+    return (x.host + x.pathname).replace(/\/+$/, '').toLowerCase();
+  } catch {
+    return u.replace(/[?#].*$/, '').replace(/\/+$/, '').toLowerCase();
+  }
+};
+const normName = (n: string) => n.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** The product whose URL matches the page address, else whose name matches the page title/heading. */
+function primaryProduct(products: Json[], pageUrl: string | null, titles: (string | null | undefined)[]): { product: Json; by: string } | null {
+  if (pageUrl) {
+    const u = normUrl(pageUrl);
+    const hit = products.find((q) => {
+      const own = str(q.url) ?? str((firstOffer(q.offers) as Json | null)?.url);
+      return own ? normUrl(own) === u : false;
+    });
+    if (hit) return { product: hit, by: 'der Seitenadresse' };
+  }
+  for (const t of titles) {
+    if (!t) continue;
+    const title = normName(t);
+    const exact = products.find((q) => str(q.name) && normName(str(q.name)!) === title);
+    if (exact) return { product: exact, by: 'der Seitenüberschrift' };
+    const partial = products.filter((q) => str(q.name) && title.includes(normName(str(q.name)!)));
+    if (partial.length === 1) return { product: partial[0], by: 'der Seitenüberschrift' };
+  }
+  return null;
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : typeof v === 'number' ? String(v) : null);
@@ -233,7 +288,7 @@ function jsonErrorText(text: string): string {
 }
 
 /** Parse JSON-LD text; tolerates HTML comments/CDATA wrappers and trailing commas. Reports errors. */
-function parseJsonLdText(raw: string, label: string): { products: Json[]; models: string[]; errors: string[] } {
+function parseJsonLdText(raw: string, label: string): { products: Json[]; models: string[]; breadcrumbs: string[]; errors: string[] } {
   const cleaned = raw
     .trim()
     .replace(/^<!--/, '')
@@ -248,10 +303,30 @@ function parseJsonLdText(raw: string, label: string): { products: Json[]; models
     try {
       value = JSON.parse(cleaned.replace(/,\s*([}\]])/g, '$1'));
     } catch (e) {
-      return { products: [], models: [], errors: [`${label} ist fehlerhaftes JSON und wurde übersprungen (${e instanceof Error ? e.message : e}).`] };
+      return { products: [], models: [], breadcrumbs: [], errors: [`${label} ist fehlerhaftes JSON und wurde übersprungen (${e instanceof Error ? e.message : e}).`] };
     }
   }
-  return { products: collectProducts(value), models: collectModels(value), errors: [] };
+  return { products: collectProducts(value), models: collectModels(value), breadcrumbs: collectBreadcrumbs(value), errors: [] };
+}
+
+/** Labels of a schema.org BreadcrumbList (e.g. "Wohnzimmer", "Sessel"), in position order. */
+function collectBreadcrumbs(root: unknown): string[] {
+  const out: string[] = [];
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) return node.forEach(visit);
+    const o = node as Json;
+    if (typeNames(o).includes('BreadcrumbList') && Array.isArray(o.itemListElement)) {
+      const items = (o.itemListElement as Json[]).slice().sort((a, b) => Number(a?.position ?? 0) - Number(b?.position ?? 0));
+      for (const it of items) {
+        const name = str(it?.name) ?? str((it?.item as Json | null)?.name);
+        if (name) out.push(name);
+      }
+    }
+    if (o['@graph']) visit(o['@graph']);
+  };
+  visit(root);
+  return out;
 }
 
 /**
@@ -336,7 +411,7 @@ export function extractJsonLdProducts(input: string): Json[] {
     .flatMap((s) => parseJsonLdText(s.textContent ?? '', 'JSON-LD').products);
 }
 
-function readMeta(doc: Document): Partial<Record<'name' | 'image' | 'url' | 'price' | 'currency' | 'sku' | 'brand' | 'availability', string>> {
+function readMeta(doc: Document): Partial<Record<'name' | 'image' | 'url' | 'price' | 'currency' | 'sku' | 'brand' | 'availability' | 'category', string>> {
   const m = (sel: string) => doc.querySelector(sel)?.getAttribute('content')?.trim() || undefined;
   const ip = (prop: string) => {
     const el = doc.querySelector(`[itemprop="${prop}"]`);
@@ -352,6 +427,7 @@ function readMeta(doc: Document): Partial<Record<'name' | 'image' | 'url' | 'pri
     sku: m('meta[property="product:retailer_item_id"]') ?? ip('sku'),
     brand: m('meta[property="product:brand"]') ?? m('meta[property="og:brand"]'),
     availability: m('meta[property="product:availability"]') ?? ip('availability'),
+    category: m('meta[property="product:category"]') ?? ip('category'),
   };
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v)) as typeof out;
 }
