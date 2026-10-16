@@ -102,6 +102,18 @@
   --color-plan-warn: #b45309; /* außerhalb des Richtwerts */
   --color-plan-halo: #ffffff; /* Schrift-Umrandung auf dem Plan */
 
+  /* ---------- Farben: 2D-Plan (#104) – gleiche Werte im Dunkelmodus, der Plan bleibt hell; Linienstärken in PlanDrawing (PLAN_STROKE) ---------- */
+  --color-plan-bg: #fafaf9; /* Planfläche */
+  --color-plan-grid: #eceff3; /* Raster fein */
+  --color-plan-grid-major: #d6dce4; /* Raster grob */
+  --color-plan-wall: #3b4147; /* Wandfläche */
+  --color-plan-wall-line: #1f2326; /* Wandkontur */
+  --color-plan-opening: #475569; /* Fenster, Türen */
+  --color-plan-furniture-line: #6b7280; /* Möbelkontur */
+  --color-plan-dimension: #94a3b8; /* Maß- und Hilfslinien */
+  --color-plan-text: #111827; /* Raumname */
+  --color-plan-text-muted: #4b5563; /* Fläche, Maßzahlen */
+
   /* ---------- Abstände (4er-Raster, in rem → skaliert mit der Grundschrift) ---------- */
   --space-0: 0.125rem; /* 2px */
   --space-1: 0.25rem; /* 4px */
@@ -246,6 +258,16 @@
   --color-plan-ok: #15803d;
   --color-plan-warn: #b45309;
   --color-plan-halo: #ffffff;
+  --color-plan-bg: #fafaf9;
+  --color-plan-grid: #eceff3;
+  --color-plan-grid-major: #d6dce4;
+  --color-plan-wall: #3b4147;
+  --color-plan-wall-line: #1f2326;
+  --color-plan-opening: #475569;
+  --color-plan-furniture-line: #6b7280;
+  --color-plan-dimension: #94a3b8;
+  --color-plan-text: #111827;
+  --color-plan-text-muted: #4b5563;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -330,5 +352,15 @@
     --color-plan-ok: #15803d;
     --color-plan-warn: #b45309;
     --color-plan-halo: #ffffff;
+    --color-plan-bg: #fafaf9;
+    --color-plan-grid: #eceff3;
+    --color-plan-grid-major: #d6dce4;
+    --color-plan-wall: #3b4147;
+    --color-plan-wall-line: #1f2326;
+    --color-plan-opening: #475569;
+    --color-plan-furniture-line: #6b7280;
+    --color-plan-dimension: #94a3b8;
+    --color-plan-text: #111827;
+    --color-plan-text-muted: #4b5563;
   }
 }

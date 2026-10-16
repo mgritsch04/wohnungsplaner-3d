@@ -10,6 +10,25 @@ import { materialById, DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 
 const pts = (poly: Vec2[]) => poly.map((p) => `${p.x},${p.y}`).join(' ');
 
+/**
+ * Plan colours (#104): theme tokens (theme.css – identical in light and dark, the plan stays
+ * light) with the same value as CSS fallback, so the standalone SVG of the PNG export, which
+ * has no stylesheet, keeps them. Selection, hover and conflict colours are unchanged.
+ */
+const C = {
+  wall: 'var(--color-plan-wall, #3b4147)',
+  wallLine: 'var(--color-plan-wall-line, #1f2326)',
+  opening: 'var(--color-plan-opening, #475569)',
+  furnitureLine: 'var(--color-plan-furniture-line, #6b7280)',
+  dimension: 'var(--color-plan-dimension, #94a3b8)',
+  text: 'var(--color-plan-text, #111827)',
+  textMuted: 'var(--color-plan-text-muted, #4b5563)',
+  halo: 'var(--color-plan-halo, #ffffff)',
+};
+/** Line widths in screen pixels (non-scaling, the same at every zoom): walls bold, openings medium, furniture thin, helpers fine. */
+export const PLAN_STROKE = { wall: 1.5, opening: 1.2, doorLeaf: 1.6, doorArc: 0.8, furniture: 1, furnitureDetail: 0.6, dimension: 0.7 } as const;
+const W = PLAN_STROKE;
+
 interface Props {
   project: Project;
   derived: DerivedPlan;
@@ -48,7 +67,7 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       <polygon
         key={r.id}
         points={pts(g.interior)}
-        fill={selected ? '#dbeafe' : lighten(mat.color, 0.72)}
+        style={{ fill: selected ? '#dbeafe' : lighten(mat.color, 0.78) }}
         stroke={selected ? '#2563eb' : hovered ? '#60a5fa' : 'none'}
         strokeWidth={selected ? 2 : 1.5}
         vectorEffect="non-scaling-stroke"
@@ -62,7 +81,8 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
     const ops = derived.openings.get(w.id) ?? [];
     const selected = isSel(selection, 'wall', w.id);
     const hovered = isSel(hover, 'wall', w.id);
-    const fill = selected ? '#2563eb' : hovered ? '#475569' : '#2f3437';
+    const fill = selected ? '#2563eb' : hovered ? '#475569' : C.wall;
+    const outline = selected || hovered ? fill : C.wallLine;
     const segments: Vec2[][] = [];
     let cursor = -Infinity;
     for (const o of ops) {
@@ -73,13 +93,13 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
     return (
       <g key={w.id}>
         {segments.filter((s) => s.length >= 3).map((s, i) => (
-          <polygon key={i} points={pts(s)} fill={fill} stroke={fill} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+          <polygon key={i} points={pts(s)} style={{ fill, stroke: outline }} strokeWidth={W.wall} strokeLinejoin="miter" vectorEffect="non-scaling-stroke" data-layer="wall" />
         ))}
       </g>
     );
   });
 
-  const hubs = derived.hubs.map((h) => <polygon key={h.nodeId} points={pts(h.polygon)} fill="#2f3437" stroke="#2f3437" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />);
+  const hubs = derived.hubs.map((h) => <polygon key={h.nodeId} points={pts(h.polygon)} style={{ fill: C.wall, stroke: C.wall }} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />);
 
   const openings = project.walls.flatMap((w) => {
     const fp = derived.footprints.get(w.id);
@@ -88,7 +108,8 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       const o = r.opening;
       const selected = isSel(selection, 'opening', o.id);
       const hovered = isSel(hover, 'opening', o.id);
-      const stroke = selected ? '#2563eb' : hovered ? '#475569' : '#1f2937';
+      const stroke = selected ? '#2563eb' : hovered ? '#1f2937' : C.opening;
+      const paper = selected ? '#dbeafe' : C.halo;
       const rect = openingRect(fp, r);
       if (o.kind === 'window') {
         const mid0 = add(fp.a, scale(fp.dir, r.s0));
@@ -96,9 +117,9 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
         const off = scale(fp.normal, fp.thickness / 6);
         return (
           <g key={o.id}>
-            <polygon points={pts(rect)} fill={selected ? '#dbeafe' : '#ffffff'} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-            <line x1={mid0.x + off.x} y1={mid0.y + off.y} x2={mid1.x + off.x} y2={mid1.y + off.y} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-            <line x1={mid0.x - off.x} y1={mid0.y - off.y} x2={mid1.x - off.x} y2={mid1.y - off.y} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <polygon points={pts(rect)} style={{ fill: paper, stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
+            <line x1={mid0.x + off.x} y1={mid0.y + off.y} x2={mid1.x + off.x} y2={mid1.y + off.y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
+            <line x1={mid0.x - off.x} y1={mid0.y - off.y} x2={mid1.x - off.x} y2={mid1.y - off.y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
           </g>
         );
       }
@@ -106,13 +127,13 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
         const ds = doorSymbol(fp, r);
         return (
           <g key={o.id}>
-            <polygon points={pts(rect)} fill={selected ? '#dbeafe' : '#ffffff'} stroke="none" />
-            <line x1={ds.hinge.x} y1={ds.hinge.y} x2={ds.openTip.x} y2={ds.openTip.y} stroke={stroke} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            <polygon points={pts(rect)} style={{ fill: paper, stroke: 'none' }} />
+            <line x1={ds.hinge.x} y1={ds.hinge.y} x2={ds.openTip.x} y2={ds.openTip.y} style={{ stroke }} strokeWidth={W.doorLeaf} vectorEffect="non-scaling-stroke" />
             <path
               d={`M ${ds.closedTip.x} ${ds.closedTip.y} A ${ds.radius} ${ds.radius} 0 0 ${ds.sweep} ${ds.openTip.x} ${ds.openTip.y}`}
               fill="none"
-              stroke={stroke}
-              strokeWidth={1}
+              style={{ stroke }}
+              strokeWidth={W.doorArc}
               strokeDasharray="4 3"
               vectorEffect="non-scaling-stroke"
             />
@@ -121,9 +142,9 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       }
       return (
         <g key={o.id}>
-          <polygon points={pts(rect)} fill={selected ? '#dbeafe' : '#ffffff'} stroke="none" />
-          <line x1={rect[0].x} y1={rect[0].y} x2={rect[3].x} y2={rect[3].y} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-          <line x1={rect[1].x} y1={rect[1].y} x2={rect[2].x} y2={rect[2].y} stroke={stroke} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          <polygon points={pts(rect)} style={{ fill: paper, stroke: 'none' }} />
+          <line x1={rect[0].x} y1={rect[0].y} x2={rect[3].x} y2={rect[3].y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
+          <line x1={rect[1].x} y1={rect[1].y} x2={rect[2].x} y2={rect[2].y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
         </g>
       );
     });
@@ -159,10 +180,10 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
           if (!g) return null;
           return (
             <g key={r.id} pointerEvents="none">
-              <text x={g.centroid.x} y={g.centroid.y - fontSize * 0.2} fontSize={fontSize * 1.15} textAnchor="middle" fill="#111827" fontWeight={600}>
+              <text x={g.centroid.x} y={g.centroid.y - fontSize * 0.2} fontSize={fontSize * 1.15} textAnchor="middle" style={{ fill: C.text }} fontWeight={600}>
                 {r.name}
               </text>
-              <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" fill="#4b5563">
+              <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" style={{ fill: C.textMuted }}>
                 {formatArea(g.area)}
               </text>
             </g>
@@ -197,19 +218,18 @@ function RoomDimensions({ project, derived, px, fontSize }: { project: Project; 
       if (ang < -90) ang += 180;
       items.push(
         <g key={`${r.id}-${i}`} pointerEvents="none">
-          <line x1={a2.x} y1={a2.y} x2={b2.x} y2={b2.y} stroke="#64748b" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
-          <line x1={a2.x - inward.x * 4 * px} y1={a2.y - inward.y * 4 * px} x2={a2.x + inward.x * 4 * px} y2={a2.y + inward.y * 4 * px} stroke="#64748b" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
-          <line x1={b2.x - inward.x * 4 * px} y1={b2.y - inward.y * 4 * px} x2={b2.x + inward.x * 4 * px} y2={b2.y + inward.y * 4 * px} stroke="#64748b" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+          <line x1={a2.x} y1={a2.y} x2={b2.x} y2={b2.y} style={{ stroke: C.dimension }} strokeWidth={W.dimension} vectorEffect="non-scaling-stroke" />
+          <line x1={a2.x - inward.x * 4 * px} y1={a2.y - inward.y * 4 * px} x2={a2.x + inward.x * 4 * px} y2={a2.y + inward.y * 4 * px} style={{ stroke: C.dimension }} strokeWidth={W.dimension} vectorEffect="non-scaling-stroke" />
+          <line x1={b2.x - inward.x * 4 * px} y1={b2.y - inward.y * 4 * px} x2={b2.x + inward.x * 4 * px} y2={b2.y + inward.y * 4 * px} style={{ stroke: C.dimension }} strokeWidth={W.dimension} vectorEffect="non-scaling-stroke" />
           <text
             x={mid.x}
             y={mid.y}
             fontSize={fontSize * 0.9}
-            fill="#334155"
+            style={{ fill: C.textMuted, stroke: C.halo }}
             textAnchor="middle"
             dominantBaseline="middle"
             transform={`rotate(${ang} ${mid.x} ${mid.y})`}
             paintOrder="stroke"
-            stroke="#ffffff"
             strokeWidth={3 * px}
           >
             {formatLength(L)}
@@ -237,15 +257,15 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
   const w = f.width;
   const d = f.depth;
   // a conflict stays visible while the item is selected/dragged (selection = thicker outline)
-  const stroke = conflict === 'error' ? '#dc2626' : conflict === 'warn' ? '#d97706' : selected ? '#2563eb' : hovered ? '#1d4ed8' : '#4b5563';
-  const fill = shape === 'rug' ? lighten(f.color, 0.3) : lighten(f.color, 0.55);
-  const sw = selected ? 2 : 1;
+  const stroke = conflict === 'error' ? '#dc2626' : conflict === 'warn' ? '#d97706' : selected ? '#2563eb' : hovered ? '#1d4ed8' : C.furnitureLine;
+  const fill = shape === 'rug' ? lighten(f.color, 0.4) : lighten(f.color, 0.62);
+  const sw = selected ? 2 : W.furniture;
   const details: React.ReactNode[] = [];
   const line = (x1: number, y1: number, x2: number, y2: number, k: string) => (
-    <line key={k} x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+    <line key={k} x1={x1} y1={y1} x2={x2} y2={y2} style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />
   );
   const rect = (x: number, y: number, rw: number, rh: number, k: string, rx = 0) => (
-    <rect key={k} x={x} y={y} width={rw} height={rh} rx={rx} fill="none" stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+    <rect key={k} x={x} y={y} width={rw} height={rh} rx={rx} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />
   );
   switch (shape) {
     case 'sofa':
@@ -270,7 +290,7 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
     case 'table-round':
       return (
         <g transform={`translate(${f.x} ${f.y}) rotate(${radToDeg(f.rotation)})`}>
-          <ellipse cx={0} cy={0} rx={w / 2} ry={d / 2} fill={fill} stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" />
+          <ellipse cx={0} cy={0} rx={w / 2} ry={d / 2} fill={fill} style={{ stroke }} strokeWidth={sw} vectorEffect="non-scaling-stroke" />
         </g>
       );
     case 'plant':
@@ -279,7 +299,7 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
     case 'pendant':
       return (
         <g transform={`translate(${f.x} ${f.y}) rotate(${radToDeg(f.rotation)})`}>
-          <circle cx={0} cy={0} r={Math.min(w, d) / 2} fill={fill} stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" strokeDasharray={shape === 'pendant' ? '3 2' : undefined} />
+          <circle cx={0} cy={0} r={Math.min(w, d) / 2} fill={fill} style={{ stroke }} strokeWidth={sw} vectorEffect="non-scaling-stroke" strokeDasharray={shape === 'pendant' ? '3 2' : undefined} />
         </g>
       );
     case 'k-sink':
@@ -288,13 +308,13 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
       break;
     case 'k-cooktop':
       for (const [cx, cy] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]])
-        details.push(<circle key={`${cx}${cy}`} cx={(cx * w) / 1} cy={(cy * d) / 1} r={Math.min(w, d) * 0.16} fill="none" stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />);
+        details.push(<circle key={`${cx}${cy}`} cx={(cx * w) / 1} cy={(cy * d) / 1} r={Math.min(w, d) * 0.16} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
       break;
     case 'bathtub':
       details.push(rect(-w / 2 + 0.06, -d / 2 + 0.06, w - 0.12, d - 0.12, 'tub', 0.15));
       break;
     case 'toilet':
-      details.push(<ellipse key="seat" cx={0} cy={d * 0.12} rx={w * 0.4} ry={d * 0.32} fill="none" stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />);
+      details.push(<ellipse key="seat" cx={0} cy={d * 0.12} rx={w * 0.4} ry={d * 0.32} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
       break;
     case 'shower':
       details.push(line(-w / 2, -d / 2, w / 2, d / 2, 's1'));
@@ -313,7 +333,7 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
         height={d}
         fill={fill}
         fillOpacity={shape === 'rug' ? 0.55 : 0.92}
-        stroke={stroke}
+        style={{ stroke }}
         strokeWidth={sw}
         strokeDasharray={f.elevation > 1.2 ? '5 3' : undefined}
         vectorEffect="non-scaling-stroke"

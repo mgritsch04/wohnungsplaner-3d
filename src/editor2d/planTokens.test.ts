@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 // relative to the project root (Vitest runs there) – independent of the test environment's import.meta.url
 const themeCss = readFileSync(resolve('src/theme.css'), 'utf8');
 const editorSrc = readFileSync(resolve('src/editor2d/Editor2D.tsx'), 'utf8');
-const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo'];
+const drawingSrc = readFileSync(resolve('src/editor2d/PlanDrawing.tsx'), 'utf8');
+const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo', ...['bg', 'grid', 'grid-major', 'wall', 'wall-line', 'opening', 'furniture-line', 'dimension', 'text', 'text-muted'].map((t) => `color-plan-${t}`)];
 
 const valuesOf = (name: string) => [...themeCss.matchAll(new RegExp(`--${name}\\s*:\\s*(#[0-9a-f]{6})`, 'gi'))].map((m) => m[1].toLowerCase());
 
@@ -34,13 +35,20 @@ describe('plan hint tokens (#82)', () => {
   });
 
   it('are readable on the plan background (WCAG AA 4.5:1)', () => {
-    const planBg = /<rect width=\{vp\.width\} height=\{vp\.height\} fill="(#[0-9a-f]{6})"/i.exec(editorSrc)?.[1];
-    expect(planBg).toBeDefined();
+    const planBg = valuesOf('color-plan-bg')[0];
+    // the editor draws its background with this token (fallback = the same value, for the PNG export)
+    expect(editorSrc).toContain(`var(--color-plan-bg, ${planBg})`);
     const halo = valuesOf('color-plan-halo')[0];
-    for (const t of ['color-plan-ok', 'color-plan-warn']) {
+    for (const t of ['color-plan-ok', 'color-plan-warn', 'color-plan-text', 'color-plan-text-muted', 'color-plan-opening']) {
       const c = valuesOf(t)[0];
       expect(contrast(c, planBg!)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(c, halo)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it('uses fallbacks equal to the tokens (the PNG export renders the plan without a stylesheet, #104)', () => {
+    const uses = [...(editorSrc + drawingSrc).matchAll(/var\(--(color-plan-[a-z-]+), (#[0-9a-f]{6})\)/gi)];
+    expect(uses.length).toBeGreaterThan(8);
+    for (const [, name, fallback] of uses) expect(valuesOf(name)[0], name).toBe(fallback.toLowerCase());
   });
 });
