@@ -1294,3 +1294,62 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   expect(nightOff).toBeGreaterThan(2); // but not pitch black (moonlight / sky)
   expect(errors).toEqual([]);
 });
+
+test('exports the plan as PNG and prints plan + parts list on one A4 page (#71, #72)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const right = page.locator('.panel.right');
+  await right.getByRole('button', { name: 'Projekt', exact: true }).click();
+
+  // PNG: real PNG signature, sensible size (2× resolution of the sheet)
+  const download = page.waitForEvent('download');
+  await right.getByRole('button', { name: 'Plan als PNG' }).click();
+  const d = await download;
+  expect(d.suggestedFilename()).toMatch(/-grundriss-\d{4}-\d{2}-\d{2}\.png$/);
+  const { readFile } = await import('node:fs/promises');
+  const png = await readFile((await d.path())!);
+  expect([...png.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  expect(png.length).toBeGreaterThan(20_000);
+  expect(png.length).toBeLessThan(20_000_000);
+  expect(png.readUInt32BE(16)).toBeGreaterThan(1000); // IHDR width
+  expect(png.readUInt32BE(20)).toBeGreaterThan(500); // IHDR height
+
+  // print view: plan (without grid) and parts list
+  await right.getByRole('button', { name: 'Druckansicht / PDF' }).click();
+  const view = page.getByTestId('print-view');
+  const plan = view.getByTestId('print-plan');
+  await expect(plan.locator('svg')).toBeVisible();
+  await expect(plan.getByText('Wohnzimmer')).toBeVisible();
+  await expect(plan.locator('pattern')).toHaveCount(0);
+  await expect(view.getByTestId('print-list').locator('tbody tr').first()).toBeVisible();
+  await expect(view.getByText('Stückliste')).toBeVisible();
+
+  // the scale bar has its true length on paper for both orientations
+  for (const o of ['A4 hoch', 'A4 quer']) {
+    await view.getByRole('button', { name: o }).click();
+    const scaleText = await view.locator('.print-header').innerText();
+    const den = Number(/Maßstab 1:(\d+)/.exec(scaleText)![1]);
+    const bar = plan.getByTestId('scale-bar');
+    const meters = Number(await bar.getAttribute('data-length-m'));
+    const box = (await bar.locator('rect').nth(2).boundingBox())!;
+    const expectedPx = ((meters * 1000) / den) * (96 / 25.4);
+    expect(Math.abs(box.width - expectedPx)).toBeLessThan(1.5);
+    // plan + list fit the page width
+    const page_ = (await view.locator('.print-page').boundingBox())!;
+    const svgBox = (await plan.locator('svg').boundingBox())!;
+    expect(svgBox.width).toBeLessThanOrEqual(page_.width);
+  }
+
+  // print media: only the page, no controls or app UI
+  await page.emulateMedia({ media: 'print' });
+  await expect(view.getByTestId('print-controls')).toBeHidden();
+  await expect(page.locator('header.toolbar')).toBeHidden();
+  await expect(page.locator('[data-testid="editor2d"]')).toBeHidden();
+  await expect(plan.locator('svg')).toBeVisible();
+  await expect(view.getByTestId('print-list')).toBeVisible();
+  await page.emulateMedia({ media: 'screen' });
+
+  await page.keyboard.press('Escape');
+  await expect(view).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
