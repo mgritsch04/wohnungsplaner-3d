@@ -2,6 +2,8 @@
 
 _Stand: 2026-10-16 (2. Untersuchungsrunde ergänzt)._  Kennzeichnung: `VERIFIED` (selbst geprüft) · `PARTIALLY VERIFIED` · `UNVERIFIED` (nur aus Sekundärquellen) · `UNAVAILABLE` (Test nicht möglich)._
 
+> **Runde 3 (2026-10-16):** `www.ikea.com` ist inzwischen erreichbar. Echte Produktseiten wurden geprüft – Ergebnisse, Planer-Analyse und Möbelix-Blocker stehen in [`PLANNER_IMPORT_RESEARCH.md`](PLANNER_IMPORT_RESEARCH.md). Wichtigste Korrekturen: Die 3D-Modelle sind als schema.org-`3DModel` deklariert; das unten erwähnte `pip-xr-viewer-model` kommt auf den geprüften Seiten nicht vor (veraltet).
+
 ## Kurzfazit
 - Für **keinen** der beiden Händler gibt es eine offiziell dokumentierte, öffentliche Produkt-API. (`UNVERIFIED` – Recherche, keine Herstellerbestätigung)
 - **Live-Tests waren in der Entwicklungsumgebung nicht möglich:** Die Cloud-Umgebung blockiert `www.ikea.com` und `www.moebelix.at` (`UNAVAILABLE`).

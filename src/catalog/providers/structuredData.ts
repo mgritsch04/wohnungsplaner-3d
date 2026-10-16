@@ -23,6 +23,8 @@ export interface ParsedProductPage extends NormalizedProduct {
   errors: string[];
   /** Which sources contributed data. */
   sources: string[];
+  /** All 3D model files the page declares (schema.org 3DModel), in the page's order. */
+  modelCandidates: string[];
 }
 
 export const MAX_INPUT_CHARS = 15_000_000;
@@ -61,6 +63,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   let embeddedText = '';
   let simple: Json | null = null;
   let modelUrl: string | null = null;
+  const models: string[] = [];
 
   if (kind === 'empty') errors.push('Bitte den Seitenquelltext oder JSON-Daten einfügen.');
   if (kind === 'url') {
@@ -72,6 +75,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   if (kind === 'jsonld') {
     const r = parseJsonLdText(input, 'Eingabe');
     products = r.products;
+    models.push(...r.models);
     errors.push(...r.errors);
     if (products.length) sources.push('JSON-LD');
   }
@@ -81,8 +85,6 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   }
   if (kind === 'html') {
     const doc = new DOMParser().parseFromString(input, 'text/html');
-    modelUrl = findModelUrl(doc, input);
-    if (modelUrl) sources.push('3D-Modell-Verweis (experimentell)');
     const scripts = [...doc.querySelectorAll('script')];
     let block = 0;
     for (const s of scripts) {
@@ -92,6 +94,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
         block++;
         const r = parseJsonLdText(text, `JSON-LD-Block ${block}`);
         products.push(...r.products);
+        models.push(...r.models);
         errors.push(...r.errors);
       } else if (type === 'application/json' || type === '' || type === 'text/javascript' || type === 'module') {
         // embedded page state – used only as a secondary source for dimension lines
@@ -99,6 +102,11 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
       }
     }
     if (products.length) sources.push('JSON-LD');
+    if (!models.length) {
+      // no standard declaration: look for other references (experimental heuristics)
+      modelUrl = findModelUrl(doc, input);
+      if (modelUrl) sources.push('3D-Modell-Verweis (experimentell)');
+    }
     meta = readMeta(doc);
     if (Object.keys(meta).length) sources.push('Meta-Angaben');
     visibleText = visibleTextOf(doc);
@@ -111,6 +119,11 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     warnings.push('Das sieht nach sichtbarem Seitentext aus, nicht nach Quelltext. Name und Preis können so nicht sicher erkannt werden – für vollständige Daten den Seitenquelltext (Strg+U) einfügen.');
   }
 
+  if (models.length) {
+    // the page's own order; IKEA lists its preferred (Draco-compressed) variant first
+    modelUrl = models[0];
+    sources.push(`3D-Modell (schema.org 3DModel${models.length > 1 ? `, ${models.length} Varianten` : ''})`);
+  }
   if (products.length > 1) warnings.push(`${products.length} Produkte in den strukturierten Daten – das erste wird verwendet.`);
   const p = products[0] ?? null;
 
@@ -191,6 +204,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     inputKind: kind,
     errors,
     sources,
+    modelCandidates: models,
   };
 }
 
@@ -219,7 +233,7 @@ function jsonErrorText(text: string): string {
 }
 
 /** Parse JSON-LD text; tolerates HTML comments/CDATA wrappers and trailing commas. Reports errors. */
-function parseJsonLdText(raw: string, label: string): { products: Json[]; errors: string[] } {
+function parseJsonLdText(raw: string, label: string): { products: Json[]; models: string[]; errors: string[] } {
   const cleaned = raw
     .trim()
     .replace(/^<!--/, '')
@@ -234,10 +248,38 @@ function parseJsonLdText(raw: string, label: string): { products: Json[]; errors
     try {
       value = JSON.parse(cleaned.replace(/,\s*([}\]])/g, '$1'));
     } catch (e) {
-      return { products: [], errors: [`${label} ist fehlerhaftes JSON und wurde übersprungen (${e instanceof Error ? e.message : e}).`] };
+      return { products: [], models: [], errors: [`${label} ist fehlerhaftes JSON und wurde übersprungen (${e instanceof Error ? e.message : e}).`] };
     }
   }
-  return { products: collectProducts(value), errors: [] };
+  return { products: collectProducts(value), models: collectModels(value), errors: [] };
+}
+
+/**
+ * glTF/GLB files declared as schema.org `3DModel` (`encoding[].contentUrl` with
+ * `encodingFormat` model/gltf-binary or model/gltf+json). Verified on IKEA Austria
+ * product pages (2026-10-16), which list several quality levels of the same model.
+ */
+function collectModels(root: unknown): string[] {
+  const out: string[] = [];
+  const isGltf = (fmt: unknown, url: string) => (typeof fmt === 'string' ? /gltf/i.test(fmt) : /\.(glb|gltf)(\?|$)/i.test(url));
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) return node.forEach(visit);
+    const o = node as Json;
+    if (typeNames(o).includes('3DModel')) {
+      const enc = o.encoding;
+      for (const e of (Array.isArray(enc) ? enc : enc ? [enc] : []) as Json[]) {
+        const u = str(e?.contentUrl);
+        if (u && /^https:\/\//i.test(u) && isGltf(e.encodingFormat, u)) out.push(u);
+      }
+      const direct = str(o.contentUrl);
+      if (direct && /^https:\/\//i.test(direct) && isGltf(o.encodingFormat, direct)) out.push(direct);
+    }
+    if (o['@graph']) visit(o['@graph']);
+    if (o.subjectOf) visit(o.subjectOf);
+  };
+  visit(root);
+  return [...new Set(out)];
 }
 
 const typeNames = (o: Json): string[] => {
