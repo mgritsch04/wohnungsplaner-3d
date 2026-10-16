@@ -697,14 +697,14 @@ export function Editor2D() {
       >
         <defs>
           <pattern id="grid-minor" width={gridStep * view.zoom} height={gridStep * view.zoom} patternUnits="userSpaceOnUse" x={gx} y={gy}>
-            <path d={`M ${gridStep * view.zoom} 0 L 0 0 0 ${gridStep * view.zoom}`} fill="none" stroke="#e5e7eb" strokeWidth={1} />
+            <path d={`M ${gridStep * view.zoom} 0 L 0 0 0 ${gridStep * view.zoom}`} fill="none" style={{ stroke: 'var(--color-plan-grid, #eceff3)' }} strokeWidth={1} />
           </pattern>
           <pattern id="grid-major" width={majorStep * view.zoom} height={majorStep * view.zoom} patternUnits="userSpaceOnUse" x={gx} y={gy}>
             <rect width={majorStep * view.zoom} height={majorStep * view.zoom} fill="url(#grid-minor)" />
-            <path d={`M ${majorStep * view.zoom} 0 L 0 0 0 ${majorStep * view.zoom}`} fill="none" stroke="#cbd5e1" strokeWidth={1} />
+            <path d={`M ${majorStep * view.zoom} 0 L 0 0 0 ${majorStep * view.zoom}`} fill="none" style={{ stroke: 'var(--color-plan-grid-major, #d6dce4)' }} strokeWidth={1} />
           </pattern>
         </defs>
-        <rect width={vp.width} height={vp.height} fill="#fafaf9" />
+        <rect width={vp.width} height={vp.height} style={{ fill: 'var(--color-plan-bg, #fafaf9)' }} data-testid="plan-bg" />
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
