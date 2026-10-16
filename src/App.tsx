@@ -5,6 +5,7 @@ import { useUiStore } from './store/uiStore';
 import { Toolbar } from './ui/Toolbar';
 import { StatusBar } from './ui/StatusBar';
 import { ModalHost, Toasts } from './ui/Modals';
+import { FurnitureHoverCard } from './ui/FurnitureHoverCard';
 import { useShortcuts } from './ui/useShortcuts';
 import { useAutosave } from './persistence/useAutosave';
 import { lastProjectId, loadProject, saveProject } from './persistence/projects';
@@ -115,6 +116,7 @@ export default function App() {
       <StatusBar />
       <ModalHost />
       <Toasts />
+      <FurnitureHoverCard />
     </div>
   );
 }

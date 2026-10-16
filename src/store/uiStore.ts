@@ -52,6 +52,8 @@ interface UiStore {
    * Kept outside the project so dragging does not clone/re-render the whole app.
    */
   timePreview: number | null;
+  /** Furniture currently carried in the first-person walkthrough (#39). */
+  walkCarry: string | null;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   setHover: (s: Selection | null) => void;
@@ -67,6 +69,7 @@ interface UiStore {
   setCursor: (p: Vec2 | null) => void;
   setFps: (fps: number | null) => void;
   setTimePreview: (hour: number | null) => void;
+  setWalkCarry: (id: string | null) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -87,6 +90,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   cursor: null,
   fps: null,
   timePreview: null,
+  walkCarry: null,
   toasts: [],
   setSelection: (selection) => set({ selection, rightTab: selection ? 'properties' : get().rightTab }),
   setHover: (hover) => {
@@ -106,6 +110,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   setCursor: (cursor) => set({ cursor }),
   setFps: (fps) => set({ fps }),
   setTimePreview: (timePreview) => set({ timePreview }),
+  setWalkCarry: (walkCarry) => set({ walkCarry }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });

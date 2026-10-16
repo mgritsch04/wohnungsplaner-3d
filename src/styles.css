@@ -1129,3 +1129,98 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
   min-width: 52px;
 }
 .model-section { border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; } .file-pick input { width: auto; }
+.rotate-group {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.rotate-group button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 4px;
+}
+/* walkthrough: small crosshair in the centre, readable on bright and dark surfaces */
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+}
+.crosshair::before,
+.crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  border-radius: 1px;
+}
+.crosshair::before {
+  left: 8px;
+  top: 0;
+  width: 2px;
+  height: 18px;
+}
+.crosshair::after {
+  left: 0;
+  top: 8px;
+  width: 18px;
+  height: 2px;
+}
+.hover-card {
+  position: fixed;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  font-size: 12.5px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.hover-card img {
+  width: 100%;
+  max-height: 110px;
+  object-fit: contain;
+  background: #f8fafc;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.hover-card .muted {
+  color: #6b7280;
+}
+/* zoom slider at the bottom of the 2D/3D viewport (#6) */
+.zoom-slider {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  z-index: 3;
+}
+.zoom-slider input[type='range'] {
+  width: min(220px, 40vw);
+}
+.zoom-slider button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1;
+}

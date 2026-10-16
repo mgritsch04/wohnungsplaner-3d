@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { parseProductPage, type InputKind, type ParsedProductPage } from '../catalog/providers/structuredData';
 import { providerForUrl } from '../catalog/providers/registry';
 import { productToCatalogItem } from '../catalog/providers/toCatalog';
+import { classifyProduct, type CategoryGuess } from '../catalog/providers/classify';
 import { useCatalogStore } from '../catalog/catalogStore';
 import { CATEGORIES } from '../catalog/types';
 import { formatEuro } from '../model/units';
@@ -143,7 +144,9 @@ export function ProductImportModal() {
   const [url, setUrl] = useState('');
   const [source, setSource] = useState('');
   const [product, setProduct] = useState<ParsedProductPage | null>(null);
-  const [form, setForm] = useState({ name: '', category: 'storage', width: '', depth: '', height: '' });
+  // no preset category: it comes from the page or the user picks it (never a silent default)
+  const [form, setForm] = useState({ name: '', category: '', width: '', depth: '', height: '' });
+  const [guess, setGuess] = useState<CategoryGuess | null>(null);
   const [model, setModel] = useState<FetchedModel | null>(null);
   const [modelState, setModelState] = useState<{ busy: boolean; message: string | null; failed: boolean }>({ busy: false, message: null, failed: false });
   const provider = providerForUrl(url);
@@ -154,7 +157,9 @@ export function ProductImportModal() {
     setModel(null);
     setModelState({ busy: false, message: null, failed: false });
     const cm = (v: number | null) => (v === null ? '' : String(Math.round(v * 10) / 10).replace('.', ','));
-    setForm({ name: p.name ?? '', category: form.category, width: cm(p.dimensions.width), depth: cm(p.dimensions.depth), height: cm(p.dimensions.height) });
+    const g = classifyProduct(p.name, p.categoryHints);
+    setGuess(g);
+    setForm({ name: p.name ?? '', category: g.category ?? '', width: cm(p.dimensions.width), depth: cm(p.dimensions.depth), height: cm(p.dimensions.height) });
   };
 
   const num = (s: string) => {
@@ -164,11 +169,13 @@ export function ProductImportModal() {
   const w = num(form.width);
   const d = num(form.depth);
   const h = num(form.height);
-  const ready = !!product && form.name.trim() && w && d && h;
+  const ready = !!product && form.name.trim() && form.category && w && d && h;
+  // the recognised shape (e.g. armchair vs. sofa) as long as the user keeps the recognised category
+  const shape = guess?.category === form.category && guess.shape ? guess.shape : (SHAPES[form.category] ?? 'box');
 
   const save = async (place: boolean) => {
     if (!product || !w || !d || !h) return;
-    const base = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape: SHAPES[form.category] ?? 'box' });
+    const base = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape });
     let item = base;
     if (model) {
       const assetId = newId('asset');
@@ -295,6 +302,7 @@ export function ProductImportModal() {
                   <span className="field-label">Kategorie</span>
                   <span className="field-input">
                     <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                      {!form.category && <option value="">– bitte wählen –</option>}
                       {CATEGORIES.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.label}
@@ -304,6 +312,15 @@ export function ProductImportModal() {
                   </span>
                 </label>
               </div>
+              {guess && (
+                <p className="small" data-testid="category-guess">
+                  <Badge kind={guess.confidence === 'sicher' ? 'ok' : guess.confidence === 'unsicher' ? 'warn' : 'error'}>
+                    Produkttyp {guess.confidence}
+                  </Badge>{' '}
+                  {guess.reason}
+                  {guess.category && form.category && guess.category !== form.category && ' · von dir geändert'}
+                </p>
+              )}
               <div className="field-grid three">
                 {(['width', 'depth', 'height'] as const).map((k) => (
                   <label className="field" key={k}>

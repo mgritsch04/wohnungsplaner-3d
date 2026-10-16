@@ -21,12 +21,14 @@ import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
 import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
 import { CollisionMarkers } from './CollisionMarkers';
+import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
   const cameraMode = useUiStore((s) => s.cameraMode);
   const quality = project.settings.quality;
   const [locked, setLocked] = useState(false);
+  const carried = useUiStore((s) => (s.walkCarry ? project.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
   const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -65,10 +67,14 @@ export function Scene3D() {
           <SceneContent project={project} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
+      {cameraMode === 'orbit' && <OrbitZoomSlider />}
+      {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && (
         <div className="walk-overlay">
-          {locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Esc: Maus freigeben</span>
+          {carried ? (
+            <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
+          ) : locked ? (
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Klick: Möbel auswählen · G: Möbel tragen · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen.</span>
           )}
@@ -101,7 +107,7 @@ function SceneContent({
   // e2e/debug hook: lets tests project world points to screen coordinates and inspect the scene
   useEffect(() => {
     const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
-    if (wp) wp.three = { camera, canvas: gl.domElement, scene };
+    if (wp) wp.three = { camera, canvas: gl.domElement, scene, gl };
   }, [camera, gl, scene]);
 
   const bounds = useMemo(() => {
@@ -206,6 +212,7 @@ function SceneContent({
           furniture={project.furniture}
           start={walkStart}
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
+          eyeHeight={project.settings.eyeHeight}
           onLockChange={onLockChange}
         />
       )}
@@ -277,6 +284,25 @@ function OrbitCamera({
     // only on mount, explicit reset or layout change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetRequest, viewMode]);
+  // zoom slider (#6): report the camera distance, let the slider move the camera
+  useEffect(() => {
+    const c = controlsRef.current;
+    if (!c) return;
+    const zoom = useOrbitZoom.getState();
+    const report = () => zoom.setDistance(camera.position.distanceTo(c.target));
+    c.addEventListener('change', report);
+    report();
+    zoom.setApply((d) => {
+      const dir = camera.position.clone().sub(c.target);
+      camera.position.copy(c.target).add(dir.setLength(Math.max(c.minDistance, Math.min(c.maxDistance, d))));
+      c.update();
+      report();
+    });
+    return () => {
+      c.removeEventListener('change', report);
+      useOrbitZoom.getState().setApply(null);
+    };
+  }, [camera, controlsRef]);
   return (
     <OrbitControls
       ref={controlsRef}
@@ -290,6 +316,15 @@ function OrbitCamera({
       rotateSpeed={rotateSpeed}
     />
   );
+}
+
+/** Zoom slider of the 3D overview, synchronised with mouse wheel / pinch (#6). */
+function OrbitZoomSlider() {
+  const distance = useOrbitZoom((s) => s.distance);
+  const apply = useOrbitZoom((s) => s.apply);
+  const resetCamera = usePerformanceStore((s) => s.resetCamera);
+  if (distance === null || !apply) return null;
+  return <ZoomSlider testId="zoom-3d" label="Zoom 3D" value={distance} min={1.5} max={80} invert onChange={apply} onFit={resetCamera} />;
 }
 
 /** Neutral image-based fill light; its strength is driven by the lighting rig (time of day). */

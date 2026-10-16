@@ -3,12 +3,12 @@ import { derivePlan } from '../../model/derived';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
-import { degToRad, formatArea, formatEuro, formatLength, normalizeAngle, radToDeg } from '../../model/units';
+import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import type { Furniture, Light, Material, Opening, Project, Provenance, Room } from '../../model/schema';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
-import { deleteSelection, duplicateSelection } from '../actions';
+import { deleteSelection, duplicateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
@@ -394,7 +394,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           <NumberField label="Y" value={f.y} factor={100} unit="cm" disabled={f.locked} onChange={(v) => upd((x) => (x.y = v))} />
         </div>
         <div className="field-row">
-          <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => upd((x) => (x.rotation = normalizeAngle(degToRad(v))))} />
+          <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
           <NumberField label="Über Boden" value={f.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
         </div>
         <div className="field-grid three">
@@ -484,9 +484,20 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         )}
       </Section>
       <div className="btn-row padded">
-        <button onClick={() => upd((x) => (x.rotation = normalizeAngle(x.rotation + Math.PI / 2)))} disabled={f.locked}>
-          ⟳ 90°
-        </button>
+        <span className="rotate-group" role="group" aria-label="Drehen">
+          <button onClick={() => setFurnitureRotation(f.id, f.rotation - Math.PI / 2)} disabled={f.locked} title="90° gegen den Uhrzeigersinn">
+            ⟲ 90°
+          </button>
+          <button onClick={() => setFurnitureRotation(f.id, f.rotation - Math.PI / 12)} disabled={f.locked} title="15° gegen den Uhrzeigersinn (Taste Q)">
+            ⟲ 15°
+          </button>
+          <button onClick={() => setFurnitureRotation(f.id, f.rotation + Math.PI / 12)} disabled={f.locked} title="15° im Uhrzeigersinn (Taste E)">
+            ⟳ 15°
+          </button>
+          <button onClick={() => setFurnitureRotation(f.id, f.rotation + Math.PI / 2)} disabled={f.locked} title="90° im Uhrzeigersinn">
+            ⟳ 90°
+          </button>
+        </span>
         <button onClick={duplicateSelection} title="Strg+D">
           Duplizieren
         </button>

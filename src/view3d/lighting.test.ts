@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approachHour, lightingAt, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
+import { approachHour, lampLevel, lightingAt, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
 
 const lum = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
@@ -34,9 +34,10 @@ describe('time-of-day lighting', () => {
     expect(evening.artificial).toBeGreaterThan(0.5);
     expect(night.daylight).toBe(0);
     expect(night.artificial).toBe(1);
-    // night is darker than noon, but exposure compensates so interiors stay visible
+    // night is darker than noon; only slight eye adaptation (no longer enough to cancel the darkness)
     expect(lum(night.background)).toBeLessThan(lum(noon.background) / 3);
     expect(night.exposure).toBeGreaterThan(noon.exposure);
+    expect(night.exposure).toBeLessThan(1.2);
     // sunset is warmer than noon but not extremely orange (blue channel kept)
     const blue = (hex: string) => parseInt(hex.slice(5, 7), 16);
     expect(blue(sunset.sunColor)).toBeLessThan(blue(noon.sunColor));
@@ -59,5 +60,31 @@ describe('time-of-day smoothing', () => {
     // 23 → 1 goes via midnight
     const d = approachHour(23, 1, 0.02, 0.05);
     expect(d > 23 || d < 1).toBe(true);
+  });
+
+  it('keeps getting darker after 21:00 instead of saturating at dusk (#7)', () => {
+    const at = (h: number) => lightingAt(h);
+    const hours = [19.5, 20.5, 21, 21.5, 22]; // full night from about 22:30
+    for (let i = 1; i < hours.length; i++) {
+      expect(at(hours[i]).ambientStrength).toBeLessThan(at(hours[i - 1]).ambientStrength);
+      expect(lum(at(hours[i]).background)).toBeLessThanOrEqual(lum(at(hours[i - 1]).background));
+    }
+    expect(at(21).night).toBeGreaterThan(0.2);
+    expect(at(21).night).toBeLessThan(1);
+    expect(at(23.5).night).toBe(1);
+    expect(at(23.5).ambientStrength).toBeLessThan(0.02); // moonlight level
+    // the ambient night/day ratio leaves room for lamps to make a visible difference
+    expect(at(23.5).ambientStrength / at(13).ambientStrength).toBeLessThan(0.02);
+  });
+
+  it('switches lamps automatically at dusk, or always on/off', () => {
+    expect(lampLevel('auto', lightingAt(13))).toBe(0);
+    expect(lampLevel('auto', lightingAt(23.5))).toBe(1);
+    expect(lampLevel('auto', lightingAt(21))).toBe(1);
+    const dusk = lampLevel('auto', lightingAt(19.75));
+    expect(dusk).toBeGreaterThan(0);
+    expect(dusk).toBeLessThan(1);
+    expect(lampLevel('on', lightingAt(13))).toBe(1);
+    expect(lampLevel('off', lightingAt(23.5))).toBe(0);
   });
 });

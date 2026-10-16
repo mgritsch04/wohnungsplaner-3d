@@ -46,22 +46,69 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `user-test` | `[USERTEST]`-Issue: manuelle Prüfung durch dich offen |
 | `needs-fix` | dein User-Test ist fehlgeschlagen (Issue bleibt offen) |
 | `done` | vollständig abgeschlossen (bei User-Tests: von dir bestanden) |
+| `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
+
+Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte, vor neuen Ideen bearbeiten), `info` (erledigt, enthält aber eine wichtige Info für dich – du schließt es), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
+
+**Prioritäten beim Start und zwischen Aufgaben (#34, #35, #40)**
+1. Ein ausdrücklicher Auftrag von dir im Chat geht immer vor.
+2. **Fehlgeschlagene User-Tests** (`FEHLGESCHLAGEN` in einem `user-test`-Issue, Label `needs-fix`) – vorhandene Funktionen reparieren und abschließen. Vorher prüfen, ob der getestete Stand schon in `main` war; wenn nicht, im Issue darauf hinweisen und nach dem Merge neu testen lassen (kein Fehlschlag).
+3. **Issues mit `priority: high`**, die Aufgaben für Claude Code sind – vor neuen Ideen und vor `Ready`-Aufgaben.
+4. **Deine Kommentare** in offenen Issues (Antworten auf `user-task`, Rückfragen) zeitnah verarbeiten.
+5. Neue `idea-inbox`-Issues übernehmen, dann die oberste `Ready`-Zeile in `docs/IDEAS.md`.
+
+**Issue-Pflege (#35, #36)**
+- Issue-Check **zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe** (nach Commit/PR): neue/geänderte Issues seit dem letzten Check lesen. Einen dauerhaft im Hintergrund laufenden Prüfer gibt es innerhalb einer Sitzung nicht (kein Pollen); zwischen Sitzungen übernimmt das die Routine (#30). Für das Auflisten/Zusammenfassen dürfen Hilfsagenten mit kleinem Modell eingesetzt werden (siehe „Modellwahl“).
+- **Fertige Aufgaben werden geschlossen** (Label `done`), sobald der Stand in `main` ist – nicht nur kommentiert. Steht noch eine wichtige Info für dich drin, bekommt das Issue zusätzlich das Label **`info`** und bleibt offen; du schließt es selbst oder per Kommentar. Wirklich offene Aufgaben bleiben offen.
+- `user-task`-Issues werden geschlossen, sobald deine Antwort umgesetzt bzw. in `docs/IDEAS.md` eingeplant ist.
+
+**Hilfsagent für Issue-Pflege (auf deinen Wunsch)**
+- Die Hauptsession startet zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe einen Hilfsagenten mit kleinem Modell (Haiku) im Hintergrund. Er **liest** alle offenen Issues und bereitet eine **Arbeitsliste** für die Hauptsession vor: Reihenfolge nach den Prioritäten oben (fehlgeschlagene Tests → `priority: high`, vor allem deine `idea-inbox`-High-Prio-Issues → Kommentare → Ideen), je Issue empfohlene Aktion, Entwurf für die `IDEAS.md`-Zeile (Beschreibung, Nutzen, Priorität, Abhängigkeiten, Abnahme) und Label-Auffälligkeiten.
+- Er darf nur eindeutige Label-Korrekturen vornehmen und kurze Hinweis-Kommentare schreiben; er ändert **keine Dateien, kein Git, schließt keine Issues** und fasst `user-test`/`user-task`-Entscheidungen nicht an – so entstehen keine Konflikte mit der Hauptsession. Entscheiden, umsetzen und `docs/IDEAS.md` pflegen bleibt bei der Hauptsession, die die Arbeitsliste direkt übernimmt.
+
+**`docs/IDEAS.md` und Branches (#40)**
+- Direkte Pushes auf `main` sind tabu (Schutzregel). Deshalb wird `docs/IDEAS.md` auf dem Arbeits-Branch gepflegt und **zügig per PR in `main` integriert**; der Stand in `main` ist maßgeblich. Bearbeitest du die Datei selbst (z. B. im GitHub-Web), bitte auf `main` oder auf dem Arbeits-Branch – die Hauptsession holt die Änderung vor dem eigenen Bearbeiten per Merge/Fast-Forward und überschreibt sie nie.
+- Mehrere Branches sind erlaubt, wenn sinnvoll (z. B. ein reiner Doku-PR parallel zu einer Feature-Arbeit), immer `claude/…`-Präfix, jeder über PR mit grüner CI. Bei parallelen Änderungen an `docs/IDEAS.md` auf verschiedenen Branches Konflikte vor dem Merge auflösen, nie per Force-Push.
+
+**Kontingent (#13):** Nur das Kontingent deines Pro-Plans. Die Hauptsession kauft nichts, aktiviert keine „usage credits“ oder Zusatznutzung und ändert keine Abrechnungseinstellungen (kann sie auch nicht). Ist das Kontingent erschöpft, stoppt die laufende Sitzung; sie kann sich **nicht** selbst nach dem Zurücksetzen neu starten. Fortgesetzt wird durch deine Nachricht („weiter“) oder den nächsten planmäßigen Routine-Lauf (#30). Ein abgelehnter Routine-Lauf wird nicht nachgeholt; der nächste planmäßige startet normal.
 
 **Ablauf je Durchlauf der Hauptsession (ohne konkreten Auftrag)**
 1. `git status`/`git fetch` prüfen; fremde uncommittete Änderungen nie überschreiben.
 2. Offene `user-test`-Issues auf neue Kommentare prüfen: `BESTANDEN` → Abnahme in `PROJECT_STATUS.md` vermerken, Label `done`, Issue schließen. `FEHLGESCHLAGEN` → Label `needs-fix`, Ursache suchen, beheben, danach im Issue um erneuten Test bitten (Label wieder `user-test`). Ein fehlgeschlagener Test wird nie als bestanden markiert.
-3. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
-4. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
-5. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue.
-6. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
+3. Offene `user-task`-Issues auf Antworten prüfen und umsetzen (z. B. Freigabe → Aufgabe von `Blocked` nach `Ready`); erledigte schließen.
+4. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
+5. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
+6. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue.
+7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
+8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
 
 **Statusbegriffe (Projektstatus):** implementiert · automatisiert getestet · User-Test offen (#Issue) · vom Nutzer bestätigt (Datum) · fehlgeschlagen/Nachbesserung (#Issue) · blockiert. „Done“ im Backlog bedeutet **nicht** automatisch „von dir bestätigt“.
 
 Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nächsten Durchlauf gelesen.
 
+## Modellwahl (#18)
+Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kontingent zu schonen.
+
+| Aufgabentyp | Modell |
+|---|---|
+| Doku-Pflege, Issue-Housekeeping, Labels, Formatierung, einfache Textänderungen | Haiku |
+| normale Feature-Arbeit (UI, Komponenten), Tests, übliche Fehlersuche, Recherche im Code | Sonnet |
+| Kern-Geometrie/Datenmodell (`src/model`, `derivePlan()`, Kollision/Platzierung, Schema-Migrationen), schwierige Fehlersuche (z. B. Rendering-Ursachen), Entscheidungen mit weitreichenden Folgen | Opus |
+
+**Entscheidung:** Die Hauptsession wählt das Modell für Hilfsagenten selbst nach dieser Tabelle (dein Auftrag vom 2026-10-16).
+
+**Paralleler Coding-Agent (auf deinen Wunsch):** Für eine klar abgegrenzte Aufgabe, die kaum Dateien mit der Hauptsession teilt, kann ein zweiter Agent in einem eigenen Git-Worktree auf eigenem Branch `claude/…` arbeiten (Modell nach Tabelle, meist Sonnet). Regeln: eigener E2E-Port (`PW_PORT=4174`), nie fremde Server/Prozesse beenden, keine Änderungen an `docs/IDEAS.md`/`docs/PROJECT_STATUS.md` (pflegt die Hauptsession beim Integrieren), kein PR/keine Issue-Änderungen durch den Agenten – die Hauptsession prüft sein Ergebnis, öffnet den PR und integriert nach grüner CI. Kosten: verbraucht dein Kontingent entsprechend schneller.
+
+**Was tatsächlich steuerbar ist:**
+- Eine laufende Sitzung kann ihr **eigenes** Modell nicht selbst wechseln; das Modell wird beim Start festgelegt (bei dir: Modellauswahl bzw. `/model`, bei Routinen in deren Einstellungen).
+- Die Hauptsession **delegiert** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
+- **Routine:** Für einen Lauf mit höchstens einer Aufgabe reicht meist Sonnet. Du kannst das Modell der Routine unter https://claude.ai/code/routines einstellen; die Hauptsession ändert es nicht eigenmächtig.
+- Wechselt die Hauptsession für eine Aufgabe das Modell bzw. gibt sie an ein anderes Modell ab und ändert das die Arbeit (z. B. Opus-Sitzung nötig), sagt sie dir das kurz im Chat bzw. im Issue.
+- Scheitert eine Aufgabe mit dem kleineren Modell (Tests rot, Ursache unklar), wird sie mit Begründung im Issue an das nächsthöhere Modell bzw. eine von dir gestartete Opus-Sitzung übergeben.
+
 ## Geplante Durchläufe (Routine)
 - Offizielle Funktion: Claude-Code-**Routines** (Research Preview, auch Pro) starten eine neue Cloud-Session nach Zeitplan, frühestens stündlich. Läufe zählen gegen dein Nutzungskontingent. Ist das Limit erreicht, werden Läufe **abgelehnt** (nicht nachgeholt); der nächste planmäßige Lauf nach dem Zurücksetzen startet normal. Zusatznutzung nur, wenn du „usage credits“ selbst einschaltest. Quelle: https://code.claude.com/docs/en/routines (abgerufen 2026-10-16).
-- Eingerichtet: siehe [`PROJECT_STATUS.md`](PROJECT_STATUS.md) › „Automatisierung“ (Name, Zeitplan, Inhalt). Ein Lauf: (1) offenen PR des vorigen Laufs prüfen – CI grün und konfliktfrei → mit Merge-Commit integrieren; rot → zuerst beheben; (2) User-Test-Rückmeldungen und neue Ideen übernehmen; (3) **höchstens eine** Aufgabe umsetzen, Checks, PR öffnen; (4) beenden. Kein direkter Push auf `main`, kein Warten/Pollen auf CI, keine Wiederholungsschleifen.
+- Stand und Einrichtung: [`PROJECT_STATUS.md`](PROJECT_STATUS.md) › „Automatisierung“; fertiger Prompt und Schritte: [`ROUTINE_PROMPT.md`](ROUTINE_PROMPT.md). Ein Lauf: (1) offenen PR des vorigen Laufs prüfen – CI grün und konfliktfrei → mit Merge-Commit integrieren; rot → zuerst beheben; (2) User-Test-Rückmeldungen und neue Ideen übernehmen; (3) **höchstens eine** Aufgabe umsetzen, Checks, PR öffnen; (4) beenden. Kein direkter Push auf `main`, kein Warten/Pollen auf CI, keine Wiederholungsschleifen.
 - Verwalten/abschalten: https://claude.ai/code/routines
 
 ## Sitzungsübergreifend

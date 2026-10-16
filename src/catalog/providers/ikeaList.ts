@@ -5,6 +5,7 @@
  */
 import type { CatalogEntry } from '../catalogFormat';
 import type { ParsedProductPage } from './structuredData';
+import { classifyProduct } from './classify';
 
 export interface ArticleRef {
   /** 8 digits, without dots */
@@ -44,25 +45,11 @@ export const ikeaProductUrl = (a: Pick<ArticleRef, 'digits' | 'combination'>, co
   `https://www.ikea.com/${country}/${language}/p/-${a.combination ? 's' : ''}${a.digits}/`;
 
 /**
- * Planner category from the German product name (heuristic, editable after import).
- * Order matters: "Schreibtisch" before "Tisch", "Bettsofa" counts as sofa.
+ * Planner category from the German product name (shared word rules, editable after
+ * import). Unknown types land in "Deko" so they stay visible in the list.
  */
-const CATEGORY_WORDS: [RegExp, string][] = [
-  [/sofa|sessel|couch|récamiere|recamiere/i, 'sofa'],
-  [/schreibtisch/i, 'desk'],
-  [/bett(gestell)?\b|bettgestell|matratze/i, 'bed'],
-  [/tisch/i, 'table'],
-  [/stuhl|hocker|bank\b/i, 'chair'],
-  [/lampe|leuchte|strahler/i, 'lighting'],
-  [/teppich|gardine|vorhang|schals?\b/i, 'textile'],
-  [/spüle|arbeitsplatte|küche|metod|unterschrank|oberschrank/i, 'kitchen'],
-  [/kühlschrank|herd|backofen|geschirrspüler|dunstabzug|mikrowelle/i, 'appliance'],
-  [/waschbecken|waschtisch|spiegelschrank|dusche/i, 'bathroom'],
-  [/regal|schrank|kommode|aufbewahrung|vitrine|sideboard/i, 'storage'],
-];
-
 export function guessCategory(name: string): string {
-  return CATEGORY_WORDS.find(([re]) => re.test(name))?.[1] ?? 'decor';
+  return classifyProduct(name).category ?? 'decor';
 }
 
 /**
