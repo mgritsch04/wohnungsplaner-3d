@@ -1878,3 +1878,51 @@ test('align and distribute several furniture items: top edge, equal gaps, one un
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('shows the kitchen work triangle with lengths, follows moved appliances and can be switched off (#82)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  // kitchen run along the north wall of the living room – first module: fridge instead of the tall cabinet
+  const s = await planToScreen(page, 1.0, -0.06);
+  await page.mouse.click(s.x, s.y);
+  expect((await getSelection(page))?.type).toBe('wall');
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Küche' }).click();
+  await left.getByRole('combobox', { name: 'Modul' }).first().selectOption({ label: 'Kühlschrank freistehend' });
+  await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const triangle = plan.getByTestId('kitchen-triangle');
+  await expect(triangle).toBeVisible();
+  const sides = triangle.getByTestId('kitchen-triangle-side');
+  await expect(sides).toHaveCount(3);
+  for (const t of await sides.allTextContents()) expect(t).toMatch(/^\d+,\d{2} m$/);
+  await expect(triangle.getByTestId('kitchen-triangle-sum')).toHaveText(/^Σ \d+,\d{2} m$/);
+  const result = left.getByTestId('kitchen-triangle-result');
+  await expect(result).toContainText('Spüle – Herd');
+  await expect(left.getByText('Richtwert, keine Norm', { exact: false })).toBeVisible();
+
+  // moving the fridge far away updates the check (sum too long)
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { kitchen?: { type: string }; x: number; y: number; rotation: number }[] }) => {
+      const f = d.furniture.find((x) => x.kitchen?.type === 'fridge')!;
+      f.x = 4.6;
+      f.y = 3.2;
+      f.rotation = Math.PI;
+    });
+  });
+  await expect(triangle).toHaveAttribute('data-ok', 'false');
+  await expect(triangle.locator('[data-testid="kitchen-triangle-side"][data-status="long"]').first()).toBeVisible();
+  await expect(result).toContainText('außerhalb');
+
+  // switching it off hides the triangle in the plan (the panel keeps the evaluation)
+  await left.getByLabel('Arbeitsdreieck im Plan anzeigen').uncheck();
+  await expect(plan.getByTestId('kitchen-triangle')).toHaveCount(0);
+  await expect(result).toBeVisible();
+  expect((await getProject(page)).settings.kitchenTriangle.show).toBe(false);
+  expect(errors).toEqual([]);
+});
