@@ -480,6 +480,32 @@ test('multi-select: Shift+click, move together, copy/paste, delete, selection bo
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+test('failed autosave shows a clear warning with export option and clears after a successful save (#60)', async ({ page }) => {
+  await freshStart(page);
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  // simulate a full browser storage: IndexedDB writes fail (test-side only)
+  await page.evaluate(() => {
+    const orig = IDBObjectStore.prototype.put;
+    (window as unknown as { __restorePut: () => void }).__restorePut = () => (IDBObjectStore.prototype.put = orig);
+    IDBObjectStore.prototype.put = function () {
+      throw new DOMException('quota', 'QuotaExceededError');
+    };
+  });
+  const name = page.locator('input.project-name');
+  await name.fill('Test Speicherfehler');
+  await name.blur();
+  const banner = page.getByTestId('save-error-banner');
+  await expect(banner).toBeVisible({ timeout: 5000 });
+  await expect(banner).toContainText('Speicherplatz des Browsers');
+  await expect(banner.getByRole('button', { name: 'Jetzt als Datei exportieren' })).toBeVisible();
+  await expect(page.getByText('Gespeichert', { exact: true })).toHaveCount(0);
+  // storage works again → retry → banner disappears, status "Gespeichert"
+  await page.evaluate(() => (window as unknown as { __restorePut: () => void }).__restorePut());
+  await banner.getByRole('button', { name: 'Erneut speichern' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible();
+});
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();
