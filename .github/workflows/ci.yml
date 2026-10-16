@@ -36,3 +36,21 @@ jobs:
           name: e2e-test-results
           path: test-results/
           retention-days: 7
+  # TEMPORARY (#157): repeat the night-lighting test to catch the intermittent failure; removed before merge
+  night-repeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test -g "night lighting" --repeat-each=8 --max-failures=0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: night-repeat-results
+          path: test-results/
+          retention-days: 3
