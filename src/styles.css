@@ -1910,3 +1910,117 @@ code {
     min-width: 0;
   }
 }
+
+/* ---------- ruhigeres Desktop-Erscheinungsbild (#122) ---------- */
+/* Tabs: gleiche Breite, etwas Luft, nichts klebt am Rand */
+.tabs {
+  padding: 0 var(--space-1);
+}
+.tabs button {
+  flex: 1 1 auto; /* Breite nach Inhalt + gleicher Zuschlag: lange Namen kleben nicht aneinander */
+  padding: var(--space-4) var(--space-2) calc(var(--space-4) - 2px);
+  font-size: 0.8125rem; /* 13px: alle Tab-Namen passen ungekürzt */
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tabs button.active,
+.tabs button.active:hover:not(:disabled) {
+  background: transparent;
+}
+/* Abschnittstitel: normale Schreibweise statt GROSSBUCHSTABEN, klare Rangordnung */
+.panel-section h3 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+}
+.panel-section {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+.panel-group-collapsed {
+  padding-bottom: var(--space-5);
+}
+.panel-group-toggle {
+  color: var(--color-text);
+}
+.panel-group-chevron {
+  color: var(--color-text-muted);
+}
+/* Werkzeuge: Hinweis zum aktiven Werkzeug direkt unter dem Raster */
+.tool-hint {
+  margin: var(--space-3) 0 0;
+  min-height: 2lh;
+}
+.tool-btn {
+  padding: var(--space-4) var(--space-1) var(--space-3);
+}
+.tool-btn kbd {
+  border: none;
+  background: transparent;
+  opacity: 0.8;
+}
+/* Symbolleiste: dünne Trenner zwischen den Gruppen, Icons mit Beschriftung */
+@media (min-width: 1181px) {
+  .toolbar-group + .toolbar-group:not(.right) {
+    padding-left: var(--space-4);
+    border-left: 1px solid var(--color-border);
+  }
+}
+.icon-btn.labeled {
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  padding-right: var(--space-4);
+}
+/* Platzmangel (schmales Fenster oder Tageszeit-Regler im Realismus): nur Icons, die Leiste bleibt einzeilig */
+@media (max-width: 1360px) {
+  .toolbar .icon-btn.labeled {
+    gap: 0;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+  .toolbar .icon-btn.labeled .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (max-width: 1700px) {
+  .toolbar:has(.time-control) .icon-btn.labeled {
+    gap: 0;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+  .toolbar:has(.time-control) .icon-btn.labeled .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+/* Zoom: kompakte Leiste unten rechts statt breiter Leiste in der Bildmitte */
+.zoom-slider {
+  left: auto;
+  right: 12px;
+  transform: none;
+  gap: 0;
+  padding: var(--space-0) var(--space-1);
+  box-shadow: var(--shadow-sm);
+}
+.zoom-slider input[type='range'] {
+  width: min(110px, 22vw);
+  margin: 0 var(--space-1);
+}
+.zoom-slider button {
+  min-width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+}
