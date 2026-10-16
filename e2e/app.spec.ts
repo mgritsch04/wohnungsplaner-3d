@@ -355,6 +355,39 @@ test('zoom slider at the bottom of 2D and 3D, synchronised with the mouse wheel 
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D + 3D' }).click();
+  await expect(page.getByTestId('walk-marker')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  const marker = page.getByTestId('walk-marker');
+  await expect(marker).toHaveCount(1);
+  const dot = async () => {
+    const b = (await marker.locator('circle').boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  // the dot sits where the camera is
+  const cam = await page.evaluate(() => (window as any).__wp.three.camera.position);
+  const expected = await planToScreen(page, cam.x, cam.z);
+  const d0 = await dot();
+  expect(Math.hypot(d0.x - expected.x, d0.y - expected.y)).toBeLessThan(4);
+  // walk forward: the dot follows live
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyW');
+  await expect.poll(async () => {
+    const d = await dot();
+    return Math.hypot(d.x - d0.x, d.y - d0.y);
+  }).toBeGreaterThan(5);
+  // 3D only or overview: no marker
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(marker).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();

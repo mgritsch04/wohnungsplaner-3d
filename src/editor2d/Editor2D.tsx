@@ -13,6 +13,7 @@ import { PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
 import { fitView, niceGridStep, screenToWorld, zoomAt, type Viewport } from './viewTransform';
 import { ZoomSlider } from '../ui/ZoomSlider';
+import { useWalkPose } from '../store/walkPoseStore';
 import { UnderlayImage } from './UnderlayImage';
 import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
@@ -649,6 +650,7 @@ export function Editor2D() {
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
           <PlanDrawing project={project} derived={derived} selection={selection} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
+          <WalkMarker px={px} />
 
           {/* node handles */}
           {(tool === 'select' || tool === 'wall') &&
@@ -902,6 +904,27 @@ function CalibrationDialog({ p1, p2, onCancel, onDone }: { p1: Vec2; p2: Vec2; o
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * "You are here" while walking in 3D next to the 2D plan (#19): dot + viewing cone at the
+ * camera position. Subscribes on its own so the plan does not re-render while walking.
+ */
+function WalkMarker({ px }: { px: number }) {
+  const pose = useWalkPose((s) => s.pose);
+  const show = useUiStore((s) => s.cameraMode === 'walk' && s.viewMode === 'split');
+  if (!show || !pose) return null;
+  const dx = -Math.sin(pose.yaw);
+  const dy = -Math.cos(pose.yaw);
+  const len = 46 * px;
+  const spread = 0.45;
+  const ray = (a: number) => `${pose.x + (dx * Math.cos(a) - dy * Math.sin(a)) * len} ${pose.y + (dx * Math.sin(a) + dy * Math.cos(a)) * len}`;
+  return (
+    <g data-testid="walk-marker" pointerEvents="none">
+      <path d={`M ${pose.x} ${pose.y} L ${ray(-spread)} L ${ray(spread)} Z`} fill="rgba(37, 99, 235, 0.18)" stroke="none" />
+      <circle cx={pose.x} cy={pose.y} r={7 * px} fill="#2563eb" stroke="#fff" strokeWidth={2 * px} />
+    </g>
   );
 }
 

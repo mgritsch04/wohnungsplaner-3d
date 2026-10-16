@@ -8,6 +8,7 @@ import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
 import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import { useWalkPose } from '../store/walkPoseStore';
 import type { Vec2 } from '../model/vec';
 
 interface Props {
@@ -203,6 +204,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       pressed.clear();
       endCarry();
       walkApi.current = null;
+      useWalkPose.getState().setPose(null);
     };
   }, [gl, onLockChange, camera, scene, raycaster]);
 
@@ -229,6 +231,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const dt = Math.min(dtRaw, 0.05);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
     camera.position.y = eyeRef.current;
+    useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
       // carried item: on the floor (or its surface height) where the gaze meets it, 1.1–4 m ahead
