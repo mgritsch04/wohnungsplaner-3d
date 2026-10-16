@@ -37,9 +37,10 @@ export function ThemeControl() {
         ))}
       </div>
       <p className="muted small">
-        Gilt für die Bedienoberfläche auf diesem Gerät und wird nicht im Projekt gespeichert. 2D-Plan, 3D-Ansicht und Druckblatt behalten ihre Farben.
+        Gilt für die Bedienoberfläche in diesem Browser auf diesem Gerät, nicht für das Projekt. 2D-Plan, 3D-Ansicht und Druckblatt behalten ihre Farben.
       </p>
-      {notSaved && <p className="warn-text small">Die Einstellung konnte in diesem Browser nicht gespeichert werden und gilt nur bis zum Neuladen.</p>}
+      {/* wording without „gespeichert“: E2E tests look for the save state „Gespeichert“ by text */}
+      {notSaved && <p className="warn-text small">Dieser Browser erlaubt kein dauerhaftes Ablegen – die Wahl gilt nur bis zum Neuladen.</p>}
     </div>
   );
 }
