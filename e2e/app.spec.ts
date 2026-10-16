@@ -2131,3 +2131,57 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('properties panel: groups collapse, keep their state across selections and work with the keyboard (#99)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p = await getProject(page);
+  const wardrobe = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const sofa = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const right = page.locator('.panel.right');
+  const group = (name: string) => right.getByRole('button', { name, exact: true });
+
+  // select a piece of furniture: frequently used groups are open, „Produkt“ is collapsed
+  const w = await planToScreen(page, wardrobe.x, wardrobe.y);
+  await page.mouse.click(w.x, w.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: wardrobe.id });
+  for (const name of ['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis']) await expect(group(name)).toHaveAttribute('aria-expanded', 'true');
+  for (const name of ['3D-Modell', 'Produkt', 'Erweitert']) await expect(group(name)).toHaveAttribute('aria-expanded', 'false');
+  await expect(right.getByLabel('Drehung')).toBeVisible();
+  await expect(right.getByLabel('Marke')).toHaveCount(0);
+
+  // expand „Produkt“, select another piece of furniture: it stays open
+  await group('Produkt').click();
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Marke')).toBeVisible();
+  const s = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofa.id });
+  await expect(right.getByLabel('Name')).toHaveValue(sofa.name);
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Händler')).toBeVisible();
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'false');
+
+  // keyboard: Enter on the heading toggles the group (Space too)
+  await group('Erweitert').focus();
+  await page.keyboard.press('Enter');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  await expect(right.getByLabel('Gesperrt (nicht verschiebbar)')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'false');
+  await expect(right.getByLabel('Gesperrt (nicht verschiebbar)')).toHaveCount(0);
+  await page.keyboard.press(' ');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  // toggling a group changes nothing in the plan (no undo step, selection unchanged)
+  expect(await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length)).toBe(0);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofa.id });
+
+  // remembered on this device after a reload
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await page.evaluate((id) => (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), wardrobe.id);
+  await expect(group('Produkt')).toHaveAttribute('aria-expanded', 'true');
+  await expect(group('Erweitert')).toHaveAttribute('aria-expanded', 'true');
+  await expect(group('3D-Modell')).toHaveAttribute('aria-expanded', 'false');
+  expect(errors).toEqual([]);
+});
