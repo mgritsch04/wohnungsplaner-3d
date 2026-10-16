@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { computeBudget, priceStatusLabel } from '../../budget/budget';
 import { exportShoppingCsv } from '../../budget/budgetActions';
+import { furnitureRoomLookup } from '../../budget/rooms';
+import { derivePlan } from '../../model/derived';
 import { formatEuro } from '../../model/units';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
@@ -8,9 +10,14 @@ import { Badge, Section } from '../fields';
 
 export function BudgetPanel() {
   const furniture = useProjectStore((s) => s.project.furniture);
+  const nodes = useProjectStore((s) => s.project.nodes);
+  const walls = useProjectStore((s) => s.project.walls);
+  const openings = useProjectStore((s) => s.project.openings);
+  const rooms = useProjectStore((s) => s.project.rooms);
   const apply = useProjectStore((s) => s.apply);
-  const b = useMemo(() => computeBudget(furniture), [furniture]);
-  const [group, setGroup] = useState<'category' | 'retailer'>('category');
+  const roomOf = useMemo(() => furnitureRoomLookup({ rooms }, derivePlan({ nodes, walls, openings, rooms })), [nodes, walls, openings, rooms]);
+  const b = useMemo(() => computeBudget(furniture, roomOf), [furniture, roomOf]);
+  const [group, setGroup] = useState<'category' | 'retailer' | 'room'>('category');
 
   if (b.lines.length === 0) {
     return (
@@ -25,7 +32,9 @@ export function BudgetPanel() {
   const groups =
     group === 'category'
       ? b.byCategory.map((c) => ({ key: c.category, label: c.label, total: c.total, lines: b.lines.filter((l) => l.category === c.category) }))
-      : b.byRetailer.map((r) => ({ key: r.retailer, label: r.retailer, total: r.total, lines: b.lines.filter((l) => l.retailer === r.retailer) }));
+      : group === 'retailer'
+        ? b.byRetailer.map((r) => ({ key: r.retailer, label: r.retailer, total: r.total, lines: b.lines.filter((l) => l.retailer === r.retailer) }))
+        : b.byRoom.map((r) => ({ key: r.roomId ?? '', label: r.label, total: r.total, lines: b.lines.filter((l) => l.roomId === r.roomId) }));
 
   return (
     <div className="panel-scroll">
@@ -45,8 +54,8 @@ export function BudgetPanel() {
           <dd>{b.missingCount ? <Badge kind="error">{b.missingCount} Position(en)</Badge> : '–'}</dd>
         </dl>
         <p className="muted small">Schätzungen sind grobe Richtwerte für generische Objekte, keine Händlerpreise.</p>
-        <button className="block" onClick={exportShoppingCsv}>
-          Einkaufsliste als CSV exportieren
+        <button className="block" onClick={() => exportShoppingCsv(group === 'room')}>
+          Einkaufsliste als CSV exportieren{group === 'room' ? ' (nach Raum)' : ''}
         </button>
       </Section>
       <Section
@@ -55,6 +64,7 @@ export function BudgetPanel() {
           <select value={group} onChange={(e) => setGroup(e.target.value as typeof group)} aria-label="Gruppierung">
             <option value="category">nach Kategorie</option>
             <option value="retailer">nach Händler</option>
+            <option value="room">nach Raum</option>
           </select>
         }
       >

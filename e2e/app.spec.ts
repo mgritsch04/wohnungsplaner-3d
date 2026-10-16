@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 
@@ -514,6 +515,21 @@ test('exports the shopping list as CSV', async ({ page }) => {
   await page.getByRole('button', { name: 'Einkaufsliste als CSV exportieren' }).click();
   const d = await download;
   expect(d.suggestedFilename()).toMatch(/einkaufsliste\.csv$/);
+
+  // grouped by room (#75): one group per room with its subtotal, CSV with room column and subtotals
+  await page.getByRole('combobox', { name: 'Gruppierung' }).selectOption('room');
+  const heads = page.locator('.budget-group-head');
+  await expect(heads).toHaveCount(2);
+  await expect(heads.nth(0)).toContainText('Schlafzimmer');
+  await expect(heads.nth(1)).toContainText('Wohnzimmer');
+  const download2 = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Einkaufsliste als CSV exportieren (nach Raum)' }).click();
+  const d2 = await download2;
+  expect(d2.suggestedFilename()).toMatch(/einkaufsliste-nach-raum\.csv$/);
+  const csv = (await readFile((await d2.path())!)).toString('utf8');
+  expect(csv).toContain('Raum;Kategorie;Artikel');
+  expect(csv).toContain('Zwischensumme Schlafzimmer');
+  expect(csv).toContain('Zwischensumme Wohnzimmer');
 });
 
 test('imports page 2 of a vector PDF, applies the stated scale and recognises walls', async ({ page }) => {
