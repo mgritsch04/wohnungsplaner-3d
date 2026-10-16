@@ -24,6 +24,7 @@ import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
+import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -49,6 +50,8 @@ interface Preview {
   measure?: { a: Vec2; b: Vec2 } | null;
   /** Walls a dragged item is snapped to (highlighted). */
   snapWalls?: string[];
+  /** Single item being dragged: show its clearances (#50). */
+  clearanceId?: string;
 }
 
 const SNAP_PX = 10;
@@ -387,7 +390,7 @@ export function Editor2D() {
             const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
             for (const g of dr.group) moveFurnitureTo(d, derived, obstacles, g.id, { x: roundMm(g.x + delta.x), y: roundMm(g.y + delta.y) }, { snap: false, collide: !e.altKey });
           });
-          setPreview({ snapWalls: snapped });
+          setPreview({ snapWalls: snapped, clearanceId: dr.group.length ? undefined : dr.id });
           return;
         }
         case 'box': {
@@ -708,6 +711,7 @@ export function Editor2D() {
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
+          {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingId={preview.clearanceId} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
 

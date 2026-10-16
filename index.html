@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wohnungsplaner 3D</title>
+    <script>
+      // Farbschema (#73) vor dem ersten Rendern setzen, damit nichts hell aufblitzt.
+      // Gleicher Schlüssel und gleiche Regeln wie src/ui/themePreference.ts.
+      (function () {
+        var theme = 'system';
+        try {
+          var stored = window.localStorage.getItem('wohnungsplaner-theme');
+          if (stored === 'light' || stored === 'dark') theme = stored;
+        } catch (e) {
+          /* localStorage gesperrt → System */
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

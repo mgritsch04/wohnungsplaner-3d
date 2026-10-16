@@ -5,9 +5,9 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Grundriss-Import schräge Wände/Räume/Maßtexte (#37 → #114), Projektversionen (#66/#58 → #115), Einkaufsliste nach Räumen + „Problem melden“ (#75/#62 → #116), Engstellen (#68 → #118), Laufwege (#67 → #120), Tastenkürzel-Übersicht (#59), UI-Grundlage (#96–#98) + Ausrichten/Verteilen (#51 → #122), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
 - **Deine Aufgaben:** #28 Smart-Home-Rückfragen (Erklärungen in `smart-home/DECISIONS.md`) · #30 Routine einrichten (Label `user-task`); #27 und #29 von dir erledigt
-- **In Arbeit (parallel):** Grundriss-Import (#37, Agent), Projektversionen/Varianten (#66/#58, Agent), Mindestbreiten (#68, lokale Sitzung „Hallo“ – Aufträge über Issue #110)
+- **In Arbeit (parallel):** Dunkelmodus (#73), Maßlinien (#50), Kamera-Lesezeichen (#55) – je ein Opus-Agent; lokale Sitzung „Hallo“: E2E-Fix Türen (Windows) und Nutzung alle 60 s fürs Dashboard (#113, Aufträge in #110). Dashboard: https://claude.ai/artifact/Smc3PMAsNzSgMnFG2WHqK2
 - **Nächster Schritt:** oberste unblockierte `Ready`-Zeile in [`IDEAS.md`](IDEAS.md), danach UI-Grundlage (#96–#98)
 
 ## Legende
@@ -138,5 +138,5 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 Siehe [`IDEAS.md`](IDEAS.md) → `Ready` (Reihenfolge dort).
 
 ## Git
-- Branch `claude/quirky-faraday-0d9uep`; `main` = `2a0072f` (zuletzt gemergt: PR #48, #108, #109). Offen: PR #111 (#71/#72). Agenten-Branches: `claude/plan-import-37`, `claude/project-versions-66`, lokal `claude/min-widths-68`.
+- Branch `claude/quirky-faraday-0d9uep`; `main` = `4f7bc78` (zuletzt gemergt: PR #111, #117, #119, #121).
 - Frühere Runden: PR #1 (`5797457`), PR #2 (`a9cc64f`), PR #3 (IKEA/Smart-Home-Doku).
