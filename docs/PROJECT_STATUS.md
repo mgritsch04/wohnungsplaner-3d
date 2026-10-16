@@ -5,9 +5,9 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
 - **Deine Aufgaben:** #28 Smart-Home-Rückfragen (Erklärungen in `smart-home/DECISIONS.md`) · #30 Routine einrichten (Label `user-task`); #27 und #29 von dir erledigt
-- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Ducken beim Begehen #20; Ergebnisse der Hilfsagenten in PR #45 (#10 IKEA-Import) und PR #44 (#27 IKEA-Küche, Empfehlung: nur mit deiner Datei))
+- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Mehrfachauswahl; parallel Agenten für weitere Ready-Aufgaben; Ergebnisse der Hilfsagenten in PR #45 (#10 IKEA-Import) und PR #44 (#27 IKEA-Küche, Empfehlung: nur mit deiner Datei))
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
@@ -32,6 +32,7 @@ Status je Aufgabe: implementiert · automatisiert getestet · User-Test offen (#
 | First-Person: Möbel auswählen/tragen (#39): Klick aufs Fadenkreuz wählt aus, G trägt (folgt dem Blick 1,1–4 m, Kollision wie beim Ziehen), Klick/G setzt ab (ein Undo-Schritt), Verlassen setzt ab; G schaltet beim Begehen kein 2D-Werkzeug | ✅ | ✅ E2E (anvisieren, tragen, absetzen, Undo-Schritt, Werkzeug unverändert) | 🧪 #42 · Screenshot angesehen |
 | C Zoom-Regler (#6): unten in 2D und 3D (−/+/logarithmischer Schieber/Einpassen), synchron mit Mausrad/Touchpad, beim Begehen ausgeblendet | ✅ | ✅ E2E (Knöpfe, Mausrad-Sync 2D/3D, ausgeblendet beim Begehen) | 🧪 #43 · Screenshot angesehen |
 | Positionsmarker (#19): Punkt + Blickkegel der Begehen-Kamera live im 2D-Plan, nur in 2D + 3D; eigener Mini-Store, kein Neuzeichnen des Plans | ✅ | ✅ E2E (Position = Kamera, folgt beim Gehen, nur in 2D+3D) | 🧪 #46 |
+| Ducken (#20): C halten senkt die Kamera weich auf ~60 % der Augenhöhe (min. 80 cm), halbe Gehgeschwindigkeit, Anzeige „Geduckt“; C ohne Wirkung auf 2D-Werkzeuge beim Begehen | ✅ | ✅ E2E | 🧪 #47 |
 | Nachtlicht-Test robust gemacht: misst nur den Bildbereich der Wohnung (vorher Mittel über das ganze, überwiegend schwarze Bild → im CI zu knapp); Lampen/Raumlicht verstärkt | ✅ | ✅ lokal an 32,2 / aus 12,0 | – |
 
 ## Diese Runde (Arbeitsauftrag 1–8)
@@ -100,6 +101,7 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 - #42 Begehen: Möbel tragen, Teppich an Wänden
 - #43 Zoom-Regler
 - #46 Positionsmarker beim Begehen
+- #47 Ducken beim Begehen
 - Hinweis: #26 und #31 hast du vor dem Merge getestet – nach Merge von PR #32 bitte neu
 - #11 Projekt speichern / erneut öffnen
 - #12 IKEA: Artikelliste → Produktliste, PAX-Planung
