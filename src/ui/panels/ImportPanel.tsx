@@ -65,7 +65,7 @@ export function ImportPanel() {
         <button className="block" onClick={() => void importFloorPlanJsonFile()}>
           Grundriss-JSON (apartment-plan.json) importieren…
         </button>
-        <button className="block" onClick={() => void importIkeaPlannerFile()} title="Gespeicherte Planung aus dem IKEA-PAX-/Aufbewahrungsplaner (JSON) – siehe Hilfe in docs/PLANNER_IMPORT_RESEARCH.md">
+        <button className="block" onClick={() => void importIkeaPlannerFile()} title="Gespeicherte Planung aus dem IKEA-PAX-/Aufbewahrungsplaner (JSON). Optional zusammen mit der Produktliste (produktliste.json) wählen – dann bekommen die Korpusse echte Namen und Preise. Anleitung: docs/IKEA_PLANUNG_JSON.md">
           IKEA-Planung (JSON) importieren…
         </button>
       </Section>
