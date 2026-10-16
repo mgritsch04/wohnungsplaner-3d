@@ -233,6 +233,36 @@ test('walkthrough mode can be entered and left', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('walkthrough: eye height 163 cm by default, adjustable live and saved; crosshair only while walking (#23, #22)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByTestId('crosshair')).toHaveCount(0); // not in the overview
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const camY = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (window as any).__wp.three.camera.position.y as number;
+    });
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
+  const field = page.getByLabel('Augenhöhe beim Begehen');
+  await expect(field).toHaveValue('163');
+  await field.fill('180');
+  await field.press('Enter');
+  await expect.poll(camY).toBeCloseTo(1.8, 3); // immediately, still walking
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByTestId('crosshair')).toHaveCount(0);
+  // saved with the project
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).settings.eyeHeight).toBeCloseTo(1.8, 6);
+  expect(errors).toEqual([]);
+});
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();

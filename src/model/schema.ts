@@ -247,6 +247,8 @@ export const SettingsSchema = z.object({
   mouseSensitivity: z.number().min(0.2).max(3).default(1),
   /** Lamps in realism mode: 'auto' = switched on at dusk, 'on' = always, 'off' = never. */
   lamps: z.enum(['auto', 'on', 'off']).default('auto'),
+  /** Camera (eye) height in the first-person walkthrough, metres. */
+  eyeHeight: z.number().min(1).max(2.2).default(1.63),
 });
 
 export const ProjectSchema = z.object({

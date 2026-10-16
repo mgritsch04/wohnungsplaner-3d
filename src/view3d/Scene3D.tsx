@@ -65,6 +65,7 @@ export function Scene3D() {
           <SceneContent project={project} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
+      {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && (
         <div className="walk-overlay">
           {locked ? (
@@ -206,6 +207,7 @@ function SceneContent({
           furniture={project.furniture}
           start={walkStart}
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
+          eyeHeight={project.settings.eyeHeight}
           onLockChange={onLockChange}
         />
       )}

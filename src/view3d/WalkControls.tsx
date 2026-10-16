@@ -13,6 +13,8 @@ interface Props {
   speed?: number;
   /** Radians per pixel of mouse movement. */
   sensitivity?: number;
+  /** Camera height above the floor (m). */
+  eyeHeight?: number;
   onLockChange: (locked: boolean) => void;
 }
 
@@ -24,7 +26,7 @@ interface Props {
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
 
-export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, onLockChange }: Props) {
+export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
   const { camera, gl } = useThree();
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
@@ -35,6 +37,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useEffect(() => {
     sensitivityRef.current = sensitivity;
   }, [sensitivity]);
+  // eye height changes apply immediately, without restarting the walk (pointer lock stays)
+  const eyeRef = useRef(eyeHeight);
+  useEffect(() => {
+    eyeRef.current = eyeHeight;
+  }, [eyeHeight]);
   const colliders = useMemo(() => buildColliders(derived, furniture), [derived, furniture]);
   const collidersRef = useRef(colliders);
   useEffect(() => {
@@ -46,7 +53,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const startY = start.y;
   useEffect(() => {
     const p = resolveCollisions({ x: startX, y: startY }, collidersRef.current);
-    camera.position.set(p.x, EYE_HEIGHT, p.y);
+    camera.position.set(p.x, eyeRef.current, p.y);
     yaw.current = 0;
     pitch.current = 0;
     camera.rotation.set(0, 0, 0, 'YXZ');
@@ -128,6 +135,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
+    camera.position.y = eyeRef.current;
     const k = keys.current;
     let fx = 0;
     let fz = 0;
@@ -150,7 +158,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       };
       p = resolveCollisions(p, collidersRef.current);
     }
-    camera.position.set(p.x, EYE_HEIGHT, p.y);
+    camera.position.set(p.x, eyeRef.current, p.y);
   });
 
   return null;

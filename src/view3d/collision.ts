@@ -6,7 +6,8 @@ import { closestPointOnSegment, pointInPolygon, sub, type Vec2 } from '../model/
 /** Heights relevant for walking: obstacles between STEP and HEAD block the player. */
 export const STEP_HEIGHT = 0.25;
 export const HEAD_HEIGHT = 1.85;
-export const EYE_HEIGHT = 1.65;
+/** Default eye height in the walkthrough (adjustable per project: settings.eyeHeight). */
+export const EYE_HEIGHT = 1.63;
 export const PLAYER_RADIUS = 0.22;
 
 export type Collider = Vec2[];

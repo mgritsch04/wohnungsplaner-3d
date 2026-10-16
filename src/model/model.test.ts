@@ -199,6 +199,13 @@ describe('settings', () => {
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, mouseSensitivity: 10 } })).toThrow();
   });
 
+  it('older projects get the default eye height of 163 cm in the walkthrough', () => {
+    const raw = structuredClone(createEmptyProject()) as unknown as { settings: Record<string, unknown> };
+    delete raw.settings.eyeHeight;
+    expect(ProjectSchema.parse(raw).settings.eyeHeight).toBe(1.63);
+    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, eyeHeight: 3 } })).toThrow();
+  });
+
   it('older projects without a lamp setting load with automatic lamps', () => {
     const raw = structuredClone(createEmptyProject()) as unknown as { settings: Record<string, unknown> };
     delete raw.settings.lamps;
