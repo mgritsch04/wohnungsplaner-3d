@@ -1,11 +1,13 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // The 2D plan keeps its light surface in dark mode, so its hint colours (#82) must
 // keep their light values in the dark theme and stay readable on the plan background.
-const themeCss = readFileSync(new URL('../theme.css', import.meta.url), 'utf8');
-const editorSrc = readFileSync(new URL('./Editor2D.tsx', import.meta.url), 'utf8');
+// relative to the project root (Vitest runs there) – independent of the test environment's import.meta.url
+const themeCss = readFileSync(resolve('src/theme.css'), 'utf8');
+const editorSrc = readFileSync(resolve('src/editor2d/Editor2D.tsx'), 'utf8');
 const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo'];
 
 const valuesOf = (name: string) => [...themeCss.matchAll(new RegExp(`--${name}\\s*:\\s*(#[0-9a-f]{6})`, 'gi'))].map((m) => m[1].toLowerCase());
