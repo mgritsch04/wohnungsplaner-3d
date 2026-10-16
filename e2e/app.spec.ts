@@ -399,7 +399,14 @@ test('2D: dragging furniture into a wall stops flush (no tunnelling), Alt allows
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await page.waitForTimeout(600);
-  const p = await getProject(page);
+  let p = await getProject(page);
+  // the TV sideboard stands between table and wall (furniture blocks too) – remove it first
+  const board = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-tv-sideboard');
+  const b = await planToScreen(page, board.x, board.y);
+  await page.mouse.click(b.x, b.y);
+  await page.keyboard.press('Delete');
+  p = await getProject(page);
+  expect(p.furniture.some((f: { id: string }) => f.id === board.id)).toBe(false);
   const table = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
   const s = await planToScreen(page, table.x, table.y);
   const target = await planToScreen(page, table.x, -3); // far beyond the north wall
