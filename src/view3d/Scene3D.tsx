@@ -144,7 +144,7 @@ function SceneContent({
       <color attach="background" args={[quality === 'realism' ? '#dfe7ee' : '#eef1f4']} />
       {quality === 'realism' && !(cutaway && cameraMode === 'orbit') && <RealismSky timeOfDay={project.settings.timeOfDay} />}
       <Lights project={project} quality={quality} center={center} span={span} />
-      {quality === 'realism' && <EnvironmentLight intensity={0.35 * project.settings.exposure} />}
+      {quality === 'realism' && <EnvironmentLight intensity={0.55} />}
       <ExposureSync exposure={project.settings.exposure} />
       <FpsMeter />
       <AdaptiveQuality />
@@ -192,12 +192,21 @@ function RealismSky({ timeOfDay }: { timeOfDay: number }) {
  */
 function RealismEffects() {
   const dprCap = usePerformanceStore((s) => s.dprCap);
+  const { gl } = useThree();
+  // tone mapping happens once, in the effect chain – not additionally in the renderer
+  useEffect(() => {
+    const prev = gl.toneMapping;
+    gl.toneMapping = THREE.NoToneMapping;
+    return () => {
+      gl.toneMapping = prev;
+    };
+  }, [gl]);
   const lowPower = dprCap < 1;
   return (
     <EffectComposer multisampling={0}>
       <N8AO aoRadius={0.6} distanceFalloff={0.6} intensity={2.2} quality={lowPower ? 'performance' : 'medium'} halfRes={lowPower} />
       <SMAA />
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <ToneMapping mode={ToneMappingMode.AGX} />
     </EffectComposer>
   );
 }
@@ -268,12 +277,13 @@ function Lights({ project, quality, center, span }: { project: Project; quality:
   const lights = project.lights.filter((l) => l.on).slice(0, realism ? 8 : 4);
   return (
     <>
-      <hemisphereLight args={['#f4f6ff', '#b8a990', 0.55 + 0.6 * daylight]} />
-      <ambientLight intensity={0.15} />
+      {/* realism relies on the environment map for soft fill light; planning needs a bright, even fill */}
+      <hemisphereLight args={['#f4f6ff', '#b8a990', realism ? 0.18 + 0.25 * daylight : 0.55 + 0.6 * daylight]} />
+      <ambientLight intensity={realism ? 0.03 : 0.15} />
       <directionalLight
         ref={ref}
         position={[center.x + sun.x * dist, Math.max(0.5, sun.y * dist), center.y + sun.z * dist]}
-        intensity={(realism ? 2.2 : 1.4) * daylight + 0.05}
+        intensity={(realism ? 3.2 : 1.4) * daylight + 0.05}
         color={daylight < 0.3 ? '#ffc58a' : '#fff6e8'}
         castShadow={realism}
         shadow-mapSize-width={2048}
