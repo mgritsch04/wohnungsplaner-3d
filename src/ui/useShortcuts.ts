@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore, type Tool } from '../store/uiStore';
-import { deleteSelection, duplicateSelection, nudgeSelection, rotateSelection, saveNow } from './actions';
+import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow } from './actions';
 
 const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure' };
 
@@ -23,6 +23,15 @@ export function useShortcuts() {
       } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {
         e.preventDefault();
         ps.redo();
+      } else if (mod && key === 'c' && !window.getSelection()?.toString()) {
+        if (copySelection()) e.preventDefault();
+      } else if (mod && key === 'v') {
+        e.preventDefault();
+        pasteClipboard();
+      } else if (mod && key === 'a' && ui.viewMode !== '3d') {
+        // select all furniture
+        e.preventDefault();
+        ui.selectFurniture(ps.project.furniture.map((f) => f.id));
       } else if (mod && key === 'd') {
         e.preventDefault();
         duplicateSelection();

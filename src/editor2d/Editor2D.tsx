@@ -6,7 +6,7 @@ import { newId } from '../model/ids';
 import { add, boundsOf, dist, dot, normalize, perp, rotate, scale, sub, type Vec2 } from '../model/vec';
 import { formatLength, radToDeg, roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
-import { useUiStore } from '../store/uiStore';
+import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { PlanDrawing } from './PlanDrawing';
@@ -26,7 +26,8 @@ import { calibrateUnderlay } from '../import/underlayTransform';
 
 type Drag =
   | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean }
-  | { kind: 'furniture'; id: string; grab: Vec2; moved: boolean }
+  | { kind: 'furniture'; id: string; grab: Vec2; moved: boolean; origin: Vec2; group: { id: string; x: number; y: number }[] }
+  | { kind: 'box'; start: Vec2 }
   | { kind: 'rotate'; id: string }
   | { kind: 'node'; id: string; moved: boolean }
   | { kind: 'wall'; id: string; start: Vec2; normal: Vec2; moved: boolean; wholeLine: boolean }
@@ -38,6 +39,8 @@ type Drag =
 interface Preview {
   snap?: SnapResult | null;
   rect?: { a: Vec2; b: Vec2 } | null;
+  /** furniture selection box (Shift+drag) */
+  box?: { a: Vec2; b: Vec2 } | null;
   opening?: { wallId: string; s: number; kind: OpeningKind } | null;
   measure?: { a: Vec2; b: Vec2 } | null;
   /** Walls a dragged item is snapped to (highlighted). */
@@ -57,6 +60,7 @@ export function Editor2D() {
 
   const selection = useUiStore((s) => s.selection);
   const hover = useUiStore((s) => s.hover);
+  const multi = useUiStore((s) => s.multi);
   const tool = useUiStore((s) => s.tool);
   const view = useUiStore((s) => s.view2d);
   const fitRequest = useUiStore((s) => s.fitRequest);
@@ -228,6 +232,17 @@ export function Editor2D() {
           }
         }
         const hit = hitTest(project, derived, w, tol);
+        // Shift+click on furniture: add to / remove from the selection (multi-select)
+        if (hit?.type === 'furniture' && e.shiftKey) {
+          ui().toggleFurnitureSelection(hit.id);
+          drag.current = null;
+          return;
+        }
+        // Shift+drag on empty space or a room floor: selection box for furniture
+        if (e.shiftKey && (!hit || hit.type === 'room')) {
+          drag.current = { kind: 'box', start: w };
+          return;
+        }
         if (!hit) {
           // underlay drag when unlocked, otherwise pan
           const u = project.underlay;
@@ -239,7 +254,10 @@ export function Editor2D() {
           drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: true };
           return;
         }
-        ui().setSelection(hit);
+        // grabbing an item of a multi-selection keeps the selection and moves the whole group
+        const current = ui();
+        const inGroup = hit.type === 'furniture' && current.multi.length > 0 && selectedFurnitureIds(current).includes(hit.id);
+        if (!inGroup) ui().setSelection(hit);
         beginTx();
         if (hit.type === 'furniture') {
           const f = project.furniture.find((x) => x.id === hit.id)!;
@@ -247,7 +265,14 @@ export function Editor2D() {
             drag.current = null;
             return;
           }
-          drag.current = { kind: 'furniture', id: hit.id, grab: sub(w, { x: f.x, y: f.y }), moved: false };
+          const group = inGroup
+            ? selectedFurnitureIds(current)
+                .filter((id) => id !== hit.id)
+                .map((id) => project.furniture.find((x) => x.id === id))
+                .filter((g): g is NonNullable<typeof g> => !!g && !g.locked)
+                .map((g) => ({ id: g.id, x: g.x, y: g.y }))
+            : [];
+          drag.current = { kind: 'furniture', id: hit.id, grab: sub(w, { x: f.x, y: f.y }), moved: false, origin: { x: f.x, y: f.y }, group };
         } else if (hit.type === 'node') {
           drag.current = { kind: 'node', id: hit.id, moved: false };
         } else if (hit.type === 'wall') {
@@ -346,9 +371,18 @@ export function Editor2D() {
           // wall snapping + collision (Alt = free placement)
           let snapped: string[] = [];
           updateTx((d) => {
-            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: !e.altKey, collide: !e.altKey });
+            // a group moves rigidly (no wall snapping), each item still stops at walls/furniture
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: !e.altKey && !dr.group.length, collide: !e.altKey });
+            const moved = d.furniture.find((x) => x.id === dr.id);
+            if (!moved || !dr.group.length) return;
+            const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
+            for (const g of dr.group) moveFurnitureTo(d, derived, obstacles, g.id, { x: roundMm(g.x + delta.x), y: roundMm(g.y + delta.y) }, { snap: false, collide: !e.altKey });
           });
           setPreview({ snapWalls: snapped });
+          return;
+        }
+        case 'box': {
+          setPreview({ box: { a: dr.start, b: w } });
           return;
         }
         case 'rotate': {
@@ -486,6 +520,19 @@ export function Editor2D() {
     if (!dr) return;
     if (dr.kind === 'pan') {
       if (!dr.moved && dr.clickSel) ui().setSelection(null);
+      return;
+    }
+    if (dr.kind === 'box') {
+      const b = toWorld(e);
+      setPreview({});
+      const x0 = Math.min(dr.start.x, b.x);
+      const x1 = Math.max(dr.start.x, b.x);
+      const y0 = Math.min(dr.start.y, b.y);
+      const y1 = Math.max(dr.start.y, b.y);
+      const inside = project.furniture.filter((f) => f.x >= x0 && f.x <= x1 && f.y >= y0 && f.y <= y1).map((f) => f.id);
+      // add to an existing furniture selection (Shift is held)
+      const keep = selectedFurnitureIds(ui());
+      ui().selectFurniture([...keep, ...inside.filter((id) => !keep.includes(id))]);
       return;
     }
     if (dr.kind === 'room-rect') {
@@ -648,7 +695,7 @@ export function Editor2D() {
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
-          <PlanDrawing project={project} derived={derived} selection={selection} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
+          <PlanDrawing project={project} derived={derived} selection={selection} multi={multi} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <WalkMarker px={px} />
 
@@ -701,6 +748,20 @@ export function Editor2D() {
           )}
 
           {/* room rectangle preview */}
+          {preview.box && (
+            <rect
+              data-testid="selection-box"
+              x={Math.min(preview.box.a.x, preview.box.b.x)}
+              y={Math.min(preview.box.a.y, preview.box.b.y)}
+              width={Math.abs(preview.box.b.x - preview.box.a.x)}
+              height={Math.abs(preview.box.b.y - preview.box.a.y)}
+              fill="rgba(37, 99, 235, 0.08)"
+              stroke="#2563eb"
+              strokeWidth={px}
+              strokeDasharray={`${4 * px} ${3 * px}`}
+              pointerEvents="none"
+            />
+          )}
           {preview.rect && (
             <g pointerEvents="none">
               <rect

@@ -107,6 +107,7 @@ function SceneContent({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const derived = useMemo(() => derivePlan(project), [archKey]);
   const selection = useUiStore((s) => s.selection);
+  const multi = useUiStore((s) => s.multi);
   const setSelection = useUiStore((s) => s.setSelection);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
   const { gl, camera, scene } = useThree();
@@ -195,7 +196,7 @@ function SceneContent({
           key={f.id}
           item={f}
           quality={quality}
-          selected={selection?.type === 'furniture' && selection.id === f.id}
+          selected={(selection?.type === 'furniture' && selection.id === f.id) || multi.includes(f.id)}
           onSelect={onSelectFurniture}
           onDragStart={onDragStart}
           onDrag={onDrag}

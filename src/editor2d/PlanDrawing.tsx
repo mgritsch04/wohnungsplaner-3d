@@ -15,6 +15,8 @@ interface Props {
   derived: DerivedPlan;
   selection: Selection | null;
   hover: Selection | null;
+  /** further selected furniture (multi-select) */
+  multi?: string[];
   zoom: number;
   showDimensions: boolean;
   /** Furniture placement problems: 'error' (in wall/door leaf) or 'warn' (door swing, overlap). */
@@ -32,7 +34,7 @@ function lighten(hex: string, amount: number): string {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, hover, zoom, showDimensions, conflicts }: Props) {
+export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, multi = [], hover, zoom, showDimensions, conflicts }: Props) {
   const px = 1 / zoom; // one screen pixel in meters
   const fontSize = 12 * px;
 
@@ -138,7 +140,7 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       <g>{openings}</g>
       <g>
         {furniture.map((f) => (
-          <FurnitureSymbol key={f.id} f={f} selected={isSel(selection, 'furniture', f.id)} hovered={isSel(hover, 'furniture', f.id)} px={px} conflict={conflicts?.get(f.id)} />
+          <FurnitureSymbol key={f.id} f={f} selected={isSel(selection, 'furniture', f.id) || multi.includes(f.id)} hovered={isSel(hover, 'furniture', f.id)} px={px} conflict={conflicts?.get(f.id)} />
         ))}
       </g>
       <g>

@@ -408,6 +408,78 @@ test('walkthrough: hold C to crouch (lower camera, slower), release to stand up 
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('multi-select: Shift+click, move together, copy/paste, delete, selection box (one undo step each)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const proj = () => getProject(page);
+  const sel = () => page.evaluate(() => {
+    const s = (window as any).__wp.useUiStore.getState();
+    return s.selection?.type === 'furniture' ? [s.selection.id, ...s.multi] : [];
+  });
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  const p0 = await proj();
+  const n1 = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const a = await planToScreen(page, n1.x, n1.y);
+  await page.mouse.click(a.x, a.y);
+  for (const n of ns) {
+    const s = await planToScreen(page, n.x, n.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    await page.keyboard.up('Shift');
+  }
+  expect((await sel()).sort()).toEqual([n1.id, ...ns.map((n: any) => n.id)].sort());
+  await expect(page.getByTestId('multi-note')).toContainText('3 Möbel ausgewählt');
+  // drag the bed down by 0.5 m: the night stands move along (one undo step)
+  const before = await past();
+  const target = await planToScreen(page, n1.x, n1.y + 0.5);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 6 });
+  await page.mouse.up();
+  const p1 = await proj();
+  const moved = (id: string) => {
+    const f = p1.furniture.find((x: any) => x.id === id);
+    const o = p0.furniture.find((x: any) => x.id === id);
+    return f.y - o.y;
+  };
+  expect(moved(n1.id)).toBeGreaterThan(0.3);
+  for (const n of ns) expect(moved(n.id)).toBeCloseTo(moved(n1.id), 2);
+  expect(await past()).toBe(before + 1);
+  // copy + paste → three new items, selected
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length + 3);
+  expect((await sel()).length).toBe(3);
+  // delete removes all selected (one undo step)
+  await page.keyboard.press('Delete');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length);
+  await page.keyboard.press('Control+z');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length + 3);
+  await page.keyboard.press('Control+z');
+  // selection box (Shift+drag on empty floor) around the living-room group
+  await page.mouse.click(10, 10); // clear
+  const sofa = p0.furniture.find((f: any) => f.catalogId === 'generic-sofa-3');
+  const table = p0.furniture.find((f: any) => f.catalogId === 'generic-coffee-table');
+  const b0 = await planToScreen(page, 1.5, 1.9);
+  const b1 = await planToScreen(page, 4.2, 3.95);
+  await page.keyboard.down('Shift');
+  await page.mouse.move(b0.x, b0.y);
+  await page.mouse.down();
+  await page.mouse.move(b1.x, b1.y, { steps: 5 });
+  await expect(page.getByTestId('selection-box')).toBeVisible();
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  const boxed = await sel();
+  expect(boxed).toContain(sofa.id);
+  expect(boxed).toContain(table.id);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();
