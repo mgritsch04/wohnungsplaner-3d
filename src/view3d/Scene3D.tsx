@@ -28,6 +28,7 @@ export function Scene3D() {
   const cameraMode = useUiStore((s) => s.cameraMode);
   const quality = project.settings.quality;
   const [locked, setLocked] = useState(false);
+  const ducking = useUiStore((s) => s.walkDuck);
   const carried = useUiStore((s) => (s.walkCarry ? project.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
@@ -69,12 +70,17 @@ export function Scene3D() {
       </WebGLBoundary>
       {cameraMode === 'orbit' && <OrbitZoomSlider />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
+      {cameraMode === 'walk' && ducking && (
+        <div className="walk-duck" data-testid="walk-duck">
+          ⤓ Geduckt
+        </div>
+      )}
       {cameraMode === 'walk' && (
         <div className="walk-overlay">
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Klick: Möbel auswählen · G: Möbel tragen · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · C (halten): ducken · Klick: Möbel auswählen · G: Möbel tragen · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen.</span>
           )}
@@ -101,6 +107,7 @@ function SceneContent({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const derived = useMemo(() => derivePlan(project), [archKey]);
   const selection = useUiStore((s) => s.selection);
+  const multi = useUiStore((s) => s.multi);
   const setSelection = useUiStore((s) => s.setSelection);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
   const { gl, camera, scene } = useThree();
@@ -189,7 +196,7 @@ function SceneContent({
           key={f.id}
           item={f}
           quality={quality}
-          selected={selection?.type === 'furniture' && selection.id === f.id}
+          selected={(selection?.type === 'furniture' && selection.id === f.id) || multi.includes(f.id)}
           onSelect={onSelectFurniture}
           onDragStart={onDragStart}
           onDrag={onDrag}

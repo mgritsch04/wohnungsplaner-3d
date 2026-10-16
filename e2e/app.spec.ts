@@ -355,6 +355,157 @@ test('zoom slider at the bottom of 2D and 3D, synchronised with the mouse wheel 
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D + 3D' }).click();
+  await expect(page.getByTestId('walk-marker')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  const marker = page.getByTestId('walk-marker');
+  await expect(marker).toHaveCount(1);
+  const dot = async () => {
+    const b = (await marker.locator('circle').boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  // the dot sits where the camera is
+  const cam = await page.evaluate(() => (window as any).__wp.three.camera.position);
+  const expected = await planToScreen(page, cam.x, cam.z);
+  const d0 = await dot();
+  expect(Math.hypot(d0.x - expected.x, d0.y - expected.y)).toBeLessThan(4);
+  // walk forward: the dot follows live
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyW');
+  await expect.poll(async () => {
+    const d = await dot();
+    return Math.hypot(d.x - d0.x, d.y - d0.y);
+  }).toBeGreaterThan(5);
+  // 3D only or overview: no marker
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(marker).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: hold C to crouch (lower camera, slower), release to stand up (#20)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await page.keyboard.down('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await expect(page.getByTestId('walk-duck')).toBeVisible();
+  // C must not trigger anything in the 2D tools while walking
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  await page.keyboard.up('KeyC');
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('multi-select: Shift+click, move together, copy/paste, delete, selection box (one undo step each)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const proj = () => getProject(page);
+  const sel = () => page.evaluate(() => {
+    const s = (window as any).__wp.useUiStore.getState();
+    return s.selection?.type === 'furniture' ? [s.selection.id, ...s.multi] : [];
+  });
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  const p0 = await proj();
+  const n1 = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const a = await planToScreen(page, n1.x, n1.y);
+  await page.mouse.click(a.x, a.y);
+  for (const n of ns) {
+    const s = await planToScreen(page, n.x, n.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    await page.keyboard.up('Shift');
+  }
+  expect((await sel()).sort()).toEqual([n1.id, ...ns.map((n: any) => n.id)].sort());
+  await expect(page.getByTestId('multi-note')).toContainText('3 Möbel ausgewählt');
+  // drag the bed down by 0.5 m: the night stands move along (one undo step)
+  const before = await past();
+  const target = await planToScreen(page, n1.x, n1.y + 0.5);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 6 });
+  await page.mouse.up();
+  const p1 = await proj();
+  const moved = (id: string) => {
+    const f = p1.furniture.find((x: any) => x.id === id);
+    const o = p0.furniture.find((x: any) => x.id === id);
+    return f.y - o.y;
+  };
+  expect(moved(n1.id)).toBeGreaterThan(0.3);
+  for (const n of ns) expect(moved(n.id)).toBeCloseTo(moved(n1.id), 2);
+  expect(await past()).toBe(before + 1);
+  // copy + paste → three new items, selected
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length + 3);
+  expect((await sel()).length).toBe(3);
+  // delete removes all selected (one undo step)
+  await page.keyboard.press('Delete');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length);
+  await page.keyboard.press('Control+z');
+  expect((await proj()).furniture.length).toBe(p0.furniture.length + 3);
+  await page.keyboard.press('Control+z');
+  // selection box (Shift+drag on empty floor) around the living-room group
+  await page.mouse.click(10, 10); // clear
+  const sofa = p0.furniture.find((f: any) => f.catalogId === 'generic-sofa-3');
+  const table = p0.furniture.find((f: any) => f.catalogId === 'generic-coffee-table');
+  const b0 = await planToScreen(page, 1.5, 1.9);
+  const b1 = await planToScreen(page, 4.2, 3.95);
+  await page.keyboard.down('Shift');
+  await page.mouse.move(b0.x, b0.y);
+  await page.mouse.down();
+  await page.mouse.move(b1.x, b1.y, { steps: 5 });
+  await expect(page.getByTestId('selection-box')).toBeVisible();
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  const boxed = await sel();
+  expect(boxed).toContain(sofa.id);
+  expect(boxed).toContain(table.id);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('failed autosave shows a clear warning with export option and clears after a successful save (#60)', async ({ page }) => {
+  await freshStart(page);
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  // simulate a full browser storage: IndexedDB writes fail (test-side only)
+  await page.evaluate(() => {
+    const orig = IDBObjectStore.prototype.put;
+    (window as unknown as { __restorePut: () => void }).__restorePut = () => (IDBObjectStore.prototype.put = orig);
+    IDBObjectStore.prototype.put = function () {
+      throw new DOMException('quota', 'QuotaExceededError');
+    };
+  });
+  const name = page.locator('input.project-name');
+  await name.fill('Test Speicherfehler');
+  await name.blur();
+  const banner = page.getByTestId('save-error-banner');
+  await expect(banner).toBeVisible({ timeout: 5000 });
+  await expect(banner).toContainText('Speicherplatz des Browsers');
+  await expect(banner.getByRole('button', { name: 'Jetzt als Datei exportieren' })).toBeVisible();
+  await expect(page.getByText('Gespeichert', { exact: true })).toHaveCount(0);
+  // storage works again → retry → banner disappears, status "Gespeichert"
+  await page.evaluate(() => (window as unknown as { __restorePut: () => void }).__restorePut());
+  await banner.getByRole('button', { name: 'Erneut speichern' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible();
+});
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();
