@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
-import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
+import { clearanceLabel, furnitureClearances, rotateHandlePoint, selectionClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -2189,6 +2189,91 @@ test('clearances (#50): dimension lines to walls and furniture while dragging an
   await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('clearances of a multi-selection and a group (#94): shared outline to walls and other furniture, while dragging and with Alt', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const wardrobe = p0.furniture.find((f: any) => f.catalogId === 'generic-wardrobe-150');
+  const ids: string[] = [bed.id, ...ns.map((n: any) => n.id)];
+  const shownLines = () =>
+    plan.locator('[data-testid="clearance"]').evaluateAll((els) => els.map((el) => ({ side: el.getAttribute('data-side'), cm: Number(el.getAttribute('data-distance-cm')), hit: el.getAttribute('data-hit') })));
+  /** The overlay shows the clearances of the whole selection, as the model computes them for the current positions. */
+  const check = async () => {
+    await expect(plan.getByTestId('clearances')).toHaveCount(1);
+    expect((await plan.getByTestId('clearances').getAttribute('data-furniture-ids'))!.split(' ').sort()).toEqual([...ids].sort());
+    const p = await getProject(page);
+    const expected = selectionClearances(p, derivePlan(p), ids).map((c) => ({ side: c.side, cm: Math.round(c.distance * 100), hit: c.hit.type }));
+    expect(expected.length).toBeGreaterThan(0);
+    await expect.poll(shownLines).toEqual(expected);
+    return expected;
+  };
+  // bed + both night stands selected (Shift+click)
+  const click = async (f: { x: number; y: number }, shift = false) => {
+    const s = await planToScreen(page, f.x, f.y);
+    if (shift) await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    if (shift) await page.keyboard.up('Shift');
+  };
+  await click(bed);
+  for (const n of ns) await click(n, true);
+  await expect(page.getByTestId('multi-note')).toContainText('3 Möbel ausgewählt');
+  // Alt shows the clearances of the whole selection (was: nothing for a multi-selection)
+  await page.keyboard.down('Alt');
+  await check();
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // dragging the bed down: lines from the shared outline, live
+  const a = await planToScreen(page, bed.x, bed.y);
+  const b = await planToScreen(page, bed.x, bed.y + 0.6);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x, (a.y + b.y) / 2, { steps: 4 });
+  const mid = await check();
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  const end = await check();
+  const cm = (xs: typeof mid, side: string) => xs.find((x) => x.side === side)?.cm ?? NaN;
+  expect(cm(end, 'back')).toBeGreaterThan(cm(mid, 'back')); // moved away from the north wall
+  // measured from the shared outline: the left line starts at the left night stand (not at the bed),
+  // the front line runs to the unselected wardrobe; no line ends at a selected item
+  const p1 = await getProject(page);
+  const res = selectionClearances(p1, derivePlan(p1), ids);
+  const leftEdge = Math.min(...ids.map((id) => p1.furniture.find((f: any) => f.id === id)).map((f: any) => f.x - f.width / 2));
+  expect(leftEdge).toBeLessThan(p1.furniture.find((f: any) => f.id === bed.id).x - bed.width / 2 - 0.1);
+  expect(res.find((c) => c.side === 'left')!.from.x).toBeCloseTo(leftEdge, 3);
+  expect(res.find((c) => c.side === 'front')!.hit).toEqual({ type: 'furniture', id: wardrobe.id });
+  for (const c of res) expect(ids).not.toContain(c.hit.id);
+  await page.screenshot({ path: 'test-results/clearances-multi-select.png' });
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+
+  // as a group (#65): Strg+G, then drag the group – the same shared-outline lines
+  await page.keyboard.press('Control+g');
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'true');
+  const pg = await getProject(page);
+  const bedNow = pg.furniture.find((f: any) => f.id === bed.id);
+  const g1 = await planToScreen(page, bedNow.x, bedNow.y);
+  const g2 = await planToScreen(page, bedNow.x, bedNow.y - 0.3);
+  await page.mouse.move(g1.x, g1.y);
+  await page.mouse.down();
+  await page.mouse.move(g2.x, g2.y, { steps: 5 });
+  const grp = await check();
+  expect(cm(grp, 'front')).toBeGreaterThan(cm(end, 'front')); // the group moved back up, away from the wardrobe
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // Alt with the whole group selected
+  await page.keyboard.down('Alt');
+  await check();
+  await page.keyboard.up('Alt');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {

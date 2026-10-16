@@ -66,8 +66,8 @@ interface Preview {
   measure?: { a: Vec2; b: Vec2 } | null;
   /** Walls a dragged item is snapped to (highlighted). */
   snapWalls?: string[];
-  /** Single item being dragged: show its clearances (#50). */
-  clearanceId?: string;
+  /** Items being dragged: show their clearances (#50; a multi-selection or group as a whole, #94). */
+  clearanceIds?: string[];
 }
 
 const SNAP_PX = 10;
@@ -424,7 +424,7 @@ export function Editor2D() {
               const cur = d.furniture.find((x) => x.id === dr.id);
               if (cur) moveGroupBy(d, obstacles, rigid, { x: roundMm(c.x) - cur.x, y: roundMm(c.y) - cur.y }, { collide: !e.altKey });
             });
-            setPreview({});
+            setPreview({ clearanceIds: rigid });
             return;
           }
           let snapped: string[] = [];
@@ -436,7 +436,7 @@ export function Editor2D() {
             const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
             for (const g of dr.group) moveFurnitureTo(d, derived, obstacles, g.id, { x: roundMm(g.x + delta.x), y: roundMm(g.y + delta.y) }, { snap: false, collide: !e.altKey });
           });
-          setPreview({ snapWalls: snapped, clearanceId: dr.group.length ? undefined : dr.id });
+          setPreview({ snapWalls: snapped, clearanceIds: [dr.id, ...dr.group.map((g) => g.id)] });
           return;
         }
         case 'box': {
@@ -797,7 +797,7 @@ export function Editor2D() {
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
-          {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingId={preview.clearanceId} />}
+          {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
 

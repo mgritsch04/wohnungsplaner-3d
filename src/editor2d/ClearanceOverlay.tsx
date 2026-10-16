@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { clearanceLabel, furnitureClearances, layoutClearance, rotateHandlePoint } from '../model/clearances';
+import { clearanceLabel, layoutClearance, rotateHandlePoint, selectionClearances } from '../model/clearances';
 import type { DerivedPlan } from '../model/derived';
+import { groupBounds, selectedGroup } from '../model/groups';
 import type { Project } from '../model/schema';
 import { normalize, perp, scale, sub } from '../model/vec';
-import { useUiStore } from '../store/uiStore';
+import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
+import { groupHandlePoint } from './GroupOverlay';
 
 const LINE = '#2563eb';
 const TEXT = '#1d4ed8';
@@ -33,23 +35,33 @@ function useAltHeld(): boolean {
 
 /**
  * Clearances (#50): thin dimension lines from the dragged item to the nearest wall
- * or furniture in its four axis directions, with the distance in cm. Shown while a
- * single item is dragged (`draggingId`), and while exactly one item is selected and
- * Alt is held.
+ * or furniture in its four axis directions, with the distance in cm. Shown while
+ * dragging (`draggingIds`), and while furniture is selected and Alt is held. A
+ * multi-selection or group (#94) is measured as a whole from its shared outline to walls
+ * and to the furniture that is not selected.
  */
-export function ClearanceOverlay({ project, derived, px, draggingId }: { project: Project; derived: DerivedPlan; px: number; draggingId?: string | null }) {
+export function ClearanceOverlay({ project, derived, px, draggingIds }: { project: Project; derived: DerivedPlan; px: number; draggingIds?: string[] | null }) {
   const alt = useAltHeld();
   const selection = useUiStore((s) => s.selection);
   const multi = useUiStore((s) => s.multi);
-  const id = draggingId ?? (alt && selection?.type === 'furniture' && multi.length === 0 ? selection.id : null);
-  const items = useMemo(() => (id ? furnitureClearances(project, derived, id) : []), [project, derived, id]);
-  if (items.length === 0) return null;
-  // the rotate handle of the selected item must stay free (#125)
-  const item = project.furniture.find((f) => f.id === id);
-  const selected = !!item && ((selection?.type === 'furniture' && selection.id === item.id) || multi.includes(item.id));
-  const handle = item && selected ? rotateHandlePoint(item, px) : null;
+  const selected = useMemo(() => selectedFurnitureIds({ selection, multi }), [selection, multi]);
+  const ids = draggingIds?.length ? draggingIds : alt && selected.length ? selected : null;
+  // keyed by the id list: dragging passes a new array on every move
+  const idsKey = ids ? ids.join(',') : '';
+  const items = useMemo(() => (idsKey ? selectionClearances(project, derived, idsKey.split(',')) : []), [project, derived, idsKey]);
+  if (!ids || items.length === 0) return null;
+  // the rotate handle of the selected item – or of the selected group – must stay free (#125)
+  const handle = (() => {
+    if (ids.length === 1) {
+      const item = project.furniture.find((f) => f.id === ids[0]);
+      return item && selected.includes(item.id) ? rotateHandlePoint(item, px) : null;
+    }
+    if (!selectedGroup(project, selected) || !ids.every((id) => selected.includes(id))) return null;
+    const b = groupBounds(project.furniture.filter((f) => ids.includes(f.id)));
+    return b ? groupHandlePoint(b, px) : null;
+  })();
   return (
-    <g pointerEvents="none" data-testid="clearances" data-furniture-id={id ?? undefined}>
+    <g pointerEvents="none" data-testid="clearances" data-furniture-id={ids.length === 1 ? ids[0] : undefined} data-furniture-ids={ids.join(' ')}>
       {items.map((c) => {
         const l = layoutClearance(c, px, handle);
         const tick = scale(perp(normalize(sub(c.to, c.from))), 4 * px);

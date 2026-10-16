@@ -4,7 +4,7 @@ import { findCatalogItem } from '../catalog/generic';
 import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall } from './operations';
 import { derivePlan } from './derived';
-import { clearanceLabel, furnitureClearances, labelWidthPx, layoutClearance, rotateHandlePoint, type Clearance, type ClearanceSide } from './clearances';
+import { clearanceLabel, furnitureClearances, labelWidthPx, layoutClearance, rotateHandlePoint, selectionClearances, type Clearance, type ClearanceSide } from './clearances';
 import type { Project } from './schema';
 import { closestPointOnSegment, dist, sub } from './vec';
 
@@ -237,5 +237,60 @@ describe('clearance layout (#125)', () => {
     const front = layoutClearance({ from: { x: 2, y: 2.3 }, to: { x: 2, y: 3 }, distance: 0.7 }, px, handle);
     expect(front.shifted).toBe(false);
     expect(front.a).toEqual({ x: 2, y: 2.3 });
+  });
+});
+
+describe('clearances of a multi-selection or group (#94)', () => {
+  const sel = (p: Project, ids: string[], opts = {}) => bySide(selectionClearances(p, derivePlan(p), ids, opts));
+
+  it('measures the shared outline to walls and to unselected furniture, not between the selected items', () => {
+    const p = room();
+    const a = box(p, 'generic-sideboard', 2, 2.5); // x 1.5 … 2.5, y 2 … 3
+    const b = box(p, 'generic-sideboard', 3.1, 2.7, 1, 0.6); // x 2.6 … 3.6, y 2.4 … 3.0 – 10 cm right of a
+    const c = sel(p, [a.id, b.id]);
+    // outline x 1.5 … 3.6, y 2 … 3: nothing measured between a and b (10 cm)
+    expect(c.left!.distance).toBeCloseTo(1.5, 9);
+    expect(c.right!.distance).toBeCloseTo(2.4, 9);
+    expect(c.back!.distance).toBeCloseTo(2.0, 9);
+    expect(c.front!.distance).toBeCloseTo(2.0, 9);
+    for (const k of ['left', 'right', 'back', 'front'] as const) expect(c[k]!.hit.type).toBe('wall');
+    expect(c.right!.from.x).toBeCloseTo(3.6, 9);
+    expect(c.left!.from.x).toBeCloseTo(1.5, 9);
+    // a single item of the pair alone measures 10 cm to the other one
+    expect(calc(p, a.id).right!.distance).toBeCloseTo(0.1, 9);
+    expect(calc(p, a.id).right!.hit).toEqual({ type: 'furniture', id: b.id });
+    // unselected furniture ahead of the outline is measured
+    const n = box(p, 'generic-dresser', 4.4, 2.5, 0.6, 1); // x 4.1 … 4.7
+    const c2 = sel(p, [a.id, b.id]);
+    expect(c2.right!.distance).toBeCloseTo(0.5, 9);
+    expect(c2.right!.hit).toEqual({ type: 'furniture', id: n.id });
+    // order of the ids does not matter; one id = the single-item result
+    expect(selectionClearances(p, derivePlan(p), [b.id, a.id])).toEqual(selectionClearances(p, derivePlan(p), [a.id, b.id]));
+    expect(selectionClearances(p, derivePlan(p), [a.id])).toEqual(furnitureClearances(p, derivePlan(p), a.id));
+    expect(selectionClearances(p, derivePlan(p), [])).toEqual([]);
+  });
+
+  it('uses the axis-aligned box around rotated members (the outline drawn for a group)', () => {
+    const p = room();
+    const a = box(p, 'generic-sideboard', 2, 2.5, 1, 1, { rotation: Math.PI / 4 }); // half diagonal 0.7071
+    const b = box(p, 'generic-sideboard', 3.5, 2.5);
+    const c = sel(p, [a.id, b.id]);
+    expect(c.left!.distance).toBeCloseTo(2 - Math.SQRT1_2, 9);
+    expect(c.back!.distance).toBeCloseTo(2.5 - Math.SQRT1_2, 9);
+    expect(c.right!.distance).toBeCloseTo(6 - 4, 9);
+  });
+
+  it('a selected rug does not widen the outline; a rug-only selection measures to walls only', () => {
+    const p = room();
+    const t = box(p, 'generic-sideboard', 3, 2.5); // x 2.5 … 3.5
+    const s = box(p, 'generic-sideboard', 3, 1.4, 1, 0.6); // y 1.1 … 1.7
+    const rug = box(p, 'generic-rug-200', 3, 2.5, 4, 3, { height: 0.01 }); // x 1 … 5
+    const c = sel(p, [t.id, s.id, rug.id]);
+    expect(c.left!.distance).toBeCloseTo(2.5, 9);
+    expect(c.back!.distance).toBeCloseTo(1.1, 9);
+    const other = box(p, 'generic-rug-160', 0.8, 0.8, 0.5, 0.5, { height: 0.01 });
+    const r = sel(p, [rug.id, other.id]);
+    for (const k of ['left', 'right', 'back', 'front'] as const) if (r[k]) expect(r[k]!.hit.type).toBe('wall');
+    expect(r.right!.distance).toBeCloseTo(1, 9);
   });
 });
