@@ -921,7 +921,7 @@ test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the s
 });
 
 test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
-  test.setTimeout(240000);
+  test.setTimeout(600000);
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -932,7 +932,17 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { settings: { timeOfDay: number } }) => void) => void } } } }).__wp;
       wp.useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = h));
     }, hour);
-    await page.waitForTimeout(4000); // a few frames in software rendering
+    // software rendering in CI can be very slow: wait until the lighting has reached the hour
+    // and several frames were actually rendered with the new state (not a fixed time)
+    const frames = () =>
+      page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const wp = (window as any).__wp;
+        return { frame: wp.three.gl.info.render.frame as number, hour: wp.lightingHour() as number };
+      });
+    await expect.poll(async () => Math.abs((await frames()).hour - hour), { timeout: 60000 }).toBeLessThan(0.01);
+    const f0 = (await frames()).frame;
+    await expect.poll(async () => (await frames()).frame - f0, { timeout: 90000 }).toBeGreaterThanOrEqual(12);
     const png = await page.locator('canvas').first().screenshot();
     return page.evaluate(async (b64) => {
       const img = new Image();

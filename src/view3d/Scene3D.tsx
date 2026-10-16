@@ -102,7 +102,7 @@ function SceneContent({
   // e2e/debug hook: lets tests project world points to screen coordinates and inspect the scene
   useEffect(() => {
     const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
-    if (wp) wp.three = { camera, canvas: gl.domElement, scene };
+    if (wp) wp.three = { camera, canvas: gl.domElement, scene, gl };
   }, [camera, gl, scene]);
 
   const bounds = useMemo(() => {
