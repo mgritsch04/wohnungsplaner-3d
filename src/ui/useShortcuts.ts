@@ -15,7 +15,8 @@ export function useShortcuts() {
       const ps = useProjectStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd'].includes(key) && !mod) return;
+      // walking keys (and G = carry furniture, #39) belong to the walkthrough, not to the 2D tools
+      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g'].includes(key) && !mod) return;
       if (mod && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         ps.undo();

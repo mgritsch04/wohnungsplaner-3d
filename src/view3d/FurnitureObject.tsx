@@ -114,6 +114,7 @@ export const FurnitureObject = memo(
       <group
         position={[item.x, item.elevation, item.y]}
         rotation={[0, planRotationToWorldY(item.rotation), 0]}
+        userData={{ furnitureId: item.id }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}

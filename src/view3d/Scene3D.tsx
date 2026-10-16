@@ -27,6 +27,7 @@ export function Scene3D() {
   const cameraMode = useUiStore((s) => s.cameraMode);
   const quality = project.settings.quality;
   const [locked, setLocked] = useState(false);
+  const carried = useUiStore((s) => (s.walkCarry ? project.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
   const downAt = useRef<{ x: number; y: number } | null>(null);
@@ -68,8 +69,10 @@ export function Scene3D() {
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && (
         <div className="walk-overlay">
-          {locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Esc: Maus freigeben</span>
+          {carried ? (
+            <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
+          ) : locked ? (
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · Klick: Möbel auswählen · G: Möbel tragen · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen.</span>
           )}

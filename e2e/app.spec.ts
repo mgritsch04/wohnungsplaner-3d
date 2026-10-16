@@ -263,6 +263,55 @@ test('walkthrough: eye height 163 cm by default, adjustable live and saved; cros
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: look at furniture, select it, carry it with G and put it down (#39)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const before = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  // stand still and look straight at the coffee table (yaw from the camera position)
+  const look = await page.evaluate(
+    ([tx, ty]) => {
+      const wp = (window as any).__wp;
+      const c = wp.three.camera.position;
+      const yaw = Math.atan2(-(tx - c.x), -(ty - c.z));
+      const dist = Math.hypot(tx - c.x, ty - c.z);
+      wp.walk.look(yaw, -Math.atan2(c.y - 0.3, dist));
+      return { dist };
+    },
+    [before.x, before.y],
+  );
+  expect(look.dist).toBeLessThan(6);
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.target())).toBe(before.id);
+  // G picks it up …
+  await page.keyboard.press('g');
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBe(before.id);
+  await expect(page.locator('.walk-overlay')).toContainText('trägst');
+  // … turn a bit: it follows the gaze (with the usual collision rules)
+  await page.evaluate(() => {
+    const wp = (window as any).__wp;
+    const e = wp.three.camera.rotation;
+    wp.walk.look(e.y + 0.35, e.x);
+  });
+  await expect
+    .poll(async () => {
+      const t = (await getProject(page)).furniture.find((f: { id: string }) => f.id === before.id);
+      return Math.hypot(t.x - before.x, t.y - before.y);
+    })
+    .toBeGreaterThan(0.2);
+  const pastBefore = await page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length);
+  // G again puts it down: one undo step
+  await page.keyboard.press('g');
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBeNull();
+  expect(await page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length)).toBe(pastBefore + 1);
+  // G must not switch the 2D tool while walking
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();
