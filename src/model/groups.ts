@@ -12,10 +12,11 @@
  */
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { newId } from './ids';
-import { collidingObstacles, constrainMove, moveCollision, type Obstacle, type Pose } from './placement';
+import type { DerivedPlan } from './derived';
+import { collidingObstacles, constrainMove, moveCollision, mtv, type Obstacle, type Pose } from './placement';
 import type { Furniture, FurnitureGroup, Project } from './schema';
 import { normalizeAngle } from './units';
-import { add, boundsOf, rotate, sub, type Bounds, type Vec2 } from './vec';
+import { add, boundsOf, pointInPolygon, rotate, sub, type Bounds, type Vec2 } from './vec';
 
 type Groupable = Pick<Project, 'furniture' | 'groups'>;
 
@@ -301,27 +302,74 @@ export function rotateGroupPoses(d: Pick<Project, 'furniture'>, ids: string[], d
   }
 }
 
+export type GroupTurnResult = 'ok' | 'moved' | 'conflict' | 'locked';
+
 /**
- * Turn the items `ids` rigidly by `deltaRad` about their area-weighted centre. Like turning
- * a single item into an obstacle with no free spot nearby, the group is turned anyway and a
- * new collision reported ('conflict', marked red; Strg+Z reverts it). 'locked' = a member
- * is locked, nothing changed.
+ * After turning a group (Q/E, panel, rotation handle): if a member now reaches into a wall,
+ * door leaf or other furniture, push the whole group rigidly back into free space – like a
+ * single turned item, at most about half an item's size and never into another room. If no
+ * free spot is near, the group stays turned and the conflict is marked ('conflict').
+ * `before` are the members' poses before the turn (obstacles they already overlapped then,
+ * e.g. placed with Alt, are ignored).
  */
-export function rotateGroupBy(d: Project, obstacles: Obstacle[], ids: string[], deltaRad: number): 'ok' | 'conflict' | 'locked' {
+export function settleGroup(d: Project, obstacles: Obstacle[], ids: string[], before: Furniture[], derived?: DerivedPlan): Exclude<GroupTurnResult, 'locked'> {
+  const items = members(d, ids);
+  const set = new Set(items.map((f) => f.id));
+  const checks = items.map((f) => {
+    const m = memberObstacles(d, f, obstacles, set);
+    const old = before.find((b) => b.id === f.id) ?? f;
+    const lift = (p: Furniture): Pose => (m.free ? { ...p, elevation: 0, height: 1 } : { ...p });
+    const stuck = new Set(collidingObstacles(lift(old), m.obstacles));
+    return { f, lift, active: m.obstacles.filter((o) => !stuck.has(o)) };
+  });
+  const hitsAt = (t: Vec2) => {
+    let worst: Vec2 | null = null;
+    for (const c of checks) {
+      const pose = { ...c.lift(c.f), x: c.f.x + t.x, y: c.f.y + t.y };
+      const fc = furnitureCorners(pose);
+      for (const o of collidingObstacles(pose, c.active)) {
+        const v = mtv(fc, o.polygon);
+        if (v && (!worst || Math.hypot(v.x, v.y) > Math.hypot(worst.x, worst.y))) worst = v;
+      }
+    }
+    return worst;
+  };
+  if (!hitsAt({ x: 0, y: 0 })) return 'ok';
+  const reach = Math.max(...items.map((f) => Math.max(f.width, f.depth))) / 2 + 0.05;
+  const centre = groupCenter(before.length ? before : items);
+  const room = derived ? [...derived.rooms.values()].find((g) => pointInPolygon(centre, g.interior)) : undefined;
+  let t = { x: 0, y: 0 };
+  for (let i = 0; i < 8; i++) {
+    const v = hitsAt(t);
+    if (!v) {
+      const rounded = { x: mm(t.x), y: mm(t.y) };
+      // millimetre rounding must not turn "touching" into a tiny overlap
+      const shift = hitsAt(rounded) ? t : rounded;
+      const c = groupCenter(items);
+      if (room && !pointInPolygon({ x: c.x + shift.x, y: c.y + shift.y }, room.interior)) return 'conflict';
+      for (const f of items) {
+        f.x += shift.x;
+        f.y += shift.y;
+      }
+      return 'moved';
+    }
+    t = add(t, v);
+    if (Math.hypot(t.x, t.y) > reach) return 'conflict';
+  }
+  return 'conflict';
+}
+
+/**
+ * Turn the items `ids` rigidly by `deltaRad` about their area-weighted centre, checked like
+ * turning a single item (see settleGroup): 'ok', 'moved' (pushed into free space),
+ * 'conflict' (turned anyway, marked red; Strg+Z reverts it) or 'locked' (a member is
+ * locked, nothing changed).
+ */
+export function rotateGroupBy(d: Project, obstacles: Obstacle[], ids: string[], deltaRad: number, derived?: DerivedPlan): GroupTurnResult {
   const items = members(d, ids);
   if (!items.length) return 'ok';
   if (items.some((f) => f.locked)) return 'locked';
-  const set = new Set(items.map((f) => f.id));
-  const before = items.map((f) => {
-    const m = memberObstacles(d, f, obstacles, set);
-    const pose: Pose = m.free ? { ...f, elevation: 0, height: 1 } : { ...f };
-    return { id: f.id, free: m.free, obstacles: m.obstacles, stuck: new Set(collidingObstacles(pose, m.obstacles)) };
-  });
+  const before = structuredClone(items);
   rotateGroupPoses(d, ids, deltaRad, groupCenter(items));
-  for (const b of before) {
-    const f = d.furniture.find((x) => x.id === b.id)!;
-    const pose: Pose = b.free ? { ...f, elevation: 0, height: 1 } : f;
-    if (collidingObstacles(pose, b.obstacles.filter((o) => !b.stuck.has(o))).length) return 'conflict';
-  }
-  return 'ok';
+  return settleGroup(d, obstacles, ids, before, derived);
 }
