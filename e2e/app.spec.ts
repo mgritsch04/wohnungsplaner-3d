@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
+import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
+import { findCatalogItem } from '../src/catalog/generic';
 import { clearanceLabel, furnitureClearances, rotateHandlePoint, selectionClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
@@ -1302,6 +1304,49 @@ test('3D: Alt while dragging places freely (no collision stop), without Alt the 
   expect((await collisionMarkers(page)).some((m) => m.includes(':overlap:') && m.includes(table.id) && m.includes(sofa.id))).toBe(true);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('chair under table (#16): the seat goes under the table top, the backrest stops at the table edge; forced in with Alt it is marked with the reason', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  // an empty living room with a dining table (y 1.075 … 1.925) and a chair facing it
+  const table = createFurnitureFromCatalog(findCatalogItem('generic-dining-table-4')!, { x: 2.5, y: 1.5 });
+  const chair = createFurnitureFromCatalog(findCatalogItem('generic-chair')!, { x: 2.5, y: 0.5 });
+  await page.evaluate(
+    (items) => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.furniture = items)),
+    [table, chair],
+  );
+  await page.waitForTimeout(400);
+  const find = async (id: string) => (await getProject(page)).furniture.find((f: any) => f.id === id);
+  const edge = table.y - table.depth / 2;
+  const drag = async (toY: number, alt: boolean) => {
+    const c = await find(chair.id);
+    const a = await planToScreen(page, c.x, c.y);
+    const b = await planToScreen(page, c.x, toY);
+    await page.mouse.move(a.x, a.y);
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 12 });
+    await page.mouse.up();
+    if (alt) await page.keyboard.up('Alt');
+    return find(chair.id);
+  };
+  const panel = page.locator('.panel.right');
+  // pushed towards the table centre: stops with the backrest (3.5 cm) at the table edge, seat under the top
+  const c1 = await drag(table.y, false);
+  const backFront = c1.y - c1.depth / 2 + 0.035;
+  expect(backFront).toBeLessThanOrEqual(edge + 0.002);
+  expect(backFront).toBeGreaterThan(edge - 0.06); // at most one 5 cm grid step short of the edge
+  expect(c1.y + c1.depth / 2 - edge).toBeGreaterThan(0.35); // most of the seat is under the table
+  await expect(panel.locator('.panel-issues')).toHaveCount(0);
+  // with Alt it can be forced into the table: marked, with the reason
+  const c2 = await drag(table.y, true);
+  expect(Math.abs(c2.y - table.y)).toBeLessThan(0.05);
+  await expect(panel.locator('.panel-issues')).toContainText('Die Lehne steht in „Esstisch 4 Personen“');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
   test.setTimeout(600000);
