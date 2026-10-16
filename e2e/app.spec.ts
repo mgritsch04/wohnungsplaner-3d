@@ -1017,7 +1017,31 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     await expect.poll(async () => Math.abs((await frames()).hour - hour), { timeout: 60000 }).toBeLessThan(0.01);
     const f0 = (await frames()).frame;
     await expect.poll(async () => (await frames()).frame - f0, { timeout: 90000 }).toBeGreaterThanOrEqual(12);
-    const png = await page.locator('canvas').first().screenshot();
+    // measure only where the apartment is on screen (the dark sky around it and UI overlays
+    // would dilute the difference depending on how large the apartment is framed)
+    const clip = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wp = (window as any).__wp;
+      const p = wp.useProjectStore.getState().project;
+      const xs = p.nodes.map((n: { x: number }) => n.x);
+      const ys = p.nodes.map((n: { y: number }) => n.y);
+      const cam = wp.three.camera;
+      const r = wp.three.canvas.getBoundingClientRect();
+      const pts: { x: number; y: number }[] = [];
+      for (const x of [Math.min(...xs), Math.max(...xs)])
+        for (const y of [Math.min(...ys), Math.max(...ys)])
+          for (const z of [0, p.settings.defaultWallHeight]) {
+            const v = cam.position.clone().set(x, z, y).project(cam);
+            pts.push({ x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height });
+          }
+      const x0 = Math.max(r.left, Math.min(...pts.map((q) => q.x)));
+      const y0 = Math.max(r.top, Math.min(...pts.map((q) => q.y)));
+      const x1 = Math.min(r.right, Math.max(...pts.map((q) => q.x)));
+      const y1 = Math.min(r.bottom, Math.max(...pts.map((q) => q.y)));
+      return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+    });
+    expect(clip.width).toBeGreaterThan(50);
+    const png = await page.screenshot({ clip });
     return page.evaluate(async (b64) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
