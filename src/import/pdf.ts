@@ -5,6 +5,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import type { PlanText } from './dimensions';
 import { PlanFileError } from './fileValidation';
+import { isAreaTone } from './areaTone';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -68,7 +69,18 @@ export interface PdfSegment {
   /** Line width in rendered pixels (0 for fill outlines). */
   width: number;
   filled: boolean;
+  /**
+   * Edge of a fill-only area in a light tone (room colouring, solid hatch of floor
+   * areas). Walls are drawn black/dark grey; such edges must not be paired into walls (#114).
+   */
+  areaFill?: boolean;
+  /** Edge of an area filled in a dark tone – how CAD programs draw solid walls (#114). */
+  darkFill?: boolean;
+  /** Stroke in a light tone (white masking lines, faint guides) – never a wall face. */
+  faint?: boolean;
 }
+
+
 
 export interface PdfContentAnalysis {
   kind: 'vector' | 'raster' | 'mixed' | 'unknown';
@@ -103,7 +115,9 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
   let ctm: Matrix = viewport.transform as Matrix;
   const stack: Matrix[] = [];
   let lineWidth = 1;
-  const lwStack: number[] = [];
+  let fillColor = '#000000';
+  let strokeColor = '#000000';
+  const lwStack: { lineWidth: number; fillColor: string; strokeColor: string }[] = [];
   let pathCount = 0;
   let imageCount = 0;
   const segments: PdfSegment[] = [];
@@ -116,10 +130,15 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
     const args = ops.argsArray[i] as unknown[];
     if (fn === O.save) {
       stack.push(ctm);
-      lwStack.push(lineWidth);
+      lwStack.push({ lineWidth, fillColor, strokeColor });
     } else if (fn === O.restore) {
       ctm = stack.pop() ?? ctm;
-      lineWidth = lwStack.pop() ?? lineWidth;
+      const g = lwStack.pop();
+      if (g) ({ lineWidth, fillColor, strokeColor } = g);
+    } else if (fn === O.setFillRGBColor) {
+      fillColor = typeof args[0] === 'string' ? args[0] : fillColor;
+    } else if (fn === O.setStrokeRGBColor) {
+      strokeColor = typeof args[0] === 'string' ? args[0] : strokeColor;
     } else if (fn === O.transform) {
       ctm = mul(ctm, args as Matrix);
     } else if (fn === O.setLineWidth) {
@@ -137,6 +156,12 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
       if (!stroked && !filled) continue;
       const scaleFactor = Math.hypot(ctm[0], ctm[1]);
       const w = stroked ? Math.max(0.5, lineWidth * scaleFactor) : 0;
+      const light = isAreaTone(fillColor);
+      const areaFill = !stroked && light;
+      const darkFill = filled && !light;
+      const faint = stroked && !darkFill && isAreaTone(strokeColor);
+      const seg = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(darkFill ? { darkFill } : {}), ...(faint ? { faint } : {}) });
       let cur: { x: number; y: number } | null = null;
       let start: { x: number; y: number } | null = null;
       for (let k = 0; k < data.length; ) {
@@ -146,7 +171,7 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
           start = cur;
         } else if (op === 1) {
           const p = apply(ctm, data[k++], data[k++]);
-          if (cur) segments.push({ x1: cur.x, y1: cur.y, x2: p.x, y2: p.y, width: w, filled });
+          if (cur) seg(cur, p);
           cur = p;
         } else if (op === 2) {
           k += 4;
@@ -155,7 +180,7 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
           k += 2;
           cur = apply(ctm, data[k++], data[k++]);
         } else if (op === 4) {
-          if (cur && start) segments.push({ x1: cur.x, y1: cur.y, x2: start.x, y2: start.y, width: w, filled });
+          if (cur && start) seg(cur, start);
           cur = start;
         } else break;
       }

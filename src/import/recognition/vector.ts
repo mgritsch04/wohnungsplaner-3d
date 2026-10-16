@@ -23,7 +23,7 @@ function vectorParams(mpp: number): VectorParams {
     tMax: 0.6 / mpp,
     minLen: 0.3 / mpp,
     angTol: Math.sin((1.5 * Math.PI) / 180),
-    assemble: { mergeGap: 0.12 / mpp, minOpening: 0.5 / mpp, maxOpening: 2.6 / mpp, joinTol: 0.08 / mpp },
+    assemble: { mergeGap: 0.12 / mpp, minOpening: 0.5 / mpp, maxOpening: 2.6 / mpp, joinTol: 0.08 / mpp, maxThickness: 0.6 / mpp },
   };
 }
 
@@ -35,11 +35,15 @@ type L = { a0: number; a1: number; c: number };
  * other directions (e.g. 30°, 45°) are grouped by angle and detected in a
  * rotated frame. Coordinates are rendered underlay pixels.
  */
-export function detectVectorWalls(segments: VectorSegment[], metersPerPixel: number, opts: { oblique?: boolean } = {}): RasterOutput {
+export function detectVectorWalls(
+  segments: VectorSegment[],
+  metersPerPixel: number,
+  opts: { oblique?: boolean; /** Lines that may face a wall; the others only help to classify openings (#114). */ isWallLine?: (i: number) => boolean } = {},
+): RasterOutput {
   const p = vectorParams(metersPerPixel);
-  const axis = detectInFrame(segments, p);
+  const axis = detectInFrame(segments, p, opts.isWallLine);
   if (opts.oblique === false) return { ...axis, threshold: 0 };
-  return { ...detectOblique(segments, p, axis), threshold: 0 };
+  return { ...detectOblique(segments, p, axis, opts.isWallLine), threshold: 0 };
 }
 
 /** Axis-aligned detection. Only segments accepted by `isWallLine` may form walls; all others count as symbols. */
@@ -91,14 +95,29 @@ function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i:
 }
 
 function makeVectorClassifier(hs: L[], vs: L[], others: VectorSegment[]): GapClassifier {
+  // axis-aligned symbol lines (not wall faces), e.g. window frames drawn with a thinner pen
+  const oh: L[] = [];
+  const ov: L[] = [];
+  const tol = Math.sin((1.5 * Math.PI) / 180);
+  for (const s of others) {
+    const dx = s.x2 - s.x1;
+    const dy = s.y2 - s.y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue;
+    if (Math.abs(dy) / len <= tol) oh.push({ a0: Math.min(s.x1, s.x2), a1: Math.max(s.x1, s.x2), c: (s.y1 + s.y2) / 2 });
+    else if (Math.abs(dx) / len <= tol) ov.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
+  }
   return (b, g0, g1) => {
     const inGap = (x: number, y: number, pad: number) => {
       const a = b.o === 'h' ? x : y;
       const c = b.o === 'h' ? y : x;
       return a > g0 + pad && a < g1 - pad && Math.abs(c - b.c) <= b.t / 2 + pad;
     };
-    // window: lines parallel to the wall inside the gap
-    const parallel = (b.o === 'h' ? hs : vs).filter((l) => l.a0 >= g0 - 2 && l.a1 <= g1 + 2 && Math.abs(l.c - b.c) <= b.t / 2 + 1).length;
+    // window: lines parallel to the wall inside the gap (wall pens or thinner symbol lines)
+    const inGapParallel = (l: L) => l.a0 >= g0 - 2 && l.a1 <= g1 + 2 && Math.abs(l.c - b.c) <= b.t / 2 + 1;
+    const symbolParallel = (b.o === 'h' ? oh : ov).filter((l) => inGapParallel(l) && l.a1 - l.a0 > (g1 - g0) * 0.5);
+    // one thin line across a gap is usually a door threshold; a window frame has two or more
+    const parallel = (b.o === 'h' ? hs : vs).filter(inGapParallel).length + (symbolParallel.length >= 2 ? symbolParallel.length : 0);
     if (parallel >= 1) return { kind: 'window', confidence: 0.6, note: 'Parallele Linien in der Öffnung' };
     const width = g1 - g0;
     let plus = 0;
@@ -150,9 +169,15 @@ const DEG = Math.PI / 180;
  * direction. Each cluster is detected in its own rotated frame, strongest
  * (longest line) first, so hatching inside oblique walls is excluded as well.
  */
-function detectOblique(segments: VectorSegment[], p: VectorParams, axis: { walls: RecognizedWall[]; openings: RecognizedOpening[] }): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
+function detectOblique(
+  segments: VectorSegment[],
+  p: VectorParams,
+  axis: { walls: RecognizedWall[]; openings: RecognizedOpening[] },
+  isWallLine?: (i: number) => boolean,
+): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
   const cands: { i: number; ang: number; len: number; mid: Pt }[] = [];
   segments.forEach((s, i) => {
+    if (isWallLine && !isWallLine(i)) return;
     const len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
     if (len < p.minLen) return;
     const ang = foldQuarter(Math.atan2(s.y2 - s.y1, s.x2 - s.x1));

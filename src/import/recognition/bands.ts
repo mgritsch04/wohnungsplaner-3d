@@ -50,6 +50,11 @@ export interface AssembleOptions {
   maxOpening: number;
   /** Tolerance when snapping wall ends onto perpendicular walls. */
   joinTol: number;
+  /**
+   * Merged bands thicker than this are dropped: they are runs of densely packed parallel lines
+   * (tiles, stairs, furniture, dimension chains) that merged into a "wall" metres thick (#114).
+   */
+  maxThickness?: number;
 }
 
 const lo = (b: Band) => b.c - b.t / 2;
@@ -100,6 +105,7 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
 
   // 1. merge collinear bands across small gaps and opening-sized gaps
   let bands = mergeBands(input, opts.mergeGap);
+  if (opts.maxThickness !== undefined) bands = bands.filter((b) => b.t <= opts.maxThickness!);
   const merged: Band[] = [];
   for (const o of ['h', 'v'] as const) {
     // along the wall first: collinear pieces whose centre lines differ by rounding noise

@@ -33,7 +33,7 @@ export interface RoomProposalOptions {
 /** Common German room names – only texts containing one of these are used as a name. */
 const ROOM_WORDS =
   /(wohn|schlaf|kind|küche|kueche|koch|bad|wc|dusche|flur|diele|gang|abstell|zimmer|büro|buero|arbeit|ess|gäste|gaeste|hwr|hauswirtschaft|technik|keller|balkon|loggia|terrasse|garderobe|ankleide|speis|vorraum|windfang|treppe|lager|studio|eltern)/i;
-const NAME_TEXT = /^[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß .\-/+&]{1,39}$/;
+const NAME_TEXT = /^[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9 .\-/+&]{1,39}$/;
 const AREA_TEXT = /(\d{1,3}(?:[.,]\d{1,2})?)\s*m(?:²|2)(?![0-9a-z])/i;
 
 function distanceToEdges(p: Vec2, poly: Vec2[]): number {
@@ -97,7 +97,8 @@ function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: D
   const usedNames = new Map<string, number>();
   return candidates.map((g, i) => {
     const inside = (opts.texts ?? []).filter((t) => pointInPolygon(t, g.interior));
-    const named = inside.map((t) => t.str.trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
+    // name and area may share one text item ("Wohnen 32,50 m²", as CAD programs often export them)
+    const named = inside.map((t) => t.str.replace(AREA_TEXT, '').trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
     let name = named ?? `Raum ${i + 1}`;
     if (named) {
       const n = (usedNames.get(named) ?? 0) + 1;
