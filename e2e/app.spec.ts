@@ -1415,3 +1415,48 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width (#68)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  const p = await getProject(page);
+  const wardrobe = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const bed = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-bed-160');
+  // select the wardrobe and move it numerically so 60 cm remain between bed and wardrobe
+  const s = await planToScreen(page, wardrobe.x, wardrobe.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: wardrobe.id });
+  const y = bed.y + bed.depth / 2 + 0.6 + wardrobe.depth / 2;
+  const right = page.locator('.panel.right');
+  await right.getByRole('textbox', { name: 'Y cm', exact: true }).fill(String(Math.round(y * 1000) / 10).replace('.', ','));
+  await right.getByRole('textbox', { name: 'Y cm', exact: true }).press('Enter');
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const marker = plan.locator('[data-testid="narrow-passage"][data-width-cm="60"]');
+  await expect(marker.first()).toBeVisible();
+  await expect(marker.first().getByText('60 cm')).toBeVisible();
+  // the 3D view shows floor markers too
+  const markers3d = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scene = (window as any).__wp.three.scene;
+      return scene.getObjectByName('narrow-passages')?.children.length ?? -1;
+    });
+  await expect.poll(markers3d).toBeGreaterThan(0);
+
+  // minimum 60 cm (lowest allowed value): a 60 cm passage is no longer narrower → marker gone
+  const left = page.locator('.panel.left');
+  const min = left.getByRole('textbox', { name: 'Mindestbreite Durchgang cm' });
+  await min.fill('60');
+  await min.press('Enter');
+  expect((await getProject(page)).settings.minPassageWidth).toBeCloseTo(0.6, 6);
+  await expect(marker).toHaveCount(0);
+
+  // switching the display off hides all markers in 2D and 3D
+  await left.getByLabel('Engstellen anzeigen').uncheck();
+  await expect(plan.locator('[data-testid="narrow-passage"]')).toHaveCount(0);
+  await expect.poll(markers3d).toBe(0);
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});
