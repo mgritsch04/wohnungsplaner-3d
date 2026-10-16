@@ -249,6 +249,8 @@ export const SettingsSchema = z.object({
   lamps: z.enum(['auto', 'on', 'off']).default('auto'),
   /** Camera (eye) height in the first-person walkthrough, metres. */
   eyeHeight: z.number().min(1).max(2.2).default(1.63),
+  /** How furniture snaps while dragging (#52): grid steps + wall edges, wall edges only, or free. Alt = free temporarily. */
+  furnitureSnap: z.enum(['grid5', 'grid10', 'wall', 'off']).default('grid5'),
 });
 
 export const ProjectSchema = z.object({
