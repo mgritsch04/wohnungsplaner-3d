@@ -30,7 +30,7 @@ interface Props {
  * First-person walkthrough: WASD/arrow keys to move, mouse to look (pointer lock),
  * Shift to walk faster, Escape releases the mouse. Collides with walls (open door
  * openings stay passable, closed doors not) and solid furniture; height is fixed at
- * eye level. Click/O at the crosshair opens or closes a door or window (#21).
+ * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -134,7 +134,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       const o = aimed();
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
-    /** O: open/close the door/window in sight, else the selected one. */
+    /** E/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
       if (carry.current) return;
       const sel = useUiStore.getState().selection;
@@ -189,7 +189,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         ui.setWalkSit(!ui.walkSit);
         return;
       }
-      if (e.code === 'KeyO' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // E (#107) or O: open/close the door or window in sight
         toggleAimedOpening();
         return;
       }

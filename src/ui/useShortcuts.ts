@@ -20,8 +20,9 @@ export function useShortcuts() {
       const ps = useProjectStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      // walking keys (G = carry furniture #39, C = crouch #20, O = open the door/window in sight #21) belong to the walkthrough
-      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'o'].includes(key) && !mod) return;
+      // walking keys (G = carry furniture #39, C = crouch #20, E/O = open the door/window in sight #21/#107)
+      // belong to the walkthrough – there E does not rotate the selection
+      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'e', 'o'].includes(key) && !mod) return;
       // Alt+1 … Alt+9: camera bookmarks (#55). Matched by e.code, so it works with every layout
       // (Option+digit types other characters on macOS); only while the 3D view is visible.
       const digit = /^Digit([1-9])$/.exec(e.code);
