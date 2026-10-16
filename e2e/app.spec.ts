@@ -468,6 +468,36 @@ test('2D: dragging furniture into a wall stops flush (no tunnelling), Alt allows
   expect(t3.y).toBeLessThan(-1);
 });
 
+test('rotating the selected item (panel buttons, Q/E): collision-checked, one undo step each (#5)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const before = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-wardrobe-150');
+  const s = await planToScreen(page, before.x, before.y);
+  await page.mouse.click(s.x, s.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe(before.id);
+  const turned = async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === before.id);
+  const delta = (r: number) => Math.atan2(Math.sin(r - before.rotation), Math.cos(r - before.rotation));
+  // wardrobe stands with its back at the south wall: turning it 90° must push it into the room, not into the wall
+  await page.getByRole('group', { name: 'Drehen' }).getByRole('button', { name: '⟳ 90°' }).click();
+  let w = await turned();
+  expect(delta(w.rotation)).toBeCloseTo(Math.PI / 2, 5);
+  expect(w.y + w.width / 2).toBeLessThanOrEqual(4.0 + 0.002); // inner face of the south wall (sample: 4 m deep)
+  await expect(page.getByText('gedreht und etwas verschoben')).toBeVisible();
+  // one undo step restores rotation and position
+  await page.keyboard.press('Control+z');
+  w = await turned();
+  expect([w.x, w.y, w.rotation]).toEqual([before.x, before.y, before.rotation]);
+  // keyboard: E = +15°, Q = −15°
+  await page.mouse.click(s.x, s.y);
+  await page.keyboard.press('e');
+  expect(delta((await turned()).rotation)).toBeCloseTo(Math.PI / 12, 5);
+  await page.keyboard.press('q');
+  expect(delta((await turned()).rotation)).toBeCloseTo(0, 5);
+  expect(errors).toEqual([]);
+});
+
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);

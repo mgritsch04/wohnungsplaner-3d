@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
-import { buildPlacementObstacles, clipConvex, moveFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
+import { buildPlacementObstacles, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
@@ -402,3 +402,71 @@ describe('unified furniture rules', () => {
     expect([...furnitureConflicts(p, d, buildPlacementObstacles(d))].map(([, c]) => c.issues.map((i) => i.message))).toEqual([]);
   });
 });
+
+describe('rotating furniture (#5)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+  function setup() {
+    const p = roomProject();
+    const d = derivePlan(p);
+    return { p, d, obs: buildPlacementObstacles(d) };
+  }
+
+  it('a wardrobe turned at a wall is pushed back into the room instead of into the wall', () => {
+    const { p, d, obs } = setup();
+    // 150 × 60 cm, back flush against the north wall (inner face y = 0)
+    const w = createFurnitureFromCatalog(cat('generic-wardrobe-150'), { x: 2, y: 0.3 });
+    p.furniture.push(w);
+    expect(collidingObstacles(w, obs)).toHaveLength(0);
+    expect(rotateFurnitureTo(p, d, obs, w.id, Math.PI / 2)).toBe('moved');
+    const r = p.furniture.find((f) => f.id === w.id)!;
+    expect(r.rotation).toBeCloseTo(Math.PI / 2, 6);
+    expect(collidingObstacles(r, obs)).toHaveLength(0);
+    expect(r.y).toBeCloseTo(0.75, 2); // now 150 cm deep along y → centre 75 cm from the wall
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('free rotation in the open room stays in place', () => {
+    const { p, d, obs } = setup();
+    const t = createFurnitureFromCatalog(cat('generic-coffee-table'), { x: 2, y: 1.5 });
+    p.furniture.push(t);
+    expect(rotateFurnitureTo(p, d, obs, t.id, Math.PI / 12)).toBe('ok');
+    expect(p.furniture[0]).toMatchObject({ x: 2, y: 1.5 });
+  });
+
+  it('turning into another piece of furniture pushes it clear of it', () => {
+    const { p, d, obs } = setup();
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 2.5 });
+    const sofaFront = sofa.y - sofa.depth / 2;
+    // shelf 80 × 30 cm just in front of the sofa; turned, it would reach 25 cm into it
+    const board = createFurnitureFromCatalog(cat('generic-shelf-80'), { x: 2, y: sofaFront - 0.2, rotation: 0 });
+    p.furniture.push(sofa, board);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+    expect(rotateFurnitureTo(p, d, obs, board.id, Math.PI / 2)).toBe('moved');
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('no free spot nearby: rotated anyway and reported as conflict (never through the wall)', () => {
+    const p = createEmptyProject();
+    // narrow 1.0 × 3 m corridor; a 1.5 m wardrobe cannot turn across it
+    addRectRoom(p, { x: 0, y: 0, width: 1, depth: 3, name: 'Gang', thickness: T, height: 2.6 });
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const w = createFurnitureFromCatalog(cat('generic-wardrobe-150'), { x: 0.3, y: 1.5, rotation: Math.PI / 2 });
+    p.furniture.push(w);
+    expect(collidingObstacles(w, obs)).toHaveLength(0);
+    expect(rotateFurnitureTo(p, d, obs, w.id, 0)).toBe('conflict');
+    const r = p.furniture[0];
+    expect(r.rotation).toBe(0);
+    expect(r.x).toBeCloseTo(0.3, 6); // not pushed through a wall into the void
+    expect(furnitureConflicts(p, d, obs).get(w.id)?.level).toBe('error');
+  });
+
+  it('locked items do not turn', () => {
+    const { p, d, obs } = setup();
+    const t = { ...createFurnitureFromCatalog(cat('generic-coffee-table'), { x: 2, y: 1.5 }), locked: true };
+    p.furniture.push(t);
+    rotateFurnitureTo(p, d, obs, t.id, 1);
+    expect(p.furniture[0].rotation).toBe(0);
+  });
+});
+
