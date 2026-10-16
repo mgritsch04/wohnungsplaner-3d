@@ -13,7 +13,7 @@
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { newId } from './ids';
 import type { DerivedPlan } from './derived';
-import { collidingObstacles, constrainMove, moveCollision, mtv, type Obstacle, type Pose } from './placement';
+import { collidingObstacles, constrainMove, moveCollision, mtv, probeCorners, type Obstacle, type Pose } from './placement';
 import type { Furniture, FurnitureGroup, Project } from './schema';
 import { normalizeAngle } from './units';
 import { add, boundsOf, pointInPolygon, rotate, sub, type Bounds, type Vec2 } from './vec';
@@ -328,7 +328,7 @@ export function settleGroup(d: Project, obstacles: Obstacle[], ids: string[], be
       const pose = { ...c.lift(c.f), x: c.f.x + t.x, y: c.f.y + t.y };
       const fc = furnitureCorners(pose);
       for (const o of collidingObstacles(pose, c.active)) {
-        const v = mtv(fc, o.polygon);
+        const v = mtv(probeCorners(pose, o, fc), o.polygon);
         if (v && (!worst || Math.hypot(v.x, v.y) > Math.hypot(worst.x, worst.y))) worst = v;
       }
     }

@@ -110,13 +110,18 @@ describe('alignFurniture (#51)', () => {
     expect(arrangeMessage({ kind: 'align', edge: 'left' }, r).text).toContain('1 von 3 Möbeln');
   });
 
-  it('a chair may move under a table, a rug under other furniture', () => {
+  it('a chair may move under a table (seat only, #16), a rug under other furniture', () => {
     const p = roomProject();
-    const table = add(p, 2, 1, {}, 'generic-dining-table-4'); // y .575..1.425
-    const chair = add(p, 2, 2.4, {}, 'generic-chair');
-    const r1 = alignFurniture(p, derivePlan(p), [table.id, chair.id], 'top');
+    const table = add(p, 2, 1, {}, 'generic-dining-table-4'); // x 1.3..2.7, y .575..1.425
+    // facing the table, the seat already under the table top (y 1.34..1.86, backrest at y 1.825..1.86)
+    const chair = add(p, 1.6, 1.6, { rotation: Math.PI }, 'generic-chair');
+    const r1 = alignFurniture(p, derivePlan(p), [table.id, chair.id], 'left');
     expect(r1.blocked).toEqual([]);
-    expect(box(p, chair.id).minY).toBeCloseTo(box(p, table.id).minY, 3);
+    expect(box(p, chair.id).minX).toBeCloseTo(box(p, table.id).minX, 3);
+    // aligned to the table's top edge the whole chair – backrest included – would stand in the table: blocked (#16)
+    const far = add(p, 2, 2.4, {}, 'generic-chair');
+    const r1b = alignFurniture(p, derivePlan(p), [table.id, far.id], 'top');
+    expect(r1b.blocked).toEqual([far.id]);
 
     const q = roomProject();
     const side = add(q, 1, 0.5, { width: 1.6, depth: 0.45 });

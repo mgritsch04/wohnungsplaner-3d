@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from '../model/factory';
 import { ProjectSchema } from '../model/schema';
-import { DUCK_MIN_EYE, goalEyeHeight } from './walkPosture';
+import { useUiStore } from '../store/uiStore';
+import { DUCK_MIN_EYE, DUCK_SPEED, goalEyeHeight, walkSpeedFactor } from './walkPosture';
 
 describe('walkthrough posture (#78)', () => {
   it('stands at the eye height, sits at the seated eye height', () => {
@@ -24,5 +25,31 @@ describe('walkthrough posture (#78)', () => {
     expect(ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 1.05 } }).settings.sitEyeHeight).toBe(1.05);
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 0.5 } })).toThrow();
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 1.7 } })).toThrow();
+  });
+
+  it('crouched or seated walks slower', () => {
+    expect(walkSpeedFactor({ sitting: false, ducking: false })).toBe(1);
+    expect(walkSpeedFactor({ sitting: false, ducking: true })).toBe(DUCK_SPEED);
+    expect(walkSpeedFactor({ sitting: true, ducking: false })).toBe(DUCK_SPEED);
+    expect(DUCK_SPEED).toBeLessThan(1);
+  });
+
+  it('C toggles crouching; sitting or standing up via X/buttons ends it; ignored while seated (#47)', () => {
+    const ui = () => useUiStore.getState();
+    ui().setWalkSit(false);
+    ui().setWalkDuck(false);
+    ui().toggleWalkDuck();
+    expect(ui().walkDuck).toBe(true);
+    ui().toggleWalkDuck();
+    expect(ui().walkDuck).toBe(false);
+    ui().toggleWalkDuck();
+    ui().setWalkSit(true);
+    expect(ui().walkDuck).toBe(false);
+    ui().toggleWalkDuck();
+    expect(ui().walkDuck).toBe(false);
+    ui().setWalkSit(false);
+    ui().toggleWalkDuck();
+    ui().setWalkSit(false); // "Stehen" button
+    expect(ui().walkDuck).toBe(false);
   });
 });

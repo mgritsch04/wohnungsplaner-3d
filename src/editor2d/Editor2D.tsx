@@ -66,8 +66,8 @@ interface Preview {
   measure?: { a: Vec2; b: Vec2 } | null;
   /** Walls a dragged item is snapped to (highlighted). */
   snapWalls?: string[];
-  /** Single item being dragged: show its clearances (#50). */
-  clearanceId?: string;
+  /** Items being dragged: show their clearances (#50; a multi-selection or group as a whole, #94). */
+  clearanceIds?: string[];
 }
 
 const SNAP_PX = 10;
@@ -116,6 +116,17 @@ export function Editor2D() {
   const [calib, setCalib] = useState<{ p1: Vec2 | null; p2: Vec2 | null }>({ p1: null, p2: null });
   const [lengthInput, setLengthInput] = useState<string | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+  // another project (new, opened, imported – #133): drop half-drawn walls, a started
+  // measurement and calibration points of the previous one (reset during render, not in an effect)
+  const [stateFor, setStateFor] = useState(project.id);
+  if (stateFor !== project.id) {
+    setStateFor(project.id);
+    setChain([]);
+    setMeasureStart(null);
+    setCalib({ p1: null, p2: null });
+    setLengthInput(null);
+    setPreview({});
+  }
 
   // track container size
   useEffect(() => {
@@ -424,7 +435,7 @@ export function Editor2D() {
               const cur = d.furniture.find((x) => x.id === dr.id);
               if (cur) moveGroupBy(d, obstacles, rigid, { x: roundMm(c.x) - cur.x, y: roundMm(c.y) - cur.y }, { collide: !e.altKey });
             });
-            setPreview({});
+            setPreview({ clearanceIds: rigid });
             return;
           }
           let snapped: string[] = [];
@@ -436,7 +447,7 @@ export function Editor2D() {
             const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
             for (const g of dr.group) moveFurnitureTo(d, derived, obstacles, g.id, { x: roundMm(g.x + delta.x), y: roundMm(g.y + delta.y) }, { snap: false, collide: !e.altKey });
           });
-          setPreview({ snapWalls: snapped, clearanceId: dr.group.length ? undefined : dr.id });
+          setPreview({ snapWalls: snapped, clearanceIds: [dr.id, ...dr.group.map((g) => g.id)] });
           return;
         }
         case 'box': {
@@ -797,7 +808,7 @@ export function Editor2D() {
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
-          {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingId={preview.clearanceId} />}
+          {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
 
@@ -1008,7 +1019,7 @@ function MeasureLine({ a, b, px }: { a: Vec2; b: Vec2; px: number }) {
   const n = scale(perp(d), 5 * px);
   const mid = scale(add(a, b), 0.5);
   return (
-    <g pointerEvents="none">
+    <g pointerEvents="none" data-testid="measure-line">
       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       <line x1={a.x - n.x} y1={a.y - n.y} x2={a.x + n.x} y2={a.y + n.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       <line x1={b.x - n.x} y1={b.y - n.y} x2={b.x + n.x} y2={b.y + n.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />

@@ -1314,6 +1314,20 @@ code {
 .hover-card .muted {
   color: var(--color-text-muted);
 }
+/* why a furniture item is marked (#16) */
+.hover-card .hover-card-conflict {
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning-strong);
+  background: var(--color-warning-soft);
+}
+.hover-card .hover-card-conflict.error {
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-strong);
+  background: var(--color-danger-soft);
+}
 /* zoom slider at the bottom of the 2D/3D viewport (#6) */
 .zoom-slider {
   position: absolute;

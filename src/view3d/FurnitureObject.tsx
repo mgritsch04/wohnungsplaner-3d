@@ -18,7 +18,8 @@ interface Props {
   /** Pointer released without dragging (a click) – second click on a selected group picks one member (#65). */
   onClickRelease?: (id: string) => void;
   onDragStart: () => void;
-  onDrag: (id: string, x: number, y: number) => void;
+  /** `free` = Alt held: free placement without snapping and collision stop (as in 2D, #16). */
+  onDrag: (id: string, x: number, y: number, free: boolean) => void;
   onDragEnd: () => void;
   /** Drag aborted by the browser: restore the position from before the drag. */
   onDragCancel: () => void;
@@ -97,7 +98,7 @@ export const FurnitureObject = memo(
       }
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(dr.plane, hit)) return;
-      onDrag(item.id, roundMm(hit.x - dr.grab.x), roundMm(hit.z - dr.grab.z));
+      onDrag(item.id, roundMm(hit.x - dr.grab.x), roundMm(hit.z - dr.grab.z), e.nativeEvent.altKey);
     };
     const onUp = (e: ThreeEvent<PointerEvent>) => {
       if (!dragging.current) return;

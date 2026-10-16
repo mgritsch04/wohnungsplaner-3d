@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from '../model/factory';
-import { insertWall } from '../model/operations';
-import { generateCountertops, kitchenChecksForItem, kitchenComponents, placeKitchenRun } from './kitchen';
+import { addRectRoom, closestWall, insertWall } from '../model/operations';
+import { derivePlan } from '../model/derived';
+import { buildPlacementObstacles, collidingObstacles, furnitureConflicts } from '../model/placement';
+import { generateCountertops, kitchenChecksForItem, kitchenComponents, placeKitchenRun, wallFaceLength } from './kitchen';
 
 function kitchenProject() {
   const p = createEmptyProject();
@@ -46,5 +48,35 @@ describe('kitchen planner', () => {
     const f = p.furniture.find((x) => x.id === b)!;
     f.y = 0;
     expect(kitchenChecksForItem(p, b).join()).toMatch(/Wand/);
+  });
+
+  it('starts at the inner room corner: no module stands in the wall or the connected wall (#16)', () => {
+    for (const thickness of [0.12, 0.24]) {
+      const p = createEmptyProject();
+      addRectRoom(p, { x: 0, y: 0, width: 4, depth: 3, name: 'K', thickness, height: 2.6 }); // interior 0..4 × 0..3
+      const w = closestWall(p, { x: 2, y: -thickness / 2 })!;
+      // the room side of the north wall
+      const side = (derivePlan(p).footprints.get(w.wall.id)!.normal.y > 0 ? 1 : -1) as 1 | -1;
+      expect(wallFaceLength(p, w.wall.id, side)).toBeCloseTo(4, 6);
+      const ids = placeKitchenRun(p, {
+        wallId: w.wall.id,
+        side,
+        start: 0,
+        modules: [{ catalogId: 'generic-k-tall-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-sink-80' }, { catalogId: 'generic-k-wall-60' }],
+      });
+      generateCountertops(p);
+      const d = derivePlan(p);
+      const walls = buildPlacementObstacles(d).filter((o) => o.kind === 'wall');
+      const items = ids.map((id) => p.furniture.find((f) => f.id === id)!);
+      for (const f of p.furniture) expect(collidingObstacles(f, walls), `${f.name} in der Wand`).toEqual([]);
+      // flush in the corner: first module begins at the inner face of the west wall, backs on the north face
+      const xs = (f: (typeof items)[0]) => [f.x - f.width / 2, f.x + f.width / 2];
+      const first = items.find((f) => f.kitchen?.type === 'tall')!;
+      const [x0, x1] = xs(first);
+      expect(Math.min(x0, x1)).toBeGreaterThanOrEqual(0);
+      expect(Math.min(x0, x1)).toBeLessThan(0.005);
+      for (const f of items) expect(f.y - f.depth / 2).toBeCloseTo(0.002, 3);
+      expect([...furnitureConflicts(p, d, buildPlacementObstacles(d)).values()].flatMap((c) => c.issues.map((i) => i.message))).toEqual([]);
+    }
   });
 });

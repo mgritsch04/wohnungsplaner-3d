@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
-import { buildPlacementObstacles, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
+import { buildPlacementObstacles, conflictSummary, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
+import { seatBackDepth } from './placementRules';
 import { pointInPolygon, polygonArea, rotate } from './vec';
 
 const T = 0.12;
@@ -400,6 +401,123 @@ describe('unified furniture rules', () => {
     generateCountertops(p);
     const d = derivePlan(p);
     expect([...furnitureConflicts(p, d, buildPlacementObstacles(d))].map(([, c]) => c.issues.map((i) => i.message))).toEqual([]);
+  });
+});
+
+describe('why an item is marked (#16)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+
+  it('gives a short reason per issue and one summary line per item', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 1.5 });
+    const lamp = createFurnitureFromCatalog(cat('generic-floor-lamp'), { x: 2.2, y: 1.5 });
+    const shelf = createFurnitureFromCatalog(cat('generic-sideboard'), { x: 2, y: 0.1 }); // 12.5 cm into the north wall
+    p.furniture.push(sofa, lamp, shelf);
+    const c = furnitureConflicts(p, d, obs);
+    expect(conflictSummary(c.get(lamp.id)!.issues)).toEqual({ level: 'error', label: 'Rot markiert', reasons: ['überlappt mit „Sofa 3-Sitzer“'] });
+    expect(conflictSummary(c.get(sofa.id)!.issues)!.reasons).toEqual(['überlappt mit „Stehlampe“']);
+    expect(conflictSummary(c.get(shelf.id)!.issues)!.reasons).toContain('ragt in die Wand');
+    for (const [, k] of c) for (const i of k.issues) expect(i.short.length).toBeGreaterThan(5);
+    expect(conflictSummary([])).toBeNull();
+  });
+
+  it('warnings only: orange', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const wardrobe = createFurnitureFromCatalog(cat('generic-wardrobe-100'), { x: 2, y: 0.3 });
+    const chair = createFurnitureFromCatalog(cat('generic-armchair'), { x: 2, y: 0.6 + 0.3 + 0.41 });
+    p.furniture.push(wardrobe, chair);
+    const s = conflictSummary(furnitureConflicts(p, d, obs).get(wardrobe.id)!.issues)!;
+    expect(s.level).toBe('warn');
+    expect(s.label).toBe('Orange markiert');
+    expect(s.reasons).toEqual(['zu wenig Platz vor den Türen („Sessel“ im Weg)']);
+  });
+});
+
+describe('chair under table: only the seat goes under the table top (#16)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+  function setup() {
+    const p = roomProject();
+    const d = derivePlan(p);
+    // dining table 140 × 85: y 1.075 … 1.925
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    p.furniture.push(table);
+    return { p, d, obs: buildPlacementObstacles(d), table };
+  }
+  const tableEdge = 1.5 - 0.85 / 2;
+
+  it('backrest depth: from the drawn chair models, 20 % of the depth when unknown, 0 for a stool', () => {
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 0, y: 0 });
+    expect(seatBackDepth(chair)).toBeCloseTo(0.035, 9);
+    const office = createFurnitureFromCatalog(cat('generic-office-chair'), { x: 0, y: 0 });
+    expect(seatBackDepth(office)).toBeCloseTo(0.19 * office.depth, 9);
+    expect(seatBackDepth(createFurnitureFromCatalog(cat('generic-bar-stool'), { x: 0, y: 0 }))).toBe(0);
+    const imported = { ...chair, model: { type: 'gltf' as const, assetId: 'a', fallbackShape: 'chair' as const } } as unknown as typeof chair;
+    expect(seatBackDepth(imported)).toBeCloseTo(0.2 * chair.depth, 9);
+  });
+
+  it('a chair pushed under the table (seat first) stops when its backrest reaches the table edge', () => {
+    const { p, d, obs, table } = setup();
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 2, y: 0.5 }); // front (+y) faces the table
+    p.furniture.push(chair);
+    moveFurnitureTo(p, d, obs, chair.id, { x: 2, y: 1.5 }, { snap: false, collide: true });
+    const c = p.furniture.find((f) => f.id === chair.id)!;
+    // rear edge + backrest depth = table edge: the seat (≈ 48 cm) is under the table top
+    expect(c.y - c.depth / 2 + 0.035).toBeCloseTo(tableEdge, 2);
+    expect(c.y - c.depth / 2 + 0.035).toBeLessThanOrEqual(tableEdge + 1e-4);
+    expect(c.y + c.depth / 2 - tableEdge).toBeGreaterThan(0.4);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+    // half under the table: still fine
+    c.y = tableEdge;
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+    expect(table.id).toBeTruthy();
+  });
+
+  it('turned the other way round, the backrest stops at the table edge at once', () => {
+    const { p, d, obs } = setup();
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 2, y: 0.5, rotation: Math.PI }); // backrest towards the table
+    p.furniture.push(chair);
+    moveFurnitureTo(p, d, obs, chair.id, { x: 2, y: 1.5 }, { snap: false, collide: true });
+    const c = p.furniture.find((f) => f.id === chair.id)!;
+    expect(c.y + c.depth / 2).toBeCloseTo(tableEdge, 2);
+    expect(c.y + c.depth / 2).toBeLessThanOrEqual(tableEdge + 1e-4);
+  });
+
+  it('a table pushed towards a chair stops at the backrest, not at the seat', () => {
+    const { p, d, obs, table } = setup();
+    // chair north of the table, facing it: y 0.74 … 1.26, backrest y 0.74 … 0.775
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 2, y: 1.0 });
+    table.y = 2.4;
+    p.furniture.push(chair);
+    moveFurnitureTo(p, d, obs, table.id, { x: 2, y: 1.0 }, { snap: false, collide: true });
+    const t = p.furniture.find((f) => f.id === table.id)!;
+    expect(t.y - t.depth / 2).toBeCloseTo(1.0 - chair.depth / 2 + 0.035, 2);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('a chair placed completely in the table (e.g. with Alt) is marked on both, with the reason', () => {
+    const { p, d, obs, table } = setup();
+    const chair = createFurnitureFromCatalog(cat('generic-chair'), { x: 2, y: 1.5 });
+    p.furniture.push(chair);
+    const c = furnitureConflicts(p, d, obs);
+    expect(c.get(chair.id)?.level).toBe('error');
+    expect(c.get(chair.id)?.issues[0]).toMatchObject({ kind: 'overlap', refId: table.id });
+    expect(c.get(chair.id)?.issues[0].message).toMatch(/Lehne steht in „Esstisch 4 Personen“/);
+    expect(c.get(table.id)?.issues[0].message).toMatch(/„Stuhl“ steht mit der Lehne im Tisch/);
+    // the marked region is the backrest strip inside the table
+    expect(polygonArea(c.get(chair.id)!.issues[0].region!.polygon)).toBeCloseTo(0.45 * 0.035, 3);
+  });
+
+  it('a stool (no backrest) may stand completely under the table', () => {
+    const { p, d, obs } = setup();
+    const stool = createFurnitureFromCatalog(cat('generic-bar-stool'), { x: 2, y: 0.4 });
+    p.furniture.push(stool);
+    moveFurnitureTo(p, d, obs, stool.id, { x: 2, y: 1.5 }, { snap: false, collide: true });
+    expect(p.furniture.find((f) => f.id === stool.id)!.y).toBeCloseTo(1.5, 3);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
   });
 });
 
