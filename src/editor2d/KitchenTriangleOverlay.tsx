@@ -4,10 +4,10 @@ import type { Project } from '../model/schema';
 import { useKitchenTriangles } from '../ui/useKitchenTriangles';
 import { rotate } from '../model/vec';
 
-// design tokens (theme.css) – green within the rule of thumb, orange outside
-const OK = 'var(--color-success)';
-const OFF = 'var(--color-warning)';
-const HALO = 'var(--color-surface)';
+// plan tokens (theme.css, same in light and dark – the SVG plan stays light): green within the rule of thumb, orange outside
+const OK = 'var(--color-plan-ok)';
+const OFF = 'var(--color-plan-warn)';
+const HALO = 'var(--color-plan-halo)';
 
 /** Kitchen work triangle (#82): dashed sides with their lengths, green/orange by rule of thumb. */
 export function KitchenTriangleOverlay({ project, derived, px }: { project: Project; derived: DerivedPlan; px: number }) {
