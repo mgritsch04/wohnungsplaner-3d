@@ -202,3 +202,31 @@ test('startet auch, wenn IndexedDB ganz fehlt', async ({ page }) => {
   await page.goto(APP);
   await expectStartsWithoutStorage(page, page, pageErrors);
 });
+
+// claude.ai packt die Seite in eine Hülle mit body{color:#000;background:#fff} (#129) –
+// der Testserver liefert index.html genauso eingepackt aus.
+test('Text bleibt in der claude.ai-Seitenhülle im Dunkelmodus hell (lesbar)', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'dark' });
+  const page = await context.newPage();
+  await freshStart(page);
+  const colors = await page.evaluate(() => {
+    const label = document.querySelector('.panel.left .tabs button:not(.active)') as HTMLElement;
+    return { body: getComputedStyle(document.body).color, bg: getComputedStyle(document.body).backgroundColor, label: getComputedStyle(label).color };
+  });
+  expect(colors.body).toBe('rgb(229, 233, 239)');
+  expect(colors.bg).toBe('rgb(15, 19, 24)');
+  expect(colors.label).not.toBe('rgb(0, 0, 0)');
+  await context.close();
+});
+
+test('Handy-Ansicht im Artefakt: 3D füllt den Bildschirm, Panels über die untere Leiste', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await freshStart(page);
+  await expect(page.locator('.app.phone')).toBeVisible();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('.panel.left')).toBeHidden();
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Werkzeuge' }).click();
+  await expect(page.locator('.panel.left')).toBeVisible();
+  await context.close();
+});

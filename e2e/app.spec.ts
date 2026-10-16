@@ -3303,3 +3303,45 @@ test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and 
   await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test.describe('Handy-Ansicht (#89)', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('Plan/3D füllen den Bildschirm, Panels öffnen sich als Blatt über die untere Leiste', async ({ page }) => {
+    const errors = collectErrors(page);
+    await freshStart(page);
+    // starts in 3D, side panels and status bar are hidden
+    await expect(page.locator('.app.phone')).toBeVisible();
+    await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.panel.left')).toBeHidden();
+    await expect(page.locator('.panel.right')).toBeHidden();
+    await expect(page.locator('.statusbar')).toHaveCount(0);
+    const ws = await page.locator('.workspace').boundingBox();
+    expect(ws!.height).toBeGreaterThan(844 * 0.6);
+    // the toolbar does not take more than a sliver of the screen
+    const tb = await page.locator('.toolbar').boundingBox();
+    expect(tb!.height).toBeLessThan(130);
+
+    const bar = page.getByRole('navigation', { name: 'Panels' });
+    await bar.getByRole('button', { name: 'Werkzeuge' }).click();
+    await expect(page.locator('.panel.left')).toBeVisible();
+    await expect(page.locator('.panel.left').getByRole('button', { name: 'Raum anlegen' })).toBeVisible();
+    await bar.getByRole('button', { name: 'Details' }).click();
+    await expect(page.locator('.panel.left')).toBeHidden();
+    await expect(page.locator('.panel.right').getByRole('button', { name: /Wohnzimmer – 20,00 m²/ })).toBeVisible();
+    await bar.getByRole('button', { name: 'Panel schließen' }).click();
+    await expect(page.locator('.panel.right')).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test('ein normales PC-Fenster bleibt unverändert', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await freshStart(page);
+    await expect(page.locator('.app.phone')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Panels' })).toHaveCount(0);
+    await expect(page.locator('.panel.left')).toBeVisible();
+    await expect(page.locator('.statusbar')).toBeVisible();
+    await expect(page.getByRole('button', { name: '2D + 3D' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
