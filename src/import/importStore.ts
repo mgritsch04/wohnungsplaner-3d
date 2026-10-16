@@ -69,7 +69,9 @@ export interface SourceAnalysis {
   imageAssetId: string;
   kind: 'vector' | 'raster' | 'mixed' | 'unknown';
   segments: import('./pdf').PdfSegment[];
-  texts: { str: string; x: number; y: number }[];
+  texts: import('./dimensions').PlanText[];
+  /** Dimension texts of a vector PDF paired with their dimension lines (for the scale check). */
+  dimensions?: import('./dimensions').DimensionMatch[];
 }
 
 export const useSourceAnalysis = create<{ analysis: SourceAnalysis | null; set: (a: SourceAnalysis | null) => void }>((set) => ({

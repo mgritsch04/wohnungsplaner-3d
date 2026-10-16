@@ -8,6 +8,7 @@ import { reportError } from '../../ui/actions';
 import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
+import { checkScale, scaleCheckMessage } from '../dimensions';
 import { proposeRooms } from '../rooms';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
@@ -49,6 +50,11 @@ export async function runRecognition() {
     const texts = analysis && analysis.imageAssetId === u.imageAssetId ? analysis.texts.map((t) => ({ str: t.str, ...imageToWorld(u, t) })) : undefined;
     draft.rooms = proposeRooms(draft.walls, { texts });
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
+    // dimension texts of a vector PDF that contradict the scale
+    if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
+      const check = checkScale(analysis.dimensions, u.metersPerPixel);
+      if (check.status === 'mismatch') draft.warnings.push(scaleCheckMessage(check)!);
+    }
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
     useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume vorgeschlagen – bitte prüfen.`, 'success');

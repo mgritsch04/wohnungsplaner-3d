@@ -3,6 +3,7 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+import type { PlanText } from './dimensions';
 import { PlanFileError } from './fileValidation';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -77,7 +78,7 @@ export interface PdfContentAnalysis {
   /** Straight segments in rendered-pixel coordinates (same frame as the underlay image). */
   segments: PdfSegment[];
   /** Text snippets with positions (rendered pixels) – e.g. room labels or dimensions. */
-  texts: { str: string; x: number; y: number }[];
+  texts: PlanText[];
 }
 
 type Matrix = [number, number, number, number, number, number];
@@ -166,7 +167,14 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
   for (const item of textContent.items) {
     if (!('str' in item) || !item.str.trim()) continue;
     const m = mul(viewport.transform as Matrix, item.transform as Matrix);
-    texts.push({ str: item.str.trim(), x: m[4], y: m[5] });
+    // reading direction and font height in rendered pixels; the advance width is given in PDF units
+    const dirLen = Math.hypot(m[0], m[1]);
+    texts.push({
+      str: item.str.trim(),
+      x: m[4],
+      y: m[5],
+      ...(dirLen > 0 ? { dir: { x: m[0] / dirLen, y: m[1] / dirLen }, height: Math.hypot(m[2], m[3]), width: item.width * pixelsPerPoint } : {}),
+    });
   }
 
   let kind: PdfContentAnalysis['kind'] = 'unknown';

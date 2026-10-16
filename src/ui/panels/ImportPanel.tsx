@@ -11,6 +11,7 @@ import { degToRad, formatArea, formatLength, radToDeg } from '../../model/units'
 import { runRecognition } from '../../import/recognition/runRecognition';
 import type { DraftStatus } from '../../import/draft';
 import { findDraftConflicts } from '../../import/review';
+import { checkScale, scaleCheckMessage } from '../../import/dimensions';
 
 export function ImportPanel() {
   const underlay = useProjectStore((s) => s.project.underlay);
@@ -103,6 +104,10 @@ function UnderlayControls() {
       if (d.underlay) fn(d.underlay);
     });
 
+  // dimension texts of a vector PDF vs. the current scale (only shown once a scale is set; never applied automatically)
+  const dimCheck = analysis && analysis.imageAssetId === u.imageAssetId && analysis.dimensions?.length && (u.calibrated || u.scaleSource === 'notation') ? checkScale(analysis.dimensions, u.metersPerPixel) : null;
+  const dimMessage = dimCheck && scaleCheckMessage(dimCheck);
+
   const scaleBadge = u.calibrated ? (
     <Badge kind="ok">Kalibriert</Badge>
   ) : u.scaleSource === 'notation' ? (
@@ -157,6 +162,11 @@ function UnderlayControls() {
               Aus Angabe übernehmen
             </button>
           </div>
+        )}
+        {dimMessage && (
+          <p className={dimCheck?.status === 'mismatch' ? 'warning small' : 'muted small'} data-testid="dimension-check">
+            {dimMessage}
+          </p>
         )}
       </Section>
 
