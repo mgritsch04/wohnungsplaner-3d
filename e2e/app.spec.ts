@@ -312,6 +312,49 @@ test('walkthrough: look at furniture, select it, carry it with G and put it down
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('zoom slider at the bottom of 2D and 3D, synchronised with the mouse wheel (#6)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  const zoom2d = () => page.evaluate(() => (window as any).__wp.useUiStore.getState().view2d.zoom as number);
+  const slider2d = page.getByLabel('Zoom 2D', { exact: true });
+  await expect(slider2d).toBeVisible();
+  const z0 = await zoom2d();
+  await page.getByRole('button', { name: 'Zoom 2D: hineinzoomen' }).click();
+  expect(await zoom2d()).toBeGreaterThan(z0 * 1.1);
+  // mouse wheel → slider follows
+  const before = Number(await slider2d.inputValue());
+  const box = (await page.getByTestId('editor2d').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(async () => Number(await slider2d.inputValue())).toBeLessThan(before);
+  await slider2d.fill('900');
+  expect(await zoom2d()).toBeGreaterThan(300);
+
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const slider3d = page.getByLabel('Zoom 3D', { exact: true });
+  await expect(slider3d).toBeVisible();
+  const dist = () =>
+    page.evaluate(() => {
+      const wp = (window as any).__wp;
+      return wp.three.camera.position.length() as number;
+    });
+  const d0 = await dist();
+  await page.getByRole('button', { name: 'Zoom 3D: hineinzoomen' }).click();
+  await expect.poll(dist).toBeLessThan(d0 - 0.2);
+  const s0 = Number(await slider3d.inputValue());
+  const cbox = (await page.getByTestId('scene3d').boundingBox())!;
+  await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 3);
+  await page.mouse.wheel(0, 800); // zoom out with the wheel
+  await expect.poll(async () => Number(await slider3d.inputValue()), { timeout: 15000 }).toBeLessThan(s0);
+  // not shown while walking
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(slider3d).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();

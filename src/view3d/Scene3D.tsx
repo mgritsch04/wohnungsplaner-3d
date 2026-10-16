@@ -21,6 +21,7 @@ import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
 import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
 import { CollisionMarkers } from './CollisionMarkers';
+import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -66,6 +67,7 @@ export function Scene3D() {
           <SceneContent project={project} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
+      {cameraMode === 'orbit' && <OrbitZoomSlider />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && (
         <div className="walk-overlay">
@@ -282,6 +284,25 @@ function OrbitCamera({
     // only on mount, explicit reset or layout change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetRequest, viewMode]);
+  // zoom slider (#6): report the camera distance, let the slider move the camera
+  useEffect(() => {
+    const c = controlsRef.current;
+    if (!c) return;
+    const zoom = useOrbitZoom.getState();
+    const report = () => zoom.setDistance(camera.position.distanceTo(c.target));
+    c.addEventListener('change', report);
+    report();
+    zoom.setApply((d) => {
+      const dir = camera.position.clone().sub(c.target);
+      camera.position.copy(c.target).add(dir.setLength(Math.max(c.minDistance, Math.min(c.maxDistance, d))));
+      c.update();
+      report();
+    });
+    return () => {
+      c.removeEventListener('change', report);
+      useOrbitZoom.getState().setApply(null);
+    };
+  }, [camera, controlsRef]);
   return (
     <OrbitControls
       ref={controlsRef}
@@ -295,6 +316,15 @@ function OrbitCamera({
       rotateSpeed={rotateSpeed}
     />
   );
+}
+
+/** Zoom slider of the 3D overview, synchronised with mouse wheel / pinch (#6). */
+function OrbitZoomSlider() {
+  const distance = useOrbitZoom((s) => s.distance);
+  const apply = useOrbitZoom((s) => s.apply);
+  const resetCamera = usePerformanceStore((s) => s.resetCamera);
+  if (distance === null || !apply) return null;
+  return <ZoomSlider testId="zoom-3d" label="Zoom 3D" value={distance} min={1.5} max={80} invert onChange={apply} onFit={resetCamera} />;
 }
 
 /** Neutral image-based fill light; its strength is driven by the lighting rig (time of day). */

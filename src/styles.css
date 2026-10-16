@@ -1198,3 +1198,29 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
 .hover-card .muted {
   color: #6b7280;
 }
+/* zoom slider at the bottom of the 2D/3D viewport (#6) */
+.zoom-slider {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  z-index: 3;
+}
+.zoom-slider input[type='range'] {
+  width: min(220px, 40vw);
+}
+.zoom-slider button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1;
+}
