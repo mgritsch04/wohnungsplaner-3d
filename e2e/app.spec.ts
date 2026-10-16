@@ -1294,3 +1294,99 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   expect(nightOff).toBeGreaterThan(2); // but not pitch black (moonlight / sky)
   expect(errors).toEqual([]);
 });
+
+test('project versions: save, move, open restores (one undo step), automatic state, compare, delete, reload (#66, #58)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const openVersions = async () => {
+    await page.getByRole('button', { name: 'Projekt ▾' }).click();
+    await page.getByRole('button', { name: /^Versionen/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Versionen' });
+    await expect(dlg).toBeVisible();
+    return dlg;
+  };
+  const itemById = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id);
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+
+  // 1. save the current state under a name
+  let dlg = await openVersions();
+  await expect(dlg.getByText('Noch keine Stände gespeichert.')).toBeVisible();
+  await dlg.getByLabel('Name des Stands').fill('Couchtisch Mitte');
+  await dlg.getByRole('button', { name: 'Aktuellen Stand speichern' }).click();
+  const items = dlg.getByTestId('version-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Couchtisch Mitte');
+  await expect(dlg.getByTestId('versions-count')).toContainText('1 von höchstens 30');
+  await dlg.getByRole('button', { name: 'Schließen' }).click();
+
+  // 2. move the coffee table
+  const start = await planToScreen(page, table.x, table.y);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 40, start.y + 10, { steps: 5 });
+  await page.mouse.move(start.x + 80, start.y + 20, { steps: 5 });
+  await page.mouse.up();
+  const moved = await itemById(table.id);
+  expect(moved.x).toBeGreaterThan(table.x + 0.3);
+
+  // 3. open the saved state: old position back, current state kept as automatic state
+  dlg = await openVersions();
+  await items.filter({ hasText: 'Couchtisch Mitte' }).getByRole('button', { name: 'Öffnen' }).click();
+  await expect(dlg).toBeHidden();
+  expect((await itemById(table.id)).x).toBeCloseTo(table.x, 6);
+  expect((await itemById(table.id)).y).toBeCloseTo(table.y, 6);
+  // opening is ONE undo step
+  await page.keyboard.press('Control+z');
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+  await page.keyboard.press('Control+y');
+  expect((await itemById(table.id)).x).toBeCloseTo(table.x, 6);
+
+  // 4. the moved state is reachable as automatic state; compare both
+  dlg = await openVersions();
+  await expect(items).toHaveCount(2);
+  const auto = items.filter({ hasText: 'Automatisch vor dem Wechsel zu „Couchtisch Mitte“' });
+  await expect(auto).toHaveCount(1);
+  await expect(auto.locator('.version-badge')).toHaveText('automatisch');
+  const optionLabel = async (select: string, prefix: string) => (await dlg.getByLabel(select).locator('option').allInnerTexts()).find((t) => t.startsWith(prefix))!;
+  await dlg.getByLabel('Stand A').selectOption({ label: await optionLabel('Stand A', 'Couchtisch Mitte') });
+  await dlg.getByLabel('Stand B').selectOption({ label: await optionLabel('Stand B', 'Automatisch') });
+  const cmp = dlg.getByTestId('versions-compare-table');
+  await expect(cmp).toContainText('A: Couchtisch Mitte');
+  await expect(cmp).toContainText('B: Automatisch vor dem Wechsel');
+  await expect(cmp).toContainText('Wohnzimmer');
+  const pieces = p0.furniture.reduce((s: number, f: { quantity: number }) => s + f.quantity, 0);
+  const piecesRow = cmp.getByRole('row', { name: /Anzahl Möbel/ });
+  await expect(piecesRow.getByRole('cell').nth(0)).toHaveText(String(pieces));
+  await expect(piecesRow.getByRole('cell').nth(2)).toHaveText('±0');
+  await expect(cmp.getByRole('row', { name: /Bodenfläche gesamt/ }).getByRole('cell').nth(0)).toContainText('m²');
+  await expect(cmp.getByRole('row', { name: /Gesamtpreis/ }).getByRole('cell').nth(0)).toContainText('€');
+
+  // open the automatic state: moved position back; the current state already exists → no extra state
+  await auto.getByRole('button', { name: 'Öffnen' }).click();
+  await expect(dlg).toBeHidden();
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+
+  // 5. delete a state (with confirmation)
+  dlg = await openVersions();
+  await expect(items).toHaveCount(2);
+  await items.filter({ hasNotText: 'Automatisch' }).getByRole('button', { name: 'Löschen' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Automatisch vor dem Wechsel');
+  await dlg.getByRole('button', { name: 'Schließen' }).click();
+
+  // 6. states survive a reload
+  await expect(page.locator('.save-state')).toHaveText('Gespeichert', { timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  dlg = await openVersions();
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Automatisch vor dem Wechsel zu „Couchtisch Mitte“');
+  await expect(dlg.getByTestId('versions-compare-table')).toBeVisible();
+  expect((await itemById(table.id)).x).toBeCloseTo(moved.x, 6);
+  expect(errors).toEqual([]);
+});
