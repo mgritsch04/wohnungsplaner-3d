@@ -63,7 +63,7 @@ Inhalt der gespeicherten JSON:
 
 **Umgesetzt:** Import dieser JSON → Raum (lichte Maße) + Korpusse an ihren Positionen/Rotationen; Einbauteile je Korpus zusammengefasst. Geprüft: 5 × 4 m-Raum mit L-förmiger Kombination, keine Wandkollisionen, 3D-Darstellung angesehen.
 
-**Wie kommt der Nutzer an die JSON?** Die App darf IKEAs Dienst nicht selbst aufrufen (das ginge nur mit IKEAs eigenem Anwendungsschlüssel). Weg für die eigene Planung: Planung im IKEA-Planer öffnen (Planungscode-Link) → Entwicklerwerkzeuge (F12) → Netzwerk → Filter `configurations` → Anfrage mit dem Code → Antwort speichern/kopieren → in der App _Import › „IKEA-Planung (JSON) übernehmen“_. (`NEEDS USER TEST` – der Ablauf in DevTools ist für Laien umständlich.)
+**Wie kommt der Nutzer an die JSON?** Die App darf IKEAs Dienst nicht selbst aufrufen (das ginge nur mit IKEAs eigenem Anwendungsschlüssel). Weg für die eigene Planung: Planung im IKEA-Planer öffnen (Planungscode-Link) → Entwicklerwerkzeuge (F12) → Netzwerk → Filter `configurations` → Anfrage mit dem Code → Antwort speichern/kopieren → in der App _Import › „IKEA-Planung (JSON) importieren“_. (`NEEDS USER TEST` – der Ablauf in DevTools ist für Laien umständlich.)
 
 Grenzen: Korpusse werden als maßgenaue Näherungsmodelle dargestellt (Planer-Modelle liegen auf `content.dexf.ikea.com`, hier gesperrt); Türen/Griffe nicht separat; die Eckeinsatz-Koordinaten im ICF sind uneinheitlich (Teil wird nur als Einbauteil gezählt); Raumöffnungen (Fenster/Türen) im Planer nicht untersucht.
 

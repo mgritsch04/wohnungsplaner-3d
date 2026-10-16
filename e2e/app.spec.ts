@@ -768,7 +768,7 @@ test('imports a stored IKEA PAX planner design (real structure): room + frames a
   await freshStart(page);
   await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: /IKEA-Planung \(JSON\) übernehmen/ }).click();
+  await page.getByRole('button', { name: /IKEA-Planung \(JSON\) importieren/ }).click();
   await (await chooser).setFiles('src/catalog/providers/fixtures/ikea-pax-design.json');
   await expect(page.getByText(/IKEA-Planung übernommen: Raum \+ 5 Korpus/)).toBeVisible();
   const p = await getProject(page);
