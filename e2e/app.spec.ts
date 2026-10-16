@@ -762,3 +762,22 @@ test('product list + .glb files chosen together: models attached, missing ones r
   await page.waitForTimeout(2500);
   expect(errors).toEqual([]);
 });
+
+test('imports a stored IKEA PAX planner design (real structure): room + frames at their planned positions', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /IKEA-Planung \(JSON\) übernehmen/ }).click();
+  await (await chooser).setFiles('src/catalog/providers/fixtures/ikea-pax-design.json');
+  await expect(page.getByText(/IKEA-Planung übernommen: Raum \+ 5 Korpus/)).toBeVisible();
+  const p = await getProject(page);
+  expect(p.rooms.some((r: { name: string }) => /IKEA-Planung/.test(r.name))).toBe(true);
+  const frames = p.furniture.filter((f: { name: string }) => /PAX Korpus/.test(f.name));
+  expect(frames).toHaveLength(5);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click();
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: 'test-results/ikea-plan-3d.png' });
+  expect(errors).toEqual([]);
+});

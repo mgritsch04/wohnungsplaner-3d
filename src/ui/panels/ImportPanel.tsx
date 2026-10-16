@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { CheckField, NumberField, Section, Badge, SelectField } from '../fields';
+import { importIkeaPlannerFile } from '../../import/ikeaPlanActions';
 import { applyScaleNotation, removeUnderlay, startPlanImport } from '../../import/underlayImport';
 import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActions';
 import { useImportStore, useSourceAnalysis } from '../../import/importStore';
@@ -63,6 +64,9 @@ export function ImportPanel() {
         <p className="muted small">Die Datei wird nur lokal in deinem Browser verarbeitet und gespeichert – nichts wird hochgeladen.</p>
         <button className="block" onClick={() => void importFloorPlanJsonFile()}>
           Grundriss-JSON (apartment-plan.json) importieren…
+        </button>
+        <button className="block" onClick={() => void importIkeaPlannerFile()} title="Gespeicherte Planung aus dem IKEA-PAX-/Aufbewahrungsplaner (JSON) – siehe Hilfe in docs/PLANNER_IMPORT_RESEARCH.md">
+          IKEA-Planung (JSON) übernehmen…
         </button>
       </Section>
       {underlay && <UnderlayControls />}

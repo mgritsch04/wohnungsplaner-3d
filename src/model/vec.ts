@@ -109,3 +109,22 @@ export function boundsOf(points: Vec2[]): Bounds | null {
   }
   return b;
 }
+
+/**
+ * Offset a simple polygon outwards by `d` (mitred corners), e.g. from a room's clear
+ * interior to the wall centre line. Works for either winding.
+ */
+export function offsetPolygon(poly: Vec2[], d: number): Vec2[] {
+  const sign = signedArea(poly) > 0 ? -1 : 1;
+  const n = poly.length;
+  const lines = poly.map((p, i) => {
+    const q = poly[(i + 1) % n];
+    const dir = normalize(sub(q, p));
+    return { p: add(p, scale(perp(dir), sign * d)), dir };
+  });
+  return poly.map((_, i) => {
+    const a = lines[(i - 1 + n) % n];
+    const b = lines[i];
+    return lineIntersection(a.p, a.dir, b.p, b.dir) ?? b.p;
+  });
+}
