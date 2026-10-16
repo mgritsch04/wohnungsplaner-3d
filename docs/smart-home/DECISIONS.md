@@ -1,11 +1,11 @@
 # Smart Home – Entscheidungen
 
-_Stand: 2026-10-16._ Format: Entscheidung · Alternativen · Begründung · Status (`VORGESCHLAGEN` = wartet auf dich, `VORLÄUFIG` = von dir vorläufig bestätigt, änderbar, `ENTSCHIEDEN`).
+_Stand: 2026-10-16._ Gesamtkonzept: [CONCEPT.md](CONCEPT.md). Format: Entscheidung · Alternativen · Begründung · Status (`VORSCHLAG (STANDARD)` = von mir vorbelegt, gilt bis du etwas anderes sagst (#134), `VORGESCHLAGEN` = wartet auf dich, `VORLÄUFIG` = von dir vorläufig bestätigt, änderbar, `ENTSCHIEDEN`).
 
 | # | Entscheidung | Alternativen | Begründung | Status |
 |---|---|---|---|---|
 | D1 | **Home Assistant** als Zentrale | openHAB, ioBroker, Homey Pro, Apple Home/Google Home | größte Geräteunterstützung, lokal, aktive Entwicklung, gute APIs für den Planer; openHAB/ioBroker ähnlich mächtig, aber kleinere Community bei Matter/Zigbee-Neuheiten; Homey/Apple/Google weniger offen bzw. Cloud-/Ökosystembindung | VORLÄUFIG (dein Ja, #28) |
-| D2 | **HAOS auf Home Assistant Green** | Pi 5 + SSD, N150-Mini-PC | sparsam, lautlos, offiziell, kein SD-Verschleiß; Pi 2026 nicht billiger; Mini-PC nur bei Kameras/lokaler Sprach-KI | OFFEN (#28: Raspberry Pi selbst kaufen prüfen – Vergleich unten) |
+| D2 | **HAOS auf Home Assistant Green** | Pi 5 + SSD, N150-Mini-PC | sparsam, lautlos, offiziell, kein SD-Verschleiß; Pi 2026 nicht billiger; Mini-PC nur bei Kameras/lokaler Sprach-KI | VORSCHLAG (STANDARD): Green – Pi 5 komplett nicht billiger, lokale Sprache mit Speech-to-Phrase läuft auch auf Green (Vergleich unten, [CONCEPT.md](CONCEPT.md) §3); Kauf offen |
 | D3 | **Zigbee (ZHA, ZBT-2) als Hauptnetz**, Thread/Matter gezielt | nur Matter; Zigbee2MQTT; Homematic IP | Reife, Preis, Auswahl; ZHA einfacher und mit Migrationsassistent; Z2M nur bei Bedarf | VORLÄUFIG (#28: „machen wir mal so“) |
 | D4 | Thread-Border-Router: **zweiter ZBT-2** – oder vorhandenes Apple/Google-Gerät | Multiprotokoll auf einem Stick | Multiprotokoll offiziell nicht empfohlen | VORLÄUFIG (#28: „ja Stick“ – zweiter ZBT-2, erst bei Kauf von Thread-Geräten) |
 | D5 | **Fernzugriff per VPN oder Home Assistant Cloud**, nie Portfreigabe | Reverse Proxy | Sicherheit, CG-NAT | VORLÄUFIG (#28: VPN; Cloud-Abo nur als Ausweichlösung) |
@@ -15,8 +15,18 @@ _Stand: 2026-10-16._ Format: Entscheidung · Alternativen · Begründung · Stat
 | D9 | Planer: **simulierte Geräte zuerst** (Roadmap P2–P4) | sofort Live-Anbindung | Nutzen ohne Hardware, keine Sicherheitsrisiken | VORLÄUFIG (#28: „Simulieren passt“; im Backlog weiter hinten) |
 | D10 | Türschloss **optional und zuletzt** | sofort | sicherheitskritisch, Vermieter/Versicherung | offen (#28: „lassen wir noch offen“) |
 | D11 | Keine Arbeiten an 230 V ohne **Elektrofachkraft** | Selbstmontage | Rechtslage Österreich (§ 106 GewO), Sicherheit | ENTSCHIEDEN |
+| D12 | **Fußbodenheizung zuerst nur messen** (Temperatur/Feuchte je Raum), steuern erst mit Zustimmung der Hausverwaltung | Stellantriebe am Verteiler oder Zigbee-Raumthermostate sofort | Mietwohnung, Eingriff in Haustechnik, 24/230 V und Einbautiefe unbekannt, Fußbodenheizung träge; Heizkörperthermostate passen nicht | VORSCHLAG (STANDARD) |
+| D13 | **Sprache über Home Assistant Voice Preview Edition** (59 €), lokal mit Speech-to-Phrase | Echo Dot über Alexa-Skill (Cloud/Umwege); Mini-PC mit Whisper | direkt für Home Assistant gebaut, lokal, unabhängig vom Echo (deine Vorgabe); Echo nicht als lokales Mikrofon nutzbar | VORSCHLAG (STANDARD) |
+| D14 | **Licht über smarte Leuchtmittel + Funktaster**, keine Unterputz-Aktoren | Shelly hinter Schaltern | Mietwohnung, ohne Elektrofachkraft umsetzbar, rückbaubar | VORSCHLAG (STANDARD) |
+| D15 | **Keine Kameras, keine Rollo-Motoren** im Start-Set | Kameras/Rollos sofort | Kameras: offen bei dir, Datenschutz, bräuchten stärkere Zentrale; Rollläden nicht elektrisch | VORSCHLAG (STANDARD) |
+| D16 | **Budgetrahmen ~520–590 €** (Zentrale + Starter-Set, ohne Schloss) | mehr/weniger | Liste in [CONCEPT.md](CONCEPT.md) §4; Kauf erst nach deiner Freigabe | VORSCHLAG (STANDARD) |
 
-## Offene Fragen an dich
+## Noch offen (nur, was sich nicht vorbelegen lässt – gesammelt in #28)
+1. **Kauf freigeben** (Zentrale ~243 €, Starter-Set ~270–300 €) – oder anderer Rahmen.
+2. **D2 Green oder Pi 5** – Vorschlag Green.
+3. **Fußbodenheizung:** Hausverwaltung fragen, ob Stellantriebe/Raumthermostate getauscht werden dürfen.
+
+## Frühere Fragen an dich (beantwortet, zur Nachverfolgung)
 1. **Q1 Budget:** Rahmen für Zentrale + Erstausstattung (Vorschlag ~590 € ohne Schloss)?
 2. **Q2 Vorhandene Geräte:** HomePod mini / Apple TV 4K / Google Nest Hub? (dann kein zweiter Thread-Stick). Welcher Router (FRITZ!Box-Modell)? NAS vorhanden?
 3. **Q3 Wohnung:** Miete oder Eigentum? Heizkörper (Ventilhersteller) oder Fußbodenheizung? Elektrische Rollläden vorhanden? Netzbetreiber/Smart Meter (z. B. Wiener Netze)?

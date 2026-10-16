@@ -53,6 +53,9 @@ export interface AssembleOptions {
   /**
    * Merged bands thicker than this are dropped: they are runs of densely packed parallel lines
    * (tiles, stairs, furniture, dimension chains) that merged into a "wall" metres thick (#114).
+   * Merging also never grows a band past this, and a band only grows thicker from a band beside
+   * it that runs along most of its length – so a thin partition wall ending at a hatched pillar
+   * is not swallowed by the pillar's stacked lines.
    */
   maxThickness?: number;
 }
@@ -61,7 +64,7 @@ const lo = (b: Band) => b.c - b.t / 2;
 const hi = (b: Band) => b.c + b.t / 2;
 
 /** Merge bands of the same orientation that overlap across and along. */
-export function mergeBands(bands: Band[], alongTol = 0): Band[] {
+export function mergeBands(bands: Band[], alongTol = 0, maxThickness?: number): Band[] {
   let list = bands.map((b) => ({ ...b }));
   let changed = true;
   while (changed) {
@@ -80,6 +83,11 @@ export function mergeBands(bands: Band[], alongTol = 0): Band[] {
         if (acrossOverlap > -0.5 && alongGap <= alongTol) {
           const nlo = Math.min(lo(cur), lo(o));
           const nhi = Math.max(hi(cur), hi(o));
+          if (maxThickness !== undefined) {
+            if (nhi - nlo > maxThickness) continue;
+            const grows = nhi - nlo > Math.max(cur.t, o.t) + 0.5;
+            if (grows && -alongGap < 0.5 * Math.max(cur.a1 - cur.a0, o.a1 - o.a0)) continue;
+          }
           const w1 = cur.a1 - cur.a0;
           const w2 = o.a1 - o.a0;
           cur.conf = (cur.conf * w1 + o.conf * w2) / Math.max(1e-9, w1 + w2);
@@ -104,7 +112,7 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
   const pointOf = (o: 'h' | 'v', along: number, c: number) => (o === 'h' ? { x: along, y: c } : { x: c, y: along });
 
   // 1. merge collinear bands across small gaps and opening-sized gaps
-  let bands = mergeBands(input, opts.mergeGap);
+  let bands = mergeBands(input, opts.mergeGap, opts.maxThickness);
   if (opts.maxThickness !== undefined) bands = bands.filter((b) => b.t <= opts.maxThickness!);
   const merged: Band[] = [];
   for (const o of ['h', 'v'] as const) {

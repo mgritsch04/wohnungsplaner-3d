@@ -39,6 +39,8 @@ import { useCompareStore, type CompareSide } from '../versions/compareStore';
 import type { FurnitureDiff } from '../versions/diff';
 import { CompareBar } from '../versions/CompareBar';
 import { CompareMarkers } from './CompareMarkers';
+import { orbitKeyInput, orbitKeyMoves, orbitKeySpeed, orbitPlaneStep, setPointerOver3d } from './orbitKeys';
+import { useDialogStore } from '../ui/dialogStore';
 
 /** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
 interface ComparePreview {
@@ -80,7 +82,15 @@ export function Scene3D() {
   }
 
   return (
-    <div className="scene3d" data-testid="scene3d" onPointerDownCapture={(e) => (downAt.current = { x: e.clientX, y: e.clientY })}>
+    <div
+      className="scene3d"
+      data-testid="scene3d"
+      onPointerDownCapture={(e) => (downAt.current = { x: e.clientX, y: e.clientY })}
+      // the middle button turns the view (#132) – no browser auto-scroll / paste
+      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+      onPointerEnter={() => setPointerOver3d(true)}
+      onPointerLeave={() => setPointerOver3d(false)}
+    >
       <WebGLBoundary onError={setWebglError}>
         <Canvas
           shadows={quality === 'realism' ? 'soft' : false}
@@ -102,6 +112,7 @@ export function Scene3D() {
         </Canvas>
       </WebGLBoundary>
       {cameraMode === 'orbit' && <OrbitZoomSlider />}
+      {cameraMode === 'orbit' && <OrbitHelp />}
       {/* saving a view changes the project – not offered while comparing (Alt+1 … 9 still jumps) */}
       {!session && <BookmarksMenu />}
       {!session && <TapeMeasureButton />}
@@ -197,10 +208,16 @@ function SceneContent({
   const updateTx = useProjectStore((s) => s.updateTransient);
   const commitTx = useProjectStore((s) => s.commitTransaction);
   const cancelTx = useProjectStore((s) => s.cancelTransaction);
-  const onDragStart = useCallback(() => {
-    beginTx();
-    if (orbitRef.current) orbitRef.current.enabled = false;
-  }, [beginTx]);
+  const onDragStart = useCallback(() => beginTx(), [beginTx]);
+  // pressing on a movable item belongs to that item (#132): the left button must not turn the
+  // view while it is grabbed. Only rotate/pan are paused, so damping and the wheel keep working
+  // and the view does not jump when the item is released.
+  const onPressFurniture = useCallback((down: boolean) => {
+    const c = orbitRef.current;
+    if (!c) return;
+    c.enableRotate = !down;
+    c.enablePan = !down;
+  }, []);
   const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
   // collision feedback: recomputed only when furniture or architecture change (not per frame,
   // not for settings changes such as the time of day)
@@ -227,14 +244,8 @@ function SceneContent({
       }),
     [updateTx, derived, obstacles],
   );
-  const onDragEnd = useCallback(() => {
-    commitTx();
-    if (orbitRef.current) orbitRef.current.enabled = true;
-  }, [commitTx]);
-  const onDragCancel = useCallback(() => {
-    cancelTx();
-    if (orbitRef.current) orbitRef.current.enabled = true;
-  }, [cancelTx]);
+  const onDragEnd = useCallback(() => commitTx(), [commitTx]);
+  const onDragCancel = useCallback(() => cancelTx(), [cancelTx]);
   // furniture groups (#65): a click on a member selects the whole group, a second click (no drag) the item
   const drillRef = useRef<string | null>(null);
   const onSelectFurniture = useCallback(
@@ -280,6 +291,7 @@ function SceneContent({
           selected={(selection?.type === 'furniture' && selection.id === f.id) || multi.includes(f.id)}
           onSelect={onSelectFurniture}
           onClickRelease={onClickFurniture}
+          onPress={onPressFurniture}
           onDragStart={onDragStart}
           onDrag={onDrag}
           onDragEnd={onDragEnd}
@@ -301,7 +313,10 @@ function SceneContent({
       )}
       <CameraBookmarkDriver />
       {cameraMode === 'orbit' ? (
-        <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
+        <>
+          <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
+          <OrbitKeyControls controlsRef={orbitRef} comparing={readOnly} />
+        </>
       ) : (
         <WalkControls
           key="walk"
@@ -393,6 +408,7 @@ function OrbitCamera({
       const radius = span * 0.62 + 1;
       const distance = radius / Math.sin(Math.min(vfov, hfov) / 2);
       const dir = new THREE.Vector3(0.35, 0.95, 1.05).normalize();
+      if (controlsRef.current) stopOrbitMotion(controlsRef.current);
       camera.position.set(center.x + dir.x * distance, dir.y * distance, center.y + dir.z * distance);
       camera.lookAt(center.x, 0, center.y);
       controlsRef.current?.target.set(center.x, 0.8, center.y);
@@ -423,6 +439,7 @@ function OrbitCamera({
     const unregister = registerOrbitRig({
       get: () => ({ position: camera.position.clone(), target: c.target.clone() }),
       set: (p, t) => {
+        stopOrbitMotion(c);
         camera.position.set(p.x, p.y, p.z);
         c.target.set(t.x, t.y, t.z);
         c.update();
@@ -445,7 +462,102 @@ function OrbitCamera({
       enableDamping
       dampingFactor={0.12}
       rotateSpeed={rotateSpeed}
+      // #132: the wheel zooms towards the mouse pointer; left or middle button turns the view,
+      // right button moves it (Shift/Strg + left button moves, too)
+      zoomToCursor
+      mouseButtons={ORBIT_MOUSE_BUTTONS}
     />
+  );
+}
+
+/**
+ * Drop the remaining damped motion of the last drag (#132): otherwise a reset or a jump to a
+ * saved view keeps drifting afterwards. One undamped update consumes it; the caller then sets
+ * the new pose.
+ */
+function stopOrbitMotion(c: OrbitControlsImpl) {
+  const damping = c.enableDamping;
+  c.enableDamping = false;
+  c.update();
+  c.enableDamping = damping;
+}
+
+const ORBIT_MOUSE_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
+
+/** W A S D / arrow keys move the overview camera in the floor plane (#132). */
+function OrbitKeyControls({ controlsRef, comparing }: { controlsRef: React.RefObject<OrbitControlsImpl | null>; comparing: boolean }) {
+  const held = useRef(new Set<string>());
+  const fast = useRef(false);
+  useEffect(() => {
+    const keys = held.current;
+    const onDown = (e: KeyboardEvent) => {
+      fast.current = e.shiftKey;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || useDialogStore.getState().modal) return;
+      const ui = useUiStore.getState();
+      const ctx = { viewMode: ui.viewMode, cameraMode: ui.cameraMode, furnitureSelected: ui.selection?.type === 'furniture', comparing };
+      if (!orbitKeyMoves(e.code, ctx)) return;
+      e.preventDefault(); // no page scrolling with the arrow keys
+      keys.add(e.code);
+    };
+    const onUp = (e: KeyboardEvent) => {
+      fast.current = e.shiftKey;
+      keys.delete(e.code);
+    };
+    const clear = () => keys.clear();
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('blur', clear);
+      clear();
+    };
+  }, [comparing]);
+  useFrame(({ camera }, dt) => {
+    const c = controlsRef.current;
+    if (!c || held.current.size === 0) return;
+    const input = orbitKeyInput(held.current);
+    if (input[0] === 0 && input[1] === 0) return;
+    // dt is capped so a stalled frame (tab switch) never throws the camera far away
+    const step = orbitKeySpeed(camera.position.distanceTo(c.target), fast.current) * Math.min(dt, 0.1);
+    const d = orbitPlaneStep(camera, input, step);
+    camera.position.add(d);
+    c.target.add(d);
+    c.update();
+  });
+  return null;
+}
+
+/** Short overview of the 3D overview controls (#132); the full list is in the keyboard help (#59). */
+function OrbitHelp() {
+  const openModal = useDialogStore((s) => s.openModal);
+  return (
+    <details className="orbit-help" data-testid="orbit-help" onPointerDown={(e) => e.stopPropagation()}>
+      <summary>Steuerung</summary>
+      <ul>
+        <li>
+          <b>Linke oder mittlere Maustaste</b> + Ziehen: Ansicht drehen
+        </li>
+        <li>
+          <b>Rechte Maustaste</b> (oder Umschalt + linke) + Ziehen: Ansicht verschieben
+        </li>
+        <li>
+          <b>Mausrad</b>: zum Mauszeiger hin zoomen
+        </li>
+        <li>
+          <b>W A S D / Pfeiltasten</b>: Ansicht bewegen (Umschalt: schneller; Pfeiltasten verschieben ein ausgewähltes Möbel)
+        </li>
+        <li>
+          <b>Möbel</b> mit der linken Maustaste ziehen – die Ansicht bleibt dabei stehen
+        </li>
+      </ul>
+      <button type="button" onClick={() => openModal('help')}>
+        Alle Tastenkürzel (?)
+      </button>
+    </details>
   );
 }
 

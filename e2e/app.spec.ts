@@ -3488,6 +3488,81 @@ test('catalog: drag and drop places a product at the dropped point in 2D and 3D;
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('3D overview navigation (#132): keys move the view, middle button turns it, dragging furniture keeps the view still', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.waitForTimeout(1500); // initial fit
+  const cam = () => page.evaluate(() => (window as any).__wp.three.camera.position.toArray() as number[]);
+  const moved = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  // wait until a damped camera movement has come to rest
+  const settled = () =>
+    expect
+      .poll(async () => {
+        const a = await cam();
+        await page.waitForTimeout(250);
+        return moved(await cam(), a);
+      }, { timeout: 15000 })
+      .toBeLessThan(0.001);
+
+  // short overview of the controls, with a link to all shortcuts
+  const help = page.getByTestId('orbit-help');
+  await help.getByText('Steuerung').click();
+  await expect(help).toContainText('mittlere Maustaste');
+  await help.getByRole('button', { name: 'Alle Tastenkürzel (?)' }).click();
+  await expect(page.getByRole('dialog')).toContainText('3D-Übersicht: Kamera');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await help.getByText('Steuerung').click();
+
+  // D held: the camera moves sideways in the floor plane (height unchanged); W is not the wall tool here
+  await page.locator('[data-testid="scene3d"]').hover();
+  const c0 = await cam();
+  await page.keyboard.down('d');
+  await expect.poll(async () => moved(await cam(), c0), { timeout: 15000 }).toBeGreaterThan(0.5);
+  await page.keyboard.up('d');
+  const c1 = await cam();
+  expect(Math.abs(c1[1] - c0[1])).toBeLessThan(0.01);
+  await page.keyboard.down('w');
+  await expect.poll(async () => moved(await cam(), c1), { timeout: 15000 }).toBeGreaterThan(0.5);
+  await page.keyboard.up('w');
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).not.toBe('wall');
+
+  // middle button drag on a furniture item turns the view, the item stays where it is
+  await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
+  await page.waitForTimeout(800);
+  await settled();
+  const p0 = await getProject(page);
+  const bed = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-bed-160');
+  let s = await worldToScreen3d(page, bed.x, 0.55, bed.y);
+  const c2 = await cam();
+  await page.mouse.move(s.x, s.y);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(s.x + 120, s.y, { steps: 8 });
+  await page.mouse.up({ button: 'middle' });
+  await expect.poll(async () => moved(await cam(), c2), { timeout: 15000 }).toBeGreaterThan(0.5);
+  const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === bed.id);
+  expect([after.x, after.y]).toEqual([bed.x, bed.y]);
+
+  // left button drag on the item moves the item, the camera stays put
+  await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
+  await page.waitForTimeout(800);
+  await settled();
+  s = await worldToScreen3d(page, bed.x, 0.55, bed.y);
+  const c3 = await cam();
+  await page.mouse.move(s.x, s.y);
+  await page.mouse.down();
+  await page.mouse.move(s.x + 40, s.y + 5, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === bed.id).x).not.toBe(bed.x);
+  await page.waitForTimeout(500); // damping would show a late jump here
+  expect(moved(await cam(), c3)).toBeLessThan(0.01);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test.describe('Handy-Ansicht (#129)', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

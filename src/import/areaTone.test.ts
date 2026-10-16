@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAreaTone } from './areaTone';
+import { mergeBands, type Band } from './recognition/bands';
 import { heavyLines, mainPlanOnly } from './recognition/recognizers';
 
 describe('wall candidates in CAD plans (#114)', () => {
@@ -31,5 +32,18 @@ describe('wall candidates in CAD plans (#114)', () => {
     const out = mainPlanOnly({ walls: [...overview, ...plan], openings, threshold: 0 }, 0.01);
     expect(out.walls).toEqual(plan);
     expect(out.openings.map((o) => o.center.x)).toEqual([500]);
+  });
+
+  it('a thin partition ending at a hatched pillar is not swallowed by the pillar (#114)', () => {
+    const band = (a0: number, a1: number, lo: number, hi: number): Band => ({ o: 'h', a0, a1, c: (lo + hi) / 2, t: hi - lo, conf: 0.7 });
+    // partition 10 cm (13 px) thick, then a pillar drawn as stacked line pairs right next to its end
+    const partition = band(277, 823, 882, 895);
+    const pillar = [band(839, 979, 884, 897), band(839, 979, 897, 930), band(839, 979, 930, 945), band(839, 979, 945, 971)];
+    const merged = mergeBands([partition, ...pillar], 16, 78);
+    const wall = merged.find((b) => b.a0 === 277);
+    expect(wall?.t).toBeLessThan(20);
+    for (const b of merged) expect(b.t).toBeLessThanOrEqual(78);
+    // without the vector limits the old behaviour stays (raster detection)
+    expect(mergeBands([partition, ...pillar], 16)).toHaveLength(1);
   });
 });

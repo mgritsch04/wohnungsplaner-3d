@@ -18,6 +18,8 @@ interface Props {
   onSelect: (id: string) => void;
   /** Pointer released without dragging (a click) – second click on a selected group picks one member (#65). */
   onClickRelease?: (id: string) => void;
+  /** Left button pressed on / released from a movable item – the view must not turn meanwhile (#132). */
+  onPress?: (down: boolean) => void;
   onDragStart: () => void;
   /** `free` = Alt held: free placement without snapping and collision stop (as in 2D, #16). */
   onDrag: (id: string, x: number, y: number, free: boolean) => void;
@@ -30,7 +32,7 @@ interface Props {
 
 /** One furniture object in 3D. Can be dragged on the floor plane. */
 export const FurnitureObject = memo(
-  function FurnitureObject({ item, quality, selected, onSelect, onClickRelease, onDragStart, onDrag, onDragEnd, onDragCancel, readOnly = false }: Props) {
+  function FurnitureObject({ item, quality, selected, onSelect, onClickRelease, onPress, onDragStart, onDrag, onDragEnd, onDragCancel, readOnly = false }: Props) {
     const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean; sx: number; sy: number; onBlur: () => void } | null>(null);
     // never leave an open transaction behind if the item disappears mid-drag
     useEffect(
@@ -38,13 +40,16 @@ export const FurnitureObject = memo(
         const dr = dragging.current;
         if (dr) window.removeEventListener('blur', dr.onBlur);
         if (dr?.started) onDragEndRef.current();
+        if (dr) onPressRef.current?.(false);
         dragging.current = null;
       },
       [],
     );
     const onDragEndRef = useRef(onDragEnd);
+    const onPressRef = useRef(onPress);
     useEffect(() => {
       onDragEndRef.current = onDragEnd;
+      onPressRef.current = onPress;
     });
     const shape = item.model.type === 'procedural' ? item.model.shape : item.model.fallbackShape;
     const accent = item.kitchen?.frontColor;
@@ -60,6 +65,7 @@ export const FurnitureObject = memo(
       if (!dr) return;
       dragging.current = null;
       window.removeEventListener('blur', dr.onBlur);
+      onPress?.(false);
       if (dr.started) (commit ? onDragEnd : onDragCancel)();
     };
 
@@ -75,6 +81,7 @@ export const FurnitureObject = memo(
       // focus loss (Alt+Tab, dialog) never delivers a pointerup: finish the drag there
       const onBlur = () => endDrag(true);
       window.addEventListener('blur', onBlur);
+      onPress?.(true);
       dragging.current = {
         // offset between the grabbed point and the item origin – kept during the whole drag
         grab: hit.sub(new THREE.Vector3(item.x, item.elevation, item.y)),
