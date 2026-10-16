@@ -78,8 +78,8 @@ export function parseAreaText(s: string): number | null {
   return v > 0 && v < 1000 ? v : null;
 }
 
-/** Propose rooms for all closed areas of the accepted draft walls. */
-export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {}): DraftRoom[] {
+/** Room proposals with the clear interior outline of their area. */
+function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: DraftRoom; interior: Vec2[] }[] {
   const minArea = opts.minArea ?? 0.5;
   const uncertainBelow = opts.uncertainBelow ?? 2;
   const d = createEmptyProject();
@@ -90,15 +90,12 @@ export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {})
   const faces = detectFaces(d);
   const index = buildIndex(d);
   const candidates = faces
-    .map((f, i) => {
-      const g = computeRoomGeometry({ id: `face${i}`, name: '', nodeIds: f.nodeIds }, index);
-      return g ? { face: f, g } : null;
-    })
-    .filter((x): x is NonNullable<typeof x> => !!x && x.g.area >= minArea)
+    .map((f, i) => computeRoomGeometry({ id: `face${i}`, name: '', nodeIds: f.nodeIds }, index))
+    .filter((g): g is NonNullable<typeof g> => !!g && g.area >= minArea)
     // left-to-right, top-to-bottom numbering
-    .sort((p, q) => p.g.centroid.y - q.g.centroid.y || p.g.centroid.x - q.g.centroid.x);
+    .sort((p, q) => p.centroid.y - q.centroid.y || p.centroid.x - q.centroid.x);
   const usedNames = new Map<string, number>();
-  return candidates.map(({ g }, i) => {
+  return candidates.map((g, i) => {
     const inside = (opts.texts ?? []).filter((t) => pointInPolygon(t, g.interior));
     const named = inside.map((t) => t.str.trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
     let name = named ?? `Raum ${i + 1}`;
@@ -109,7 +106,7 @@ export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {})
     }
     const statedArea = inside.map((t) => parseAreaText(t.str)).find((v): v is number => v !== null);
     const uncertain = g.area < uncertainBelow;
-    return {
+    const room: DraftRoom = {
       id: newId('drm'),
       name,
       labelPoint: interiorPoint(g.interior),
@@ -117,7 +114,42 @@ export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {})
       area: Math.round(g.area * 100) / 100,
       status: uncertain ? 'uncertain' : 'estimated',
       accepted: !uncertain,
-    } satisfies DraftRoom;
+    };
+    return { room, interior: g.interior };
+  });
+}
+
+/** Propose rooms for all closed areas of the accepted draft walls. */
+export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {}): DraftRoom[] {
+  return roomProposals(walls, opts).map((p) => p.room);
+}
+
+/**
+ * Recompute the proposals after walls were changed in the review. A previous
+ * room whose label point lies in a new area keeps its name, selection and
+ * confirmation; areas that no longer exist disappear.
+ */
+export function refreshRoomProposals(draft: ReconstructionDraft, opts: RoomProposalOptions = {}): DraftRoom[] {
+  const used = new Set<string>();
+  const kept = new Set<string>();
+  const rooms = roomProposals(draft.walls, opts).map(({ room, interior }) => {
+    const old = draft.rooms.find((r) => !used.has(r.id) && pointInPolygon(r.labelPoint, interior));
+    if (!old) return room;
+    used.add(old.id);
+    kept.add(old.id);
+    return { ...room, id: old.id, name: old.name, accepted: old.accepted, status: old.status === 'confirmed' ? old.status : room.status, statedArea: old.statedArea ?? room.statedArea };
+  });
+  // new areas get generic names that are not taken yet
+  const names = new Set(rooms.filter((r) => kept.has(r.id)).map((r) => r.name));
+  let k = 1;
+  return rooms.map((r) => {
+    if (kept.has(r.id) || !/^Raum \d+$/.test(r.name) || !names.has(r.name)) {
+      names.add(r.name);
+      return r;
+    }
+    while (names.has(`Raum ${k}`)) k++;
+    names.add(`Raum ${k}`);
+    return { ...r, name: `Raum ${k}` };
   });
 }
 

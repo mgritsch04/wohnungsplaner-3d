@@ -8,7 +8,7 @@ import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActi
 import { useImportStore, useSourceAnalysis } from '../../import/importStore';
 import { dist } from '../../model/vec';
 import { degToRad, formatArea, formatLength, radToDeg } from '../../model/units';
-import { runRecognition } from '../../import/recognition/runRecognition';
+import { refreshDraftRooms, runRecognition } from '../../import/recognition/runRecognition';
 import type { DraftStatus } from '../../import/draft';
 import { findDraftConflicts } from '../../import/review';
 import { checkScale, scaleCheckMessage } from '../../import/dimensions';
@@ -401,6 +401,11 @@ function DraftReview() {
               onSelect={() => st().select({ type: 'room', id: r.id })} onToggle={() => st().updateRoom(r.id, { accepted: !r.accepted })} />
           ))}
         </ul>
+        {draft.source !== 'json' && (
+          <button className="block" onClick={() => refreshDraftRooms()} title="Nach dem Entfernen, Abwählen oder Verschieben von Wänden: Räume aus den ausgewählten Wänden neu ermitteln">
+            Räume neu vorschlagen
+          </button>
+        )}
       </Section>
     </div>
   );

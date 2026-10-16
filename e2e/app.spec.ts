@@ -1187,6 +1187,9 @@ test('recognises a sloped 30° wall in a raster plan and proposes the rooms (#37
   expect(Math.abs(areas[0] - 1.8 * 3.8)).toBeLessThan(0.15);
   expect(Math.abs(areas[1] - polygonArea(offsetPolygon(rightRoom, -0.1)))).toBeLessThan(0.3);
   await expect(page.getByText(/Raum „Raum 1“ · \d+,\d\d m²/)).toBeVisible();
+  // re-proposing from the (unchanged) walls keeps both rooms
+  await page.getByRole('button', { name: 'Räume neu vorschlagen' }).click();
+  await expect(page.getByText('2 Räume aus den ausgewählten Wänden vorgeschlagen.')).toBeVisible();
 
   // take it over as the new floor plan
   await page.locator('.panel.left').getByLabel('Übernahme').selectOption('replace');

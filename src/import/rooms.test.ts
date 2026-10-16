@@ -9,7 +9,7 @@ import type { DraftWall, ReconstructionDraft } from './draft';
 import { detectRasterWalls } from './recognition/raster';
 import { outputToDraft } from './recognition/runRecognition';
 import { renderSyntheticPlan } from './recognition/syntheticPlans';
-import { interiorPoint, parseAreaText, proposeRooms, roomsInsideExistingRooms } from './rooms';
+import { interiorPoint, parseAreaText, proposeRooms, refreshRoomProposals, roomsInsideExistingRooms } from './rooms';
 
 const c30 = Math.cos(Math.PI / 6);
 const s30 = Math.sin(Math.PI / 6);
@@ -68,6 +68,28 @@ describe('room proposals', () => {
 
   it('ignores walls that are not accepted in the review', () => {
     expect(proposeRooms(twoRooms.map((w) => (w.id === twoRooms[5].id ? { ...w, accepted: false } : w)))).toHaveLength(1);
+  });
+
+  it('re-proposes rooms after walls change in the review and keeps what the user set', () => {
+    const base: ReconstructionDraft = { source: 'raster', sourceName: 'x', scaleConfirmed: true, walls: twoRooms, openings: [], rooms: [], furniture: [], warnings: [], mode: 'replace' };
+    const left = <T extends { labelPoint: Vec2 }>(rooms: T[]) => rooms.find((r) => r.labelPoint.x < 3)!;
+    const initial = proposeRooms(twoRooms).map((r) => (r.labelPoint.x < 3 ? { ...r, name: 'Küche', status: 'confirmed' as const } : r));
+    // the right room loses a wall: only the kitchen is left, unchanged
+    const rightWallOff = twoRooms.map((w) => (w.id === twoRooms[2].id ? { ...w, accepted: false } : w));
+    const one = refreshRoomProposals({ ...base, walls: rightWallOff, rooms: initial });
+    expect(one).toHaveLength(1);
+    expect(one[0]).toMatchObject({ id: left(initial).id, name: 'Küche', status: 'confirmed' });
+    // and back: the new area gets a free generic name
+    const two = refreshRoomProposals({ ...base, rooms: one });
+    expect(two).toHaveLength(2);
+    expect(left(two).name).toBe('Küche');
+    expect(two.find((r) => r.labelPoint.x > 3)!.name).toMatch(/^Raum \d$/);
+    // generic names never repeat
+    const onlyRight = proposeRooms(twoRooms.map((w) => (w.id === twoRooms[4].id ? { ...w, accepted: false } : w)));
+    expect(onlyRight.map((r) => r.name)).toEqual(['Raum 1']);
+    const both = refreshRoomProposals({ ...base, rooms: onlyRight });
+    expect(both.map((r) => r.name).sort()).toEqual(['Raum 1', 'Raum 2']);
+    expect(both.find((r) => r.labelPoint.x > 3)!.name).toBe('Raum 1');
   });
 
   it('finds a label point inside an L-shaped room', () => {

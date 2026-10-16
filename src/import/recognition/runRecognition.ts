@@ -9,7 +9,7 @@ import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
 import { checkScale, scaleCheckMessage } from '../dimensions';
-import { proposeRooms } from '../rooms';
+import { proposeRooms, refreshRoomProposals, type PlacedText } from '../rooms';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
@@ -47,8 +47,7 @@ export async function runRecognition() {
       return;
     }
     // rooms: closed areas of the proposed walls; names/areas only from the plan's own text layer
-    const texts = analysis && analysis.imageAssetId === u.imageAssetId ? analysis.texts.map((t) => ({ str: t.str, ...imageToWorld(u, t) })) : undefined;
-    draft.rooms = proposeRooms(draft.walls, { texts });
+    draft.rooms = proposeRooms(draft.walls, { texts: planTextsInWorld() });
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
     if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
@@ -63,6 +62,26 @@ export async function runRecognition() {
   } finally {
     progress(null);
   }
+}
+
+/** Texts of the current PDF underlay (centre of each text) in plan metres, if available. */
+function planTextsInWorld(): PlacedText[] | undefined {
+  const u = useProjectStore.getState().project.underlay;
+  const analysis = useSourceAnalysis.getState().analysis;
+  if (!u || !analysis || analysis.imageAssetId !== u.imageAssetId) return undefined;
+  return analysis.texts.map((t) => {
+    const c = t.dir && t.width ? { x: t.x + (t.dir.x * t.width) / 2, y: t.y + (t.dir.y * t.width) / 2 } : t;
+    return { str: t.str, ...imageToWorld(u, c) };
+  });
+}
+
+/** Re-propose rooms in the review after walls were removed, deselected or moved. */
+export function refreshDraftRooms() {
+  const draft = useImportStore.getState().draft;
+  if (!draft) return;
+  const rooms = refreshRoomProposals(draft, { texts: draft.source === 'json' ? undefined : planTextsInWorld() });
+  useImportStore.getState().patchDraft({ rooms });
+  useUiStore.getState().toast(`${rooms.length} Räume aus den ausgewählten Wänden vorgeschlagen.`, 'info');
 }
 
 export function outputToDraft(out: RasterOutput, u: Underlay, source: ReconstructionDraft['source'], label: string): ReconstructionDraft {
