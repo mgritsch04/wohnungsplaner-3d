@@ -1202,3 +1202,28 @@ test('recognises a sloped 30° wall in a raster plan and proposes the rooms (#37
   await page.waitForTimeout(800);
   expect(errors).toEqual([]);
 });
+
+test('checks the scale against dimension texts of a vector PDF without changing it (#37)', async ({ page }) => {
+  const { dimensionedPlanPdf } = await import('./fixtures');
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'bemasst.pdf', mimeType: 'application/pdf', buffer: dimensionedPlanPdf() });
+  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 15000 });
+  // no statement before a scale is set
+  await expect(page.getByTestId('dimension-check')).toHaveCount(0);
+  // stated scale 1:100 matches the drawing: all four dimensions agree
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen zum Maßstab (4 Maße');
+  // a wrong stated scale (1:110) is reported, not corrected
+  await page.getByLabel('Maßstab 1:').fill('110');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await expect(page.getByTestId('dimension-check')).toContainText('passen nicht zum Maßstab: Abweichung +10,0 %');
+  const u = (await getProject(page)).underlay;
+  expect(u.pixelsPerPoint * 28.3465 * u.metersPerPixel).toBeCloseTo(1.1, 3); // still 1:110 as entered
+  expect(errors).toEqual([]);
+});
