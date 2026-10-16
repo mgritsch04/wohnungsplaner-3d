@@ -51,7 +51,8 @@ describe('toolbar (#100, #103)', () => {
       expect(label.length).toBeGreaterThan(1);
       expect(b.getAttribute('title')).toContain(label.split(' ')[0]);
       expect(b.getAttribute('data-tip')).toBe(b.getAttribute('title'));
-      expect(b.textContent!.trim()).toBe(''); // icon only
+      // icon only, or icon with its name as visible caption (#122)
+      expect(['', label]).toContain(b.textContent!.trim());
       expect(b.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
     }
     // toggles announce their state

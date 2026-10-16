@@ -116,6 +116,7 @@ describe('IKEA design + product list → names and prices', () => {
     const split = splitPlanFiles([
       { name: 'produktliste.json', text: products },
       { name: 'planung.json', text: design },
+      { name: 'bericht.json', text: '[{"article":"604.582.13","ok":true}]' }, // whole ikea-import folder chosen (#12)
     ]);
     expect(split.plan.name).toBe('planung.json');
     expect(split.lists.length).toBe(entries.length);

@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { QualityMode } from '../model/schema';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
-import { registerLampLight, registerLampShade } from './lampRegistry';
+import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
 
 /** Light of one lamp at full brightness (candela-like, physically based lights). */
 const LAMP_INTENSITY = 6;
@@ -401,7 +401,7 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
   }
 }
 
-/** Shapes that emit light; in realism mode they get a real (shadowless) point light. */
+/** Shapes that emit light; in realism mode they get a real point light (with shadows within the lamp budget, #130). */
 export const LIGHT_SHAPES = new Set(['floor-lamp', 'table-lamp', 'pendant']);
 
 export const ProceduralModel = memo(function ProceduralModel({
@@ -446,7 +446,7 @@ export const ProceduralModel = memo(function ProceduralModel({
           rotation={p.r ?? [0, 0, 0]}
           material={materials[i]}
           castShadow={castShadow && (p.opacity ?? 1) === 1 && !p.emissive}
-          receiveShadow={castShadow}
+          receiveShadow={quality === 'realism'}
         />
       ))}
       {quality === 'realism' && LIGHT_SHAPES.has(shape) && <LampBulb y={lampY} />}
@@ -454,9 +454,18 @@ export const ProceduralModel = memo(function ProceduralModel({
   );
 });
 
-/** The (shadowless) light of a lamp; its brightness follows the lamp switch / time of day. */
+/** The light of a lamp; its brightness follows the lamp switch / time of day, its shadow keeps it out of neighbouring rooms. */
 function LampBulb({ y }: { y: number }) {
   const ref = useRef<THREE.PointLight>(null);
-  useEffect(() => (ref.current ? registerLampLight(ref.current, LAMP_INTENSITY) : undefined), []);
+  useEffect(() => {
+    const l = ref.current;
+    if (!l) return;
+    const offLight = registerLampLight(l, LAMP_INTENSITY);
+    const offShadow = registerShadowLamp(l);
+    return () => {
+      offLight();
+      offShadow();
+    };
+  }, []);
   return <pointLight ref={ref} position={[0, y, 0]} color={kelvinToColor(2700)} intensity={0} distance={5} decay={2} />;
 }

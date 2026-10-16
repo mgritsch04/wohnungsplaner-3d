@@ -39,3 +39,15 @@ export function pickFiles(accept: string): Promise<File[]> {
     input.click();
   });
 }
+
+/** Open a folder picker (all files inside, including subfolders); resolves with them (empty when cancelled). */
+export function pickFolder(): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.onchange = () => resolve([...(input.files ?? [])]);
+    input.oncancel = () => resolve([]);
+    input.click();
+  });
+}

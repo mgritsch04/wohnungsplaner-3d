@@ -19,6 +19,7 @@ import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MA
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { blockBehind, isClick, isClippedHit } from './pointer';
+import { requestLampShadowUpdate } from './lampRegistry';
 
 interface Props {
   project: Project;
@@ -277,6 +278,8 @@ function LeafPivot({ leaf, inset = 0, name, children }: { leaf: OpeningLeaf; ins
     const step = LEAF_SPEED * Math.min(dt, 0.1);
     angle.current = Math.abs(diff) <= step ? target : angle.current + Math.sign(diff) * step;
     g.rotation.y = base - s * angle.current;
+    // a moving door changes where lamp light reaches (#130)
+    requestLampShadowUpdate();
   });
   return (
     <group ref={ref} name={name} position={[pivot.x, leaf.z0, pivot.y]}>

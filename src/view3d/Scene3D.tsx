@@ -19,6 +19,7 @@ import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
+import { requestLampShadowUpdate } from './lampRegistry';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { groupOf, moveGroupBy, selectedGroup } from '../model/groups';
 import { pressFurnitureSelection, selectSingleFurniture } from '../ui/groupActions';
@@ -175,6 +176,11 @@ function SceneContent({
     gl.clippingPlanes = cutaway && cameraMode === 'orbit' ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), 1.2)] : [];
     setPickClipping(gl.clippingPlanes);
   }, [gl, cutaway, cameraMode]);
+
+  // lamp shadow maps are cached (#130): re-render them when walls, doors, furniture or the cut change
+  useEffect(() => {
+    requestLampShadowUpdate();
+  }, [project, derived, cutaway, cameraMode]);
 
   // walk start: center of the selected room, else of the first room, else bounds center.
   // Fixed when the walk begins (or another project is opened): edits while walking (opening a
