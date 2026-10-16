@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 const themeCss = readFileSync(resolve('src/theme.css'), 'utf8');
 const editorSrc = readFileSync(resolve('src/editor2d/Editor2D.tsx'), 'utf8');
 const drawingSrc = readFileSync(resolve('src/editor2d/PlanDrawing.tsx'), 'utf8');
-const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo', 'color-plan-visible', 'color-plan-hidden', 'color-plan-viewpoint', ...['bg', 'grid', 'grid-major', 'wall', 'wall-line', 'opening', 'furniture-line', 'dimension', 'text', 'text-muted'].map((t) => `color-plan-${t}`)];
+const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo', 'color-plan-visible', 'color-plan-hidden', 'color-plan-viewpoint', 'color-plan-group', ...['bg', 'grid', 'grid-major', 'wall', 'wall-line', 'opening', 'furniture-line', 'dimension', 'text', 'text-muted'].map((t) => `color-plan-${t}`)];
 
 const valuesOf = (name: string) => [...themeCss.matchAll(new RegExp(`--${name}\\s*:\\s*(#[0-9a-f]{6})`, 'gi'))].map((m) => m[1].toLowerCase());
 
@@ -39,7 +39,7 @@ describe('plan hint tokens (#82)', () => {
     // the editor draws its background with this token (fallback = the same value, for the PNG export)
     expect(editorSrc).toContain(`var(--color-plan-bg, ${planBg})`);
     const halo = valuesOf('color-plan-halo')[0];
-    for (const t of ['color-plan-ok', 'color-plan-warn', 'color-plan-viewpoint', 'color-plan-text', 'color-plan-text-muted', 'color-plan-opening']) {
+    for (const t of ['color-plan-ok', 'color-plan-warn', 'color-plan-viewpoint', 'color-plan-text', 'color-plan-text-muted', 'color-plan-opening', 'color-plan-group']) {
       const c = valuesOf(t)[0];
       expect(contrast(c, planBg!)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(c, halo)).toBeGreaterThanOrEqual(4.5);

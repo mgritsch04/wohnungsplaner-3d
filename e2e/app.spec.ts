@@ -4,6 +4,7 @@ import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
+import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -2658,3 +2659,137 @@ test('2D plan: wall outlines keep their screen-pixel width at every zoom, plan c
   expect(await wall.evaluate((el) => getComputedStyle(el).fill)).toBe('rgb(59, 65, 71)');
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('furniture groups: Strg+G groups, click selects the group, drag moves all (one undo step), second click picks one, rename, kept after reload, Strg+Umschalt+G dissolves (#65)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const sel = () =>
+    page.evaluate(() => {
+      const s = (window as any).__wp.useUiStore.getState();
+      return s.selection?.type === 'furniture' ? [s.selection.id, ...s.multi] : [];
+    });
+  const past = () => page.evaluate(() => (window as any).__wp.useProjectStore.getState().past.length as number);
+  const click = async (f: { x: number; y: number }) => {
+    const s = await planToScreen(page, f.x, f.y);
+    await page.mouse.click(s.x, s.y);
+  };
+  const p0 = await getProject(page);
+  expect(p0.groups).toEqual([]);
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const ids: string[] = [bed.id, ...ns.map((n: any) => n.id)];
+
+  // select bed + night stands, Strg+G → one group (one undo step)
+  await click(bed);
+  for (const n of ns) {
+    await page.keyboard.down('Shift');
+    await click(n);
+    await page.keyboard.up('Shift');
+  }
+  const beforeGroup = await past();
+  await page.keyboard.press('Control+g');
+  const p1 = await getProject(page);
+  expect(p1.groups).toHaveLength(1);
+  const gid = p1.groups[0].id;
+  expect(p1.furniture.filter((f: any) => f.groupId === gid).map((f: any) => f.id).sort()).toEqual([...ids].sort());
+  expect(await past()).toBe(beforeGroup + 1);
+  const panel = page.locator('.panel.right');
+  await expect(panel.getByTestId('group-controls')).toBeVisible();
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'true');
+
+  // a click on one night stand selects the whole group
+  await page.keyboard.press('Escape');
+  expect(await sel()).toEqual([]);
+  await click(ns[0]);
+  expect((await sel()).sort()).toEqual([...ids].sort());
+  expect((await sel())[0]).toBe(ns[0].id);
+  await expect(page.getByTestId('multi-note')).toContainText('Gruppe „Gruppe 1“ ausgewählt (3 Möbel)');
+
+  // dragging the bed moves all three by the same amount – one undo step
+  const beforeDrag = await past();
+  const a = await planToScreen(page, bed.x, bed.y);
+  const b = await planToScreen(page, bed.x, bed.y + 0.5);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 6 });
+  await page.mouse.up();
+  const p2 = await getProject(page);
+  const dy = (p: any, id: string) => p.furniture.find((f: any) => f.id === id).y - p0.furniture.find((f: any) => f.id === id).y;
+  const dx = (p: any, id: string) => p.furniture.find((f: any) => f.id === id).x - p0.furniture.find((f: any) => f.id === id).x;
+  expect(dy(p2, bed.id)).toBeGreaterThan(0.3);
+  for (const id of ids) {
+    expect(dy(p2, id)).toBeCloseTo(dy(p2, bed.id), 3);
+    expect(dx(p2, id)).toBeCloseTo(dx(p2, bed.id), 3);
+  }
+  expect(await past()).toBe(beforeDrag + 1);
+  expect((await sel()).sort()).toEqual([...ids].sort()); // still the group
+
+  // Strg+Z once restores all three positions
+  await page.keyboard.press('Control+z');
+  const p3 = await getProject(page);
+  for (const id of ids) {
+    expect(dy(p3, id)).toBeCloseTo(0, 6);
+    expect(dx(p3, id)).toBeCloseTo(0, 6);
+  }
+  expect(p3.groups).toHaveLength(1);
+
+  // E turns the group about its centre – one undo step, distances between the members kept
+  const dist = (p: any, i: string, j: string) => {
+    const f = p.furniture.find((x: any) => x.id === i);
+    const g = p.furniture.find((x: any) => x.id === j);
+    return Math.hypot(f.x - g.x, f.y - g.y);
+  };
+  const beforeTurn = await past();
+  await page.keyboard.press('e');
+  const p4 = await getProject(page);
+  expect(await past()).toBe(beforeTurn + 1);
+  expect(p4.furniture.find((f: any) => f.id === bed.id).rotation).not.toBeCloseTo(bed.rotation, 3);
+  expect(dist(p4, bed.id, ns[0].id)).toBeCloseTo(dist(p0, bed.id, ns[0].id), 2);
+  expect(dist(p4, ns[0].id, ns[1].id)).toBeCloseTo(dist(p0, ns[0].id, ns[1].id), 2);
+  await page.keyboard.press('Control+z');
+
+  // a second click (no drag) selects just the clicked item; the group stays outlined faintly
+  await click(bed);
+  expect(await sel()).toEqual([bed.id]);
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'false');
+  await expect(panel.getByTestId('group-controls')).toContainText('Teil der Gruppe „Gruppe 1“');
+  // back to the whole group via the panel, rename it there
+  await panel.getByRole('button', { name: 'Ganze Gruppe auswählen' }).click();
+  expect((await sel()).sort()).toEqual([...ids].sort());
+  const nameField = panel.getByTestId('group-controls').getByLabel('Name der Gruppe');
+  await nameField.fill('Schlafbereich');
+  await nameField.press('Enter');
+  await expect.poll(async () => (await getProject(page)).groups[0]?.name).toBe('Schlafbereich');
+  await expect(page.getByTestId('group-label')).toHaveText('Schlafbereich');
+
+  // kept after reload
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p5 = await getProject(page);
+  expect(p5.groups).toEqual([{ id: gid, name: 'Schlafbereich' }]);
+  expect(p5.furniture.filter((f: any) => f.groupId === gid)).toHaveLength(3);
+  await click(bed);
+  expect((await sel()).sort()).toEqual([...ids].sort());
+
+  // Strg+Umschalt+G dissolves the group – the items stay where they are; one undo step
+  const beforeUngroup = await past();
+  await page.keyboard.press('Control+Shift+G');
+  const p6 = await getProject(page);
+  expect(p6.groups).toEqual([]);
+  expect(p6.furniture.every((f: any) => !f.groupId)).toBe(true);
+  for (const id of ids) expect(dy(p6, id)).toBeCloseTo(0, 6);
+  expect(await past()).toBe(beforeUngroup + 1);
+  await page.keyboard.press('Escape');
+  await click(bed);
+  expect(await sel()).toEqual([bed.id]);
+  await expect(page.getByTestId('group-outline')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */

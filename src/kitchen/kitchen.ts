@@ -6,6 +6,7 @@ import { newId } from '../model/ids';
 import type { Furniture, Project } from '../model/schema';
 import { roundMm } from '../model/units';
 import { add, dot, scale, sub } from '../model/vec';
+import { pruneGroups } from '../model/groups';
 
 /**
  * Modular kitchen planning on top of the shared furniture model.
@@ -62,6 +63,7 @@ const FLOOR_TYPES = new Set(['base', 'sink', 'dishwasher', 'oven']);
 /** Remove previously generated countertops and create new ones over contiguous base modules. */
 export function generateCountertops(d: Project): number {
   d.furniture = d.furniture.filter((f) => !(f.kitchen?.type === 'countertop' && f.kitchen.generated));
+  pruneGroups(d);
   const base = d.furniture.filter((f) => f.kitchen && FLOOR_TYPES.has(f.kitchen.type) && f.elevation < 0.01);
   const groups: Furniture[][] = [];
   for (const f of base) {

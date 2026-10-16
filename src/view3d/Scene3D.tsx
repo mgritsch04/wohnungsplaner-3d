@@ -11,7 +11,7 @@ import type { Project, QualityMode } from '../model/schema';
 import { boundsOf } from '../model/vec';
 import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
-import { useUiStore } from '../store/uiStore';
+import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
@@ -20,6 +20,8 @@ import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
+import { groupOf, moveGroupBy, selectedGroup } from '../model/groups';
+import { pressFurnitureSelection, selectSingleFurniture } from '../ui/groupActions';
 import { snapToGrid } from '../model/operations';
 import { CollisionMarkers } from './CollisionMarkers';
 import { NarrowPassageMarkers } from './NarrowPassageMarkers';
@@ -205,6 +207,13 @@ function SceneContent({
         // same snapping choice as in 2D (#52)
         const fs = furnitureSnapOptions(d.settings.furnitureSnap);
         const p = fs.grid ? snapToGrid({ x, y }, fs.grid) : { x, y };
+        // a selected furniture group (#65) moves rigidly, collision-checked as a whole
+        const ids = selectedFurnitureIds(useUiStore.getState());
+        const cur = d.furniture.find((f) => f.id === id);
+        if (cur && ids.includes(id) && selectedGroup(d, ids)) {
+          moveGroupBy(d, obstacles, ids, { x: roundMm(p.x) - cur.x, y: roundMm(p.y) - cur.y }, { collide: true });
+          return;
+        }
         moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: true });
       }),
     [updateTx, derived, obstacles],
@@ -217,7 +226,20 @@ function SceneContent({
     cancelTx();
     if (orbitRef.current) orbitRef.current.enabled = true;
   }, [cancelTx]);
-  const onSelectFurniture = useCallback((id: string) => setSelection({ type: 'furniture', id }), [setSelection]);
+  // furniture groups (#65): a click on a member selects the whole group, a second click (no drag) the item
+  const drillRef = useRef<string | null>(null);
+  const onSelectFurniture = useCallback(
+    (id: string) => {
+      drillRef.current = null;
+      if (groupOf(useProjectStore.getState().project, id)) drillRef.current = pressFurnitureSelection(id, false);
+      else setSelection({ type: 'furniture', id });
+    },
+    [setSelection],
+  );
+  const onClickFurniture = useCallback((id: string) => {
+    if (drillRef.current === id) selectSingleFurniture(id);
+    drillRef.current = null;
+  }, []);
   const onSelectArch = useCallback((type: 'wall' | 'room' | 'opening', id: string) => setSelection({ type, id }), [setSelection]);
   const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
@@ -248,6 +270,7 @@ function SceneContent({
           quality={quality}
           selected={(selection?.type === 'furniture' && selection.id === f.id) || multi.includes(f.id)}
           onSelect={onSelectFurniture}
+          onClickRelease={onClickFurniture}
           onDragStart={onDragStart}
           onDrag={onDrag}
           onDragEnd={onDragEnd}

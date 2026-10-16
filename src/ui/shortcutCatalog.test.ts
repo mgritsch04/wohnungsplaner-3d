@@ -22,6 +22,16 @@ describe('keyboard overview (#59)', () => {
     for (let i = 1; i <= 9; i++) expect(listed.has(`Digit${i}`)).toBe(true);
   });
 
+  it('lists Strg+G / Strg+Umschalt+G for furniture groups, handled with the modifier only (#65)', () => {
+    expect(shortcutsSource).toMatch(/mod && key === 'g'/);
+    expect(shortcutsSource).toMatch(/e\.shiftKey\) ungroupSelection\(\)/);
+    const items = SHORTCUT_GROUPS.flatMap((g) => g.items);
+    expect(items.find((i) => i.keys === 'Strg+G')?.action).toMatch(/gruppieren/);
+    expect(items.find((i) => i.keys === 'Strg+Umschalt+G')?.action).toMatch(/Gruppe auflösen/);
+    // the plain G key stays the passage tool (2D) and carrying (walkthrough)
+    expect(TOOL_KEYS.g).toBe('passage');
+  });
+
   it('lists every key the walkthrough reacts to', () => {
     const code = walkSource;
     const codes = new Set<string>();

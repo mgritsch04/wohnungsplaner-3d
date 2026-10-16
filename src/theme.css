@@ -116,6 +116,7 @@
   --color-plan-dimension: #94a3b8; /* Maß- und Hilfslinien */
   --color-plan-text: #111827; /* Raumname */
   --color-plan-text-muted: #4b5563; /* Fläche, Maßzahlen */
+  --color-plan-group: #6d28d9; /* Umrandung einer ausgewählten Möbelgruppe (#65) */
 
   /* ---------- Abstände (4er-Raster, in rem → skaliert mit der Grundschrift) ---------- */
   --space-0: 0.125rem; /* 2px */
@@ -274,6 +275,7 @@
   --color-plan-dimension: #94a3b8;
   --color-plan-text: #111827;
   --color-plan-text-muted: #4b5563;
+  --color-plan-group: #6d28d9;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -371,5 +373,6 @@
     --color-plan-dimension: #94a3b8;
     --color-plan-text: #111827;
     --color-plan-text-muted: #4b5563;
+    --color-plan-group: #6d28d9;
   }
 }

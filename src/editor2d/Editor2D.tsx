@@ -29,10 +29,25 @@ import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
+import { groupBounds, groupCenter, groupName, moveGroupBy, rotateGroupPoses, selectedGroup, settleGroup, type GroupTurnResult } from '../model/groups';
+import { pressFurnitureSelection, reportGroupTurn, selectFurnitureWithGroups, selectSingleFurniture } from '../ui/groupActions';
+import { GroupOverlay, groupHandlePoint } from './GroupOverlay';
 
 type Drag =
   | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean }
-  | { kind: 'furniture'; id: string; grab: Vec2; moved: boolean; origin: Vec2; group: { id: string; x: number; y: number }[] }
+  | {
+      kind: 'furniture';
+      id: string;
+      grab: Vec2;
+      moved: boolean;
+      origin: Vec2;
+      group: { id: string; x: number; y: number }[];
+      /** A furniture group (#65) is selected as a whole: it moves rigidly. */
+      rigid: string[] | null;
+      /** Released without dragging: select only this member (second click on a group). */
+      drill: string | null;
+    }
+  | { kind: 'rotate-group'; ids: string[]; center: Vec2; startAngle: number }
   | { kind: 'box'; start: Vec2 }
   | { kind: 'rotate'; id: string }
   | { kind: 'node'; id: string; moved: boolean }
@@ -82,6 +97,10 @@ export function Editor2D() {
     for (const [id, c] of furnitureConflicts(project, derived, obstacles)) m.set(id, c.level);
     return m;
   }, [project, derived, obstacles]);
+  // furniture group selected as a whole (#65): shared outline + one rotation handle
+  const selectedIds = useMemo(() => selectedFurnitureIds({ selection, multi }), [selection, multi]);
+  const groupSel = useMemo(() => selectedGroup(project, selectedIds), [project, selectedIds]);
+  const groupBox = useMemo(() => (groupSel ? groupBounds(project.furniture.filter((f) => selectedIds.includes(f.id))) : null), [groupSel, project, selectedIds]);
   const draft = useImportStore((s) => s.draft);
   const draftSel = useImportStore((s) => s.selected);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -227,8 +246,18 @@ export function Editor2D() {
           useImportStore.getState().select(dh);
           if (dh) return;
         }
+        // rotation handle of a selected group: turns all members about the group centre
+        if (groupSel && groupBox) {
+          const members = project.furniture.filter((f) => selectedIds.includes(f.id));
+          if (!members.some((f) => f.locked) && dist(groupHandlePoint(groupBox, 1 / view.zoom), w) <= 8 / view.zoom) {
+            const center = groupCenter(members);
+            beginTx();
+            drag.current = { kind: 'rotate-group', ids: selectedIds, center, startAngle: Math.atan2(w.y - center.y, w.x - center.x) };
+            return;
+          }
+        }
         // rotation handle of selected furniture
-        if (selection?.type === 'furniture') {
+        if (selection?.type === 'furniture' && !groupSel) {
           const f = project.furniture.find((x) => x.id === selection.id);
           if (f && !f.locked) {
             const handle = add({ x: f.x, y: f.y }, rotate({ x: 0, y: -f.depth / 2 - 22 / view.zoom }, f.rotation));
@@ -240,9 +269,9 @@ export function Editor2D() {
           }
         }
         const hit = hitTest(project, derived, w, tol);
-        // Shift+click on furniture: add to / remove from the selection (multi-select)
+        // Shift+click on furniture: add to / remove from the selection (multi-select; a group as a whole)
         if (hit?.type === 'furniture' && e.shiftKey) {
-          ui().toggleFurnitureSelection(hit.id);
+          pressFurnitureSelection(hit.id, true);
           drag.current = null;
           return;
         }
@@ -262,25 +291,30 @@ export function Editor2D() {
           drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: true };
           return;
         }
-        // grabbing an item of a multi-selection keeps the selection and moves the whole group
-        const current = ui();
-        const inGroup = hit.type === 'furniture' && current.multi.length > 0 && selectedFurnitureIds(current).includes(hit.id);
-        if (!inGroup) ui().setSelection(hit);
+        // furniture: group rules (#65) – first click selects the whole group, a second click
+        // (released without dragging) the single item; grabbing an item of a multi-selection
+        // keeps the selection and moves all of it
+        const drill = hit.type === 'furniture' ? pressFurnitureSelection(hit.id, false) : null;
+        if (hit.type !== 'furniture') ui().setSelection(hit);
         beginTx();
         if (hit.type === 'furniture') {
           const f = project.furniture.find((x) => x.id === hit.id)!;
-          if (f.locked) {
-            drag.current = null;
+          const ids = selectedFurnitureIds(ui());
+          const rigid = selectedGroup(project, ids) ? ids : null;
+          if (f.locked || (rigid && project.furniture.some((x) => rigid.includes(x.id) && x.locked))) {
+            // a locked item (or a group with one) does not move – a click may still pick a single member
+            drag.current = drill ? { kind: 'furniture', id: hit.id, grab: { x: 0, y: 0 }, moved: false, origin: { x: f.x, y: f.y }, group: [], rigid: [], drill } : null;
             return;
           }
-          const group = inGroup
-            ? selectedFurnitureIds(current)
-                .filter((id) => id !== hit.id)
-                .map((id) => project.furniture.find((x) => x.id === id))
-                .filter((g): g is NonNullable<typeof g> => !!g && !g.locked)
-                .map((g) => ({ id: g.id, x: g.x, y: g.y }))
-            : [];
-          drag.current = { kind: 'furniture', id: hit.id, grab: sub(w, { x: f.x, y: f.y }), moved: false, origin: { x: f.x, y: f.y }, group };
+          const group =
+            !rigid && ids.length > 1
+              ? ids
+                  .filter((id) => id !== hit.id)
+                  .map((id) => project.furniture.find((x) => x.id === id))
+                  .filter((g): g is NonNullable<typeof g> => !!g && !g.locked)
+                  .map((g) => ({ id: g.id, x: g.x, y: g.y }))
+              : [];
+          drag.current = { kind: 'furniture', id: hit.id, grab: sub(w, { x: f.x, y: f.y }), moved: false, origin: { x: f.x, y: f.y }, group, rigid, drill };
         } else if (hit.type === 'node') {
           drag.current = { kind: 'node', id: hit.id, moved: false };
         } else if (hit.type === 'wall') {
@@ -377,11 +411,22 @@ export function Editor2D() {
         }
         case 'furniture': {
           dr.moved = true;
+          if (dr.rigid && !dr.rigid.length) return; // locked group: does not move
           let c = sub(w, dr.grab);
           // snapping as chosen under Werkzeuge › „Möbel einrasten“ (#52); Alt = free placement
           const fs = furnitureSnapOptions(settings.furnitureSnap, e.altKey);
           if (fs.grid) c = snapToGrid(c, fs.grid);
           // wall snapping + collision (Alt = free placement)
+          if (dr.rigid) {
+            // a furniture group moves rigidly; the collision check applies to the group as a whole
+            const rigid = dr.rigid;
+            updateTx((d) => {
+              const cur = d.furniture.find((x) => x.id === dr.id);
+              if (cur) moveGroupBy(d, obstacles, rigid, { x: roundMm(c.x) - cur.x, y: roundMm(c.y) - cur.y }, { collide: !e.altKey });
+            });
+            setPreview({});
+            return;
+          }
           let snapped: string[] = [];
           updateTx((d) => {
             // a group moves rigidly (no wall snapping), each item still stops at walls/furniture
@@ -407,6 +452,21 @@ export function Editor2D() {
           updateTx((d) => {
             const ff = d.furniture.find((x) => x.id === dr.id);
             if (ff) ff.rotation = ang;
+          });
+          return;
+        }
+        case 'rotate-group': {
+          // turn about the group centre from the transaction base (no drift), 15° steps (Shift = free)
+          let delta = Math.atan2(w.y - dr.center.y, w.x - dr.center.x) - dr.startAngle;
+          if (!e.shiftKey) delta = Math.round(delta / (Math.PI / 12)) * (Math.PI / 12);
+          const base = useProjectStore.getState().txBase ?? project;
+          updateTx((d) => {
+            for (const id of dr.ids) {
+              const b = base.furniture.find((x) => x.id === id);
+              const f = d.furniture.find((x) => x.id === id);
+              if (b && f) Object.assign(f, { x: b.x, y: b.y, rotation: b.rotation });
+            }
+            rotateGroupPoses(d, dr.ids, delta, dr.center);
           });
           return;
         }
@@ -543,9 +603,9 @@ export function Editor2D() {
       const y0 = Math.min(dr.start.y, b.y);
       const y1 = Math.max(dr.start.y, b.y);
       const inside = project.furniture.filter((f) => f.x >= x0 && f.x <= x1 && f.y >= y0 && f.y <= y1).map((f) => f.id);
-      // add to an existing furniture selection (Shift is held)
+      // add to an existing furniture selection (Shift is held); a grouped item brings its whole group
       const keep = selectedFurnitureIds(ui());
-      ui().selectFurniture([...keep, ...inside.filter((id) => !keep.includes(id))]);
+      selectFurnitureWithGroups([...keep, ...inside.filter((id) => !keep.includes(id))]);
       return;
     }
     if (dr.kind === 'room-rect') {
@@ -585,7 +645,20 @@ export function Editor2D() {
       }
       setPreview({});
     }
-    if (dr.kind === 'furniture') setPreview({});
+    if (dr.kind === 'rotate-group' && dragStarted.current) {
+      // like Q/E: push the turned group out of walls/furniture if a free spot is near
+      const base = useProjectStore.getState().txBase ?? project;
+      const before = base.furniture.filter((f) => dr.ids.includes(f.id));
+      const out: { result: GroupTurnResult } = { result: 'ok' };
+      updateTx((d) => void (out.result = settleGroup(d, obstacles, dr.ids, before, derived)));
+      const gid = base.furniture.find((f) => f.id === dr.ids[0])?.groupId;
+      reportGroupTurn(out.result, gid ? groupName(base, gid) : 'Gruppe');
+    }
+    if (dr.kind === 'furniture') {
+      setPreview({});
+      // second click on a member of the selected group (no drag): select just that item
+      if (!dr.moved && dr.drill) selectSingleFurniture(dr.drill);
+    }
     commitTx();
   };
 
@@ -708,7 +781,18 @@ export function Editor2D() {
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
-          <PlanDrawing project={project} derived={derived} selection={selection} multi={multi} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
+          <PlanDrawing
+            project={project}
+            derived={derived}
+            selection={selection}
+            multi={multi}
+            hover={hover}
+            zoom={view.zoom}
+            showDimensions
+            conflicts={conflicts}
+            rotateHandleFor={groupSel ? null : selection?.type === 'furniture' ? selection.id : null}
+          />
+          {tool === 'select' && <GroupOverlay project={project} selectedIds={selectedIds} groupId={groupSel} px={px} />}
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
