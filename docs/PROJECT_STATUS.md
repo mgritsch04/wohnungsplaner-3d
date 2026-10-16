@@ -66,7 +66,7 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
-- Vitest: ✅ 184/184 · Playwright: siehe Git-Abschnitt (Headless-Chromium, SwiftShader)
+- Vitest: ✅ 184/184 · Playwright: ✅ 22/22 (Headless-Chromium, SwiftShader; ein Namenskonflikt des neuen Import-Knopfs wurde dabei gefunden und behoben)
 
 ## Wartet auf deinen Test
 1. 3D: Möbel anklicken (bleibt ausgewählt, bewegt sich nicht) und ziehen (folgt der Maus, kein Sprung) – auch in der Schnittansicht.
@@ -93,5 +93,5 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 Siehe [`IDEAS.md`](IDEAS.md) → `Ready`: 1. Smart Home P2 (simulierte Geräte im Planer) · 2. IKEA-Planung mit Stückliste anreichern · 3. allgemeinen Quelltext-Import überarbeiten.
 
 ## Git
-- Branch `claude/quirky-faraday-0d9uep`; `main` = `5797457` (PR #1 gemergt nach grüner CI)
-- Diese Runde: `2918525` CI/Workflow · `34551bd` Kollisionen 3D + Drag-Fix · `485726b` Mausempfindlichkeit · `004c716` Wandfang/Durchdringung · `1a6ce1f` Tageszeit-Regler · `e25da43` 3DModel/Recherche
+- Branch `claude/quirky-faraday-0d9uep`; `main` = `a9cc64f` (PR #2 gemergt); Runde 5 wird per PR #3 integriert
+- Runde 5: `eb638f2` IKEA-Modellwahl · `b79c590` Artikelliste/Skript/Mehrdatei-Import · `97f7532` PAX-Planung · `37b14ad` Recherche · `624baee` Smart-Home-Doku · `0bd9806`/`0035663` Backlog · `c1648c6` Knopf-Fix
