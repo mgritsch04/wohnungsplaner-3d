@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
+import { cadFilledPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
@@ -598,6 +598,42 @@ test('imports page 2 of a vector PDF, applies the stated scale and recognises wa
   const draft = await page.evaluate(() => (window as unknown as { __wp: { useImportStore: { getState: () => { draft: { walls: { thickness: number }[] } } } } }).__wp.useImportStore.getState().draft);
   expect(draft.walls).toHaveLength(4);
   for (const w of draft.walls) expect(w.thickness).toBeCloseTo(0.2, 1);
+  expect(errors).toEqual([]);
+});
+
+test('CAD plan with solid dark walls, coloured rooms (as strips) and a tile hatch: real walls only, rooms named from the labels (#114)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'grundriss-a3.pdf', mimeType: 'application/pdf', buffer: cadFilledPlanPdf() });
+  await expect(page.getByRole('button', { name: 'Aus Angabe übernehmen' })).toBeVisible({ timeout: 15000 });
+  await page.locator('.field-row.compact input').fill('75');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const draft = await page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
+  expect(draft.source).toBe('pdf-vector');
+  // 4 outer walls (30 cm) + 3 inner walls (12 cm); no phantom walls from strips or tiles
+  expect(draft.walls).toHaveLength(7);
+  const thick = draft.walls.map((w: { thickness: number }) => w.thickness).sort();
+  expect(thick.filter((t: number) => Math.abs(t - 0.12) < 0.02)).toHaveLength(3);
+  expect(thick.filter((t: number) => Math.abs(t - 0.3) < 0.02)).toHaveLength(4);
+  // entrance + three inner doors are gaps
+  expect(draft.openings.length).toBeGreaterThanOrEqual(4);
+  const rooms = draft.rooms.map((r: { name: string; statedArea?: number }) => [r.name, r.statedArea]).sort();
+  expect(rooms).toEqual([['Bad', 6], ['Kueche', 6], ['Schlafen', 14], ['Wohnen', 32.5]]);
   expect(errors).toEqual([]);
 });
 

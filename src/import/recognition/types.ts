@@ -13,7 +13,7 @@ export interface RecognitionInput {
   pixelHeight: number;
   metersPerPixel: number;
   /** Vector segments from a PDF, in underlay pixel coordinates (if available). */
-  vectorSegments?: { x1: number; y1: number; x2: number; y2: number }[];
+  vectorSegments?: { x1: number; y1: number; x2: number; y2: number; areaFill?: boolean; darkFill?: boolean }[];
 }
 
 export interface FloorPlanRecognizer {

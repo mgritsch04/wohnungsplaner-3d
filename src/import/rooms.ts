@@ -97,7 +97,8 @@ function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: D
   const usedNames = new Map<string, number>();
   return candidates.map((g, i) => {
     const inside = (opts.texts ?? []).filter((t) => pointInPolygon(t, g.interior));
-    const named = inside.map((t) => t.str.trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
+    // name and area may share one text item ("Wohnen 32,50 m²", as CAD programs often export them)
+    const named = inside.map((t) => t.str.replace(AREA_TEXT, '').trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
     let name = named ?? `Raum ${i + 1}`;
     if (named) {
       const n = (usedNames.get(named) ?? 0) + 1;
