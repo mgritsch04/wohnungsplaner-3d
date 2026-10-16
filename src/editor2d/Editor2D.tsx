@@ -23,6 +23,7 @@ import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, move
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
+import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -706,6 +707,7 @@ export function Editor2D() {
           <PlanDrawing project={project} derived={derived} selection={selection} multi={multi} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
+          <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
 
