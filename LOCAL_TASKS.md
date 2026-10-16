@@ -203,3 +203,11 @@ Bitte zwei kleine Aufgaben **nacheinander**, je auf einem eigenen Branch von `or
 - Issues
 
 **Fertig, wenn:** je Branch alle Checks und die volle E2E-Suite grün sind, gepusht ist und du mir **je Teilaufgabe** berichtet hast.
+
+## Hinweis: nach Aufgabe 11b keine neuen Aufgaben
+
+Auf Wunsch des Nutzers: Bitte nur noch **11b (#104, 2D-Plan verfeinern)** fertigstellen: Checks, volle E2E-Suite, Push auf `claude/plan-polish-104`, Bericht. **Danach keine neue Aufgabe beginnen** und nicht mehr im Kanal nach Aufgaben suchen, bis der Nutzer selbst etwas Neues sagt.
+
+Bitte unterwegs Zwischenstände auf deinen eigenen Branch pushen, etwa alle 30 Minuten, damit nichts verloren geht, falls der PC ausgeschaltet wird.
+
+Bericht zu 11a (#125) ist angekommen, danke – er kommt in den nächsten Sammel-PR.
