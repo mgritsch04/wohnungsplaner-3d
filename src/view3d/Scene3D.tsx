@@ -1,6 +1,8 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
+import { OrbitControls, PerformanceMonitor, Sky } from '@react-three/drei';
+import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -140,13 +142,21 @@ function SceneContent({
   return (
     <>
       <color attach="background" args={[quality === 'realism' ? '#dfe7ee' : '#eef1f4']} />
+      {quality === 'realism' && !(cutaway && cameraMode === 'orbit') && <RealismSky timeOfDay={project.settings.timeOfDay} />}
       <Lights project={project} quality={quality} center={center} span={span} />
       {quality === 'realism' && <EnvironmentLight intensity={0.35 * project.settings.exposure} />}
       <ExposureSync exposure={project.settings.exposure} />
       <FpsMeter />
       <AdaptiveQuality />
       <Ground quality={quality} />
-      <Architecture project={project} derived={derived} quality={quality} selectedId={selection?.id ?? null} onSelect={onSelectArch} />
+      <Architecture
+        project={project}
+        derived={derived}
+        quality={quality}
+        selectedId={selection?.id ?? null}
+        onSelect={onSelectArch}
+        showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
+      />
       {project.furniture.map((f) => (
         <FurnitureObject
           key={f.id}
@@ -159,12 +169,36 @@ function SceneContent({
           onDragEnd={onDragEnd}
         />
       ))}
+      {quality === 'realism' && <RealismEffects />}
       {cameraMode === 'orbit' ? (
         <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} />
       ) : (
         <WalkControls key="walk" derived={derived} furniture={project.furniture} start={walkStart} onLockChange={onLockChange} />
       )}
     </>
+  );
+}
+
+/** Physically based sky matching the sun position (realism mode). */
+function RealismSky({ timeOfDay }: { timeOfDay: number }) {
+  const sun = sunDirection(timeOfDay);
+  return <Sky distance={450} sunPosition={[sun.x * 100, sun.y * 100, sun.z * 100]} turbidity={6} rayleigh={1.2} mieCoefficient={0.005} mieDirectionalG={0.85} />;
+}
+
+/**
+ * Post-processing for realism mode: screen-space ambient occlusion (contact
+ * shadows in corners and under furniture), SMAA anti-aliasing and filmic tone mapping.
+ * Skipped automatically when the pixel ratio was reduced for performance.
+ */
+function RealismEffects() {
+  const dprCap = usePerformanceStore((s) => s.dprCap);
+  const lowPower = dprCap < 1;
+  return (
+    <EffectComposer multisampling={0}>
+      <N8AO aoRadius={0.6} distanceFalloff={0.6} intensity={2.2} quality={lowPower ? 'performance' : 'medium'} halfRes={lowPower} />
+      <SMAA />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+    </EffectComposer>
   );
 }
 

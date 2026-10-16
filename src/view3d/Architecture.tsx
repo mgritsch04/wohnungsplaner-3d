@@ -14,13 +14,14 @@ interface Props {
   quality: QualityMode;
   selectedId: string | null;
   onSelect: (type: 'wall' | 'room' | 'opening', id: string) => void;
+  showCeilings: boolean;
 }
 
 /**
  * Walls, floors, ceilings, doors and windows generated from the shared model.
  * Geometry is rebuilt only when the architecture key (nodes/walls/openings/rooms/materials) changes.
  */
-export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect }: Props) {
+export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect, showCeilings }: Props) {
   const shadows = quality === 'realism';
 
   const wallMeshes = useMemo(() => {
@@ -132,7 +133,7 @@ export const Architecture = memo(function Architecture({ project, derived, quali
               onSelect('room', f.room.id);
             }}
           />
-          {project.settings.showCeilings && <mesh geometry={f.ceiling} material={getSurfaceMaterial(f.ceilingMat, quality)} receiveShadow={shadows} />}
+          {showCeilings && <mesh geometry={f.ceiling} material={getSurfaceMaterial(f.ceilingMat, quality)} receiveShadow={shadows} />}
         </group>
       ))}
       {project.walls.map((w) => {
