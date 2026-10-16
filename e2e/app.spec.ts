@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
+import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
+import { derivePlan } from '../src/model/derived';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -813,6 +815,8 @@ test('hover info: name, category, size and price after a short delay; hidden whi
 });
 
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
+  // realism rendering with software WebGL takes ~45–55 s alone; under parallel load it overran 60 s
+  test.setTimeout(150_000);
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -1333,12 +1337,30 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
       const v = pivot.children[0].getWorldPosition(t.camera.position.clone());
       return { x: v.x as number, y: v.z as number, h: v.y as number };
     }, id);
+  /**
+   * Leaf position once its open/close animation has finished. The animation advances at most
+   * 0.1 s per frame, so with software rendering under load (few FPS) it takes noticeably longer
+   * than its nominal ~0.6 s – aiming at a leaf still in motion misses the thin leaf.
+   */
+  const restingLeaf = async (id: string) => {
+    let last = await leafCenter(id);
+    await expect
+      .poll(async () => {
+        await page.waitForTimeout(150);
+        const now = await leafCenter(id);
+        const moved = Math.hypot(now.x - last.x, now.y - last.y);
+        last = now;
+        return moved;
+      })
+      .toBeLessThan(0.001);
+    return last;
+  };
 
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Schnitt' }).click(); // look into the rooms
   await page.waitForTimeout(2000);
   // the open inner door leaf stands in the living room (wall at x = 5.06)
-  const openLeaf = await leafCenter(inner.id);
+  const openLeaf = await restingLeaf(inner.id);
   expect(openLeaf.x).toBeLessThan(4.8);
   const s = await worldToScreen3d(page, openLeaf.x, 0.8, openLeaf.y);
   // a single click only selects it …
@@ -1395,7 +1417,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
       [x, y, h] as const,
     );
   const target = () => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null);
-  const leaf = await leafCenter(inner.id);
+  const leaf = await restingLeaf(inner.id); // the undo above re-opened it – wait until it stands still
   await lookAt(leaf.x, leaf.y, 1.0);
   await expect.poll(target).toBe(inner.id);
   const p2 = await past();
@@ -1404,7 +1426,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(await past()).toBe(p2 + 1);
   expect(await getSelection(page)).toEqual({ type: 'opening', id: entrance.id }); // the click does not change the selection
   // the closed door now fills the doorway: aim at it and press O
-  await page.waitForTimeout(800);
+  await restingLeaf(inner.id);
   await lookAt(5.0, 2.0, 1.0);
   await expect.poll(target).toBe(inner.id);
   await page.keyboard.press('o');
@@ -1412,7 +1434,7 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   expect(await past()).toBe(p2 + 2);
   expect(await openOf(entrance.id)).toBe(false); // O acted on the door in sight, not on the selected one
   // the living-room window: the sash opens into the room
-  const glass = await leafCenter(window1.id);
+  const glass = await restingLeaf(window1.id);
   await lookAt(glass.x, glass.y, 1.6);
   await expect.poll(target).toBe(window1.id);
   await page.evaluate(() => (window as any).__wp.walk.pickOrDrop());
@@ -1875,6 +1897,233 @@ test('align and distribute several furniture items: top edge, equal gaps, one un
   await expect(controls.getByRole('button', { name: 'Waagrecht verteilen' })).toBeDisabled();
   await expect(controls.getByRole('button', { name: 'Links ausrichten' })).toBeEnabled();
   await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('dark mode: light / dark / system switch in the project panel, kept after reload, print sheet stays white (#73)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await freshStart(page);
+  const html = page.locator('html');
+  // relative luminance (0 = black, 1 = white) of a computed background colour
+  const lum = (selector: string) =>
+    page.evaluate((sel) => {
+      const [r, g, b] = getComputedStyle(document.querySelector(sel)!).backgroundColor.match(/[\d.]+/g)!.map(Number);
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    }, selector);
+  const stored = () => page.evaluate(() => localStorage.getItem('wohnungsplaner-theme'));
+
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeGreaterThan(0.8);
+
+  const panel = page.locator('.panel.right');
+  await panel.getByRole('button', { name: 'Projekt', exact: true }).click();
+  const group = panel.getByRole('group', { name: 'Farbschema' });
+  await expect(group.getByRole('button', { name: 'System', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+  // Dunkel
+  await group.getByRole('button', { name: 'Dunkel', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(group.getByRole('button', { name: 'Dunkel', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect(await lum('html')).toBeLessThan(0.15);
+  expect(await lum('.panel.right')).toBeLessThan(0.15);
+  expect(await lum('.toolbar')).toBeLessThan(0.15);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
+  expect(await stored()).toBe('dark');
+
+  // reload → still dark (device setting, not part of the project)
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  expect(await lum('html')).toBeLessThan(0.15);
+
+  // the print sheet stays white in dark mode
+  await page.getByRole('button', { name: 'Export ▾' }).click();
+  await page.getByRole('button', { name: /Plan drucken/ }).click();
+  await expect(page.locator('.print-page')).toBeVisible();
+  expect(await lum('.print-page')).toBeGreaterThan(0.99);
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.locator('.print-page')).toHaveCount(0);
+
+  // Hell wins over a dark system theme
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await panel.getByRole('button', { name: 'Projekt', exact: true }).click();
+  await group.getByRole('button', { name: 'Hell', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  expect(await lum('html')).toBeGreaterThan(0.8);
+  expect(await stored()).toBe('light');
+
+  // System follows the operating system
+  await group.getByRole('button', { name: 'System', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeLessThan(0.15);
+  expect(await stored()).toBeNull();
+  await page.emulateMedia({ colorScheme: 'light' });
+  expect(await lum('html')).toBeGreaterThan(0.8);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeLessThan(0.15);
+
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+
+test('clearances (#50): dimension lines to walls and furniture while dragging an item', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId: string }) => f.catalogId === 'generic-coffee-table');
+  const a = await planToScreen(page, table.x, table.y);
+  const b = await planToScreen(page, table.x - 0.6, table.y);
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move((a.x + b.x) / 2, a.y, { steps: 4 });
+  // while the button is held: lines with cm labels, matching the model for the current position
+  const check = async () => {
+    const lines = plan.locator('[data-testid="clearance"]');
+    await expect(lines.first()).toBeVisible();
+    const shown = await lines.evaluateAll((els) =>
+      els.map((el) => ({ side: el.getAttribute('data-side'), cm: Number(el.getAttribute('data-distance-cm')), text: el.textContent })),
+    );
+    const p = await getProject(page);
+    const expected = furnitureClearances(p, derivePlan(p), table.id).map((c) => ({ side: c.side, cm: Math.round(c.distance * 100), text: clearanceLabel(c.distance) }));
+    expect(expected.length).toBeGreaterThan(0);
+    expect(shown).toEqual(expected);
+    for (const s of shown) expect(s.text).toMatch(/^\d+ cm$/);
+    return shown;
+  };
+  const mid = await check();
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  const end = await check();
+  // the values follow the item live (it moved left: less room on the left)
+  const left = (xs: typeof mid) => xs.find((s) => s.side === 'left')?.cm ?? NaN;
+  expect(left(end)).toBeLessThan(left(mid));
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // Alt held with exactly this item selected shows them again, releasing Alt hides them
+  await page.keyboard.down('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(1);
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(1000);
+  type V = { x: number; y: number; z: number };
+  const camPos = (): Promise<V> =>
+    page.evaluate(() => {
+      const c = (window as any).__wp.three.camera.position;
+      return { x: c.x, y: c.y, z: c.z };
+    });
+  const dist = (a: V, b: V) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const cameraMode = () => page.evaluate(() => (window as any).__wp.useUiStore.getState().cameraMode as string);
+  const menu = page.getByTestId('bookmarks-menu');
+  const toggleMenu = () => menu.getByRole('button', { name: /^Ansichten/ }).click();
+  const saveAs = async (name: string) => {
+    await menu.getByRole('button', { name: 'Aktuelle Ansicht speichern …' }).click();
+    await menu.getByLabel('Name der Ansicht').fill(name);
+    if (name === 'Eingang') await page.screenshot({ path: 'test-results/camera-bookmarks-save-form.png' });
+    await menu.getByRole('button', { name: 'Speichern' }).click();
+  };
+  const zoom = async (dir: 'hinein' | 'heraus', n: number) => {
+    for (let i = 0; i < n; i++) await page.getByRole('button', { name: `Zoom 3D: ${dir}zoomen` }).click();
+    await page.waitForTimeout(600);
+  };
+
+  // change the camera, then save it as "Eingang"
+  await zoom('hinein', 4);
+  const saved = await camPos();
+  await toggleMenu();
+  await expect(menu.getByText('Noch keine Ansicht gespeichert.')).toBeVisible();
+  await saveAs('Eingang');
+  await expect(menu.getByRole('button', { name: /^Eingang/ })).toBeVisible();
+  const bm = (await getProject(page)).cameraBookmarks[0];
+  expect(bm).toMatchObject({ name: 'Eingang', mode: 'orbit', cutaway: false });
+  expect(dist(bm.position, saved)).toBeLessThan(0.01);
+  await page.screenshot({ path: 'test-results/camera-bookmarks-menu.png' });
+
+  // change the camera again; a click on the bookmark brings it back (smooth transition ≈ 0.5 s)
+  await zoom('heraus', 7);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(1);
+  await menu.getByRole('button', { name: /^Eingang/ }).click();
+  await page.waitForTimeout(120);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(0.05); // not a hard cut
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
+
+  // the same with Alt+1 – with reduced motion it jumps immediately
+  await toggleMenu(); // close
+  await zoom('heraus', 7);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(1);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.keyboard.press('Alt+1');
+  await page.waitForTimeout(150);
+  expect(dist(await camPos(), saved)).toBeLessThan(0.05);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  // Alt+1 must not switch the view mode (plain 1 = 2D)
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('3d');
+
+  // walk bookmark: saved in "Begehen", restored from "Übersicht" (mode switches)
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await page.waitForTimeout(800);
+  const startPos = await camPos();
+  // step aside (the walkthrough keeps its position in the camera) and look around
+  await page.evaluate(() => {
+    const c = (window as any).__wp.three.camera;
+    c.position.x += 0.6;
+    c.position.z -= 0.4;
+    (window as any).__wp.walk.look(1.2, -0.1);
+  });
+  await page.waitForTimeout(300);
+  const walkPos = await camPos();
+  expect(dist(walkPos, startPos)).toBeGreaterThan(0.2);
+  await toggleMenu();
+  await saveAs('Flur');
+  const flur = (await getProject(page)).cameraBookmarks[1];
+  expect(flur).toMatchObject({ name: 'Flur', mode: 'walk' });
+  expect(flur.eyeHeight).toBeCloseTo(walkPos.y, 2);
+  await toggleMenu();
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.waitForTimeout(800);
+  expect(dist(await camPos(), walkPos)).toBeGreaterThan(1);
+  await toggleMenu();
+  await menu.getByRole('button', { name: /^Flur/ }).click();
+  await expect.poll(cameraMode).toBe('walk');
+  await expect.poll(async () => dist(await camPos(), walkPos), { timeout: 3000 }).toBeLessThan(0.05);
+  expect(dist(walkPos, startPos)).toBeGreaterThan(0.2);
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.three.camera.rotation.y), { timeout: 3000 }).toBeCloseTo(1.2, 2);
+  // and back to the orbit bookmark with Alt+1
+  await page.keyboard.press('Alt+1');
+  await expect.poll(cameraMode).toBe('orbit');
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
+
+  // rename and delete (one undo step each)
+  await menu.getByRole('button', { name: '„Flur“ umbenennen' }).click();
+  await menu.getByLabel('Neuer Name für „Flur“').fill('Gang');
+  await menu.getByRole('button', { name: 'OK' }).click();
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toBeVisible();
+  await menu.getByRole('button', { name: '„Gang“ löschen' }).click();
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toBeVisible();
+
+  // kept in the project after a reload
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).cameraBookmarks.map((b: { name: string }) => b.name)).toEqual(['Eingang', 'Gang']);
+  await page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Ansichten/ }).click();
+  await expect(page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Eingang/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

@@ -1407,6 +1407,8 @@ code {
   margin: 0 auto;
   background: #ffffff;
   color: #111827;
+  /* bleibt hell, auch im Dunkelmodus (#73) */
+  color-scheme: light;
   box-shadow: var(--shadow-lg);
   padding: 10mm;
   width: 210mm;
@@ -1416,6 +1418,10 @@ code {
 .print-page.landscape {
   width: 297mm;
   min-height: 210mm;
+}
+/* Nebentext auf dem Blatt: fester Grauton statt UI-Token, damit er im Dunkelmodus nicht hell auf Weiß wird (#73) */
+.print-page .muted {
+  color: #636b78;
 }
 .print-header {
   display: flex;
@@ -1538,4 +1544,89 @@ code {
   margin: 8px 0 4px;
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+/* Kamera-Lesezeichen „Ansichten“ in der 3D-Ansicht (#55) */
+.bookmarks-menu {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  font-size: var(--font-size-md);
+}
+.bookmarks-menu > button {
+  background: var(--color-surface-floating);
+  box-shadow: var(--shadow-md);
+}
+.bookmarks-popover {
+  width: min(300px, calc(100vw - 2 * var(--space-6)));
+  max-height: min(420px, 60vh);
+  overflow: auto;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.bookmarks-popover .bookmarks-save {
+  margin-top: 0;
+}
+.bookmarks-form {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  width: 100%;
+}
+.bookmarks-form input {
+  flex: 1;
+  min-width: 0;
+}
+.bookmarks-empty {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.bookmarks-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.bookmarks-list li {
+  display: flex;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+.bookmarks-jump {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0);
+  text-align: left;
+}
+.bookmarks-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bookmarks-meta {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.bookmarks-icon {
+  width: 30px;
+  padding: 0;
 }
