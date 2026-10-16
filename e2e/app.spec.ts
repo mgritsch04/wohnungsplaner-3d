@@ -1210,6 +1210,65 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
   expect(errors).toEqual([]);
 });
 
+test('walk look: a single huge pointer-lock delta does not flip the view; editing while walking keeps the view (#142)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  // start the walk in the second room, so a reset to the default start would be visible
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    wp.useUiStore.getState().setSelection({ type: 'room', id: wp.useProjectStore.getState().project.rooms[1].id });
+  });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await page.waitForTimeout(800);
+  const camYaw = () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    page.evaluate(() => (window as any).__wp.three.camera.rotation.y as number);
+  await page.evaluate(() => {
+    const canvas = document.querySelector('[data-testid="scene3d"] canvas');
+    Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
+  });
+  const y0 = await camYaw();
+  // slow look to the left with one spurious 1400 px event in between (≈ 175° at the default speed)
+  await page.evaluate(() => {
+    for (const dx of [4, 5, 4, 1400, 5, 4, 4]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
+  });
+  await page.waitForTimeout(300);
+  const turned = Math.abs((await camYaw()) - y0);
+  expect(turned).toBeCloseTo(26 * 0.0022, 3); // only the small moves count
+  // a real fast move (several large events in a row) still turns the view
+  await page.evaluate(() => {
+    for (const dx of [250, 260, 270]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
+  });
+  await page.waitForTimeout(300);
+  expect(Math.abs((await camYaw()) - y0)).toBeGreaterThan(turned + 500 * 0.0022);
+
+  // a change to the plan while walking (here: selection cleared, a door opened) keeps position and view direction
+  const pose = () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    page.evaluate(() => { const c = (window as any).__wp.three.camera; return { x: c.position.x, z: c.position.z, yaw: c.rotation.y }; });
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('KeyW');
+  const before = await pose();
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    wp.useUiStore.getState().setSelection(null);
+    const st = wp.useProjectStore.getState();
+    const door = st.project.openings.find((o: { kind: string }) => o.kind === 'door');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    st.apply((d: any) => { const o = d.openings.find((x: { id: string }) => x.id === door.id); o.open = !o.open; });
+  });
+  await page.waitForTimeout(400);
+  const after = await pose();
+  expect(after.yaw).toBeCloseTo(before.yaw, 3);
+  expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeLessThan(0.01);
+  await page.evaluate(() => delete (document as unknown as Record<string, unknown>).pointerLockElement);
+  expect(errors).toEqual([]);
+});
+
 test('product list + .glb files chosen together: models attached, missing ones reported, placed with real model', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);

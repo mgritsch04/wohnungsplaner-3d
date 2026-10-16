@@ -176,13 +176,15 @@ function SceneContent({
     setPickClipping(gl.clippingPlanes);
   }, [gl, cutaway, cameraMode]);
 
-  // walk start: center of the selected room, else of the first room, else bounds center
+  // walk start: center of the selected room, else of the first room, else bounds center.
+  // Fixed when the walk begins (or another project is opened): edits while walking (opening a
+  // door, selecting furniture) must not move the walker back to the start and reset the view (#142)
   const walkStart = useMemo(() => {
     const roomId = selection?.type === 'room' ? selection.id : project.rooms[0]?.id;
     const g = roomId ? derived.rooms.get(roomId) : undefined;
     return g ? g.centroid : center;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraMode, derived]);
+  }, [cameraMode, project.id]);
 
   const beginTx = useProjectStore((s) => s.beginTransaction);
   const updateTx = useProjectStore((s) => s.updateTransient);
