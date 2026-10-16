@@ -46,18 +46,38 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `user-test` | `[USERTEST]`-Issue: manuelle Prüfung durch dich offen |
 | `needs-fix` | dein User-Test ist fehlgeschlagen (Issue bleibt offen) |
 | `done` | vollständig abgeschlossen (bei User-Tests: von dir bestanden) |
+| `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
+
+Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
 
 **Ablauf je Durchlauf der Hauptsession (ohne konkreten Auftrag)**
 1. `git status`/`git fetch` prüfen; fremde uncommittete Änderungen nie überschreiben.
 2. Offene `user-test`-Issues auf neue Kommentare prüfen: `BESTANDEN` → Abnahme in `PROJECT_STATUS.md` vermerken, Label `done`, Issue schließen. `FEHLGESCHLAGEN` → Label `needs-fix`, Ursache suchen, beheben, danach im Issue um erneuten Test bitten (Label wieder `user-test`). Ein fehlgeschlagener Test wird nie als bestanden markiert.
-3. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
-4. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
-5. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue.
-6. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
+3. Offene `user-task`-Issues auf Antworten prüfen und umsetzen (z. B. Freigabe → Aufgabe von `Blocked` nach `Ready`); erledigte schließen.
+4. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
+5. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
+6. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue.
+7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
+8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
 
 **Statusbegriffe (Projektstatus):** implementiert · automatisiert getestet · User-Test offen (#Issue) · vom Nutzer bestätigt (Datum) · fehlgeschlagen/Nachbesserung (#Issue) · blockiert. „Done“ im Backlog bedeutet **nicht** automatisch „von dir bestätigt“.
 
 Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nächsten Durchlauf gelesen.
+
+## Modellwahl (#18)
+Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kontingent zu schonen.
+
+| Aufgabentyp | Modell |
+|---|---|
+| Doku-Pflege, Issue-Housekeeping, Labels, Formatierung, einfache Textänderungen | Haiku |
+| normale Feature-Arbeit (UI, Komponenten), Tests, übliche Fehlersuche, Recherche im Code | Sonnet |
+| Kern-Geometrie/Datenmodell (`src/model`, `derivePlan()`, Kollision/Platzierung, Schema-Migrationen), schwierige Fehlersuche (z. B. Rendering-Ursachen), Entscheidungen mit weitreichenden Folgen | Opus |
+
+**Was tatsächlich steuerbar ist:**
+- Eine laufende Sitzung kann ihr **eigenes** Modell nicht selbst wechseln; das Modell wird beim Start festgelegt (bei dir: Modellauswahl bzw. `/model`, bei Routinen in deren Einstellungen).
+- Die Hauptsession **delegiert** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
+- **Routine:** Für einen Lauf mit höchstens einer Aufgabe reicht meist Sonnet. Du kannst das Modell der Routine unter https://claude.ai/code/routines einstellen; die Hauptsession ändert es nicht eigenmächtig.
+- Scheitert eine Aufgabe mit dem kleineren Modell (Tests rot, Ursache unklar), wird sie mit Begründung im Issue an das nächsthöhere Modell bzw. eine von dir gestartete Opus-Sitzung übergeben.
 
 ## Geplante Durchläufe (Routine)
 - Offizielle Funktion: Claude-Code-**Routines** (Research Preview, auch Pro) starten eine neue Cloud-Session nach Zeitplan, frühestens stündlich. Läufe zählen gegen dein Nutzungskontingent. Ist das Limit erreicht, werden Läufe **abgelehnt** (nicht nachgeholt); der nächste planmäßige Lauf nach dem Zurücksetzen startet normal. Zusatznutzung nur, wenn du „usage credits“ selbst einschaltest. Quelle: https://code.claude.com/docs/en/routines (abgerufen 2026-10-16).

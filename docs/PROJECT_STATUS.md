@@ -5,8 +5,9 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** einheitliches Kollisionssystem (#4) → User-Test #16
-- **Nächster Schritt:** höchste `Ready`-Aufgabe in [`IDEAS.md`](IDEAS.md) (Nachtbeleuchtung #7)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Deine Aufgaben:** #27 IKEA-Küche · #28 Smart-Home-Entscheidungen · #29 Gamepad (Label `user-task`)
+- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Drehen & Objektinteraktion #5)
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
@@ -20,7 +21,10 @@ Status je Aufgabe: implementiert · automatisiert getestet · User-Test offen (#
 | Aufgabe | Implementiert | Automatisiert getestet | Abnahme |
 |---|---|---|---|
 | Issue-Workflow, Labels, Vorlagen, Ideen-Erfassung | ✅ `DEVELOPMENT_WORKFLOW.md`, `IDEA_CAPTURE.md`, `.github/ISSUE_TEMPLATE/` | – | – |
+| Backlog als Tabelle, `user-task`-Issues #27–#29, Modellwahl-Regel (#15, #18) | ✅ `IDEAS.md`, `DEVELOPMENT_WORKFLOW.md` | – | – |
 | A Kollisionssystem (#4): eine Regel für 2D/3D/Ziehen/Platzieren; Möbel-Überschneidung = Fehler (rot) und blockiert das Ziehen; erlaubt: Teppich/Vorhang, Stuhl unter Tisch/Schreibtisch, Kücheneinbauten; Tischlampe/Deko stellt sich beim Ziehen auf Tisch/Kommode; Warnung (orange) bei zu wenig Platz vor Schrank-/Schubladenfronten. Regeln: `src/model/placementRules.ts` | ✅ | ✅ Unit (Lampe im Sofa, Stuhl/Tisch/Teppich/Tischlampe ohne Konflikt, Stapeln, Ziehen stoppt am Sofa, Frontabstand, Küchenzeile) + E2E (3D-Marker Lampe/Sofa, 2D-Ziehen stoppt) | 🧪 User-Test offen #16 (nicht visuell von mir bewertet) |
+| D Nachtbeleuchtung (#7): **Ursache** – Licht ab ~20:45 auf Nachtwerte gesättigt (21:00 = 23:30), Belichtung nachts ×1,5, hohe Mindestwerte für Umgebungs-/Himmelslicht, Automatik-Raumlichter immer an. **Jetzt** Dunkelwerden bis ~22:30, Mondlicht-Niveau, Belichtung nur ×1,12; Schalter „Lampen: automatisch/an/aus“ für Steh-/Tischlampen, platzierte Leuchten und Raumlicht; Raumlicht-Reichweite an Raumgröße | ✅ | ✅ Unit (Lichtwerte 19:30–22:00 fallend, Lampenstufen, Schema-Default) + E2E mit gemessener Bildhelligkeit (vorher 13:00/21:00/23:30 = 206/109/109, nachher 206/34/18, Lampen aus 10) | 🧪 #25 · Bilder von mir angesehen (Cloud-Browser, Software-Rendering) |
+| F Möbelix-Produkttyp (#8): **Ursache** – Dialog übernahm die Kategorie nie aus der Seite (fest „Schränke & Regale“ → Form Regal); bei mehreren Produkten wurde das erste genommen. **Jetzt** Typ aus Name + schema.org-Kategorie + Breadcrumb (`src/catalog/providers/classify.ts`), Anzeige sicher/unsicher/nicht erkannt, ohne Erkennung muss gewählt werden; Sessel → Sessel-Form; Hauptprodukt über Seitenadresse/Überschrift | ✅ | ✅ Unit (18 Typen, Widerspruch, Breadcrumb, Empfehlung vor Hauptprodukt) + E2E (Sessel über Breadcrumb, unbekannter Typ sperrt „Hinzufügen“) – nur synthetische Seiten | 🧪 #26 (braucht echten Möbelix-Quelltext von dir) |
 
 ## Diese Runde (Arbeitsauftrag 1–8)
 
@@ -71,7 +75,7 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 | Gamepad | PLANNED (wartet auf Freigabe) | Bewertung `CONTROLLER_ASSESSMENT.md` | – | – | – |
 | Küchenplaner, Budget, CSV | NEEDS USER TEST / DONE | ✅ | ✅ | ✅ | – |
 
-**Von dir bestätigt (Rückmeldung 2026-10-16):** Mausempfindlichkeit, Klick/Ziehen/Auswahl, Wandfang und Ecken, 2D/3D-Synchronisierung, manueller GLB-Download/-Import. **Nicht bestanden / Nachbesserung:** Kollisionen (#4 → #16), Nachtwirkung der Tageszeit (#7).
+**Von dir bestätigt (Rückmeldung 2026-10-16):** Mausempfindlichkeit, Klick/Ziehen/Auswahl, Wandfang und Ecken, 2D/3D-Synchronisierung, manueller GLB-Download/-Import. **Nicht bestanden / Nachbesserung:** Kollisionen (#4 → nachgebessert, Test #16), Nachtwirkung der Tageszeit (#7 → nachgebessert, Test #25).
 
 ## Automatische Prüfungen (letzter Lauf, siehe Git-Abschnitt)
 - `tsc -b`, `eslint`, `vite build`: ✅
@@ -80,6 +84,8 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 ## Wartet auf deinen Test
 Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …`):
 - #16 Kollisionen (Lampe/Sofa, Stuhl unter Tisch, Lampe auf Tisch, Platz vor Schranktüren)
+- #25 Nachtbeleuchtung (Abend, Nacht, Lampen an/aus)
+- #26 Möbelix: richtiger Produkttyp (mit echtem Seitenquelltext)
 - #11 Projekt speichern / erneut öffnen
 - #12 IKEA: Artikelliste → Produktliste, PAX-Planung
 
@@ -93,6 +99,7 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 - **Allgemeiner Website-/Quelltext-Import (zurückgestellt, Aufgabe 8):** zuverlässig nur bei Seiten mit schema.org-Daten (JSON-LD/Microdata/Meta). Bei per JavaScript nachgeladenen Shops enthält der Quelltext oft keine Produktdaten; reiner Seitentext liefert nur Maße (heuristisch, kann Zusatzmaße wie Sitzhöhe verwechseln); mehrere Produkte auf einer Seite → das erste wird genommen; die App ruft Seiten nie selbst ab (CORS). Wird nach den Händler-/Planer-Themen überarbeitet.
 - Kollision nutzt die Außenmaße (Quader) der Möbel – auch bei importierten Modellen; Hohlräume (z. B. unter einem Bett) werden nicht berücksichtigt.
 - Erkennung nur für achsparallele, gefüllte Wände.
+- Lampen- und Raumlicht wirft keine Schatten; etwas Licht scheint durch Wände (z. B. auf den Boden vor der Wohnung).
 - 3D-Leistung auf echter GPU nicht gemessen (Cloud: Software-Rendering).
 - Speicherung browserlokal (Export als Projektpaket für andere Geräte).
 
