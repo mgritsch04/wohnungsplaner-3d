@@ -2471,3 +2471,47 @@ test('empty project: start card with first steps, "Raum zeichnen" picks the tool
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('sight lines: from the entrance, draggable viewpoint updates the visible area, can be switched off (#89)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const right = page.locator('.panel.right');
+  await right.getByRole('button', { name: 'Projekt', exact: true }).click();
+  await right.getByLabel('Sichtlinien anzeigen').check();
+
+  const plan = page.locator('[data-testid="editor2d"]');
+  const sight = plan.getByTestId('sightlines');
+  await expect(sight).toBeVisible();
+  await expect(plan.getByTestId('sight-visible')).toBeVisible();
+  const share0 = Number(await sight.getAttribute('data-share'));
+  expect(share0).toBeGreaterThan(0.1);
+  expect(share0).toBeLessThan(1);
+  await expect(right.getByTestId('sight-share-panel')).toContainText(`${Math.round(share0 * 100)} %`);
+  // default viewpoint: just inside the entrance door (living room, south wall)
+  const vp = plan.getByTestId('sight-viewpoint');
+  const x0 = Number(await vp.getAttribute('data-x'));
+  const y0 = Number(await vp.getAttribute('data-y'));
+  expect(y0).toBeCloseTo(3.7, 1);
+
+  // drag the viewpoint into the bedroom: the visible area changes, nothing gets selected
+  const from = await planToScreen(page, x0, y0);
+  const to = await planToScreen(page, 7.2, 2.8);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 5 });
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await vp.getAttribute('data-x'))).toBeGreaterThan(6.5);
+  const share1 = Number(await sight.getAttribute('data-share'));
+  expect(Math.abs(share1 - share0)).toBeGreaterThan(0.05);
+  expect(await getSelection(page)).toBeNull();
+  // back to the entrance
+  await right.getByRole('button', { name: 'Blickpunkt auf den Eingang zurücksetzen' }).click();
+  await expect.poll(async () => Number(await vp.getAttribute('data-y'))).toBeCloseTo(3.7, 1);
+
+  await right.getByLabel('Sichtlinien anzeigen').uncheck();
+  await expect(plan.getByTestId('sightlines')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
