@@ -1407,6 +1407,8 @@ code {
   margin: 0 auto;
   background: #ffffff;
   color: #111827;
+  /* bleibt hell, auch im Dunkelmodus (#73) */
+  color-scheme: light;
   box-shadow: var(--shadow-lg);
   padding: 10mm;
   width: 210mm;
@@ -1416,6 +1418,10 @@ code {
 .print-page.landscape {
   width: 297mm;
   min-height: 210mm;
+}
+/* Nebentext auf dem Blatt: fester Grauton statt UI-Token, damit er im Dunkelmodus nicht hell auf Weiß wird (#73) */
+.print-page .muted {
+  color: #636b78;
 }
 .print-header {
   display: flex;
