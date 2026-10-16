@@ -10,9 +10,9 @@ import { doorSymbol } from '../editor2d/openingSymbols';
 import { furnitureCorners, footprintsOverlap } from '../editor2d/furnitureGeometry';
 import type { DerivedPlan } from './derived';
 import type { Furniture, Project } from './schema';
-import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid, scale, signedArea, sub, type Vec2 } from './vec';
+import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid, rotate, scale, signedArea, sub, type Vec2 } from './vec';
 import { normalizeAngle } from './units';
-import { frontClearance, isRug, isStackable, isSurface, pairRule } from './placementRules';
+import { frontClearance, isRug, isStackable, isSurface, pairRule, seatAndTable, seatBackDepth } from './placementRules';
 import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
 
 export interface Obstacle {
@@ -22,6 +22,23 @@ export interface Obstacle {
   /** 'door-leaf' = an opened door leaf or window sash (#21). */
   kind: 'wall' | 'door-leaf' | 'furniture';
   refId: string;
+  /**
+   * Chair under a table (#16): only the rear `seatBack` metres of the moving item's footprint
+   * (its backrest) count against this obstacle – the seat may go under the table top.
+   */
+  seatBack?: number;
+}
+
+/** Rear strip of depth `back` of an item's footprint (local −y side, the backrest of a chair). */
+export function backStripCorners(f: Pick<Furniture, 'x' | 'y' | 'width' | 'depth' | 'rotation'>, back: number): Vec2[] {
+  const b = Math.min(back, f.depth);
+  const c = add({ x: f.x, y: f.y }, rotate({ x: 0, y: -f.depth / 2 + b / 2 }, f.rotation));
+  return furnitureCorners({ x: c.x, y: c.y, width: f.width, depth: b, rotation: f.rotation });
+}
+
+/** The part of the moving item's footprint `fc` that is tested against obstacle `o`. */
+export function probeCorners(pose: Pick<Furniture, 'x' | 'y' | 'width' | 'depth' | 'rotation'>, o: Obstacle, fc: Vec2[]): Vec2[] {
+  return o.seatBack ? backStripCorners(pose, o.seatBack) : fc;
 }
 
 export function buildPlacementObstacles(d: DerivedPlan): Obstacle[] {
@@ -89,7 +106,11 @@ function boxesOverlap(fc: Vec2[], o: Obstacle): boolean {
 
 export function collidingObstacles(pose: Pose, obstacles: Obstacle[]): Obstacle[] {
   const fc = furnitureCorners(pose);
-  return obstacles.filter((o) => heightOverlap(pose, o) && boxesOverlap(fc, o) && footprintsOverlap(fc, o.polygon, 1e-4));
+  return obstacles.filter((o) => {
+    if (!heightOverlap(pose, o)) return false;
+    const pc = probeCorners(pose, o, fc);
+    return boxesOverlap(pc, o) && footprintsOverlap(pc, o.polygon, 1e-4);
+  });
 }
 
 const boundsCache = new WeakMap<Obstacle, { minX: number; maxX: number; minY: number; maxY: number; thickness: number }>();
@@ -122,8 +143,9 @@ function resolve(pose: Pose, obstacles: Obstacle[]): Pose {
     let moved = false;
     let fc = furnitureCorners(p);
     for (const o of obstacles) {
-      if (!heightOverlap(p, o) || !boxesOverlap(fc, o)) continue;
-      const m = mtv(fc, o.polygon);
+      const pc = probeCorners(p, o, fc);
+      if (!heightOverlap(p, o) || !boxesOverlap(pc, o)) continue;
+      const m = mtv(pc, o.polygon);
       if (!m) continue;
       p = { ...p, x: p.x + m.x, y: p.y + m.y };
       fc = furnitureCorners(p);
@@ -293,6 +315,8 @@ export interface CollisionRegion {
 export interface PlacementIssue {
   kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance';
   message: string;
+  /** Short reason why the item is marked, e.g. „ragt in die Wand“, „überlappt mit „Sofa““ (#16). */
+  short: string;
   refId?: string;
   /** Where the item intersects the obstacle (footprint ∩ obstacle, common height range). */
   region?: CollisionRegion;
@@ -303,7 +327,8 @@ export interface PlacementIssue {
 /**
  * Real intersections (wall, door leaf, other furniture) are errors; door swing,
  * outside the room and missing space in front of doors/drawers are warnings.
- * Intended combinations (rug, chair under table, kitchen inserts) are no issue at all.
+ * Intended combinations (rug, chair under table, kitchen inserts) are no issue at all – for a
+ * chair under a table only as long as its backrest stays out of the table (#16).
  */
 export function issueLevel(kind: PlacementIssue['kind']): 'error' | 'warn' | 'info' {
   return kind === 'wall' || kind === 'door-leaf' || kind === 'overlap' ? 'error' : 'warn';
@@ -397,10 +422,11 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
     const region = intersection(item, fc, culprit);
     issues.push(
       o.kind === 'wall'
-        ? { kind: 'wall', message: 'Ragt in eine Wand.', refId: o.refId, region, culprit }
+        ? { kind: 'wall', message: 'Ragt in eine Wand.', short: 'ragt in die Wand', refId: o.refId, region, culprit }
         : {
             kind: 'door-leaf',
             message: `Steht im geöffneten ${p.openings.find((x) => x.id === o.refId)?.kind === 'window' ? 'Fensterflügel' : 'Türblatt'} – ${describeOpening(p, d, o.refId)}.`,
+            short: `steht im geöffneten ${p.openings.find((x) => x.id === o.refId)?.kind === 'window' ? 'Fensterflügel' : 'Türblatt'}`,
             refId: o.refId,
             region,
             culprit,
@@ -414,6 +440,7 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
         issues.push({
           kind: 'door-swing',
           message: `Blockiert den Türaufschlag – ${describeOpening(p, d, s.openingId)} lässt sich nicht ganz öffnen.`,
+          short: 'blockiert den Türaufschlag',
           refId: s.openingId,
           region: intersection(item, fc, culprit),
           culprit,
@@ -428,15 +455,39 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
     const inAny = rooms.some((g) => inset.every((c) => pointInPolygon(c, g.interior)) || polygonArea(g.interior) < 0.01);
     const center = { x: item.x, y: item.y };
     const centerIn = rooms.some((g) => pointInPolygon(center, g.interior));
-    if (!inAny && !issues.some((i) => i.kind === 'wall')) issues.push({ kind: 'outside', message: centerIn ? 'Ragt aus dem Raum hinaus.' : 'Steht außerhalb der Räume.' });
+    if (!inAny && !issues.some((i) => i.kind === 'wall'))
+      issues.push(centerIn ? { kind: 'outside', message: 'Ragt aus dem Raum hinaus.', short: 'ragt aus dem Raum' } : { kind: 'outside', message: 'Steht außerhalb der Räume.', short: 'steht außerhalb der Räume' });
   }
   for (const o of p.furniture) {
-    if (o.id === item.id || pairRule(item, o).allowed) continue;
+    if (o.id === item.id) continue;
     if (Math.min(o.elevation + o.height, item.elevation + item.height) - Math.max(o.elevation, item.elevation) <= 0.005) continue;
+    const st = seatAndTable(item, o);
+    if (st) {
+      // chair under table (#16): the seat may go under the table top, the backrest may not
+      const back = seatBackDepth(st.seat);
+      if (back <= 0) continue;
+      const strip = backStripCorners(st.seat, back);
+      const tc = furnitureCorners(st.table);
+      if (!footprintsOverlap(strip, tc, 0.003)) continue;
+      const culprit = st.seat === item ? { polygon: tc, z0: o.elevation, z1: o.elevation + o.height } : { polygon: strip, z0: o.elevation, z1: o.elevation + o.height };
+      issues.push({
+        kind: 'overlap',
+        message:
+          st.seat === item
+            ? `Die Lehne steht in „${o.name}“ – nur die Sitzfläche passt unter die Tischplatte.`
+            : `„${o.name}“ steht mit der Lehne im Tisch – nur die Sitzfläche passt unter die Tischplatte.`,
+        short: st.seat === item ? `Lehne steht in „${o.name}“` : `Lehne von „${o.name}“ steht im Tisch`,
+        refId: o.id,
+        region: intersection(item, st.seat === item ? strip : fc, culprit),
+        culprit,
+      });
+      continue;
+    }
+    if (pairRule(item, o).allowed) continue;
     const oc = furnitureCorners(o);
     if (footprintsOverlap(fc, oc, 0.003)) {
       const culprit = { polygon: oc, z0: o.elevation, z1: o.elevation + o.height };
-      issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, refId: o.id, region: intersection(item, fc, culprit), culprit });
+      issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, short: `überlappt mit „${o.name}“`, refId: o.id, region: intersection(item, fc, culprit), culprit });
     }
   }
   // doors/drawers need free space in front of the item
@@ -453,6 +504,7 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
       issues.push({
         kind: 'clearance',
         message: `Vor „${item.name}“ sind nur ${Math.max(0, Math.round(free * 100))} cm frei – Türen/Schubladen brauchen etwa ${Math.round(need * 100)} cm („${o.name}“ steht im Weg).`,
+        short: `zu wenig Platz vor den Türen („${o.name}“ im Weg)`,
         refId: o.id,
         region: intersection(item, oc, culprit),
         culprit,
@@ -493,6 +545,18 @@ export function furnitureConflicts(p: Project, d: DerivedPlan, obstacles: Obstac
     m.set(f.id, { level: issues.some((i) => issueLevel(i.kind) === 'error') ? 'error' : 'warn', issues });
   }
   return m;
+}
+
+/**
+ * Why an item is marked (#16): „Rot markiert: ragt in die Wand · überlappt mit „Sofa““ – one
+ * line for the properties panel and the hover card. Null when nothing is marked.
+ */
+export function conflictSummary(issues: PlacementIssue[]): { level: 'error' | 'warn'; label: string; reasons: string[] } | null {
+  const marked = issues.filter((i) => issueLevel(i.kind) !== 'info');
+  if (!marked.length) return null;
+  const level = marked.some((i) => issueLevel(i.kind) === 'error') ? 'error' : 'warn';
+  const reasons = [...new Set(marked.map((i) => i.short))];
+  return { level, label: level === 'error' ? 'Rot markiert' : 'Orange markiert', reasons };
 }
 
 /** Centre of a region (for labels/markers). */
@@ -595,9 +659,22 @@ export function rotateFurnitureTo(d: Project, derived: DerivedPlan, obstacles: O
 
 /** Other furniture the item must not move into (intended combinations excluded). */
 export function furnitureObstacles(d: Project, item: Furniture): Obstacle[] {
-  return d.furniture
-    .filter((o) => o.id !== item.id && !pairRule(item, o).allowed)
-    .map((o) => ({ polygon: furnitureCorners(o), z0: o.elevation, z1: o.elevation + o.height, kind: 'furniture' as const, refId: o.id }));
+  const out: Obstacle[] = [];
+  for (const o of d.furniture) {
+    if (o.id === item.id) continue;
+    const st = seatAndTable(item, o);
+    if (st) {
+      // chair under table (#16): only the backrest stops at the table edge
+      const back = seatBackDepth(st.seat);
+      if (back <= 0) continue;
+      if (st.seat === item) out.push({ polygon: furnitureCorners(o), z0: o.elevation, z1: o.elevation + o.height, kind: 'furniture', refId: o.id, seatBack: back });
+      else out.push({ polygon: backStripCorners(o, back), z0: o.elevation, z1: o.elevation + o.height, kind: 'furniture', refId: o.id });
+      continue;
+    }
+    if (pairRule(item, o).allowed) continue;
+    out.push({ polygon: furnitureCorners(o), z0: o.elevation, z1: o.elevation + o.height, kind: 'furniture', refId: o.id });
+  }
+  return out;
 }
 
 /** Height of the highest surface (table, cabinet …) under point `p`, or 0 (floor). */

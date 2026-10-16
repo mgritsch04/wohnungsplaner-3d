@@ -21,6 +21,34 @@ const isTableLike = (f: Item) => f.category === 'table' || f.category === 'desk'
 const KITCHEN_INSERTS = new Set(['countertop', 'cooktop', 'hood']);
 const isKitchenInsert = (f: Item) => !!f.kitchen && KITCHEN_INSERTS.has(f.kitchen.type);
 
+/**
+ * Chair under a table (#16): the seat may go under the table top, the backrest stops at the
+ * table edge. Returns the depth (m) of the rear strip of a seat's footprint – its backrest –
+ * that must stay clear of tables. The catalogue only stores bounding boxes, so the value comes
+ * from the 3D model the app draws (`ProceduralModel.tsx`), where that is known:
+ * - stool (no backrest): 0 – it may stand completely under the table;
+ * - 'chair': 3.5 cm – backrest board (3 cm) and its posts (up to 3.5 cm from the rear edge);
+ * - 'office-chair': 19 % of the depth – the backrest's front face lies at −0.62 × half the depth;
+ * - anything else (imported models, unknown shapes): an assumed 20 % of the depth – about the
+ *   share of the office chair, the larger of the two modelled backrests, so an unknown chair
+ *   rather stops a little early than disappears in the table.
+ */
+export function seatBackDepth(f: Pick<Furniture, 'depth' | 'model'>): number {
+  if (f.model.type === 'procedural') {
+    if (f.model.shape === 'stool') return 0;
+    if (f.model.shape === 'chair') return Math.min(0.035, f.depth);
+    if (f.model.shape === 'office-chair') return 0.19 * f.depth;
+  }
+  return 0.2 * f.depth;
+}
+
+/** The seat and the table of a chair-under-table pair (in either order), or null. */
+export function seatAndTable<T extends Item>(a: T, b: T): { seat: T; table: T } | null {
+  if (isSeat(a) && isTableLike(b)) return { seat: a, table: b };
+  if (isSeat(b) && isTableLike(a)) return { seat: b, table: a };
+  return null;
+}
+
 export interface PairRule {
   allowed: boolean;
   /** why the overlap is fine (for tooltips/docs) */
@@ -30,7 +58,8 @@ export interface PairRule {
 /** May `a` and `b` overlap in plan and height? */
 export function pairRule(a: Item, b: Item): PairRule {
   if (isTextile(a) || isTextile(b)) return { allowed: true, reason: 'Teppich/Vorhang' };
-  if ((isSeat(a) && isTableLike(b)) || (isSeat(b) && isTableLike(a))) return { allowed: true, reason: 'Stuhl unter Tisch' };
+  // only the seat: the backrest must stay out of the table (`seatBackDepth`, checked in placement.ts)
+  if (seatAndTable(a, b)) return { allowed: true, reason: 'Stuhl unter Tisch' };
   if ((a.kitchen || b.kitchen) && (isKitchenInsert(a) || isKitchenInsert(b))) return { allowed: true, reason: 'Kücheneinbau' };
   return { allowed: false };
 }

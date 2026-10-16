@@ -12,7 +12,7 @@ import { useWalkPose } from '../store/walkPoseStore';
 import type { Vec2 } from '../model/vec';
 import { toggleOpening } from '../ui/actions';
 import { registerWalkRig } from './cameraBookmarks';
-import { goalEyeHeight } from './walkPosture';
+import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
 
 interface Props {
   derived: DerivedPlan;
@@ -30,7 +30,7 @@ interface Props {
  * First-person walkthrough: WASD/arrow keys to move, mouse to look (pointer lock),
  * Shift to walk faster, Escape releases the mouse. Collides with walls (open door
  * openings stay passable, closed doors not) and solid furniture; height is fixed at
- * eye level. Click/O at the crosshair opens or closes a door or window (#21).
+ * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -41,8 +41,6 @@ const PICK_RANGE = 6;
 const CARRY_MIN = 1.1;
 const CARRY_MAX = 4;
 const CENTER = new THREE.Vector2(0, 0);
-/** Crouching (C held, #20): eye height factor, minimum eye height (m), walking speed factor. */
-const DUCK_SPEED = 0.5;
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
 function furnitureIdOf(o: THREE.Object3D | null): string | null {
@@ -136,7 +134,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       const o = aimed();
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
-    /** O: open/close the door/window in sight, else the selected one. */
+    /** E/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
       if (carry.current) return;
       const sel = useUiStore.getState().selection;
@@ -180,13 +178,19 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         toggleCarry();
         return;
       }
+      if (e.code === 'KeyC' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // crouch / stand up again (#47: toggle instead of holding); ignored while seated
+        useUiStore.getState().toggleWalkDuck();
+        return;
+      }
       if (e.code === 'KeyX' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // stand / sit (#78) – takes effect immediately, without leaving the walkthrough
+        // stand / sit (#78) – takes effect immediately, without leaving the walkthrough; ends crouching
         const ui = useUiStore.getState();
         ui.setWalkSit(!ui.walkSit);
         return;
       }
-      if (e.code === 'KeyO' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // E (#107) or O: open/close the door or window in sight
         toggleAimedOpening();
         return;
       }
@@ -303,10 +307,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
-    // crouch while C is held, sit with X (#78): move the eyes smoothly (frame-rate independent); seated, C is ignored
+    // crouch toggled with C (#47), sit with X (#78): move the eyes smoothly (frame-rate independent); seated, C is ignored
     const seated = useUiStore.getState().walkSit;
-    const ducking = !seated && keys.current.has('KeyC');
-    if (ducking !== useUiStore.getState().walkDuck) useUiStore.getState().setWalkDuck(ducking);
+    const ducking = !seated && useUiStore.getState().walkDuck;
     const goalEye = goalEyeHeight({ eye: eyeRef.current, sitEye: sitEyeRef.current, sitting: seated, ducking });
     eyeNow.current = eyeNow.current === null ? goalEye : eyeNow.current + (goalEye - eyeNow.current) * (1 - Math.exp(-dt / 0.08));
     if (Math.abs(eyeNow.current - goalEye) < 0.001) eyeNow.current = goalEye;
@@ -337,7 +340,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     forward.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     right.set(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
     const len = Math.hypot(fx, fz);
-    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * (ducking || seated ? DUCK_SPEED : 1) * dt) / len;
+    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * walkSpeedFactor({ sitting: seated, ducking }) * dt) / len;
     // sub-steps prevent tunnelling through thin walls at high speed
     const steps = Math.max(1, Math.ceil(v / 0.05));
     let p = { x: camera.position.x, y: camera.position.z };

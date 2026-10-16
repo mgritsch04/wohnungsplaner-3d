@@ -23,6 +23,9 @@
  * - Furniture whose footprint overlaps the item is skipped (intended overlaps such
  *   as chair under table, or a conflict that is marked separately).
  *
+ * Multi-selections and furniture groups (#94) are measured as a whole from their shared
+ * outline (`selectionClearances`); the selected items do not block each other.
+ *
  * Results below `minDistance` (touching, default 5 mm) or above `maxDistance`
  * (default 3 m) and directions without a hit are left out.
  */
@@ -30,7 +33,7 @@ import { footprintsOverlap, furnitureCorners } from '../editor2d/furnitureGeomet
 import type { DerivedPlan } from './derived';
 import { isTextile } from './placementRules';
 import type { Furniture, Project } from './schema';
-import { add, closestPointOnSegment, dist, normalize, perp, rotate, scale, sub, type Vec2 } from './vec';
+import { add, boundsOf, closestPointOnSegment, dist, normalize, perp, rotate, scale, sub, type Vec2 } from './vec';
 
 export type ClearanceSide = 'left' | 'right' | 'back' | 'front';
 
@@ -155,13 +158,24 @@ function sweep(xs: number[], ys: number[], axis: 0 | 1, sign: number, ha: number
   }
 }
 
-function candidates(project: Project, derived: DerivedPlan, item: Furniture): Candidate[] {
+/** The measured outline: one item, or the shared outline of a selection (#94). */
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  rotation: number;
+  elevation: number;
+  height: number;
+}
+
+function candidates(project: Project, derived: DerivedPlan, exclude: ReadonlySet<string>, wallsOnly: boolean): Candidate[] {
   const out: Candidate[] = [];
   for (const [wallId, pieces] of derived.pieces) for (const pc of pieces) out.push({ polygon: pc.polygon, z0: pc.z0, z1: pc.z1, type: 'wall', id: wallId });
   for (const h of derived.hubs) out.push({ polygon: h.polygon, z0: 0, z1: h.height, type: 'wall', id: h.nodeId });
-  if (isTextile(item)) return out;
+  if (wallsOnly) return out;
   for (const o of project.furniture) {
-    if (o.id === item.id || isTextile(o) || o.height < FLAT) continue;
+    if (exclude.has(o.id) || isTextile(o) || o.height < FLAT) continue;
     out.push({ polygon: furnitureCorners(o), z0: o.elevation, z1: o.elevation + o.height, type: 'furniture', id: o.id });
   }
   return out;
@@ -171,6 +185,33 @@ function candidates(project: Project, derived: DerivedPlan, item: Furniture): Ca
 export function furnitureClearances(project: Project, derived: DerivedPlan, furnitureId: string, opts: ClearanceOptions = {}): Clearance[] {
   const item = project.furniture.find((f) => f.id === furnitureId);
   if (!item) return [];
+  return boxClearances(item, candidates(project, derived, new Set([item.id]), isTextile(item)), opts);
+}
+
+/**
+ * Clearances of a multi-selection or furniture group (#94): measured from the shared outline
+ * of the selected items – the axis-aligned box around their footprints, the same outline the
+ * plan draws around a group – to walls and to furniture that is not selected. The selected
+ * items never block each other. The height range spans all selected items. Selected textiles
+ * (a rug under the table) do not widen the outline; a selection of textiles only measures to
+ * walls, like a single rug. A single id gives the same result as `furnitureClearances`.
+ */
+export function selectionClearances(project: Project, derived: DerivedPlan, ids: readonly string[], opts: ClearanceOptions = {}): Clearance[] {
+  const set = new Set(ids);
+  const items = project.furniture.filter((f) => set.has(f.id));
+  if (items.length === 0) return [];
+  if (items.length === 1) return furnitureClearances(project, derived, items[0].id, opts);
+  const solid = items.filter((f) => !isTextile(f));
+  const measured = solid.length ? solid : items;
+  const b = boundsOf(measured.flatMap((f) => furnitureCorners(f)));
+  if (!b) return [];
+  const z0 = Math.min(...measured.map((f) => f.elevation));
+  const z1 = Math.max(...measured.map((f) => f.elevation + f.height));
+  const box: Box = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, width: b.maxX - b.minX, depth: b.maxY - b.minY, rotation: 0, elevation: z0, height: z1 - z0 };
+  return boxClearances(box, candidates(project, derived, set, solid.length === 0), opts);
+}
+
+function boxClearances(item: Box, cands: Candidate[], opts: ClearanceOptions): Clearance[] {
   const max = opts.maxDistance ?? CLEARANCE_MAX;
   const min = opts.minDistance ?? CLEARANCE_MIN;
   const hw = item.width / 2;
@@ -185,7 +226,7 @@ export function furnitureClearances(project: Project, derived: DerivedPlan, furn
   const best: Best[] = SIDES.map(() => ({ d: Infinity, bMin: 0, bMax: 0, hit: null }));
   const xs: number[] = [];
   const ys: number[] = [];
-  for (const c of candidates(project, derived, item)) {
+  for (const c of cands) {
     // height ranges must overlap (a wall cabinet does not block a sofa below it)
     if (Math.min(z1, c.z1) - Math.max(z0, c.z0) <= 0.005) continue;
     // to local coordinates; cheap reject when the whole polygon is out of reach

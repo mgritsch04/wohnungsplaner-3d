@@ -66,7 +66,7 @@ Origin); Export/Import des Projektpakets ist die Brücke.
 * **Maße ändern:** Element anklicken → rechts Werte in cm eingeben (Enter oder Feld verlassen).
 * **Plan importieren:** Tab **Import** → PDF/Bild → **Maßstab kalibrieren** (zwei Punkte, reale Länge) → nachzeichnen oder **Erkennung starten** → prüfen → übernehmen.
 * **3D:** oben 2D / 2D + 3D / 3D; **Begehen** für die Ich-Perspektive.
-* **Türen/Fenster öffnen:** in 3D Doppelklick oder Taste **O** (ausgewählte Tür/Fenster), beim Begehen Klick oder **O** aufs Ziel im Fadenkreuz; auch im Eigenschaften-Panel. Ein geöffneter Flügel zählt in der Kollisionsprüfung, eine geschlossene Tür versperrt beim Begehen den Weg.
+* **Türen/Fenster öffnen:** in 3D Doppelklick oder Taste **O** (ausgewählte Tür/Fenster), beim Begehen **E** (oder Klick, **O**) aufs Ziel im Fadenkreuz; auch im Eigenschaften-Panel. Ein geöffneter Flügel zählt in der Kollisionsprüfung, eine geschlossene Tür versperrt beim Begehen den Weg.
 * Alle Kürzel: **?** oben rechts.
 
 ## Architektur

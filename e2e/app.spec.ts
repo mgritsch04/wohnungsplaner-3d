@@ -3,7 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
-import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
+import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
+import { findCatalogItem } from '../src/catalog/generic';
+import { buildPlacementObstacles, collidingObstacles } from '../src/model/placement';
+import { clearanceLabel, furnitureClearances, rotateHandlePoint, selectionClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -398,21 +401,43 @@ test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)'
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-test('walkthrough: hold C to crouch (lower camera, slower), release to stand up (#20)', async ({ page }) => {
+test('walkthrough: C toggles crouching (lower camera, slower), C again stands up; X and leaving end it (#20, #47)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
   await expect.poll(camY).toBeCloseTo(1.63, 3);
-  await page.keyboard.down('KeyC');
+  // one press crouches – and the camera stays down after releasing C (toggle, #47)
+  await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeLessThan(1.0);
+  await expect(page.getByTestId('walk-duck')).toBeVisible();
+  await page.waitForTimeout(400);
+  expect(await camY()).toBeLessThan(1.0);
   await expect(page.getByTestId('walk-duck')).toBeVisible();
   // C must not trigger anything in the 2D tools while walking
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
-  await page.keyboard.up('KeyC');
+  // crouched, walking is slower (same factor as seated)
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().walkDuck)).toBe(true);
+  // pressing C again stands up
+  await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeCloseTo(1.63, 3);
   await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  // sitting down (X) ends crouching; standing up again (X) does not crouch
+  await page.keyboard.press('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await page.keyboard.press('KeyX');
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  await expect.poll(camY).toBeCloseTo(1.2, 3);
+  await page.keyboard.press('KeyX');
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  // leaving the walkthrough resets crouching
+  await page.keyboard.press('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -593,6 +618,12 @@ test('plans a kitchen run along a selected wall', async ({ page }) => {
   expect(kitchen.some((f: { kitchen: { type: string } }) => f.kitchen.type === 'countertop')).toBe(true);
   expect(q.furniture.length).toBeGreaterThan(p.furniture.length);
   await expect(page.getByText('Stückliste Küche')).toBeVisible();
+  // no module stands in the wall or in the connected wall at the corner (#16): flush in front of the face
+  const walls = buildPlacementObstacles(derivePlan(q)).filter((o) => o.kind === 'wall');
+  for (const f of kitchen) expect(collidingObstacles(f, walls), f.name).toEqual([]);
+  const westmost = Math.min(...kitchen.map((f: { x: number; width: number }) => f.x - f.width / 2));
+  expect(westmost).toBeGreaterThanOrEqual(0);
+  expect(westmost).toBeLessThan(0.01);
 });
 
 test('takes over a product from a pasted retailer page (synthetic sample) and places it', async ({ page }) => {
@@ -823,6 +854,54 @@ test('hover info: name, category, size and price after a short delay; hidden whi
   await expect(card).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('marked furniture says why (#16): reason in the properties panel and in the 2D hover card', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p0 = await getProject(page);
+  const sofa = p0.furniture.find((f: any) => f.catalogId === 'generic-sofa-3');
+  const lamp = p0.furniture.find((f: any) => f.catalogId === 'generic-floor-lamp');
+  const panel = page.locator('.panel.right');
+  // not marked: no reason shown
+  const l = await planToScreen(page, lamp.x, lamp.y);
+  await page.mouse.click(l.x, l.y);
+  await expect(panel.getByTestId('conflict-summary')).toHaveCount(0);
+  // Alt: drag the floor lamp into the sofa → both red, the lamp's panel says why
+  const into = await planToScreen(page, sofa.x + 0.7, sofa.y);
+  await page.mouse.move(l.x, l.y);
+  await page.keyboard.down('Alt');
+  await page.mouse.down();
+  await page.mouse.move(into.x, into.y, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  const summary = panel.getByTestId('conflict-summary');
+  await expect(summary).toHaveText('Rot markiert: überlappt mit „Sofa 3-Sitzer“');
+  await expect(summary).toHaveAttribute('data-level', 'error');
+  await expect(panel.getByTestId('furniture-issues')).toContainText('Überschneidet sich mit „Sofa 3-Sitzer“.');
+  // hovering the (unselected) sofa in 2D: the hover card names the reason, too
+  const s = await planToScreen(page, sofa.x - 0.6, sofa.y);
+  await page.mouse.move(s.x, s.y);
+  const card = page.getByTestId('furniture-hover');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(sofa.name);
+  await expect(card.getByTestId('hover-conflict')).toHaveText('Rot markiert: überlappt mit „Stehlampe“');
+  await page.screenshot({ path: 'test-results/conflict-reason-hover.png' });
+  // an item that is not marked shows no reason in its card
+  const tv = p0.furniture.find((f: any) => f.catalogId === 'generic-tv-sideboard');
+  const t = await planToScreen(page, tv.x, tv.y);
+  await page.mouse.move(t.x, t.y);
+  await expect(card).toContainText(tv.name);
+  await expect(card.getByTestId('hover-conflict')).toHaveCount(0);
+  // pushing a sideboard into the wall (Alt): „ragt in die Wand“
+  await page.evaluate((id) => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.furniture.find((f: any) => f.id === id).y = 0.05)), tv.id);
+  await page.mouse.click(t.x, t.y + 2);
+  await expect(panel.getByTestId('conflict-summary')).toContainText('ragt in die Wand');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
   // realism rendering with software WebGL takes ~45–55 s alone; under parallel load it overran 60 s
@@ -1241,6 +1320,89 @@ test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the s
   expect(errors).toEqual([]);
 });
 
+test('3D: Alt while dragging places freely (no collision stop), without Alt the item stops at the sofa (#16)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Schnitt' }).click(); // walls cut at 1.2 m: furniture visible
+  await page.waitForTimeout(2500);
+  const p0 = await getProject(page);
+  const sofa = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const find = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id);
+  const overlapsSofa = (t: { x: number; y: number; width: number; depth: number }) =>
+    Math.abs(t.x - sofa.x) < (sofa.width + t.width) / 2 - 0.005 && Math.abs(t.y - sofa.y) < (sofa.depth + t.depth) / 2 - 0.005;
+  const drag = async (alt: boolean) => {
+    const t = await find(table.id);
+    const a = await worldToScreen3d(page, t.x + 0.2, t.height, t.y);
+    const b = await worldToScreen3d(page, t.x + 0.2, t.height, t.y + 0.75);
+    await page.mouse.move(a.x, a.y);
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 10 });
+    await page.mouse.up();
+    if (alt) await page.keyboard.up('Alt');
+    await page.waitForTimeout(400);
+    return find(table.id);
+  };
+  // without Alt: the table stops at the sofa
+  const t1 = await drag(false);
+  expect(t1.y).toBeGreaterThan(table.y + 0.1);
+  expect(overlapsSofa(t1)).toBe(false);
+  expect(await collisionMarkers(page)).not.toContain(`collision:${table.id}`);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await find(table.id)).y).toBeCloseTo(table.y, 6);
+  // with Alt: placed freely into the sofa, the overlap is marked in 3D (as in 2D)
+  const t2 = await drag(true);
+  expect(overlapsSofa(t2)).toBe(true);
+  await expect.poll(() => collisionMarkers(page)).toContain(`collision:${table.id}`);
+  expect((await collisionMarkers(page)).some((m) => m.includes(':overlap:') && m.includes(table.id) && m.includes(sofa.id))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('chair under table (#16): the seat goes under the table top, the backrest stops at the table edge; forced in with Alt it is marked with the reason', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  // an empty living room with a dining table (y 1.075 … 1.925) and a chair facing it
+  const table = createFurnitureFromCatalog(findCatalogItem('generic-dining-table-4')!, { x: 2.5, y: 1.5 });
+  const chair = createFurnitureFromCatalog(findCatalogItem('generic-chair')!, { x: 2.5, y: 0.5 });
+  await page.evaluate(
+    (items) => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.furniture = items)),
+    [table, chair],
+  );
+  await page.waitForTimeout(400);
+  const find = async (id: string) => (await getProject(page)).furniture.find((f: any) => f.id === id);
+  const edge = table.y - table.depth / 2;
+  const drag = async (toY: number, alt: boolean) => {
+    const c = await find(chair.id);
+    const a = await planToScreen(page, c.x, c.y);
+    const b = await planToScreen(page, c.x, toY);
+    await page.mouse.move(a.x, a.y);
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 12 });
+    await page.mouse.up();
+    if (alt) await page.keyboard.up('Alt');
+    return find(chair.id);
+  };
+  const panel = page.locator('.panel.right');
+  // pushed towards the table centre: stops with the backrest (3.5 cm) at the table edge, seat under the top
+  const c1 = await drag(table.y, false);
+  const backFront = c1.y - c1.depth / 2 + 0.035;
+  expect(backFront).toBeLessThanOrEqual(edge + 0.002);
+  expect(backFront).toBeGreaterThan(edge - 0.06); // at most one 5 cm grid step short of the edge
+  expect(c1.y + c1.depth / 2 - edge).toBeGreaterThan(0.35); // most of the seat is under the table
+  await expect(panel.locator('.panel-issues')).toHaveCount(0);
+  // with Alt it can be forced into the table: marked, with the reason
+  const c2 = await drag(table.y, true);
+  expect(Math.abs(c2.y - table.y)).toBeLessThan(0.05);
+  await expect(panel.locator('.panel-issues')).toContainText('Die Lehne steht in „Esstisch 4 Personen“');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
   test.setTimeout(600000);
   const errors = collectErrors(page);
@@ -1474,6 +1636,91 @@ test('3D: doors and windows open/close – double-click, O, click while walking;
   const after = await getProject(page);
   expect(after.openings.find((o: { id: string }) => o.id === inner.id).open).toBe(true);
   expect(after.openings.find((o: { id: string }) => o.id === window1.id).open).toBe(true);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: E opens/closes the door or window in sight; in the overview E still rotates the selection (#107)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p0 = await getProject(page);
+  const window1 = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'window' && Math.abs(o.width - 1.8) < 1e-6); // living room, north
+  const inner = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'door' && Math.abs(o.width - 0.9) < 1e-6);
+  const table = p0.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  expect([window1.open, inner.open]).toEqual([false, true]);
+  const openOf = async (id: string) => (await getProject(page)).openings.find((o: { id: string }) => o.id === id).open as boolean;
+  const rotOf = async (id: string) => (await getProject(page)).furniture.find((f: { id: string }) => f.id === id).rotation as number;
+  const leafCenter = (id: string) =>
+    page.evaluate((oid) => {
+      const t = (window as any).__wp.three;
+      const pivot = t.scene.getObjectByName(`leaf:${oid}:0`);
+      const v = pivot.children[0].getWorldPosition(t.camera.position.clone());
+      return { x: v.x as number, y: v.z as number };
+    }, id);
+  const restingLeaf = async (id: string) => {
+    let last = await leafCenter(id);
+    await expect
+      .poll(async () => {
+        await page.waitForTimeout(150);
+        const now = await leafCenter(id);
+        const moved = Math.hypot(now.x - last.x, now.y - last.y);
+        last = now;
+        return moved;
+      })
+      .toBeLessThan(0.001);
+    return last;
+  };
+  const lookAt = (x: number, y: number, h: number) =>
+    page.evaluate(
+      ([tx, ty, th]) => {
+        const wp = (window as any).__wp;
+        const c = wp.three.camera.position;
+        wp.walk.look(Math.atan2(-(tx - c.x), -(ty - c.z)), Math.atan2(th - c.y, Math.hypot(tx - c.x, ty - c.z)));
+      },
+      [x, y, h] as const,
+    );
+  const target = () => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null);
+  // a selected piece of furniture: E must not rotate it while walking
+  await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), table.id);
+  const rot0 = await rotOf(table.id);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  // the closed living-room window: E opens it …
+  const glass = await restingLeaf(window1.id);
+  await lookAt(glass.x, glass.y, 1.6);
+  await expect.poll(target).toBe(window1.id);
+  await page.keyboard.press('e');
+  await expect.poll(() => openOf(window1.id)).toBe(true);
+  await restingLeaf(window1.id);
+  await page.screenshot({ path: 'test-results/walk-e-opens-window.png' });
+  // … and E on the opened sash closes it again
+  const sash = await restingLeaf(window1.id);
+  await lookAt(sash.x, sash.y, 1.6);
+  await expect.poll(target).toBe(window1.id);
+  await page.keyboard.press('e');
+  await expect.poll(() => openOf(window1.id)).toBe(false);
+  // the open inner door: E closes it; O still works, too
+  const leaf = await restingLeaf(inner.id);
+  await lookAt(leaf.x, leaf.y, 1.0);
+  await expect.poll(target).toBe(inner.id);
+  await page.keyboard.press('e');
+  await expect.poll(() => openOf(inner.id)).toBe(false);
+  await restingLeaf(inner.id);
+  await lookAt(5.0, 2.0, 1.0);
+  await expect.poll(target).toBe(inner.id);
+  await page.keyboard.press('o');
+  await expect.poll(() => openOf(inner.id)).toBe(true);
+  // while walking, E neither rotated the selected table nor reached the 2D tools
+  expect(await rotOf(table.id)).toBeCloseTo(rot0, 6);
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  // in the overview, E rotates the selection by 15° again (Q/E)
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), table.id);
+  await page.keyboard.press('e');
+  await expect.poll(() => rotOf(table.id)).toBeCloseTo(rot0 + Math.PI / 12, 6);
+  expect(await openOf(window1.id)).toBe(false);
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -1817,6 +2064,45 @@ test('keyboard overview: "?" opens all shortcuts (2D, 3D, walking), Esc closes (
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('a new empty project starts without the measuring line and walking path of the previous project (#133)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const plan = page.locator('[data-testid="editor2d"]');
+  const clickAt = async (x: number, y: number) => {
+    const s = await planToScreen(page, x, y);
+    await page.mouse.click(s.x, s.y);
+  };
+  // a measuring line (M) …
+  await page.keyboard.press('m');
+  await clickAt(1, 0.8);
+  await clickAt(3, 0.8);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(1);
+  // … and a walking path (L), the tool stays active
+  await page.keyboard.press('l');
+  await clickAt(1, 0.8);
+  await clickAt(5.7, 3);
+  await expect(plan.getByTestId('walk-path-line')).toBeVisible();
+  // Projekt → „Neues leeres Projekt“: nothing of it is left
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  await expect.poll(async () => (await getProject(page)).walls.length).toBe(0);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(0);
+  await expect(plan.getByTestId('walk-path')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().measurements.length)).toBe(0);
+  // a measurement in the new project works as usual (the start card would cover the plan)
+  await page.getByTestId('start-card').getByRole('button', { name: 'Startkarte schließen' }).click();
+  await page.keyboard.press('m');
+  await clickAt(0, 0);
+  await clickAt(2, 0);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('measures the walking path from the living room to the bedroom and clears it with Esc (#67)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
@@ -2082,6 +2368,91 @@ test('clearances (#50): dimension lines to walls and furniture while dragging an
   await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('clearances of a multi-selection and a group (#94): shared outline to walls and other furniture, while dragging and with Alt', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const wardrobe = p0.furniture.find((f: any) => f.catalogId === 'generic-wardrobe-150');
+  const ids: string[] = [bed.id, ...ns.map((n: any) => n.id)];
+  const shownLines = () =>
+    plan.locator('[data-testid="clearance"]').evaluateAll((els) => els.map((el) => ({ side: el.getAttribute('data-side'), cm: Number(el.getAttribute('data-distance-cm')), hit: el.getAttribute('data-hit') })));
+  /** The overlay shows the clearances of the whole selection, as the model computes them for the current positions. */
+  const check = async () => {
+    await expect(plan.getByTestId('clearances')).toHaveCount(1);
+    expect((await plan.getByTestId('clearances').getAttribute('data-furniture-ids'))!.split(' ').sort()).toEqual([...ids].sort());
+    const p = await getProject(page);
+    const expected = selectionClearances(p, derivePlan(p), ids).map((c) => ({ side: c.side, cm: Math.round(c.distance * 100), hit: c.hit.type }));
+    expect(expected.length).toBeGreaterThan(0);
+    await expect.poll(shownLines).toEqual(expected);
+    return expected;
+  };
+  // bed + both night stands selected (Shift+click)
+  const click = async (f: { x: number; y: number }, shift = false) => {
+    const s = await planToScreen(page, f.x, f.y);
+    if (shift) await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    if (shift) await page.keyboard.up('Shift');
+  };
+  await click(bed);
+  for (const n of ns) await click(n, true);
+  await expect(page.getByTestId('multi-note')).toContainText('3 Möbel ausgewählt');
+  // Alt shows the clearances of the whole selection (was: nothing for a multi-selection)
+  await page.keyboard.down('Alt');
+  await check();
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // dragging the bed down: lines from the shared outline, live
+  const a = await planToScreen(page, bed.x, bed.y);
+  const b = await planToScreen(page, bed.x, bed.y + 0.6);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x, (a.y + b.y) / 2, { steps: 4 });
+  const mid = await check();
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  const end = await check();
+  const cm = (xs: typeof mid, side: string) => xs.find((x) => x.side === side)?.cm ?? NaN;
+  expect(cm(end, 'back')).toBeGreaterThan(cm(mid, 'back')); // moved away from the north wall
+  // measured from the shared outline: the left line starts at the left night stand (not at the bed),
+  // the front line runs to the unselected wardrobe; no line ends at a selected item
+  const p1 = await getProject(page);
+  const res = selectionClearances(p1, derivePlan(p1), ids);
+  const leftEdge = Math.min(...ids.map((id) => p1.furniture.find((f: any) => f.id === id)).map((f: any) => f.x - f.width / 2));
+  expect(leftEdge).toBeLessThan(p1.furniture.find((f: any) => f.id === bed.id).x - bed.width / 2 - 0.1);
+  expect(res.find((c) => c.side === 'left')!.from.x).toBeCloseTo(leftEdge, 3);
+  expect(res.find((c) => c.side === 'front')!.hit).toEqual({ type: 'furniture', id: wardrobe.id });
+  for (const c of res) expect(ids).not.toContain(c.hit.id);
+  await page.screenshot({ path: 'test-results/clearances-multi-select.png' });
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+
+  // as a group (#65): Strg+G, then drag the group – the same shared-outline lines
+  await page.keyboard.press('Control+g');
+  await expect(page.getByTestId('group-outline')).toHaveAttribute('data-whole', 'true');
+  const pg = await getProject(page);
+  const bedNow = pg.furniture.find((f: any) => f.id === bed.id);
+  const g1 = await planToScreen(page, bedNow.x, bedNow.y);
+  const g2 = await planToScreen(page, bedNow.x, bedNow.y - 0.3);
+  await page.mouse.move(g1.x, g1.y);
+  await page.mouse.down();
+  await page.mouse.move(g2.x, g2.y, { steps: 5 });
+  const grp = await check();
+  expect(cm(grp, 'front')).toBeGreaterThan(cm(end, 'front')); // the group moved back up, away from the wardrobe
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // Alt with the whole group selected
+  await page.keyboard.down('Alt');
+  await check();
+  await page.keyboard.up('Alt');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {
@@ -2588,12 +2959,23 @@ test('3D tape measure in the walkthrough: crosshair clicks measure, the capture 
   await centre(); // captures the mouse – no point yet
   await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
   const look = (yaw: number, pitch: number) => page.evaluate(([y, p]) => (window as unknown as { __wp: { walk: { look: (a: number, b: number) => void } } }).__wp.walk.look(y, p), [yaw, pitch] as const);
-  await look(0, -0.6);
-  await page.waitForTimeout(200);
+  // the new view is applied on the next rendered frame – on a slow CI runner a fixed wait may not cover one,
+  // so wait until the camera really looks somewhere else before clicking
+  const dir = () => page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cam = (window as any).__wp.three.camera;
+    const m = cam.matrixWorld.elements;
+    return [-m[8], -m[9], -m[10]];
+  });
+  const lookAndWait = async (yaw: number, pitch: number) => {
+    const d0 = await dir();
+    await look(yaw, pitch);
+    await expect.poll(async () => { const d = await dir(); return Math.hypot(d[0] - d0[0], d[1] - d0[1], d[2] - d0[2]); }, { timeout: 15000 }).toBeGreaterThan(0.05);
+  };
+  await lookAndWait(0, -0.6);
   await centre();
   await expect(page.getByRole('status')).toContainText('Zweiten Punkt anklicken');
-  await look(0.4, -0.5);
-  await page.waitForTimeout(200);
+  await lookAndWait(0.4, -0.5);
   await centre();
   await expect(page.getByTestId('tape-label')).toHaveCount(1);
   expect(Number(await page.getByTestId('tape-label').getAttribute('data-length'))).toBeGreaterThan(0.1);
