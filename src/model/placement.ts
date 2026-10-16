@@ -535,11 +535,8 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   let elevation = f.elevation;
   if (opts.snap && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
   if (opts.collide) {
-    // rugs lie under furniture but stop at walls like everything else (#39)
-    const all = free ? obstacles.filter((o) => o.kind === 'wall') : [...obstacles, ...furnitureObstacles(d, { ...f, elevation })];
-    // a flat rug would never overlap a wall in height – test it with the full wall height
-    const pose = free ? { ...f, rotation, elevation: 0, height: 1 } : { ...f, rotation, elevation };
-    const r = constrainMove(pose, goal, all, undefined, free ? { ...f, elevation: 0, height: 1 } : f);
+    const m = moveCollision(d, { ...f, rotation, elevation }, obstacles);
+    const r = constrainMove(m.pose, goal, m.obstacles, undefined, m.free ? { ...f, elevation: 0, height: 1 } : f);
     goal = { x: r.x, y: r.y };
   }
   f.x = Math.round(goal.x * 1000) / 1000;
@@ -547,6 +544,18 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   f.rotation = rotation;
   f.elevation = Math.round(elevation * 1000) / 1000;
   return snapped;
+}
+
+/**
+ * What a moving item collides with, as used by dragging: walls, opened door leaves and
+ * other furniture (intended combinations excluded). Rugs lie under furniture but stop at
+ * walls like everything else (#39); a flat rug would never overlap a wall in height, so
+ * it is tested with a 1 m tall pose (`pose`).
+ */
+export function moveCollision(d: Project, f: Furniture, obstacles: Obstacle[]): { pose: Pose; obstacles: Obstacle[]; free: boolean } {
+  const free = f.category === 'textile' && f.height < 0.05;
+  if (free) return { pose: { ...f, elevation: 0, height: 1 }, obstacles: obstacles.filter((o) => o.kind === 'wall'), free };
+  return { pose: { ...f }, obstacles: [...obstacles, ...furnitureObstacles(d, f)], free };
 }
 
 /**

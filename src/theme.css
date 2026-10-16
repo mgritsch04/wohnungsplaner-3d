@@ -1,0 +1,141 @@
+/*
+ * Design-Tokens der Bedienoberfläche (#96, #97, #98) – die einzige Stelle für
+ * Farben, Abstände, Radien, Schatten und Schriftgrößen der UI.
+ *
+ * - Farben haben semantische Namen. Ein späterer Dunkelmodus (#73) überschreibt
+ *   nur die Farb-Tokens (z. B. in `:root[data-theme='dark'] { … }`), alles andere bleibt.
+ * - NICHT hier: Farben des 3D-Renderings (src/view3d), des SVG-Plans
+ *   (src/editor2d/PlanDrawing.tsx) und des Druckblatts (src/export) – die haben
+ *   eigene, druckfähige Farben (#104).
+ * - Kontrast: die wichtigsten Text/Hintergrund-Paare werden in
+ *   src/ui/theme.test.ts gegen WCAG AA (4,5:1) geprüft.
+ */
+:root {
+  /* ---------- Farben: Flächen ---------- */
+  --color-bg: #f4f5f7; /* App-Hintergrund */
+  --color-surface: #ffffff; /* Panels, Menüs, Dialoge, Felder */
+  --color-surface-alt: #f8fafc; /* Tab-Leisten, Ablagezonen */
+  --color-surface-hover: #f1f5f9; /* Hover auf neutralen Schaltflächen */
+  --color-surface-pressed: #e2e8f0; /* gedrückte neutrale Schaltfläche */
+  --color-surface-sunken: #f1f5f9; /* kbd, code, Bild-Hintergrund */
+  --color-surface-floating: rgba(255, 255, 255, 0.92); /* schwebende Leisten über dem Plan/3D */
+
+  /* ---------- Farben: Text ---------- */
+  --color-text: #1f2937;
+  --color-text-muted: #636b78; /* Beschriftungen, Einheiten, Nebeninfos */
+  --color-text-subtle: #475569; /* Abschnittstitel */
+  --color-text-code: #334155;
+
+  /* ---------- Farben: Linien ---------- */
+  --color-border: #e2e5ea; /* Trennlinien, Panel-Ränder */
+  --color-border-strong: #cbd5e1; /* Hover-Rand, Ablagezone */
+  --color-border-control: #cfd5dd; /* Ränder von Schaltflächen und Feldern */
+  --color-border-hover: #a8b3c1; /* Rand beim Überfahren */
+  --color-border-dashed: #eef0f3;
+  --color-border-alpha: rgba(0, 0, 0, 0.1); /* Rahmen um Farbmuster */
+
+  /* ---------- Farben: Akzent (Primär, aktiv, Fokus) ---------- */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-pressed: #1e40af;
+  --color-accent-soft: #dbeafe; /* aktiver Umschalter, Hervorhebung */
+  --color-accent-soft-hover: #cfe0fd;
+  --color-accent-soft-border: #93c5fd;
+  --color-accent-soft-text: #1e40af; /* Text auf --color-accent-soft */
+  --color-accent-faint: #f8fbff; /* aktuelles Projekt in Listen */
+  --color-on-accent: #ffffff;
+  --color-focus-ring: #2563eb;
+  --color-focus-ring-soft: rgba(37, 99, 235, 0.22);
+
+  /* ---------- Farben: Status ---------- */
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-danger-pressed: #991b1b;
+  --color-danger-strong: #991b1b; /* Text auf --color-danger-soft */
+  --color-danger-soft: #fef2f2;
+  --color-danger-soft-strong: #fee2e2;
+  --color-danger-border: #fecaca;
+  --color-on-danger: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-strong: #92400e;
+  --color-warning-soft: #fffbeb;
+  --color-warning-soft-strong: #fef3c7;
+  --color-warning-border: #fde68a;
+  --color-success: #15803d;
+  --color-success-strong: #166534;
+  --color-success-soft: #dcfce7;
+  --color-info-soft: #eff6ff;
+  --color-info-border: #bfdbfe;
+  --color-neutral-soft: #f1f5f9;
+  --color-neutral-strong: #475569;
+  /* Legende Maßsicherheit (Import) */
+  --color-legend-confirmed: #16a34a;
+  --color-legend-estimated: #d97706;
+  --color-legend-uncertain: #dc2626;
+
+  /* ---------- Farben: Überlagerungen ---------- */
+  --color-overlay: rgba(15, 23, 42, 0.82); /* Hinweis-Pillen über Plan/3D */
+  --color-on-overlay: #ffffff;
+  --color-backdrop: rgba(15, 23, 42, 0.35); /* hinter Dialogen */
+  --color-toast-bg: #1e293b;
+  --color-toast-error-bg: #3b1d1d;
+  --color-toast-text: #ffffff;
+  --color-toast-info: #60a5fa;
+  --color-toast-success: #22c55e;
+  --color-toast-error: #ef4444;
+  --color-crosshair: rgba(255, 255, 255, 0.9);
+  --color-crosshair-outline: rgba(0, 0, 0, 0.55);
+  --color-print-backdrop: #d1d5db; /* Fläche um das Druckblatt (nur Bildschirm) */
+
+  /* ---------- Abstände (4er-Raster, in rem → skaliert mit der Grundschrift) ---------- */
+  --space-0: 0.125rem; /* 2px */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.375rem; /* 6px */
+  --space-3: 0.5rem; /* 8px */
+  --space-4: 0.625rem; /* 10px */
+  --space-5: 0.75rem; /* 12px */
+  --space-6: 1rem; /* 16px */
+  --space-7: 1.25rem; /* 20px */
+  --space-8: 1.5rem; /* 24px */
+
+  /* ---------- Radien ---------- */
+  --radius-sm: 4px;
+  --radius-md: 6px; /* Schaltflächen, Felder */
+  --radius-lg: 8px; /* Menüs, Karten */
+  --radius-xl: 12px; /* Dialoge */
+  --radius-pill: 999px;
+
+  /* ---------- Schatten ---------- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 6px 24px rgba(15, 23, 42, 0.14);
+
+  /* ---------- Typografie (#98) ---------- */
+  /* System-Schrift: keine Webfonts, funktioniert offline */
+  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Größenstufen in rem (relativ zur Browser-Grundschrift, wächst mit Zoom/Schriftgröße) */
+  --font-size-xs: 0.6875rem; /* 11px – Beschriftung: Feld-Labels, Einheiten, Badges, Statusleiste */
+  --font-size-sm: 0.75rem; /* 12px – kleiner Text, Listen, Abschnittstitel */
+  --font-size-md: 0.875rem; /* 14px – Text, Schaltflächen, Felder */
+  --font-size-lg: 1rem; /* 16px – Überschrift (Dialogtitel) */
+  --font-size-xl: 1.25rem; /* 20px – Kennzahl (Budget-Summe) */
+  --font-size-label: var(--font-size-xs);
+  --font-size-text: var(--font-size-md);
+  --font-size-section-title: var(--font-size-sm);
+  --font-size-heading: var(--font-size-lg);
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.3;
+  --line-height-text: 1.45;
+
+  /* ---------- Bedienelemente (#97) ---------- */
+  --control-height: 1.875rem; /* 30px – Schaltflächen und Felder */
+  --control-pad-y: 0.3125rem; /* 5px */
+  --control-pad-x: 0.625rem; /* 10px */
+  --control-pad-x-input: 0.5rem; /* 8px */
+  --control-radius: var(--radius-md);
+  --focus-ring: 0 0 0 3px var(--color-focus-ring-soft);
+  --transition-fast: 0.12s ease;
+}

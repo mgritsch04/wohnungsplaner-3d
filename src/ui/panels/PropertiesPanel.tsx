@@ -14,6 +14,7 @@ import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
 import { placementIssues } from '../../model/placement';
+import { ArrangeControls } from './ArrangeControls';
 
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
@@ -401,6 +402,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           <strong>{more + 1} Möbel ausgewählt.</strong> Ziehen verschiebt alle, Pfeiltasten/Entf/Strg+D/Strg+C wirken auf alle. Die Felder unten gelten nur für „{f.name}“.
         </p>
       )}
+      <ArrangeControls />
       <Section title="Objekt" actions={f.approximate ? <Badge kind="muted" title="Vereinfachtes 3D-Modell, Maße sind maßgeblich">Näherungsmodell</Badge> : undefined}>
         <TextField label="Name" value={f.name} onChange={(v) => upd((x) => (x.name = v.slice(0, 200)))} />
         <SelectField
