@@ -111,3 +111,32 @@ Bitte zwei kleine Aufgaben **nacheinander**, je auf einem eigenen Branch von `or
 Ebenfalls nicht anfassen: `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`, Issues.
 
 **Fertig, wenn:** je Branch alle Checks und die volle E2E-Suite grün sind, gepusht ist und du mir **je Teilaufgabe** per Nachricht berichtet hast (Dateien, Tests, Commits, User-Test-Schritte).
+
+## Aufgabe 9: Sichtlinien vom Eingang (#89)
+
+Berichte zu 8a (#78) und 8b (#102) sind angekommen, danke – beide sind zusammengeführt. „Neues Projekt“ wegzulassen war richtig.
+
+**Wichtig – neue Basis:** Bitte ab jetzt vom Branch `origin/claude/quirky-faraday-0d9uep` abzweigen, nicht von `origin/main`. Dort liegen schon #99, #76, #82, #87, #78 und #102, und der PR nach main kommt erst noch. Vor dem finalen Push `git merge origin/claude/quirky-faraday-0d9uep` (kein Rebase).
+
+**Branch:** `claude/sightlines-89`
+
+**Ziel:** Issue #89 lesen. Im 2D-Plan einen Blickpunkt setzen (Standard: Mitte der Eingangstür, also die Tür, die als Eingang markiert ist bzw. die erste Außentür; vorher im Modell prüfen, was es gibt, nichts erfinden). Dann farbig zeigen, welche Bereiche der Wohnung von dort sichtbar sind und welche verdeckt (Wände verdecken, offene Türöffnungen nicht; Möbel in dieser ersten Version nicht).
+
+1. **Reine Funktion** (z. B. `src/model/visibility.ts`): Sichtbarkeits-Polygon aus Blickpunkt und Wandsegmenten (klassischer Ray-Casting/Visibility-Polygon-Ansatz); Laufzeit für die Beispielwohnung deutlich unter 16 ms.
+2. **Anzeige:** eigenes Overlay in `src/editor2d/` (wie das Küchendreieck), in `Editor2D.tsx` nur eingehängt. Sichtbares Gebiet halbtransparent gefüllt, Blickpunkt als ziehbarer Marker. Ein-/ausschaltbar über einen Schalter (z. B. im Ansicht- oder Projekt-Panel, nicht in `Toolbar.tsx`). Farben über Tokens; denk an den hell bleibenden Plan (wie deine `--color-plan-*`-Tokens).
+3. Optional, wenn einfach: Anteil der sichtbaren Wohnfläche in % anzeigen.
+
+**Nicht anfassen:**
+- `src/ui/Toolbar.tsx` (Agent für #100)
+- `src/model/schema.ts` nur, falls wirklich nötig, und dann nur additiv mit Default (ein Agent arbeitet an Möbelgruppen #65)
+- `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`
+- Issues
+
+**Tests:**
+- **Unit:** leerer Raum = ganzer Raum sichtbar; Wand dazwischen verdeckt; offene Tür lässt durch; Laufzeit.
+- **E2E** am Ende von `e2e/app.spec.ts`: einschalten, Fläche sichtbar, Marker verschieben ändert die Fläche, ausschalten.
+
+**Fertig, wenn:**
+- alle Checks und die volle E2E-Suite grün sind;
+- gepusht ist;
+- du mir berichtet hast: Dateien, Tests, Commits, User-Test-Schritte.
