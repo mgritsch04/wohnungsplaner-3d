@@ -4,7 +4,6 @@ import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { clearanceLabel, furnitureClearances, rotateHandlePoint } from '../src/model/clearances';
-import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
