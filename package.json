@@ -10,7 +10,10 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "predev": "node scripts/copy-draco.mjs",
+    "prebuild": "node scripts/copy-draco.mjs",
+    "pretest": "node scripts/copy-draco.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

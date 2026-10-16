@@ -36,8 +36,9 @@ Voraussetzung: Node.js ≥ 20. Für die E2E-Tests wird Chromium von Playwright g
 | Maßstab: Zwei-Punkt-Kalibrierung (Pflicht), Maßstabsangabe 1:N (als „angenommen“), Kontrollmessungen mit Abweichung | ✅ |
 | Automatische Erkennung (Beta): Vektor-PDFs und Rasterbilder, achsparallele Wände + Öffnungskandidaten, Prüfansicht mit Status | ✅ (Heuristik, siehe Grenzen) |
 | `apartment-plan.json`: Import (mit Prüfung) und Export, dokumentiert, versioniert | ✅ |
-| Katalog: ~50 generische Objekte mit typischen Maßen, Suche/Filter, prozedurale Modelle, GLB/glTF mit Ersatzmodell | ✅ |
-| Echte Produkte: Produktlisten-Import (CSV/JSON) – keine offizielle IKEA/Möbelix-API verfügbar | ✅ (siehe [docs/catalog-format.md](docs/catalog-format.md)) |
+| Katalog: ~50 generische Objekte mit typischen Maßen, Suche/Filter, prozedurale Modelle | ✅ |
+| GLB/glTF-Import: Upload (.glb, eigenständige .gltf, Draco lokal), Prüfung, Maße aus Modell mit Einheitenvorschlag, als Katalogobjekt oder Modell für ein vorhandenes Möbel, Ersatzmodell bei Fehlern, im Projektexport enthalten | ✅ |
+| Echte Produkte: „Produkt von Händlerseite übernehmen“ (schema.org-Daten aus eingefügter Seite) und Produktlisten (CSV/JSON) – keine offizielle IKEA/Möbelix-API | ✅ (siehe [docs/INTEGRATIONS_IKEA.md](docs/INTEGRATIONS_IKEA.md)) |
 | Küchenplaner: Module an Wand ausrichten, Breiten, Frontfarbe, Arbeitsplatten-Generierung, Konfliktprüfung, Stückliste | ✅ |
 | Materialien & Licht: Wand-/Bodenmaterialien je Raum/Wandseite, Tageszeit, Belichtung, Leuchten mit Farbtemperatur | ✅ |
 | Planungs- und Realismusmodus, adaptive Qualität, FPS-Anzeige | ✅ |

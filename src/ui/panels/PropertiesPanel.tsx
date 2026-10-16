@@ -9,7 +9,7 @@ import type { Furniture, Light, Material, Opening, Project, Provenance, Room } f
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { deleteSelection, duplicateSelection } from '../actions';
-import { confirmDialog } from '../dialogStore';
+import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
 import { kitchenChecksForItem } from '../../kitchen/kitchen';
@@ -424,7 +424,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           </p>
         ))}
       </Section>
-      <Section title="Preis & Produkt">
+      <Section title="Preis">
         <div className="field-row">
           <NumberField
             label="Preis"
@@ -455,6 +455,25 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             Preis entfernen
           </button>
         )}
+      </Section>
+      <Section title="3D-Modell" actions={f.model.type === 'gltf' ? <Badge kind="ok">GLB</Badge> : <Badge kind="muted">prozedural</Badge>}>
+        <div className="btn-row">
+          <button onClick={() => useDialogStore.getState().openModal('model', { furnitureId: f.id })}>{f.model.type === 'gltf' ? 'Anderes GLB…' : 'Eigenes GLB hinterlegen…'}</button>
+          {f.model.type === 'gltf' && (
+            <button
+              onClick={() =>
+                upd((x) => {
+                  if (x.model.type === 'gltf') x.model = { type: 'procedural', shape: x.model.fallbackShape };
+                  x.approximate = true;
+                })
+              }
+            >
+              Näherungsmodell verwenden
+            </button>
+          )}
+        </div>
+      </Section>
+      <Section title="Produkt">
         <TextField label="Marke" value={f.brand ?? ''} onChange={(v) => upd((x) => (x.brand = v || undefined))} />
         <TextField label="Händler" value={f.retailer ?? ''} onChange={(v) => upd((x) => (x.retailer = v || undefined))} placeholder="z. B. IKEA Österreich" />
         <TextField label="Produkt-URL" value={f.productUrl ?? ''} onChange={(v) => upd((x) => (x.productUrl = v || undefined))} placeholder="https://…" />

@@ -45,6 +45,9 @@ export async function deleteProject(id: string): Promise<void> {
   await db.putMeta(INDEX_KEY, index);
   if (loaded) {
     const stillUsed = new Set<string>();
+    // models referenced by the imported catalog must survive project deletion
+    const catalog = (await db.getMeta<{ model: { type: string; assetId?: string } }[]>('importedCatalog')) ?? [];
+    for (const c of catalog) if (c.model.type === 'gltf' && c.model.assetId) stillUsed.add(c.model.assetId);
     for (const m of index) {
       const other = await loadProject(m.id).catch(() => null);
       if (other) referencedAssetIds(other.project).forEach((a) => stillUsed.add(a));

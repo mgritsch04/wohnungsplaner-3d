@@ -6,6 +6,7 @@ import type { Furniture, QualityMode } from '../model/schema';
 import { planRotationToWorldY, roundMm } from '../model/units';
 import { ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
+import { DRACO_PATH } from '../import/gltf';
 
 interface Props {
   item: Furniture;
@@ -99,7 +100,7 @@ function GltfModel({ item, fallback, castShadow }: { item: Furniture; fallback: 
 }
 
 function LoadedGltf({ url, item, castShadow }: { url: string; item: Furniture; castShadow: boolean }) {
-  const gltf = useGLTF(url);
+  const gltf = useGLTF(url, DRACO_PATH);
   const scene = useMemo(() => {
     const s = gltf.scene.clone(true);
     const box = new THREE.Box3().setFromObject(s);

@@ -74,6 +74,9 @@ export function CatalogPanel() {
         {items.length === 0 && <li className="empty">Keine Einträge gefunden.</li>}
       </ul>
       <div className="catalog-footer">
+        <button className="block" onClick={() => useDialogStore.getState().openModal('model')}>
+          3D-Modell importieren (GLB/glTF)…
+        </button>
         <button className="block" onClick={() => useDialogStore.getState().openModal('product')}>
           Produkt von Händlerseite übernehmen (IKEA, Möbelix …)
         </button>

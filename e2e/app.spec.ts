@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf } from './fixtures';
+import { boxGlb } from '../src/test/glbFixture';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -324,4 +325,41 @@ test('takes over a product from a pasted retailer page (synthetic sample) and pl
   expect(item.height).toBeCloseTo(2.02, 6);
   expect(item.retailer).toBe('IKEA Österreich');
   expect(item.price.amount).toBe(59.99);
+});
+
+test('imports a GLB model into the catalog, places it and attaches a model to an item', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: /3D-Modell importieren/ }).click();
+  const dlg = page.getByRole('dialog', { name: '3D-Modell importieren' });
+  // invalid file first
+  await dlg.getByLabel('Modelldatei').setInputFiles({ name: 'kaputt.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from('nope') });
+  await expect(dlg.getByText(/Kein glTF/)).toBeVisible();
+  // valid box model 80 × 60 × 200 cm, modelled in centimetres
+  await dlg.getByLabel('Modelldatei').setInputFiles({ name: 'schrank.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(80, 200, 60)) });
+  await expect(dlg.getByText('gültig')).toBeVisible();
+  await expect(dlg.getByText(/Zentimetern/)).toBeVisible();
+  await dlg.getByRole('button', { name: 'Zum Katalog hinzufügen und platzieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'schrank')).toBe(true);
+  const item = (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'schrank');
+  expect(item.model.type).toBe('gltf');
+  expect(item.width).toBeCloseTo(0.8, 6);
+  expect(item.height).toBeCloseTo(2.0, 6);
+  expect(item.approximate).toBe(false);
+  // attach a model to an existing procedural item via the properties panel
+  const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  await page.evaluate((id) => (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), sofa.id);
+  await page.getByRole('button', { name: 'Eigenes GLB hinterlegen…' }).click();
+  const dlg2 = page.getByRole('dialog', { name: '3D-Modell importieren' });
+  await dlg2.getByLabel('Modelldatei').setInputFiles({ name: 'sofa.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(2.1, 0.8, 0.9)) });
+  await dlg2.getByRole('button', { name: 'Auf bisherige Maße skalieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id).model.type).toBe('gltf');
+  const sofa2 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id);
+  expect(sofa2.model.type).toBe('gltf');
+  expect(sofa2.width).toBeCloseTo(sofa.width, 6);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(2500);
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible();
+  expect(errors).toEqual([]);
 });

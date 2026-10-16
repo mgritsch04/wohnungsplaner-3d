@@ -7,6 +7,7 @@ import { openProject } from './actions';
 import { confirmDialog, useDialogStore } from './dialogStore';
 import { importPdfPage } from '../import/underlayImport';
 import { ProductImportModal } from './ProductImportModal';
+import { ModelImportModal } from './ModelImportModal';
 
 export function ModalHost() {
   const modal = useDialogStore((s) => s.modal);
@@ -17,6 +18,7 @@ export function ModalHost() {
       {modal === 'help' && <HelpModal />}
       {modal === 'pdfPage' && <PdfPageModal />}
       {modal === 'product' && <ProductImportModal />}
+      {modal === 'model' && <ModelImportModal />}
       {confirm && (
         <div className="modal-backdrop" onMouseDown={() => confirm.resolve(false)}>
           <div className="modal small" role="alertdialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
