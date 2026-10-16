@@ -8,6 +8,7 @@ import { reportError } from '../../ui/actions';
 import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
+import { proposeRooms } from '../rooms';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
@@ -44,9 +45,13 @@ export async function runRecognition() {
       useUiStore.getState().toast('Es wurden keine Wände erkannt. Bitte die Wände manuell nachzeichnen (Werkzeug „Wand“).', 'info');
       return;
     }
+    // rooms: closed areas of the proposed walls; names/areas only from the plan's own text layer
+    const texts = analysis && analysis.imageAssetId === u.imageAssetId ? analysis.texts.map((t) => ({ str: t.str, ...imageToWorld(u, t) })) : undefined;
+    draft.rooms = proposeRooms(draft.walls, { texts });
+    if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
-    useUiStore.getState().toast(`${draft.walls.length} Wände und ${draft.openings.length} Öffnungen vorgeschlagen – bitte prüfen.`, 'success');
+    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume vorgeschlagen – bitte prüfen.`, 'success');
   } catch (e) {
     reportError(e, 'Erkennung fehlgeschlagen');
   } finally {
