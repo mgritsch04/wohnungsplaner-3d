@@ -263,6 +263,8 @@ export const SettingsSchema = z.object({
   lamps: z.enum(['auto', 'on', 'off']).default('auto'),
   /** Camera (eye) height in the first-person walkthrough, metres. */
   eyeHeight: z.number().min(1).max(2.2).default(1.63),
+  /** Eye height when seated in the walkthrough (#78), metres – e.g. on the sofa or at the dining table. */
+  sitEyeHeight: z.number().min(0.6).max(1.6).default(1.2),
   /** How furniture snaps while dragging (#52): grid steps + wall edges, wall edges only, or free. Alt = free temporarily. */
   furnitureSnap: z.enum(['grid5', 'grid10', 'wall', 'off']).default('grid5'),
   /** Minimum clear width of passages (#68) in metres – a guideline, not a building code. */

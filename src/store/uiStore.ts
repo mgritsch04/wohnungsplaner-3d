@@ -58,6 +58,8 @@ interface UiStore {
   walkCarry: string | null;
   /** Crouching in the walkthrough (#20). */
   walkDuck: boolean;
+  /** Seated in the walkthrough (#78) – eyes at settings.sitEyeHeight. */
+  walkSit: boolean;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   /** Shift+click: add/remove a furniture item to/from the selection. */
@@ -79,6 +81,7 @@ interface UiStore {
   setTimePreview: (hour: number | null) => void;
   setWalkCarry: (id: string | null) => void;
   setWalkDuck: (duck: boolean) => void;
+  setWalkSit: (sit: boolean) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -102,6 +105,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   timePreview: null,
   walkCarry: null,
   walkDuck: false,
+  walkSit: false,
   toasts: [],
   setSelection: (selection) => set({ selection, multi: [], rightTab: selection ? 'properties' : get().rightTab }),
   toggleFurnitureSelection: (id) => {
@@ -137,6 +141,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   setTimePreview: (timePreview) => set({ timePreview }),
   setWalkCarry: (walkCarry) => set({ walkCarry }),
   setWalkDuck: (walkDuck) => set({ walkDuck }),
+  setWalkSit: (walkSit) => set({ walkSit }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });
