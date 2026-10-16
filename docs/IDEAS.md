@@ -15,6 +15,7 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 
 | # | Titel (Issue) | Beschreibung | Nutzen | Prio | Abhängigkeiten | Abnahme | Status |
 |---|---|---|---|---|---|---|---|
+| 0 | High Prio Issues abarbeiten | Bevor du was anderes machst, arbeite alle high prio issues ab die aufgaben für dich sind | organisation | P1 | – | siehe Issue | Ready |
 | 1 | Möbel-Hoverinformationen (#9) | Name, Kategorie, Preis, Maße, Händler, Bild beim Überfahren; nur echte Daten, kein Stören beim Ziehen, Touch berücksichtigen | schneller Überblick ohne Auswahl | P2 | – | siehe Issue | Ready |
 | 2 | Zoom-Regler (#6) | Regler am unteren Viewport-Rand, synchron mit Mausrad | Bedienung ohne Mausrad/Touchpad | P2 | – | siehe Issue | Ready |
 | 3 | Positionsmarker im 2D-Plan beim Begehen (#19) | Punkt + Blickrichtung im 2D-Plan, live, nur bei 2D + 3D | Orientierung in großen Wohnungen | P2 | – | siehe Issue | Ready |
