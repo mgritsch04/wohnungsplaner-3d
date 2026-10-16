@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { QualityMode } from '../model/schema';
-import { getColorMaterial } from './materials3d';
+import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
 
 /**
@@ -71,6 +71,9 @@ export interface Part {
   emissive?: string;
   opacity?: number;
   doubleSide?: boolean;
+  /** Surface structure in realism mode. */
+  detail?: DetailKind;
+  detailRepeat?: number;
 }
 
 function shade(hex: string, f: number): string {
@@ -100,7 +103,7 @@ const cyl = (x: number, y0: number, z: number, r: number, y1: number, color: str
   color,
   ...extra,
 });
-const leg = (x: number, z: number, top: number, r: number, color: string): Part => ({ geo: TAPER, p: [x, top / 2, z], s: [r * 2, top, r * 2], color, rough: 0.6 });
+const leg = (x: number, z: number, top: number, r: number, color: string): Part => ({ geo: TAPER, p: [x, top / 2, z], s: [r * 2, top, r * 2], color, rough: 0.6, detail: 'woodgrain' });
 
 const WOOD = '#8a6748';
 const METAL = '#a7abb0';
@@ -110,7 +113,8 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
   const W = w / 2;
   const D = d / 2;
   const front = accent ?? color;
-  const fabric = { rough: 0.95 };
+  const fabric: Partial<Part> = { rough: 0.95, detail: 'fabric', detailRepeat: 3 };
+  const grain: Partial<Part> = { detail: 'woodgrain', detailRepeat: 1 };
   const legs4 = (top: number, inset: number, r: number, c = WOOD) =>
     [
       [-W + inset, -D + inset],
@@ -168,7 +172,7 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
       const mattress = 0.22;
       const headD = 0.08;
       const parts: Part[] = [
-        rbox(-W, 0.06, -D + headD, W, frameTop, D, 0.02, color, { rough: 0.8 }),
+        rbox(-W, 0.06, -D + headD, W, frameTop, D, 0.02, color, fabric),
         rbox(-W, 0.05, -D, W, h, -D + headD, 0.04, shade(color, 0.92), fabric),
         rbox(-W + 0.03, frameTop, -D + headD + 0.01, W - 0.03, frameTop + mattress, D - 0.03, 0.06, '#f5f3ee', fabric),
         // duvet over the lower two thirds, slightly overhanging
@@ -186,7 +190,7 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
     case 'table':
     case 'desk': {
       const top = 0.035;
-      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, 0.008, color, { rough: 0.45 })];
+      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, 0.008, color, { rough: 0.45, ...grain })];
       if (shape === 'desk') {
         parts.push(rbox(-W + 0.02, 0, -D + 0.04, -W + 0.06, h - top, D - 0.04, 0.005, shade(color, 0.9)));
         parts.push(rbox(W - 0.06, 0, -D + 0.04, W - 0.02, h - top, D - 0.04, 0.005, shade(color, 0.9)));
@@ -196,7 +200,7 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
     }
     case 'table-round': {
       const r = Math.min(w, d) / 2;
-      return [cyl(0, h - 0.035, 0, r, h, color, { rough: 0.45 }), cyl(0, 0.03, 0, 0.045, h - 0.035, shade(color, 0.8)), cyl(0, 0, 0, r * 0.4, 0.03, shade(color, 0.8))];
+      return [cyl(0, h - 0.035, 0, r, h, color, { rough: 0.45, ...grain }), cyl(0, 0.03, 0, 0.045, h - 0.035, shade(color, 0.8)), cyl(0, 0, 0, r * 0.4, 0.03, shade(color, 0.8))];
     }
     case 'chair':
       return [
@@ -335,10 +339,10 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
     case 'pendant':
       return [cyl(0, h * 0.4, 0, 0.003, h, BLACK), { geo: CONE, p: [0, h * 0.2, 0], s: [Math.min(w, d), h * 0.4, Math.min(w, d)], color, emissive: '#ffd9a3', doubleSide: true }];
     case 'rug':
-      return [rbox(-W, 0, -D, W, Math.max(0.008, h), D, 0.004, color, { rough: 1 })];
+      return [rbox(-W, 0, -D, W, Math.max(0.008, h), D, 0.004, color, { rough: 1, detail: 'carpet', detailRepeat: 4 })];
     case 'curtain':
       return [
-        { geo: curtainGeometry(w, h - 0.03, Math.max(0.04, d)), p: [0, (h - 0.03) / 2 + 0.01, 0], s: [1, 1, 1], color, rough: 1, doubleSide: true },
+        { geo: curtainGeometry(w, h - 0.03, Math.max(0.04, d)), p: [0, (h - 0.03) / 2 + 0.01, 0], s: [1, 1, 1], color, rough: 1, doubleSide: true, detail: 'fabric', detailRepeat: 4 },
         cyl(0, h - 0.015, 0, 0.012, h, METAL, { metal: 0.8, r: [0, 0, Math.PI / 2] }),
         { geo: CYL, p: [0, h - 0.015, 0], s: [0.024, w + 0.1, 0.024], r: [0, 0, Math.PI / 2], color: METAL, metal: 0.8, rough: 0.3 },
       ];
@@ -426,7 +430,7 @@ export const ProceduralModel = memo(function ProceduralModel({
           position={p.p}
           scale={p.s}
           rotation={p.r ?? [0, 0, 0]}
-          material={getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide })}
+          material={getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat })}
           castShadow={castShadow && (p.opacity ?? 1) === 1 && !p.emissive}
           receiveShadow={castShadow}
         />
