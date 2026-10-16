@@ -83,6 +83,9 @@ export function CatalogPanel() {
         <button className="block" onClick={() => void importCatalogFile()}>
           Produktliste importieren (JSON/CSV, optional mit .glb)…
         </button>
+        <button className="block" onClick={() => void importCatalogFile({ folder: true })} title="Ganzen Ordner wählen, z. B. ikea-import (Produktliste + 3D-Modelle)">
+          Ordner importieren (z. B. ikea-import)…
+        </button>
         <p className="muted small">
           Generische Einträge haben typische Maße und <strong>geschätzte Richtpreise</strong> – keine Angebote eines Händlers. Echte Produkte (z. B. IKEA, Möbelix)
           können per Produktliste importiert werden – siehe Dokumentation.
