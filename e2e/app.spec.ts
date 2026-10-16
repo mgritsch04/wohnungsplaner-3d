@@ -388,6 +388,26 @@ test('2D plan shows where you are while walking in 3D (2D + 3D view only) (#19)'
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: hold C to crouch (lower camera, slower), release to stand up (#20)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await page.keyboard.down('KeyC');
+  await expect.poll(camY).toBeLessThan(1.0);
+  await expect(page.getByTestId('walk-duck')).toBeVisible();
+  // C must not trigger anything in the 2D tools while walking
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
+  await page.keyboard.up('KeyC');
+  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect(page.getByTestId('walk-duck')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('exports the shopping list as CSV', async ({ page }) => {
   await freshStart(page);
   await page.locator('.panel.right').getByRole('button', { name: 'Budget' }).click();

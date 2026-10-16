@@ -54,6 +54,8 @@ interface UiStore {
   timePreview: number | null;
   /** Furniture currently carried in the first-person walkthrough (#39). */
   walkCarry: string | null;
+  /** Crouching in the walkthrough (#20). */
+  walkDuck: boolean;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   setHover: (s: Selection | null) => void;
@@ -70,6 +72,7 @@ interface UiStore {
   setFps: (fps: number | null) => void;
   setTimePreview: (hour: number | null) => void;
   setWalkCarry: (id: string | null) => void;
+  setWalkDuck: (duck: boolean) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -91,6 +94,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   fps: null,
   timePreview: null,
   walkCarry: null,
+  walkDuck: false,
   toasts: [],
   setSelection: (selection) => set({ selection, rightTab: selection ? 'properties' : get().rightTab }),
   setHover: (hover) => {
@@ -111,6 +115,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   setFps: (fps) => set({ fps }),
   setTimePreview: (timePreview) => set({ timePreview }),
   setWalkCarry: (walkCarry) => set({ walkCarry }),
+  setWalkDuck: (walkDuck) => set({ walkDuck }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });

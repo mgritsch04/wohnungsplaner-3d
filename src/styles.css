@@ -1224,3 +1224,16 @@ code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f
   border-radius: 999px;
   line-height: 1;
 }
+.walk-duck {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.8);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 2;
+}
