@@ -9,6 +9,13 @@ import { pointInFurniture } from './furnitureGeometry';
  * (usually a few screen pixels divided by the zoom).
  */
 export function hitTest(p: Project, d: DerivedPlan, pt: Vec2, tol: number, opts: { nodes?: boolean } = {}): Selection | null {
+  // Furniture is drawn on top of walls: a click clearly inside an item selects the item,
+  // never a wall/corner underneath it (smallest item wins when stacked).
+  const inside = p.furniture.filter((f) => pointInFurniture(f, pt, 0));
+  if (inside.length) {
+    inside.sort((a, b) => a.width * a.depth - b.width * b.depth);
+    return { type: 'furniture', id: inside[0].id };
+  }
   if (opts.nodes !== false) {
     let best: { id: string; dd: number } | null = null;
     for (const n of p.nodes) {

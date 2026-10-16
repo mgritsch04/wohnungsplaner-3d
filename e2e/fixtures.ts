@@ -122,3 +122,16 @@ export function vectorPlanPdf(): Buffer {
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(out, 'latin1');
 }
+
+/** Screen position of a 3D world point (Y up) in the 3D canvas. */
+export async function worldToScreen3d(page: Page, x: number, y: number, z: number) {
+  return page.evaluate(
+    ([wx, wy, wz]) => {
+      const t = (window as unknown as { __wp: { three: { camera: { position: { clone: () => { set: (a: number, b: number, c: number) => { project: (c: unknown) => { x: number; y: number } } } } }; canvas: HTMLCanvasElement } } }).__wp.three;
+      const v = t.camera.position.clone().set(wx, wy, wz).project(t.camera);
+      const r = t.canvas.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    },
+    [x, y, z] as const,
+  );
+}

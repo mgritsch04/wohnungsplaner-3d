@@ -8,6 +8,7 @@ import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MA
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { doorSymbol } from '../editor2d/openingSymbols';
+import { isClick } from './pointer';
 
 interface Props {
   project: Project;
@@ -111,7 +112,7 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             receiveShadow={shadows}
             onClick={(e) => {
               e.stopPropagation();
-              onSelect('wall', wall.id);
+              if (isClick(e)) onSelect('wall', wall.id);
             }}
           />
         );
@@ -132,7 +133,7 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             receiveShadow={shadows}
             onClick={(e) => {
               e.stopPropagation();
-              onSelect('room', f.room.id);
+              if (isClick(e)) onSelect('room', f.room.id);
             }}
           />
           {showCeilings && <mesh geometry={f.ceiling} material={getSurfaceMaterial(f.ceilingMat, quality)} receiveShadow={shadows} />}
@@ -149,9 +150,9 @@ export const Architecture = memo(function Architecture({ project, derived, quali
           const center = add(fp.a, scale(fp.dir, (r.s0 + r.s1) / 2));
           const h = r.top - r.bottom;
           const sel = selectedId === o.id;
-          const select = (e: { stopPropagation: () => void }) => {
+          const select = (e: { stopPropagation: () => void; delta?: number }) => {
             e.stopPropagation();
-            onSelect('opening', o.id);
+            if (isClick(e)) onSelect('opening', o.id);
           };
           if (o.kind === 'window') {
             const ft = 0.07; // outer frame (Blendrahmen)

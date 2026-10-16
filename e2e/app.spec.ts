@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf } from './fixtures';
+import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
@@ -362,4 +362,35 @@ test('imports a GLB model into the catalog, places it and attaches a model to an
   await page.waitForTimeout(2500);
   await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('3D: clicking furniture keeps it selected after release; walls stay selectable; orbit drag keeps selection', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(2500);
+  const p = await getProject(page);
+  const bed = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-bed-160');
+  const s = await worldToScreen3d(page, bed.x, 0.55, bed.y);
+  await page.mouse.click(s.x, s.y);
+  await page.waitForTimeout(400);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: bed.id });
+  // repeated click keeps it selected
+  await page.mouse.click(s.x, s.y);
+  await page.waitForTimeout(400);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: bed.id });
+  // orbit drag on empty floor does not change the selection
+  const f = await worldToScreen3d(page, 1.0, 0, 1.5);
+  await page.mouse.move(f.x, f.y);
+  await page.mouse.down();
+  await page.mouse.move(f.x + 60, f.y + 10, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: bed.id });
+  // clicking the exposed top of a wall selects that wall
+  await page.getByRole('button', { name: '⟲ Kamera' }).click();
+  await page.waitForTimeout(800);
+  const w = await worldToScreen3d(page, 4.0, 2.6, -0.06);
+  await page.mouse.click(w.x, w.y);
+  await page.waitForTimeout(400);
+  expect((await getSelection(page))?.type).toBe('wall');
 });

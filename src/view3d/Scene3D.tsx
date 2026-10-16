@@ -18,6 +18,7 @@ import { WalkControls } from './WalkControls';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { kelvinToColor, sunDirection } from './lighting';
 import { usePerformanceStore } from './performanceStore';
+import { CLICK_THRESHOLD_PX } from './pointer';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -25,6 +26,8 @@ export function Scene3D() {
   const quality = project.settings.quality;
   const [locked, setLocked] = useState(false);
   const [webglError, setWebglError] = useState<string | null>(null);
+  // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
+  const downAt = useRef<{ x: number; y: number } | null>(null);
   const cutaway = usePerformanceStore((s) => s.cutaway);
   const dprCap = usePerformanceStore((s) => s.dprCap);
 
@@ -39,7 +42,7 @@ export function Scene3D() {
   }
 
   return (
-    <div className="scene3d" data-testid="scene3d">
+    <div className="scene3d" data-testid="scene3d" onPointerDownCapture={(e) => (downAt.current = { x: e.clientX, y: e.clientY })}>
       <WebGLBoundary onError={setWebglError}>
         <Canvas
           shadows={quality === 'realism' ? 'soft' : false}
@@ -52,7 +55,9 @@ export function Scene3D() {
           }}
           frameloop="always"
           onPointerMissed={(e) => {
-            if (e.button === 0 && cameraMode === 'orbit') useUiStore.getState().setSelection(null);
+            const d = downAt.current;
+            const moved = d ? Math.hypot(e.clientX - d.x, e.clientY - d.y) : 0;
+            if (e.button === 0 && cameraMode === 'orbit' && moved <= CLICK_THRESHOLD_PX) useUiStore.getState().setSelection(null);
           }}
         >
           <SceneContent project={project} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
@@ -90,7 +95,12 @@ function SceneContent({
   const selection = useUiStore((s) => s.selection);
   const setSelection = useUiStore((s) => s.setSelection);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
-  const { gl } = useThree();
+  const { gl, camera } = useThree();
+  // e2e/debug hook: lets tests project world points to screen coordinates
+  useEffect(() => {
+    const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
+    if (wp) wp.three = { camera, canvas: gl.domElement };
+  }, [camera, gl]);
 
   const bounds = useMemo(() => {
     const pts = [...project.nodes, ...project.furniture.flatMap((f) => furnitureCorners(f))];

@@ -7,6 +7,7 @@ import { planRotationToWorldY, roundMm } from '../model/units';
 import { ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
 import { DRACO_PATH } from '../import/gltf';
+import { isClick } from './pointer';
 
 interface Props {
   item: Furniture;
@@ -21,7 +22,7 @@ interface Props {
 /** One furniture object in 3D. Can be dragged on the floor plane. */
 export const FurnitureObject = memo(
   function FurnitureObject({ item, quality, selected, onSelect, onDragStart, onDrag, onDragEnd }: Props) {
-    const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane } | null>(null);
+    const dragging = useRef<{ grab: THREE.Vector3; plane: THREE.Plane; started: boolean } | null>(null);
     const shape = item.model.type === 'procedural' ? item.model.shape : item.model.fallbackShape;
     const accent = item.kitchen?.frontColor;
     const castShadow = quality === 'realism' && item.height > 0.05;
@@ -38,14 +39,19 @@ export const FurnitureObject = memo(
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -item.elevation);
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(plane, hit)) return;
-      dragging.current = { grab: hit.sub(new THREE.Vector3(item.x, item.elevation, item.y)), plane };
+      dragging.current = { grab: hit.sub(new THREE.Vector3(item.x, item.elevation, item.y)), plane, started: false };
       (e.target as unknown as Element).setPointerCapture?.(e.pointerId);
-      onDragStart();
     };
     const onMove = (e: ThreeEvent<PointerEvent>) => {
       const dr = dragging.current;
       if (!dr) return;
       e.stopPropagation();
+      // only start moving after a small threshold so a click never nudges the object
+      if (!dr.started) {
+        if (isClick(e)) return;
+        dr.started = true;
+        onDragStart();
+      }
       const hit = new THREE.Vector3();
       if (!e.ray.intersectPlane(dr.plane, hit)) return;
       onDrag(item.id, roundMm(hit.x - dr.grab.x), roundMm(hit.z - dr.grab.z));
@@ -53,9 +59,15 @@ export const FurnitureObject = memo(
     const onUp = (e: ThreeEvent<PointerEvent>) => {
       if (!dragging.current) return;
       e.stopPropagation();
+      const started = dragging.current.started;
       dragging.current = null;
       (e.target as unknown as Element).releasePointerCapture?.(e.pointerId);
-      onDragEnd();
+      if (started) onDragEnd();
+    };
+    // The click that follows pointerup must stop here; otherwise R3F hands it to the
+    // next object behind (e.g. a wall), which would steal the selection.
+    const onClick = (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
     };
 
     return (
@@ -65,6 +77,7 @@ export const FurnitureObject = memo(
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
+        onClick={onClick}
       >
         {item.model.type === 'gltf' ? (
           <ModelErrorBoundary fallback={fallback}>
