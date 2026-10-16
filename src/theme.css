@@ -101,6 +101,9 @@
   --color-plan-ok: #15803d; /* im Richtwert */
   --color-plan-warn: #b45309; /* außerhalb des Richtwerts */
   --color-plan-halo: #ffffff; /* Schrift-Umrandung auf dem Plan */
+  --color-plan-visible: #0d9488; /* Sichtlinien (#89): sichtbarer Bereich */
+  --color-plan-hidden: #64748b; /* Sichtlinien: verdeckter Bereich */
+  --color-plan-viewpoint: #0f766e; /* Sichtlinien: Blickpunkt */
 
   /* ---------- Abstände (4er-Raster, in rem → skaliert mit der Grundschrift) ---------- */
   --space-0: 0.125rem; /* 2px */
@@ -246,6 +249,9 @@
   --color-plan-ok: #15803d;
   --color-plan-warn: #b45309;
   --color-plan-halo: #ffffff;
+  --color-plan-visible: #0d9488;
+  --color-plan-hidden: #64748b;
+  --color-plan-viewpoint: #0f766e;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -330,5 +336,8 @@
     --color-plan-ok: #15803d;
     --color-plan-warn: #b45309;
     --color-plan-halo: #ffffff;
+    --color-plan-visible: #0d9488;
+    --color-plan-hidden: #64748b;
+    --color-plan-viewpoint: #0f766e;
   }
 }
