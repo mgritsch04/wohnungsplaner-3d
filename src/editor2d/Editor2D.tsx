@@ -23,6 +23,8 @@ import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, move
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
+import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
+import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
 
 type Drag =
@@ -324,6 +326,9 @@ export function Editor2D() {
         if (id) ui().setSelection({ type: 'opening', id });
         return;
       }
+      case 'walkpath':
+        walkPathClick(w);
+        return;
       case 'measure': {
         const s = snap(w, e, measureStart);
         if (!measureStart) setMeasureStart(s.point);
@@ -701,6 +706,7 @@ export function Editor2D() {
           <PlanDrawing project={project} derived={derived} selection={selection} multi={multi} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
+          {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
 
           {/* node handles */}
@@ -862,6 +868,7 @@ export function Editor2D() {
       {tool === 'room' && <div className="editor-hint">Rechteck mit Innenmaßen aufziehen – oder in eine umschlossene Fläche klicken.</div>}
       {(tool === 'door' || tool === 'window' || tool === 'passage') && <div className="editor-hint">Auf eine Wand klicken, um {tool === 'door' ? 'eine Tür' : tool === 'window' ? 'ein Fenster' : 'einen Durchgang'} einzusetzen.</div>}
       {tool === 'measure' && <div className="editor-hint">Zwei Punkte klicken, um zu messen. Esc bricht ab.</div>}
+      {tool === 'walkpath' && <WalkPathHint />}
       {tool === 'calibrate' && !calib.p2 && (
         <div className="editor-hint">Maßstab kalibrieren: {calib.p1 ? 'zweiten Punkt' : 'ersten Punkt'} einer bekannten Strecke im Plan anklicken.</div>
       )}

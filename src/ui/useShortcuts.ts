@@ -3,7 +3,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore, type Tool } from '../store/uiStore';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure' };
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', r: 'room', t: 'door', f: 'window', g: 'passage', m: 'measure', l: 'walkpath' };
 
 /** Global keyboard shortcuts (ignored while typing in form fields). */
 export function useShortcuts() {
