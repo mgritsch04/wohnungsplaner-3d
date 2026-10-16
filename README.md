@@ -24,6 +24,19 @@ Voraussetzung: Node.js ≥ 20. Für die E2E-Tests wird Chromium von Playwright g
 (`npx playwright install chromium`, falls nicht vorhanden; ein vorinstalliertes Chromium unter
 `/opt/pw-browsers/chromium` oder `PW_CHROMIUM_PATH` wird automatisch verwendet).
 
+### Zusätzlich als Claude-Artefakt (#129)
+
+```bash
+npm run build:artifact  # Build mit relativen Pfaden nach dist-artifact/ + artifact-manifest.json
+npm run test:artifact   # eigene E2E-Suite: Build unter Unterpfad, fremde Hosts gesperrt, iframe, ohne Speicher
+```
+
+Nur `vite build --mode artifact` ändert sich (`base: './'`, Ausgabe `dist-artifact/`, pdf.js-Worker als
+`.js`); `npm run build`/`dist/` bleiben unverändert. `scripts/artifact-manifest.mjs` listet
+„veröffentlichter Pfad → Quelldatei + Medientyp“ und prüft die Artefakt-Grenzen (Größe, Anzahl,
+Endungen, nur relative Verweise). Projekte im Artefakt liegen getrennt von der PC-App (eigene
+Origin); Export/Import des Projektpakets ist die Brücke.
+
 ## Funktionsumfang (Stand)
 
 | Bereich | Status |
