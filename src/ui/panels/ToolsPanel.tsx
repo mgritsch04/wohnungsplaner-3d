@@ -151,7 +151,7 @@ export function ToolsPanel() {
 
       <Section title="Durchgänge">
         <NumberField
-          label="Mindestbreite Durchgang"
+          label="Durchgang mindestens"
           value={settings.minPassageWidth}
           factor={100}
           digits={0}

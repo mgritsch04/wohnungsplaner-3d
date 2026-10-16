@@ -1447,7 +1447,7 @@ test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width
 
   // minimum 60 cm (lowest allowed value): a 60 cm passage is no longer narrower → marker gone
   const left = page.locator('.panel.left');
-  const min = left.getByRole('textbox', { name: 'Mindestbreite Durchgang cm' });
+  const min = left.getByRole('textbox', { name: 'Durchgang mindestens cm' });
   await min.fill('60');
   await min.press('Enter');
   expect((await getProject(page)).settings.minPassageWidth).toBeCloseTo(0.6, 6);
