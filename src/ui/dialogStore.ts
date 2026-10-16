@@ -10,7 +10,7 @@ interface ConfirmRequest {
 
 interface DialogStore {
   confirmRequest: ConfirmRequest | null;
-  modal: 'projects' | 'help' | 'pdfPage' | 'product' | 'model' | 'bugReport' | null;
+  modal: 'projects' | 'help' | 'pdfPage' | 'product' | 'model' | 'bugReport' | 'versions' | null;
   modalData: unknown;
   openModal: (m: DialogStore['modal'], data?: unknown) => void;
   closeModal: () => void;

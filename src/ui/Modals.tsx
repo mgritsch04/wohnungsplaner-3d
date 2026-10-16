@@ -9,6 +9,7 @@ import { importPdfPage } from '../import/underlayImport';
 import { ProductImportModal } from './ProductImportModal';
 import { ModelImportModal } from './ModelImportModal';
 import { BugReportModal } from './BugReportModal';
+import { VersionsModal } from '../versions/VersionsModal';
 
 export function ModalHost() {
   const modal = useDialogStore((s) => s.modal);
@@ -21,6 +22,7 @@ export function ModalHost() {
       {modal === 'product' && <ProductImportModal />}
       {modal === 'model' && <ModelImportModal />}
       {modal === 'bugReport' && <BugReportModal />}
+      {modal === 'versions' && <VersionsModal />}
       {confirm && (
         <div className="modal-backdrop" onMouseDown={() => confirm.resolve(false)}>
           <div className="modal small" role="alertdialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>

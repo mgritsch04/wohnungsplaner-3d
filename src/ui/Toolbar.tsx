@@ -68,6 +68,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               <button onClick={closeAfter(() => newProject(true))}>Neues Beispielprojekt</button>
               <button onClick={closeAfter(() => openModal('projects'))}>Projekte öffnen…</button>
               <button onClick={closeAfter(saveNow)}>Jetzt speichern (Strg+S)</button>
+              <button onClick={closeAfter(() => openModal('versions'))}>Versionen (Stände speichern/vergleichen)…</button>
               <hr />
               <button onClick={closeAfter(importProjectFile)}>Projekt importieren (.wohnplan.json)…</button>
               <button onClick={closeAfter(importFloorPlanJsonFile)}>Grundriss-JSON importieren…</button>

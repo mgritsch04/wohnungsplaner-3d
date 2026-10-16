@@ -2,6 +2,7 @@ import type { Project } from '../model/schema';
 import { parseProjectJson, serializeProject } from '../formats/project/projectFile';
 import { referencedAssetIds } from '../formats/project/packageFile';
 import { db } from './db';
+import { deleteAllVersions, versionAssetIds } from './versions';
 
 export interface ProjectMeta {
   id: string;
@@ -37,9 +38,11 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   return [...index].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-/** Delete a project and the assets that no other saved project references. */
+/** Delete a project, its saved states and the assets that no other saved project (or state) references. */
 export async function deleteProject(id: string): Promise<void> {
   const loaded = await loadProject(id).catch(() => null);
+  const ownVersionAssets = await versionAssetIds(id);
+  await deleteAllVersions(id);
   await db.deleteProject(id);
   const index = (await readIndex()).filter((m) => m.id !== id);
   await db.putMeta(INDEX_KEY, index);
@@ -51,8 +54,9 @@ export async function deleteProject(id: string): Promise<void> {
     for (const m of index) {
       const other = await loadProject(m.id).catch(() => null);
       if (other) referencedAssetIds(other.project).forEach((a) => stillUsed.add(a));
+      (await versionAssetIds(m.id)).forEach((a) => stillUsed.add(a));
     }
-    for (const a of referencedAssetIds(loaded.project)) if (!stillUsed.has(a)) await db.deleteAsset(a);
+    for (const a of new Set([...referencedAssetIds(loaded.project), ...ownVersionAssets])) if (!stillUsed.has(a)) await db.deleteAsset(a);
   }
   if ((await db.getMeta<string>(LAST_KEY)) === id) await db.putMeta(LAST_KEY, index[0]?.id ?? null);
 }
