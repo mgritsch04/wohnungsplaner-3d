@@ -8,6 +8,8 @@ import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
+import { exportPlanPng } from '../../export/exportPng';
+import { openPrintView } from '../../export/PrintView';
 
 export function ProjectPanel() {
   const project = useProjectStore((s) => s.project);
@@ -113,6 +115,13 @@ export function ProjectPanel() {
             ))}
           </ul>
         )}
+      </Section>
+      <Section title="Plan exportieren">
+        <p className="muted small">Grundriss mit Maßen, Titel, Datum und Maßstabsbalken – ohne Raster und Auswahl.</p>
+        <div className="button-row">
+          <button onClick={() => void exportPlanPng()}>Plan als PNG</button>
+          <button onClick={openPrintView}>Druckansicht / PDF</button>
+        </div>
       </Section>
       <Section title="Projekt">
         <p className="muted small">

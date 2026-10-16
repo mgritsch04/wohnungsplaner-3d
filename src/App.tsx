@@ -19,6 +19,7 @@ import { BudgetPanel } from './ui/panels/BudgetPanel';
 import { ProjectPanel } from './ui/panels/ProjectPanel';
 import { useCatalogStore } from './catalog/catalogStore';
 import { useImportStore } from './import/importStore';
+import { PrintViewHost } from './export/PrintView';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -119,6 +120,7 @@ export default function App() {
       </div>
       <StatusBar />
       <ModalHost />
+      <PrintViewHost />
       <Toasts />
       <FurnitureHoverCard />
     </div>

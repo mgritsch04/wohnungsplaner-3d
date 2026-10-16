@@ -7,6 +7,7 @@ import { exportPackage, importProjectFile, newProject, saveNow } from './actions
 import type { SaveState } from '../persistence/useAutosave';
 import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPlanActions';
 import { exportShoppingCsv } from '../budget/budgetActions';
+import { openPrintView } from '../export/PrintView';
 import { TimeOfDayControl } from './TimeOfDayControl';
 
 export function Toolbar({ saveState }: { saveState: SaveState }) {
@@ -83,6 +84,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               <button onClick={closeAfter(exportPackage)}>Projektpaket (.wohnplan.json)</button>
               <button onClick={closeAfter(exportFloorPlanJson)}>Grundriss (apartment-plan.json)</button>
               <button onClick={closeAfter(exportShoppingCsv)}>Einkaufsliste (CSV)</button>
+              <button onClick={closeAfter(openPrintView)}>Plan drucken / PDF / PNG…</button>
             </div>
           )}
         </div>
