@@ -327,6 +327,38 @@ test('takes over a product from a pasted retailer page (synthetic sample) and pl
   expect(item.price.amount).toBe(59.99);
 });
 
+test('product type comes from the page (armchair stays an armchair); unknown type must be chosen (#8)', async ({ page }) => {
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Produkt von Händlerseite übernehmen' });
+  const category = dlg.getByLabel('Kategorie');
+  // synthetic shop page: unknown model name, breadcrumb says "Sessel"
+  const crumbs = '{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Wohnzimmer"},{"@type":"ListItem","position":2,"name":"Sessel"}]}';
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill(`<script type="application/ld+json">${crumbs}</script><script type="application/ld+json">{"@type":"Product","name":"Aurora","offers":{"price":"299","priceCurrency":"EUR"}}</script><p>Breite: 80 cm</p><p>Tiefe: 85 cm</p><p>Höhe: 95 cm</p>`);
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(category).toHaveValue('sofa');
+  await expect(dlg.getByTestId('category-guess')).toContainText('sicher');
+  await dlg.getByRole('button', { name: 'Hinzufügen und platzieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'Aurora')).toBe(true);
+  const item = (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'Aurora');
+  expect(item.category).toBe('sofa');
+  expect(item.model).toMatchObject({ type: 'procedural', shape: 'armchair' });
+  // nothing recognisable → no silent default, adding stays disabled until a category is chosen
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill('<script type="application/ld+json">{"@type":"Product","name":"Modell Nova","offers":{"price":"99","priceCurrency":"EUR"}}</script><p>Breite: 50 cm</p><p>Tiefe: 50 cm</p><p>Höhe: 50 cm</p>');
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(dlg.getByTestId('category-guess')).toContainText('nicht erkannt');
+  await expect(category).toHaveValue('');
+  await expect(dlg.getByRole('button', { name: 'Hinzufügen und platzieren' })).toBeDisabled();
+  await category.selectOption('decor');
+  await expect(dlg.getByRole('button', { name: 'Hinzufügen und platzieren' })).toBeEnabled();
+});
+
 test('imports a GLB model into the catalog, places it and attaches a model to an item', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
