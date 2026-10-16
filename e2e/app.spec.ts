@@ -726,3 +726,39 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
   expect((await getProject(page)).settings.mouseSensitivity).toBe(1);
   expect(errors).toEqual([]);
 });
+
+test('product list + .glb files chosen together: models attached, missing ones reported, placed with real model', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  // SYNTHETIC list (made-up products) in the format scripts/ikea-products.mjs writes
+  const list = {
+    format: 'wohnungsplaner-catalog',
+    version: 1,
+    name: 'Testliste',
+    units: 'cm',
+    items: [
+      { name: 'TESTREGAL mit Modell', category: 'storage', width: 80, depth: 28, height: 202, price: 59.99, modelFile: '00263850.glb' },
+      { name: 'TESTSCHRANK ohne Datei', category: 'storage', width: 30, depth: 32, height: 180, modelFile: 'fehlt.glb' },
+    ],
+  };
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Produktliste importieren/ }).click();
+  await (await chooser).setFiles([
+    { name: 'produktliste.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(list)) },
+    { name: '00263850.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(0.8, 2.02, 0.28)) },
+  ]);
+  await expect(page.getByText(/2 Produkt\(e\) importiert, 1 mit 3D-Modell/)).toBeVisible();
+  await expect(page.getByText(/fehlt\.glb/)).toBeVisible();
+  await page.getByPlaceholder(/Suchen/).fill('TESTREGAL');
+  await page.locator('.panel.left').getByText('TESTREGAL mit Modell').click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'TESTREGAL mit Modell')).toBe(true);
+  const item = (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'TESTREGAL mit Modell');
+  expect(item.model.type).toBe('gltf');
+  expect(item.model.assetId).toBeTruthy();
+  expect(item.approximate).toBe(false);
+  expect([item.width, item.depth, item.height]).toEqual([0.8, 0.28, 2.02]);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(2500);
+  expect(errors).toEqual([]);
+});

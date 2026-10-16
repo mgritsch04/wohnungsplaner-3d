@@ -81,7 +81,7 @@ export function CatalogPanel() {
           Produkt von Händlerseite übernehmen (IKEA, Möbelix …)
         </button>
         <button className="block" onClick={() => void importCatalogFile()}>
-          Produktliste importieren (JSON/CSV)…
+          Produktliste importieren (JSON/CSV, optional mit .glb)…
         </button>
         <p className="muted small">
           Generische Einträge haben typische Maße und <strong>geschätzte Richtpreise</strong> – keine Angebote eines Händlers. Echte Produkte (z. B. IKEA, Möbelix)

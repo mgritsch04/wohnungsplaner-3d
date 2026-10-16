@@ -20,3 +20,19 @@ describe('IKEA model variants', () => {
     expect(pickIkeaModel([])).toBeNull();
   });
 });
+
+describe('IKEA article lists', () => {
+  it('finds article numbers with quantities, combinations and URLs, merging duplicates', async () => {
+    const { parseArticleList, ikeaProductUrl, formatArticle, guessCategory } = await import('./ikeaList');
+    const list = parseArticleList('KALLAX 104.099.32\n2 x 106.230.36\nS895.792.19 ×1\nhttps://www.ikea.com/at/de/p/kallax-regal-weiss-10409932/\nPreis 99,00');
+    expect(list.map((a) => [formatArticle(a), a.quantity])).toEqual([
+      ['104.099.32', 2],
+      ['106.230.36', 2],
+      ['S895.792.19', 1],
+    ]);
+    expect(ikeaProductUrl(list[2])).toBe('https://www.ikea.com/at/de/p/-s89579219/');
+    expect(guessCategory('SALTSJÖBADEN 3er-Bettsofa mit Récamiere')).toBe('sofa');
+    expect(guessCategory('ENHET Hochschrank mit Tür')).toBe('storage');
+    expect(guessCategory('MICKE Schreibtisch')).toBe('desk');
+  });
+});
