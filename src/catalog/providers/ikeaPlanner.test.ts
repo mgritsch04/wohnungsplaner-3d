@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import designJson from './fixtures/ikea-pax-design.json';
+import productsJson from './fixtures/ikea-pax-products.synthetic.json';
+import { parseCatalogEntries } from '../catalogFormat';
+import { enrichPlacement, planArticles } from './ikeaPlanProducts';
 import { IkeaPlanError, parseIkeaPlannerJson, placeIkeaPlan } from './ikeaPlanner';
 
 // Reduced copy of a REAL design stored by the IKEA Austria PAX planner on 2026-10-16
@@ -68,5 +71,63 @@ describe('IKEA design → project', () => {
     }
     // the added room lies right of the sample apartment
     expect(Math.min(...xs)).toBeGreaterThan(8.6);
+  });
+});
+
+describe('IKEA design + product list → names and prices', () => {
+  // SYNTHETIC list (made-up names/prices, real article numbers of the fixture design); two articles are left out on purpose.
+  const products = JSON.stringify(productsJson);
+  const entries = parseCatalogEntries(products).entries;
+  const priceOf = (no: string) => entries.find((x) => x.articleNumber!.replace(/\D/g, '') === no)?.price ?? 0;
+
+  it('collects the article numbers of the fittings per frame', () => {
+    const plan = parseIkeaPlannerJson(design);
+    const corner = plan.items.find((i) => i.itemNo === '80458207')!;
+    expect(Object.values(corner.fittingArticles).reduce((a, b) => a + b, 0)).toBe(Object.values(corner.fittings).reduce((a, b) => a + b, 0));
+    expect(planArticles(plan)).toHaveLength(16); // distinct articles of the shopping list
+    expect(planArticles(plan).find((a) => a.digits === '30246722')?.quantity).toBe(10);
+  });
+
+  it('matches by article number: frame name + frame price + priced fittings; reports gaps', () => {
+    const plan = parseIkeaPlannerJson(design);
+    const e = enrichPlacement(plan, entries);
+    expect(e.furniture).toHaveLength(plan.items.length);
+    expect(e.named).toBe(5);
+    expect(e.priced).toBe(5);
+    plan.items.forEach((item, i) => {
+      expect(e.furniture[i].name).toContain(`SYNTHETISCH Testartikel ${item.itemNo}`);
+      const fit = Object.entries(item.fittingArticles).reduce((s, [no, n]) => s + priceOf(no) * n, 0);
+      expect(e.furniture[i].price?.amount).toBeCloseTo(priceOf(item.itemNo) + fit, 6);
+    });
+    expect(e.notes.join(' ')).toMatch(/Nicht in der Produktliste gefunden: .*302\.779\.59/);
+    expect(e.notes.join(' ')).toMatch(/Teil\(e\) der IKEA-Stückliste haben keine eigene Position/);
+    expect(e.furniture.some((f) => f.price?.status === 'estimate')).toBe(true);
+  });
+
+  it('without a matching list nothing changes (no names, no prices)', () => {
+    const e = enrichPlacement(parseIkeaPlannerJson(design), []);
+    expect(e.named).toBe(0);
+    expect(e.furniture.every((f) => !f.name && !f.price)).toBe(true);
+  });
+
+  it('applyIkeaPlan stores names and prices on the furniture; splitPlanFiles separates plan and list', async () => {
+    const { applyIkeaPlan, splitPlanFiles } = await import('../../import/ikeaPlanActions');
+    const { createSampleProject } = await import('../../model/sample');
+    const split = splitPlanFiles([
+      { name: 'produktliste.json', text: products },
+      { name: 'planung.json', text: design },
+    ]);
+    expect(split.plan.name).toBe('planung.json');
+    expect(split.lists.length).toBe(entries.length);
+    expect(() => splitPlanFiles([{ name: 'produktliste.json', text: products }])).toThrow(/Keine IKEA-Planung/);
+    const p = createSampleProject();
+    const before = p.furniture.length;
+    const res = applyIkeaPlan(p, parseIkeaPlannerJson(split.plan.text), split.lists);
+    expect(res.named).toBe(5);
+    const added = p.furniture.slice(before);
+    expect(added.every((f) => f.name.startsWith('SYNTHETISCH Testartikel') && f.price && f.retailer === 'IKEA Österreich')).toBe(true);
+    const old = createSampleProject();
+    applyIkeaPlan(old, parseIkeaPlannerJson(design));
+    expect(old.furniture.slice(before).every((f) => /PAX Korpus/.test(f.name) && !f.price)).toBe(true);
   });
 });

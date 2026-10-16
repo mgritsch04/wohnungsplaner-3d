@@ -3,6 +3,7 @@
  * IKEA Österreich: Artikelnummern → Produktliste für den Wohnungsplaner.
  *
  *   node scripts/ikea-products.mjs <liste.txt | "104.099.32, 2x 106.230.36"> [--out ordner] [--models] [--max 25]
+ *   node scripts/ikea-products.mjs --plan <planung.json> [--out ordner] [--max 50]
  *
  * Ruft für jede Artikelnummer die ÖFFENTLICHE Produktseite ab (www.ikea.com/at/de/p/…,
  * eine Anfrage pro 1,5 s), liest deren schema.org-Daten mit demselben Parser wie die
@@ -10,6 +11,10 @@
  * wird zusätzlich je Produkt die von der Seite deklarierte 3D-Datei (GLB) geladen
  * (web-api.ikea.com/dimma/assets – laut robots.txt erlaubt). In der App:
  * Katalog › „Produktliste importieren“ → JSON und die .glb-Dateien gemeinsam wählen.
+ *
+ * Mit --plan werden die Artikelnummern aus einer gespeicherten IKEA-Planung (PAX-Planer,
+ * siehe docs/IKEA_PLANUNG_JSON.md) gelesen; die entstehende produktliste.json wird in der App
+ * gemeinsam mit der Planungs-JSON importiert (Namen und Preise der Korpusse).
  *
  * Grenzen (bewusst): keine Suche, keine Konten/Merklisten, keine internen IKEA-APIs,
  * höchstens --max Artikel pro Lauf. 3D-Modelle und Bilder sind urheberrechtlich
@@ -25,14 +30,15 @@ const opt = (name, def) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : def;
 };
-const input = args.find((a, i) => !a.startsWith('--') && !['--out', '--max'].includes(args[i - 1]));
-if (!input) {
-  console.error('Aufruf: node scripts/ikea-products.mjs <datei | "artikelnummern"> [--out ordner] [--models] [--max 25]');
+const planFile = opt('--plan', null);
+const input = args.find((a, i) => !a.startsWith('--') && !['--out', '--max', '--plan'].includes(args[i - 1]));
+if (!input && !planFile) {
+  console.error('Aufruf: node scripts/ikea-products.mjs <datei | "artikelnummern"> [--out ordner] [--models] [--max 25]\n    oder: node scripts/ikea-products.mjs --plan <planung.json> [--out ordner]');
   process.exit(2);
 }
 const outDir = resolve(opt('--out', 'ikea-import'));
 const withModels = args.includes('--models');
-const max = Math.min(50, Number(opt('--max', 25)) || 25);
+const max = Math.min(50, Number(opt('--max', planFile ? 50 : 25)) || 25);
 const DELAY_MS = 1500;
 const UA = 'wohnungsplaner-3d/0.1 (privates Planungswerkzeug; einzelne Produktseiten auf Nutzeranfrage)';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -45,8 +51,16 @@ try {
   const { parseArticleList, ikeaProductUrl, formatArticle, pageToCatalogEntry } = await vite.ssrLoadModule('/src/catalog/providers/ikeaList.ts');
   const { parseProductPage } = await vite.ssrLoadModule('/src/catalog/providers/structuredData.ts');
 
-  const text = existsSync(input) ? readFileSync(input, 'utf-8') : input;
-  const articles = parseArticleList(text);
+  let articles;
+  if (planFile) {
+    const { parseIkeaPlannerJson } = await vite.ssrLoadModule('/src/catalog/providers/ikeaPlanner.ts');
+    const { planArticles } = await vite.ssrLoadModule('/src/catalog/providers/ikeaPlanProducts.ts');
+    articles = planArticles(parseIkeaPlannerJson(readFileSync(planFile, 'utf-8')));
+    console.log(`${articles.length} verschiedene Artikel in der Planung.`);
+  } else {
+    const text = existsSync(input) ? readFileSync(input, 'utf-8') : input;
+    articles = parseArticleList(text);
+  }
   if (!articles.length) throw new Error('Keine IKEA-Artikelnummern gefunden (Format z. B. 104.099.32 oder S895.792.19).');
   if (articles.length > max) console.warn(`${articles.length} Artikel gefunden – nur die ersten ${max} werden abgerufen (--max).`);
   mkdirSync(outDir, { recursive: true });
@@ -91,6 +105,7 @@ try {
   writeFileSync(join(outDir, 'produktliste.json'), JSON.stringify(list, null, 2));
   writeFileSync(join(outDir, 'bericht.json'), JSON.stringify(report, null, 2));
   console.log(`\n${items.length} Produkt(e) → ${join(outDir, 'produktliste.json')}`);
+  if (planFile) console.log('In der App: Import › „IKEA-Planung (JSON) importieren“ → Planungs-JSON UND produktliste.json gemeinsam auswählen.');
 } finally {
   await vite.close();
 }
