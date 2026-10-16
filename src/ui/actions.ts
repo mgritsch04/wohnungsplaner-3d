@@ -14,7 +14,9 @@ import { loadProject, saveProject } from '../persistence/projects';
 import { exportVersions, replaceVersions } from '../persistence/versions';
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
-import type { Furniture } from '../model/schema';
+import type { Furniture, FurnitureGroup } from '../model/schema';
+import { moveGroupBy, regroupCopies } from '../model/groups';
+import { rotateSelectedGroup, selectedGroupId } from './groupActions';
 import { confirmDialog } from './dialogStore';
 import { downloadBlob, pickFile, safeFileName } from './fileUtils';
 import { newId } from '../model/ids';
@@ -67,21 +69,30 @@ export function duplicateSelection() {
   if (!ids.length) return;
   const created: string[] = [];
   store().apply((d) => {
+    const copies: { id: string; sourceGroupId?: string }[] = [];
     for (const id of ids) {
       const nid = duplicateFurniture(d, id);
-      if (nid) created.push(nid);
+      if (nid) {
+        created.push(nid);
+        copies.push({ id: nid, sourceGroupId: d.furniture.find((f) => f.id === id)?.groupId });
+      }
     }
+    // duplicating a whole group gives a new group (#65)
+    regroupCopies(d, copies, structuredClone(d.groups));
   });
   ui().selectFurniture(created);
 }
 
 /** Furniture copied with Ctrl+C (kept in memory for this tab, pasted with Ctrl+V). */
 let clipboard: Furniture[] = [];
+/** Names of the groups of the copied items (#65) – pasting a whole group creates a new one. */
+let clipboardGroups: FurnitureGroup[] = [];
 let pasteCount = 0;
 
 export function copySelection(): number {
   const ids = new Set(selectedFurnitureIds(ui()));
   clipboard = store().project.furniture.filter((f) => ids.has(f.id)).map((f) => structuredClone(f));
+  clipboardGroups = structuredClone(store().project.groups);
   pasteCount = 0;
   if (clipboard.length) ui().toast(`${clipboard.length} Möbel kopiert – Strg+V fügt ein`, 'info');
   return clipboard.length;
@@ -94,11 +105,15 @@ export function pasteClipboard() {
   const off = 0.3 * pasteCount;
   const created: string[] = [];
   store().apply((d) => {
+    const copies: { id: string; sourceGroupId?: string }[] = [];
     for (const f of clipboard) {
       const nid = newId('item');
-      d.furniture.push({ ...structuredClone(f), id: nid, x: roundMm(f.x + off), y: roundMm(f.y + off) });
+      const { groupId, ...rest } = structuredClone(f);
+      d.furniture.push({ ...rest, id: nid, x: roundMm(f.x + off), y: roundMm(f.y + off) });
       created.push(nid);
+      copies.push({ id: nid, sourceGroupId: groupId });
     }
+    regroupCopies(d, copies, clipboardGroups);
   });
   ui().selectFurniture(created);
 }
@@ -107,6 +122,8 @@ export function pasteClipboard() {
 export function rotateSelection(deltaRad: number) {
   const sel = ui().selection;
   if (sel?.type !== 'furniture') return;
+  // a selected group turns as a whole about its centre (#65)
+  if (rotateSelectedGroup(deltaRad)) return;
   const f = store().project.furniture.find((x) => x.id === sel.id);
   if (f) setFurnitureRotation(f.id, f.rotation + deltaRad);
 }
@@ -131,6 +148,11 @@ export function nudgeSelection(dx: number, dy: number) {
   const p = store().project;
   const derived = derivePlan(p);
   const obstacles = buildPlacementObstacles(derived);
+  // a selected group moves rigidly, its collision check applies to the group as a whole (#65)
+  if (selectedGroupId()) {
+    store().apply((d) => void moveGroupBy(d, obstacles, ids, { x: dx, y: dy }, { collide: true }));
+    return;
+  }
   // nudging respects walls but does not snap (fine positioning); all selected items, one undo step
   store().apply((d) => {
     for (const id of ids) {

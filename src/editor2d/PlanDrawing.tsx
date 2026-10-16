@@ -21,6 +21,11 @@ interface Props {
   showDimensions: boolean;
   /** Furniture placement problems: 'error' (in wall/door leaf) or 'warn' (door swing, overlap). */
   conflicts?: Map<string, 'error' | 'warn'>;
+  /**
+   * Item that shows the rotation handle (the one the editor reacts to); null = none (e.g. a
+   * furniture group has its own handle, #65). Default: every selected item.
+   */
+  rotateHandleFor?: string | null;
 }
 
 const isSel = (s: Selection | null, type: Selection['type'], id: string) => s?.type === type && s.id === id;
@@ -34,7 +39,7 @@ function lighten(hex: string, amount: number): string {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, multi = [], hover, zoom, showDimensions, conflicts }: Props) {
+export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, multi = [], hover, zoom, showDimensions, conflicts, rotateHandleFor }: Props) {
   const px = 1 / zoom; // one screen pixel in meters
   const fontSize = 12 * px;
 
@@ -140,7 +145,15 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       <g>{openings}</g>
       <g>
         {furniture.map((f) => (
-          <FurnitureSymbol key={f.id} f={f} selected={isSel(selection, 'furniture', f.id) || multi.includes(f.id)} hovered={isSel(hover, 'furniture', f.id)} px={px} conflict={conflicts?.get(f.id)} />
+          <FurnitureSymbol
+            key={f.id}
+            f={f}
+            selected={isSel(selection, 'furniture', f.id) || multi.includes(f.id)}
+            handle={rotateHandleFor === undefined ? isSel(selection, 'furniture', f.id) || multi.includes(f.id) : rotateHandleFor === f.id}
+            hovered={isSel(hover, 'furniture', f.id)}
+            px={px}
+            conflict={conflicts?.get(f.id)}
+          />
         ))}
       </g>
       <g>
@@ -232,7 +245,22 @@ function signedAreaSign(poly: Vec2[]): number {
 }
 
 /** Simple top-view symbol for a furniture item; detail depends on the procedural shape. */
-const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px, conflict }: { f: Furniture; selected: boolean; hovered: boolean; px: number; conflict?: 'error' | 'warn' }) {
+const FurnitureSymbol = memo(function FurnitureSymbol({
+  f,
+  selected,
+  handle,
+  hovered,
+  px,
+  conflict,
+}: {
+  f: Furniture;
+  selected: boolean;
+  /** Draw the rotation handle above the item. */
+  handle: boolean;
+  hovered: boolean;
+  px: number;
+  conflict?: 'error' | 'warn';
+}) {
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
   const w = f.width;
   const d = f.depth;
@@ -319,7 +347,7 @@ const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px
         vectorEffect="non-scaling-stroke"
       />
       {details}
-      {selected && <circle cx={0} cy={-d / 2 - 22 * px} r={5 * px} fill="#2563eb" />}
+      {handle && <circle cx={0} cy={-d / 2 - 22 * px} r={5 * px} fill="#2563eb" />}
     </g>
   );
 });

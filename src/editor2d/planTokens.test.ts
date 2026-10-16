@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 // relative to the project root (Vitest runs there) – independent of the test environment's import.meta.url
 const themeCss = readFileSync(resolve('src/theme.css'), 'utf8');
 const editorSrc = readFileSync(resolve('src/editor2d/Editor2D.tsx'), 'utf8');
-const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo'];
+const PLAN_TOKENS = ['color-plan-ok', 'color-plan-warn', 'color-plan-halo', 'color-plan-group'];
 
 const valuesOf = (name: string) => [...themeCss.matchAll(new RegExp(`--${name}\\s*:\\s*(#[0-9a-f]{6})`, 'gi'))].map((m) => m[1].toLowerCase());
 
@@ -37,7 +37,7 @@ describe('plan hint tokens (#82)', () => {
     const planBg = /<rect width=\{vp\.width\} height=\{vp\.height\} fill="(#[0-9a-f]{6})"/i.exec(editorSrc)?.[1];
     expect(planBg).toBeDefined();
     const halo = valuesOf('color-plan-halo')[0];
-    for (const t of ['color-plan-ok', 'color-plan-warn']) {
+    for (const t of ['color-plan-ok', 'color-plan-warn', 'color-plan-group']) {
       const c = valuesOf(t)[0];
       expect(contrast(c, planBg!)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(c, halo)).toBeGreaterThanOrEqual(4.5);

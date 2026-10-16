@@ -101,6 +101,7 @@
   --color-plan-ok: #15803d; /* im Richtwert */
   --color-plan-warn: #b45309; /* außerhalb des Richtwerts */
   --color-plan-halo: #ffffff; /* Schrift-Umrandung auf dem Plan */
+  --color-plan-group: #6d28d9; /* Umrandung einer ausgewählten Möbelgruppe (#65) */
 
   /* ---------- Abstände (4er-Raster, in rem → skaliert mit der Grundschrift) ---------- */
   --space-0: 0.125rem; /* 2px */
@@ -246,6 +247,7 @@
   --color-plan-ok: #15803d;
   --color-plan-warn: #b45309;
   --color-plan-halo: #ffffff;
+  --color-plan-group: #6d28d9;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -330,5 +332,6 @@
     --color-plan-ok: #15803d;
     --color-plan-warn: #b45309;
     --color-plan-halo: #ffffff;
+    --color-plan-group: #6d28d9;
   }
 }
