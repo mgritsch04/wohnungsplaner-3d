@@ -48,7 +48,25 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `done` | vollständig abgeschlossen (bei User-Tests: von dir bestanden) |
 | `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
 
-Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
+Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte, vor neuen Ideen bearbeiten), `info` (erledigt, enthält aber eine wichtige Info für dich – du schließt es), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
+
+**Prioritäten beim Start und zwischen Aufgaben (#34, #35, #40)**
+1. Ein ausdrücklicher Auftrag von dir im Chat geht immer vor.
+2. **Fehlgeschlagene User-Tests** (`FEHLGESCHLAGEN` in einem `user-test`-Issue, Label `needs-fix`) – vorhandene Funktionen reparieren und abschließen. Vorher prüfen, ob der getestete Stand schon in `main` war; wenn nicht, im Issue darauf hinweisen und nach dem Merge neu testen lassen (kein Fehlschlag).
+3. **Issues mit `priority: high`**, die Aufgaben für Claude Code sind – vor neuen Ideen und vor `Ready`-Aufgaben.
+4. **Deine Kommentare** in offenen Issues (Antworten auf `user-task`, Rückfragen) zeitnah verarbeiten.
+5. Neue `idea-inbox`-Issues übernehmen, dann die oberste `Ready`-Zeile in `docs/IDEAS.md`.
+
+**Issue-Pflege (#35, #36)**
+- Issue-Check **zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe** (nach Commit/PR): neue/geänderte Issues seit dem letzten Check lesen. Einen dauerhaft im Hintergrund laufenden Prüfer gibt es innerhalb einer Sitzung nicht (kein Pollen); zwischen Sitzungen übernimmt das die Routine (#30). Für das Auflisten/Zusammenfassen dürfen Hilfsagenten mit kleinem Modell eingesetzt werden (siehe „Modellwahl“).
+- **Fertige Aufgaben werden geschlossen** (Label `done`), sobald der Stand in `main` ist – nicht nur kommentiert. Steht noch eine wichtige Info für dich drin, bekommt das Issue zusätzlich das Label **`info`** und bleibt offen; du schließt es selbst oder per Kommentar. Wirklich offene Aufgaben bleiben offen.
+- `user-task`-Issues werden geschlossen, sobald deine Antwort umgesetzt bzw. in `docs/IDEAS.md` eingeplant ist.
+
+**`docs/IDEAS.md` und Branches (#40)**
+- Direkte Pushes auf `main` sind tabu (Schutzregel). Deshalb wird `docs/IDEAS.md` auf dem Arbeits-Branch gepflegt und **zügig per PR in `main` integriert**; der Stand in `main` ist maßgeblich. Bearbeitest du die Datei selbst (z. B. im GitHub-Web), bitte auf `main` oder auf dem Arbeits-Branch – die Hauptsession holt die Änderung vor dem eigenen Bearbeiten per Merge/Fast-Forward und überschreibt sie nie.
+- Mehrere Branches sind erlaubt, wenn sinnvoll (z. B. ein reiner Doku-PR parallel zu einer Feature-Arbeit), immer `claude/…`-Präfix, jeder über PR mit grüner CI. Bei parallelen Änderungen an `docs/IDEAS.md` auf verschiedenen Branches Konflikte vor dem Merge auflösen, nie per Force-Push.
+
+**Kontingent (#13):** Nur das Kontingent deines Pro-Plans. Die Hauptsession kauft nichts, aktiviert keine „usage credits“ oder Zusatznutzung und ändert keine Abrechnungseinstellungen (kann sie auch nicht). Ist das Kontingent erschöpft, stoppt die laufende Sitzung; sie kann sich **nicht** selbst nach dem Zurücksetzen neu starten. Fortgesetzt wird durch deine Nachricht („weiter“) oder den nächsten planmäßigen Routine-Lauf (#30). Ein abgelehnter Routine-Lauf wird nicht nachgeholt; der nächste planmäßige startet normal.
 
 **Ablauf je Durchlauf der Hauptsession (ohne konkreten Auftrag)**
 1. `git status`/`git fetch` prüfen; fremde uncommittete Änderungen nie überschreiben.
