@@ -6,6 +6,7 @@ import { formatEuro } from '../../model/units';
 import { addCatalogItem } from '../actions';
 import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
+import { useDialogStore } from '../dialogStore';
 
 export function CatalogPanel() {
   const imported = useCatalogStore((s) => s.items);
@@ -73,6 +74,9 @@ export function CatalogPanel() {
         {items.length === 0 && <li className="empty">Keine Einträge gefunden.</li>}
       </ul>
       <div className="catalog-footer">
+        <button className="block" onClick={() => useDialogStore.getState().openModal('product')}>
+          Produkt von Händlerseite übernehmen (IKEA, Möbelix …)
+        </button>
         <button className="block" onClick={() => void importCatalogFile()}>
           Produktliste importieren (JSON/CSV)…
         </button>

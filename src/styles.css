@@ -1090,3 +1090,20 @@ dl.stats dd {
     overflow: visible;
   }
 }
+textarea {
+  font: inherit;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  width: 100%;
+  resize: vertical;
+}
+.product-review {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

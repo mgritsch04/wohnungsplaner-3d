@@ -296,3 +296,32 @@ test('plans a kitchen run along a selected wall', async ({ page }) => {
   expect(q.furniture.length).toBeGreaterThan(p.furniture.length);
   await expect(page.getByText('Stückliste Küche')).toBeVisible();
 });
+
+test('takes over a product from a pasted retailer page (synthetic sample) and places it', async ({ page }) => {
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: /Produkt von Händlerseite übernehmen/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Produkt von Händlerseite übernehmen' });
+  // failure case: garbage input keeps the app usable and adding disabled
+  await dlg.getByLabel('Seitenquelltext oder JSON-LD').fill('keine Produktdaten');
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(dlg.getByText('unzureichend')).toBeVisible();
+  await expect(dlg.getByRole('button', { name: 'Hinzufügen und platzieren' })).toBeDisabled();
+  // synthetic page (not a real retailer page)
+  await dlg.getByLabel('Produkt-URL').fill('https://www.ikea.com/at/de/p/testregal-weiss-00263850/');
+  await dlg
+    .getByLabel('Seitenquelltext oder JSON-LD')
+    .fill('<script type="application/ld+json">{"@type":"Product","name":"TESTREGAL","sku":"00263850","offers":{"price":"59.99","priceCurrency":"EUR"}}</script><p>Breite: 80 cm</p><p>Tiefe: 28 cm</p><p>Höhe: 202 cm</p>');
+  await dlg.getByRole('button', { name: 'Produktdaten auslesen' }).click();
+  await expect(dlg.getByText('vollständig aus Quelle')).toBeVisible();
+  await expect(dlg.getByText('IKEA Österreich').first()).toBeVisible();
+  await dlg.getByRole('button', { name: 'Hinzufügen und platzieren' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f: { name: string }) => f.name === 'TESTREGAL')).toBe(true);
+  const p = await getProject(page);
+  const item = p.furniture.find((f: { name: string }) => f.name === 'TESTREGAL');
+  expect(item).toBeTruthy();
+  expect(item.width).toBeCloseTo(0.8, 6);
+  expect(item.height).toBeCloseTo(2.02, 6);
+  expect(item.retailer).toBe('IKEA Österreich');
+  expect(item.price.amount).toBe(59.99);
+});
