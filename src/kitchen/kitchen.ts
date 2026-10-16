@@ -7,6 +7,7 @@ import type { Furniture, Project } from '../model/schema';
 import { roundMm } from '../model/units';
 import { add, dot, scale, sub } from '../model/vec';
 import { pruneGroups } from '../model/groups';
+import type { WallFootprint } from '../model/geometry/walls';
 
 /**
  * Modular kitchen planning on top of the shared furniture model.
@@ -28,13 +29,31 @@ export interface PlaceRunInput {
   wallId: string;
   /** +1 = left side of the wall (a→b), -1 = right side. */
   side: 1 | -1;
-  /** Start position along the wall measured from node a (meters). */
+  /**
+   * Start position along the wall (meters), measured from the start of the wall face on
+   * `side` – at a room corner that is the inner corner, not the centreline node (#16).
+   */
   start: number;
   modules: RunModule[];
   frontColor?: string;
 }
 
-/** Place a row of kitchen modules flush against a wall face. Returns created item ids. */
+/**
+ * Where the face of the wall on `side` begins and ends along the wall direction, measured from
+ * the centreline start `a` (meters). At a corner the face is shorter than the centreline by
+ * the connected wall's thickness: starting there keeps the first module out of that wall.
+ */
+export function wallFaceRange(fp: Pick<WallFootprint, 'a' | 'dir' | 'polygon'>, side: 1 | -1): { s0: number; s1: number } {
+  // polygon = [leftA, leftB, rightB, rightA], "left" = +normal = side 1
+  const [p0, p1] = side === 1 ? [fp.polygon[0], fp.polygon[1]] : [fp.polygon[3], fp.polygon[2]];
+  return { s0: dot(sub(p0, fp.a), fp.dir), s1: dot(sub(p1, fp.a), fp.dir) };
+}
+
+/**
+ * Place a row of kitchen modules flush against a wall face (back side on the face, wall
+ * thickness taken into account) and starting at the face's corner, so no module stands in
+ * the wall or in a connected wall (#16). Returns created item ids.
+ */
 export function placeKitchenRun(d: Project, input: PlaceRunInput): string[] {
   const derived = derivePlan(d);
   const fp = derived.footprints.get(input.wallId);
@@ -42,7 +61,7 @@ export function placeKitchenRun(d: Project, input: PlaceRunInput): string[] {
   const rotation = Math.atan2(fp.dir.y, fp.dir.x) + (input.side === 1 ? 0 : Math.PI);
   const normal = scale(fp.normal, input.side);
   const ids: string[] = [];
-  let along = input.start;
+  let along = wallFaceRange(fp, input.side).s0 + input.start;
   for (const m of input.modules) {
     const item = findCatalogItem(m.catalogId);
     if (!item) continue;
@@ -193,12 +212,13 @@ export function kitchenComponents(p: Project): { components: KitchenComponent[];
 }
 
 /** Kitchen modules placed along a wall face: length used vs. available. */
-export function wallFaceLength(p: Project, wallId: string): number {
+export function wallFaceLength(p: Project, wallId: string, side?: 1 | -1): number {
   const fp = derivePlan(p).footprints.get(wallId);
   if (!fp) return 0;
-  // usable face length ≈ centerline length minus the thickness of connected walls
-  const f = fp.polygon;
-  const left = Math.abs(dot(sub(f[1], f[0]), fp.dir));
-  const right = Math.abs(dot(sub(f[2], f[3]), fp.dir));
-  return Math.min(left, right);
+  // usable face length = centerline length minus the thickness of connected walls
+  const len = (sd: 1 | -1) => {
+    const r = wallFaceRange(fp, sd);
+    return Math.abs(r.s1 - r.s0);
+  };
+  return side ? len(side) : Math.min(len(1), len(-1));
 }

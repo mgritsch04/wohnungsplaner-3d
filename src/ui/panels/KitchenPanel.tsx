@@ -27,7 +27,7 @@ export function KitchenPanel() {
   const [start, setStart] = useState(0);
   const [frontColor, setFrontColor] = useState('#f2f0eb');
   const wallId = selection?.type === 'wall' ? selection.id : null;
-  const faceLen = wallId ? wallFaceLength(project, wallId) : 0;
+  const faceLen = wallId ? wallFaceLength(project, wallId, side) : 0;
   const runLen = run.reduce((s, m) => {
     const it = MODULES.find((x) => x.id === m.catalogId);
     if (!it || ['wall', 'hood', 'cooktop'].includes(it.kitchen!.type)) return s;
@@ -58,7 +58,7 @@ export function KitchenPanel() {
         )}
         <div className="field-row">
           <SelectField label="Wandseite" value={side === 1 ? 'l' : 'r'} options={[{ value: 'l', label: 'Seite A' }, { value: 'r', label: 'Seite B' }]} onChange={(v) => setSide(v === 'l' ? 1 : -1)} />
-          <NumberField label="Start ab Wandanfang" value={start} factor={100} unit="cm" min={0} max={10000} onChange={setStart} />
+          <NumberField label="Start ab Wandecke" title="Abstand vom Anfang der Wandfläche auf dieser Seite (Innenecke) – die Module stehen bündig vor der Wand" value={start} factor={100} unit="cm" min={0} max={10000} onChange={setStart} />
         </div>
         <ol className="run-list">
           {run.map((m, i) => {

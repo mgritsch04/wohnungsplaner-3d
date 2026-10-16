@@ -5,6 +5,7 @@ import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
 import { findCatalogItem } from '../src/catalog/generic';
+import { buildPlacementObstacles, collidingObstacles } from '../src/model/placement';
 import { clearanceLabel, furnitureClearances, rotateHandlePoint, selectionClearances } from '../src/model/clearances';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
@@ -617,6 +618,12 @@ test('plans a kitchen run along a selected wall', async ({ page }) => {
   expect(kitchen.some((f: { kitchen: { type: string } }) => f.kitchen.type === 'countertop')).toBe(true);
   expect(q.furniture.length).toBeGreaterThan(p.furniture.length);
   await expect(page.getByText('Stückliste Küche')).toBeVisible();
+  // no module stands in the wall or in the connected wall at the corner (#16): flush in front of the face
+  const walls = buildPlacementObstacles(derivePlan(q)).filter((o) => o.kind === 'wall');
+  for (const f of kitchen) expect(collidingObstacles(f, walls), f.name).toEqual([]);
+  const westmost = Math.min(...kitchen.map((f: { x: number; width: number }) => f.x - f.width / 2));
+  expect(westmost).toBeGreaterThanOrEqual(0);
+  expect(westmost).toBeLessThan(0.01);
 });
 
 test('takes over a product from a pasted retailer page (synthetic sample) and places it', async ({ page }) => {
