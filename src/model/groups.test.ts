@@ -29,6 +29,7 @@ import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection } from '../ui/actions';
 import { groupSelection, pressFurnitureSelection, renameGroupAction, selectSingleFurniture, ungroupSelection } from '../ui/groupActions';
+import { contentHash, restoreVersionContent } from '../versions/versions';
 
 const T = 0.12;
 /** Room with a clear interior 0..6 × 0..4. */
@@ -77,6 +78,25 @@ describe('furniture groups: schema and loading old projects (#65)', () => {
     const back = parseProjectJson(serializeProject(p)).project;
     expect(back.groups).toEqual([{ id: gid, name: 'Küchenzeile' }]);
     expect(groupMemberIds(back, gid)).toEqual(ids);
+  });
+
+  it('saved states (#66) restore the groups with the furniture; projects without groups keep their content hash', () => {
+    const { p, ids } = rowProject();
+    const plain = structuredClone(p) as Partial<Project>;
+    delete plain.groups;
+    expect(contentHash(p)).toBe(contentHash(plain as Project));
+    const snapshot = structuredClone(p);
+    const gid = createGroup(snapshot, ids, 'Küche')!;
+    expect(contentHash(snapshot)).not.toBe(contentHash(p));
+    const draft = structuredClone(p);
+    restoreVersionContent(draft, snapshot);
+    expect(draft.groups).toEqual([{ id: gid, name: 'Küche' }]);
+    expect(groupMemberIds(draft, gid)).toEqual(ids);
+    // a state saved before #65 restores ungrouped furniture and no stale group names
+    const old = structuredClone(p) as Partial<Project>;
+    delete old.groups;
+    restoreVersionContent(draft, old as Project);
+    expect(draft.groups).toEqual([]);
   });
 
   it('rejects invalid group entries', () => {

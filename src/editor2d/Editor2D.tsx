@@ -409,8 +409,8 @@ export function Editor2D() {
           return;
         }
         case 'furniture': {
-          if (dr.rigid && !dr.rigid.length) return; // locked group: click only
           dr.moved = true;
+          if (dr.rigid && !dr.rigid.length) return; // locked group: does not move
           let c = sub(w, dr.grab);
           // snapping as chosen under Werkzeuge › „Möbel einrasten“ (#52); Alt = free placement
           const fs = furnitureSnapOptions(settings.furnitureSnap, e.altKey);
