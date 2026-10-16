@@ -8,6 +8,10 @@
   text-size-adjust: 100%;
 }
 body {
+  /* Farben auch auf body: claude.ai packt die Seite im Artefakt (Issue 129) in eine Hülle, die auf body
+     schwarzen Text auf Weiß setzt – ohne diese Zeilen erbt dort nichts von :root (schwarzer Text im Dunkelmodus) */
+  color: var(--color-text);
+  background: var(--color-bg);
   font-family: var(--font-family);
   font-size: var(--font-size-text);
 }
@@ -1188,6 +1192,106 @@ dl.stats dd {
   .panel-scroll {
     overflow: visible;
   }
+}
+
+/* ---------- Handy-Ansicht (#89, aus Issue 129) ----------
+ * Gilt nur mit der Klasse .app.phone (Schwelle: PHONE_QUERY in src/ui/phoneLayout.ts).
+ * Plan/3D füllen den Bildschirm; die Panels sind ausgeblendet und öffnen sich über die
+ * untere Leiste (MobileBar) als Blatt über der Ansicht; die Statusleiste entfällt. */
+.app.phone {
+  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.app.phone .main {
+  flex-direction: column;
+  position: relative;
+}
+.app.phone .workspace {
+  order: 0;
+  height: auto;
+  flex: 1;
+}
+.app.phone .panel {
+  display: none;
+}
+.app.phone.sheet-left .panel.left,
+.app.phone.sheet-right .panel.right {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: 62%;
+  z-index: 40;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.app.phone .panel-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Werkzeugleiste: kompakt, höchstens zwei Zeilen */
+.app.phone .toolbar {
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  row-gap: var(--space-1);
+}
+.app.phone .toolbar-group.right {
+  margin-left: 0;
+}
+.app.phone .project-name {
+  width: 96px !important;
+}
+.app.phone .save-state:not(.save-error) .save-dot {
+  display: inline-block;
+}
+.app.phone .save-state:not(.save-error) .save-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Tastenkürzel-Hilfe ist am Handy ohne Nutzen */
+.app.phone .toolbar [aria-label='Hilfe & Tastenkürzel'] {
+  display: none;
+}
+.mobile-bar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.mobile-bar button {
+  flex: 1;
+  min-height: 40px;
+  position: relative;
+}
+.mobile-bar button.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  border-color: var(--color-accent-soft-border);
+}
+.mobile-bar .mobile-bar-close {
+  flex: 0 0 44px;
+}
+.mobile-bar-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  vertical-align: middle;
 }
 textarea {
   font: inherit;
