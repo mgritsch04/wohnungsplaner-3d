@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { usePanelGroupOpen, usePanelGroupStore } from './panelGroupStore';
 
 interface NumberFieldProps {
   label: string;
@@ -152,6 +153,43 @@ export function Section({ title, children, actions }: { title: string; children:
         {actions}
       </header>
       <div className="panel-section-body">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Collapsible group of the properties panel (#99). The heading is a button
+ * (`aria-expanded`, Enter/Space); the open state is kept per kind of group
+ * (`groupKey`, e.g. `furniture.product`), so it survives selecting another object.
+ * Closed groups do not render their fields.
+ */
+export function PanelGroup({ groupKey, title, defaultOpen = true, actions, children }: { groupKey: string; title: string; defaultOpen?: boolean; actions?: ReactNode; children: ReactNode }) {
+  const open = usePanelGroupOpen(groupKey, defaultOpen);
+  const bodyId = useId();
+  return (
+    <section className={`panel-section panel-group${open ? '' : ' panel-group-collapsed'}`} data-group={groupKey}>
+      <header>
+        <h3>
+          <button
+            type="button"
+            className="panel-group-toggle"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            onClick={() => usePanelGroupStore.getState().setOpen(groupKey, !open)}
+            // the 2D editor uses Space for panning (window listener, preventDefault) – keep it from swallowing the button press
+            onKeyDown={(e) => e.key === ' ' && e.stopPropagation()}
+          >
+            <svg className="panel-group-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+            {title}
+          </button>
+        </h3>
+        {actions}
+      </header>
+      <div id={bodyId} className="panel-section-body" hidden={!open}>
+        {open ? children : null}
+      </div>
     </section>
   );
 }

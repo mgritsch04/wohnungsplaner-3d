@@ -1630,3 +1630,52 @@ code {
   width: 30px;
   padding: 0;
 }
+
+/* ---------- einklappbare Gruppen im Eigenschaften-Panel (#99) ---------- */
+.panel-group h3 {
+  flex: 1;
+  min-width: 0;
+}
+.panel-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  border: none;
+  background: none;
+  padding: var(--space-1) 0;
+  margin: calc(-1 * var(--space-1)) 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  color: inherit;
+}
+.panel-group-toggle:hover:not(:disabled),
+.panel-group-toggle:active:not(:disabled) {
+  background: none;
+  color: var(--color-text);
+}
+.panel-group-chevron {
+  flex: none;
+  transition: transform var(--transition-fast);
+}
+.panel-group-toggle[aria-expanded='false'] .panel-group-chevron {
+  transform: rotate(-90deg);
+}
+.panel-group-collapsed {
+  padding-bottom: var(--space-4);
+}
+.panel-group-collapsed header {
+  margin-bottom: 0;
+}
+.panel-issues {
+  padding: var(--space-3) var(--space-5) 0;
+}
+.panel-issues > * {
+  margin: 0;
+}
+.panel-issues > * + * {
+  margin-top: var(--space-1);
+}

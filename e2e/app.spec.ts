@@ -673,6 +673,10 @@ test('imports a GLB model into the catalog, places it and attaches a model to an
   // attach a model to an existing procedural item via the properties panel
   const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
   await page.evaluate((id) => (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), sofa.id);
+  // the „3D-Modell“ group of the properties panel is collapsed by default (#99)
+  const modelGroup = page.locator('.panel.right').getByRole('button', { name: '3D-Modell', exact: true });
+  await expect(modelGroup).toHaveAttribute('aria-expanded', 'false');
+  await modelGroup.click();
   await page.getByRole('button', { name: 'Eigenes GLB hinterlegen…' }).click();
   const dlg2 = page.getByRole('dialog', { name: '3D-Modell importieren' });
   await dlg2.getByLabel('Modelldatei').setInputFiles({ name: 'sofa.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(2.1, 0.8, 0.9)) });
