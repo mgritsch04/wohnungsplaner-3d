@@ -619,3 +619,47 @@ describe('furniture snapping choice (#52)', () => {
     expect(furnitureSnapOptions('grid10', true)).toEqual({ grid: null, walls: false });
   });
 });
+
+describe('catalog drag and drop (#131)', () => {
+  const item = () => {
+    const c = findCatalogItem('generic-sofa-3');
+    if (!c) throw new Error('catalog item missing');
+    return c;
+  };
+
+  it('places a dropped item at the point, on the furniture grid', async () => {
+    const { placeDroppedFurniture } = await import('./placement');
+    const p = roomProject();
+    const f = createFurnitureFromCatalog(item(), { x: 0, y: 0 });
+    expect(placeDroppedFurniture(p, derivePlan(p), f, { x: 2.013, y: 1.48 })).toBe(true);
+    expect(p.furniture).toHaveLength(1);
+    expect(p.furniture[0]).toMatchObject({ x: 2, y: 1.5 });
+  });
+
+  it('snaps to a nearby wall, Alt places freely', async () => {
+    const { placeDroppedFurniture } = await import('./placement');
+    const p = roomProject();
+    const c = item();
+    const near = { x: 2, y: c.depth / 2 + 0.05 };
+    const a = createFurnitureFromCatalog(c, near);
+    placeDroppedFurniture(p, derivePlan(p), a, near);
+    expect(p.furniture[0].y - c.depth / 2).toBeCloseTo(0, 2); // flush to the inner face of the north wall
+    const q = roomProject();
+    const b = createFurnitureFromCatalog(c, near);
+    placeDroppedFurniture(q, derivePlan(q), b, { x: 2.013, y: near.y }, true);
+    expect(q.furniture[0]).toMatchObject({ x: 2.013, y: Math.round(near.y * 1000) / 1000 });
+  });
+
+  it('rejects points outside every room and invalid points, without changing the project', async () => {
+    const { canDropAt, placeDroppedFurniture } = await import('./placement');
+    const p = roomProject();
+    const d = derivePlan(p);
+    expect(canDropAt(d, { x: 2, y: 1.5 })).toBe(true);
+    expect(canDropAt(d, { x: 6, y: 1.5 })).toBe(false);
+    expect(canDropAt(d, { x: NaN, y: 1 })).toBe(false);
+    expect(placeDroppedFurniture(p, d, createFurnitureFromCatalog(item(), { x: 6, y: 1.5 }), { x: 6, y: 1.5 })).toBe(false);
+    expect(p.furniture).toHaveLength(0);
+    // without rooms (empty plan) any finite point is fine
+    expect(canDropAt(derivePlan(createEmptyProject()), { x: 50, y: -3 })).toBe(true);
+  });
+});

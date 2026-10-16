@@ -19,7 +19,10 @@ import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
 import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
-import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
+import { buildPlacementObstacles, canDropAt, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo, placeDroppedFurniture } from '../model/placement';
+import { draggedCatalogItem, droppedCatalogItem, isCatalogDrag } from '../catalog/catalogDrag';
+import { createFurnitureFromCatalog } from '../catalog/instantiate';
+import { dropCatalogItemAt } from '../ui/actions';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
@@ -116,6 +119,8 @@ export function Editor2D() {
   const [calib, setCalib] = useState<{ p1: Vec2 | null; p2: Vec2 | null }>({ p1: null, p2: null });
   const [lengthInput, setLengthInput] = useState<string | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+  /** Footprint of a catalog entry being dragged over the plan (#131); ok = may be dropped here. */
+  const [dropGhost, setDropGhost] = useState<{ corners: Vec2[]; ok: boolean } | null>(null);
   // another project (new, opened, imported – #133): drop half-drawn walls, a started
   // measurement and calibration points of the previous one (reset during render, not in an effect)
   const [stateFor, setStateFor] = useState(project.id);
@@ -753,11 +758,43 @@ export function Editor2D() {
     return <polygon points={poly.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(37,99,235,0.35)" stroke="#2563eb" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />;
   })();
 
+  // ---------- catalog drag and drop (#131) ----------
+  const onDragOver = (e: React.DragEvent) => {
+    if (!isCatalogDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    const w = toWorld(e);
+    const ok = canDropAt(derived, w);
+    // a drop outside a room still fires, so the release can explain why nothing was placed
+    e.dataTransfer.dropEffect = 'copy';
+    const item = draggedCatalogItem();
+    if (!item) return setDropGhost(null);
+    // the same placement as on drop, on a shallow copy (only the new item is changed)
+    const f = createFurnitureFromCatalog(item, w);
+    if (ok) placeDroppedFurniture({ ...project, furniture: [...project.furniture] }, derived, f, w, e.altKey);
+    setDropGhost({ corners: furnitureCorners(f), ok });
+  };
+  const onDrop = (e: React.DragEvent) => {
+    setDropGhost(null);
+    const item = droppedCatalogItem(e.dataTransfer);
+    if (!item) return;
+    e.preventDefault();
+    dropCatalogItemAt(item, toWorld(e), e.altKey);
+  };
+
   const lastChain = chain[chain.length - 1];
   const snapPt = preview.snap?.point;
 
   return (
-    <div ref={containerRef} className={`editor2d ${cursorClass}`} data-testid="editor2d">
+    <div
+      ref={containerRef}
+      className={`editor2d ${cursorClass}`}
+      data-testid="editor2d"
+      onDragOver={onDragOver}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropGhost(null);
+      }}
+      onDrop={onDrop}
+    >
       <svg
         ref={svgRef}
         width={vp.width}
@@ -902,6 +939,18 @@ export function Editor2D() {
           )}
 
           {openingPreview}
+          {dropGhost && (
+            <polygon
+              data-testid="drop-ghost"
+              points={dropGhost.corners.map((q) => `${q.x},${q.y}`).join(' ')}
+              fill={dropGhost.ok ? 'rgba(37,99,235,0.18)' : 'rgba(220,38,38,0.12)'}
+              stroke={dropGhost.ok ? '#2563eb' : '#dc2626'}
+              strokeWidth={1.5}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+          )}
           {(preview.snapWalls ?? []).map((id) => {
             const fp = derived.footprints.get(id);
             return fp ? (
