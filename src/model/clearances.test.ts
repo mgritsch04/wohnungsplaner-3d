@@ -4,7 +4,7 @@ import { findCatalogItem } from '../catalog/generic';
 import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall } from './operations';
 import { derivePlan } from './derived';
-import { clearanceLabel, furnitureClearances, type Clearance, type ClearanceSide } from './clearances';
+import { clearanceLabel, furnitureClearances, labelWidthPx, layoutClearance, rotateHandlePoint, type Clearance, type ClearanceSide } from './clearances';
 import type { Project } from './schema';
 import { closestPointOnSegment, dist, sub } from './vec';
 
@@ -198,5 +198,44 @@ describe('clearances while dragging (#50)', () => {
     console.log(`Abstände (25 Räume, ${p.furniture.length} Möbel, ${p.walls.length} Wände): schnellster Lauf ${fastest.toFixed(3)} ms`);
     expect(n).toBeGreaterThan(0);
     expect(fastest).toBeLessThan(2);
+  });
+});
+
+describe('clearance layout (#125)', () => {
+  const px = 1 / 80; // 80 px per metre
+  it('keeps the label on long lines', () => {
+    const l = layoutClearance({ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, distance: 1 }, px);
+    expect(l.beside).toBe(false);
+    expect(l.label).toEqual({ x: 0.5, y: 0 });
+    expect(l.anchor).toBe('middle');
+  });
+
+  it('puts the label next to a short line instead of on it', () => {
+    // 8 cm = 6.4 px, far shorter than the "8 cm" label (~32 px)
+    const h = layoutClearance({ from: { x: 0, y: 0 }, to: { x: 0.08, y: 0 }, distance: 0.08 }, px);
+    expect(h.beside).toBe(true);
+    expect(h.anchor).toBe('middle');
+    expect(h.label.y).toBeCloseTo(-10 * px, 9); // above the horizontal line
+    const v = layoutClearance({ from: { x: 0, y: 0 }, to: { x: 0, y: 0.08 }, distance: 0.08 }, px);
+    expect(v.beside).toBe(true);
+    expect(v.anchor).toBe('start');
+    expect(v.label.x).toBeCloseTo(7 * px, 9); // right of the vertical line
+    expect(labelWidthPx('8 cm')).toBeGreaterThan(0.08 / px + 10);
+  });
+
+  it('shifts a line that would run through the rotate handle', () => {
+    const f = { x: 2, y: 2, depth: 0.6, rotation: 0 };
+    const handle = rotateHandlePoint(f, px); // 22 px behind the back edge (y = 1.7)
+    expect(handle.y).toBeCloseTo(1.7 - 22 * px, 9);
+    const back = { from: { x: 2, y: 1.7 }, to: { x: 2, y: 0.5 }, distance: 1.2 };
+    const l = layoutClearance(back, px, handle);
+    expect(l.shifted).toBe(true);
+    // the drawn line now passes the handle at ≥ 10 px
+    const off = Math.abs(l.a.x - handle.x) / px;
+    expect(off).toBeGreaterThanOrEqual(10);
+    // a line away from the handle stays where it is
+    const front = layoutClearance({ from: { x: 2, y: 2.3 }, to: { x: 2, y: 3 }, distance: 0.7 }, px, handle);
+    expect(front.shifted).toBe(false);
+    expect(front.a).toEqual({ x: 2, y: 2.3 });
   });
 });

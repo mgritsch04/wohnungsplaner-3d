@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { clearanceLabel, furnitureClearances } from '../model/clearances';
+import { clearanceLabel, furnitureClearances, layoutClearance, rotateHandlePoint } from '../model/clearances';
 import type { DerivedPlan } from '../model/derived';
 import type { Project } from '../model/schema';
-import { add, normalize, perp, scale, sub } from '../model/vec';
+import { normalize, perp, scale, sub } from '../model/vec';
 import { useUiStore } from '../store/uiStore';
 
 const LINE = '#2563eb';
@@ -44,25 +44,29 @@ export function ClearanceOverlay({ project, derived, px, draggingId }: { project
   const id = draggingId ?? (alt && selection?.type === 'furniture' && multi.length === 0 ? selection.id : null);
   const items = useMemo(() => (id ? furnitureClearances(project, derived, id) : []), [project, derived, id]);
   if (items.length === 0) return null;
+  // the rotate handle of the selected item must stay free (#125)
+  const item = project.furniture.find((f) => f.id === id);
+  const selected = !!item && ((selection?.type === 'furniture' && selection.id === item.id) || multi.includes(item.id));
+  const handle = item && selected ? rotateHandlePoint(item, px) : null;
   return (
     <g pointerEvents="none" data-testid="clearances" data-furniture-id={id ?? undefined}>
       {items.map((c) => {
+        const l = layoutClearance(c, px, handle);
         const tick = scale(perp(normalize(sub(c.to, c.from))), 4 * px);
-        const mid = scale(add(c.from, c.to), 0.5);
         return (
-          <g key={c.side} data-testid="clearance" data-side={c.side} data-distance-cm={Math.round(c.distance * 100)} data-hit={c.hit.type}>
-            <line x1={c.from.x} y1={c.from.y} x2={c.to.x} y2={c.to.y} stroke={LINE} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-            {[c.from, c.to].map((q, k) => (
+          <g key={c.side} data-testid="clearance" data-side={c.side} data-distance-cm={Math.round(c.distance * 100)} data-hit={c.hit.type} data-label={l.beside ? 'beside' : 'on-line'} data-shifted={l.shifted ? 'true' : 'false'}>
+            <line x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} stroke={LINE} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            {[l.a, l.b].map((q, k) => (
               <line key={k} x1={q.x - tick.x} y1={q.y - tick.y} x2={q.x + tick.x} y2={q.y + tick.y} stroke={LINE} strokeWidth={1} vectorEffect="non-scaling-stroke" />
             ))}
-            {/* label on the line, with a white halo so it stays readable on walls and furniture */}
+            {/* label on the line (beside it when the line is short), with a white halo so it stays readable on walls and furniture */}
             <text
-              x={mid.x}
-              y={mid.y}
+              x={l.label.x}
+              y={l.label.y}
               fontSize={11 * px}
               fontWeight={600}
               fill={TEXT}
-              textAnchor="middle"
+              textAnchor={l.anchor}
               dominantBaseline="middle"
               paintOrder="stroke"
               stroke="#ffffff"
