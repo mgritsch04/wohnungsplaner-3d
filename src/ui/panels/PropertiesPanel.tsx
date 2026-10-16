@@ -12,7 +12,7 @@ import { deleteSelection, duplicateSelection } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
-import { kitchenChecksForItem } from '../../kitchen/kitchen';
+import { placementIssues } from '../../model/placement';
 
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
@@ -378,7 +378,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       const x = d.furniture.find((q) => q.id === id);
       if (x) fn(x);
     });
-  const kitchenIssues = f.kitchen ? kitchenChecksForItem(project, f.id) : [];
+  const issues = placementIssues(project, derivePlan(project), f);
   return (
     <div className="panel-scroll">
       <Section title="Objekt" actions={f.approximate ? <Badge kind="muted" title="Vereinfachtes 3D-Modell, Maße sind maßgeblich">Näherungsmodell</Badge> : undefined}>
@@ -418,9 +418,9 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         )}
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
-        {kitchenIssues.map((i, k) => (
-          <p key={k} className="warning small">
-            {i}
+        {issues.map((i, k) => (
+          <p key={k} className={i.kind === "door-swing" || i.kind === "overlap" ? "warning small" : "warning small error-text"}>
+            {i.message}
           </p>
         ))}
       </Section>

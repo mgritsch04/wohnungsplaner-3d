@@ -6,6 +6,7 @@ import { deleteFurniture, deleteNode, deleteRoom, deleteWalls, duplicateFurnitur
 import { createSampleProject } from '../model/sample';
 import { normalizeAngle, roundMm } from '../model/units';
 import { pointInPolygon } from '../model/vec';
+import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
 import { buildPackage, parsePackageOrProject } from '../formats/project/packageFile';
 import { FileFormatError } from '../formats/zodErrors';
 import { db } from '../persistence/db';
@@ -79,12 +80,14 @@ export function rotateSelection(deltaRad: number) {
 export function nudgeSelection(dx: number, dy: number) {
   const sel = ui().selection;
   if (sel?.type !== 'furniture') return;
+  const p = store().project;
+  const f = p.furniture.find((x) => x.id === sel.id);
+  if (!f || f.locked) return;
+  const derived = derivePlan(p);
+  const obstacles = buildPlacementObstacles(derived);
+  // nudging respects walls but does not snap (fine positioning)
   store().apply((d) => {
-    const f = d.furniture.find((x) => x.id === sel.id);
-    if (f && !f.locked) {
-      f.x = roundMm(f.x + dx);
-      f.y = roundMm(f.y + dy);
-    }
+    moveFurnitureTo(d, derived, obstacles, sel.id, { x: roundMm(f.x + dx), y: roundMm(f.y + dy) }, { snap: false, collide: true });
   });
 }
 

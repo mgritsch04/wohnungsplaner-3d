@@ -17,6 +17,8 @@ interface Props {
   hover: Selection | null;
   zoom: number;
   showDimensions: boolean;
+  /** Furniture placement problems: 'error' (in wall/door leaf) or 'warn' (door swing, overlap). */
+  conflicts?: Map<string, 'error' | 'warn'>;
 }
 
 const isSel = (s: Selection | null, type: Selection['type'], id: string) => s?.type === type && s.id === id;
@@ -30,7 +32,7 @@ function lighten(hex: string, amount: number): string {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, hover, zoom, showDimensions }: Props) {
+export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, hover, zoom, showDimensions, conflicts }: Props) {
   const px = 1 / zoom; // one screen pixel in meters
   const fontSize = 12 * px;
 
@@ -136,7 +138,7 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
       <g>{openings}</g>
       <g>
         {furniture.map((f) => (
-          <FurnitureSymbol key={f.id} f={f} selected={isSel(selection, 'furniture', f.id)} hovered={isSel(hover, 'furniture', f.id)} px={px} />
+          <FurnitureSymbol key={f.id} f={f} selected={isSel(selection, 'furniture', f.id)} hovered={isSel(hover, 'furniture', f.id)} px={px} conflict={conflicts?.get(f.id)} />
         ))}
       </g>
       <g>
@@ -228,11 +230,11 @@ function signedAreaSign(poly: Vec2[]): number {
 }
 
 /** Simple top-view symbol for a furniture item; detail depends on the procedural shape. */
-const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px }: { f: Furniture; selected: boolean; hovered: boolean; px: number }) {
+const FurnitureSymbol = memo(function FurnitureSymbol({ f, selected, hovered, px, conflict }: { f: Furniture; selected: boolean; hovered: boolean; px: number; conflict?: 'error' | 'warn' }) {
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
   const w = f.width;
   const d = f.depth;
-  const stroke = selected ? '#2563eb' : hovered ? '#1d4ed8' : '#4b5563';
+  const stroke = selected ? '#2563eb' : hovered ? '#1d4ed8' : conflict === 'error' ? '#dc2626' : conflict === 'warn' ? '#d97706' : '#4b5563';
   const fill = shape === 'rug' ? lighten(f.color, 0.3) : lighten(f.color, 0.55);
   const sw = selected ? 2 : 1;
   const details: React.ReactNode[] = [];

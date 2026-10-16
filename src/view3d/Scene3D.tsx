@@ -19,6 +19,7 @@ import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { kelvinToColor, sunDirection } from './lighting';
 import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX } from './pointer';
+import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -129,16 +130,13 @@ function SceneContent({
     beginTx();
     if (orbitRef.current) orbitRef.current.enabled = false;
   }, [beginTx]);
+  const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
   const onDrag = useCallback(
     (id: string, x: number, y: number) =>
       updateTx((d) => {
-        const f = d.furniture.find((i) => i.id === id);
-        if (f) {
-          f.x = roundMm(x);
-          f.y = roundMm(y);
-        }
+        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(x), y: roundMm(y) }, { snap: true, collide: true });
       }),
-    [updateTx],
+    [updateTx, derived, obstacles],
   );
   const onDragEnd = useCallback(() => {
     commitTx();

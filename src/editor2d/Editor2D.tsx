@@ -17,6 +17,7 @@ import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
 import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
+import { buildPlacementObstacles, moveFurnitureTo, placementIssues } from '../model/placement';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -37,9 +38,12 @@ interface Preview {
   rect?: { a: Vec2; b: Vec2 } | null;
   opening?: { wallId: string; s: number; kind: OpeningKind } | null;
   measure?: { a: Vec2; b: Vec2 } | null;
+  /** Walls a dragged item is snapped to (highlighted). */
+  snapWalls?: string[];
 }
 
 const SNAP_PX = 10;
+const DRAG_THRESHOLD_PX = 4;
 
 export function Editor2D() {
   const project = useProjectStore((s) => s.project);
@@ -57,12 +61,24 @@ export function Editor2D() {
   const ui = useUiStore.getState;
 
   const derived = useMemo(() => derivePlan(project), [project]);
+  const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
+  const conflicts = useMemo(() => {
+    const m = new Map<string, 'error' | 'warn'>();
+    for (const f of project.furniture) {
+      const issues = placementIssues(project, derived, f, obstacles);
+      if (issues.some((i) => i.kind === 'wall' || i.kind === 'door-leaf')) m.set(f.id, 'error');
+      else if (issues.some((i) => i.kind === 'door-swing' || i.kind === 'outside')) m.set(f.id, 'warn');
+    }
+    return m;
+  }, [project, derived, obstacles]);
   const draft = useImportStore((s) => s.draft);
   const draftSel = useImportStore((s) => s.selected);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [vp, setVp] = useState<Viewport>({ width: 800, height: 600 });
   const drag = useRef<Drag | null>(null);
+  const downScreen = useRef<{ x: number; y: number } | null>(null);
+  const dragStarted = useRef(false);
   const [preview, setPreview] = useState<Preview>({});
   /** Points of the wall chain currently being drawn. */
   const [chain, setChain] = useState<Vec2[]>([]);
@@ -182,6 +198,8 @@ export function Editor2D() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (lengthInput !== null && (e.target as HTMLElement).tagName === 'INPUT') return;
     const w = toWorld(e);
+    downScreen.current = { x: e.clientX, y: e.clientY };
+    dragStarted.current = false;
     svgRef.current?.setPointerCapture(e.pointerId);
     const isPan = e.button === 1 || e.button === 2 || spaceDown;
     if (isPan) {
@@ -309,6 +327,11 @@ export function Editor2D() {
     ui().setCursor(w);
     const dr = drag.current;
     if (dr) {
+      // a click with a little jitter must not move anything
+      if (dr.kind !== 'pan' && dr.kind !== 'room-rect' && downScreen.current && !dragStarted.current) {
+        if (Math.hypot(e.clientX - downScreen.current.x, e.clientY - downScreen.current.y) < DRAG_THRESHOLD_PX) return;
+        dragStarted.current = true;
+      }
       switch (dr.kind) {
         case 'pan': {
           const dx = e.clientX - dr.startScreen.x;
@@ -321,13 +344,12 @@ export function Editor2D() {
           dr.moved = true;
           let c = sub(w, dr.grab);
           if (!e.altKey && grid) c = snapToGrid(c, Math.min(grid, 0.05));
+          // wall snapping + collision (Alt = free placement)
+          let snapped: string[] = [];
           updateTx((d) => {
-            const f = d.furniture.find((x) => x.id === dr.id);
-            if (f) {
-              f.x = roundMm(c.x);
-              f.y = roundMm(c.y);
-            }
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: !e.altKey, collide: !e.altKey });
           });
+          setPreview({ snapWalls: snapped });
           return;
         }
         case 'rotate': {
@@ -482,6 +504,7 @@ export function Editor2D() {
       }
       setPreview({});
     }
+    if (dr.kind === 'furniture') setPreview({});
     commitTx();
   };
 
@@ -603,7 +626,7 @@ export function Editor2D() {
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
-          <PlanDrawing project={project} derived={derived} selection={selection} hover={hover} zoom={view.zoom} showDimensions />
+          <PlanDrawing project={project} derived={derived} selection={selection} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
 
           {/* node handles */}
@@ -682,6 +705,12 @@ export function Editor2D() {
           )}
 
           {openingPreview}
+          {(preview.snapWalls ?? []).map((id) => {
+            const fp = derived.footprints.get(id);
+            return fp ? (
+              <polygon key={`snap-${id}`} points={fp.polygon.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#f97316" strokeWidth={2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+            ) : null;
+          })}
 
           {/* snap indicator + guides */}
           {preview.snap && tool !== 'select' && (

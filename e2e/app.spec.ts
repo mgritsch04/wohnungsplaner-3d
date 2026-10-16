@@ -394,3 +394,37 @@ test('3D: clicking furniture keeps it selected after release; walls stay selecta
   await page.waitForTimeout(400);
   expect((await getSelection(page))?.type).toBe('wall');
 });
+
+test('2D: dragging furniture into a wall stops flush (no tunnelling), Alt allows free placement', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p = await getProject(page);
+  const table = p.furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  const s = await planToScreen(page, table.x, table.y);
+  const target = await planToScreen(page, table.x, -3); // far beyond the north wall
+  await page.mouse.move(s.x, s.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 3 }); // fast drag
+  await page.mouse.up();
+  const t = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
+  expect(t.y - t.depth / 2).toBeGreaterThanOrEqual(-0.002); // inner face of the north wall is y=0
+  expect(t.y - t.depth / 2).toBeLessThan(0.02); // snapped flush
+  // a plain click (with tiny jitter) does not move the item
+  const s2 = await planToScreen(page, t.x, t.y);
+  await page.mouse.move(s2.x, s2.y);
+  await page.mouse.down();
+  await page.mouse.move(s2.x + 2, s2.y + 1);
+  await page.mouse.up();
+  const t2 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
+  expect([t2.x, t2.y]).toEqual([t.x, t.y]);
+  // Alt = free placement through the wall
+  await page.keyboard.down('Alt');
+  await page.mouse.move(s2.x, s2.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 3 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  const t3 = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
+  expect(t3.y).toBeLessThan(-1);
+});

@@ -1107,3 +1107,4 @@ textarea {
   flex-direction: column;
   gap: 8px;
 }
+.error-text { color: var(--danger); background: #fef2f2; border-color: #fecaca; }

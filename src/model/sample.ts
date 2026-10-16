@@ -33,10 +33,11 @@ export function createSampleProject(): Project {
     const item = findCatalogItem(catalogId);
     if (item) p.furniture.push(createFurnitureFromCatalog(item, { x, y, rotation }));
   };
-  place('generic-sofa-3', 2.5, 3.45, Math.PI);
-  place('generic-coffee-table', 2.5, 2.4);
-  place('generic-tv-sideboard', 2.5, 0.25);
-  place('generic-rug-200', 2.5, 2.3);
+  // the living-room group sits right of the entrance door so the door can open fully
+  place('generic-sofa-3', 2.85, 3.547, Math.PI);
+  place('generic-coffee-table', 2.85, 2.4);
+  place('generic-tv-sideboard', 2.85, 0.213);
+  place('generic-rug-200', 2.85, 2.3);
   place('generic-floor-lamp', 4.6, 3.6);
   place('generic-bed-160', 7.37, 1.16);
   place('generic-wardrobe-150', 6.1, 3.68, Math.PI);
