@@ -1878,3 +1878,73 @@ test('align and distribute several furniture items: top edge, equal gaps, one un
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('dark mode: light / dark / system switch in the project panel, kept after reload, print sheet stays white (#73)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await freshStart(page);
+  const html = page.locator('html');
+  // relative luminance (0 = black, 1 = white) of a computed background colour
+  const lum = (selector: string) =>
+    page.evaluate((sel) => {
+      const [r, g, b] = getComputedStyle(document.querySelector(sel)!).backgroundColor.match(/[\d.]+/g)!.map(Number);
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    }, selector);
+  const stored = () => page.evaluate(() => localStorage.getItem('wohnungsplaner-theme'));
+
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeGreaterThan(0.8);
+
+  const panel = page.locator('.panel.right');
+  await panel.getByRole('button', { name: 'Projekt', exact: true }).click();
+  const group = panel.getByRole('group', { name: 'Farbschema' });
+  await expect(group.getByRole('button', { name: 'System', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+  // Dunkel
+  await group.getByRole('button', { name: 'Dunkel', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(group.getByRole('button', { name: 'Dunkel', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect(await lum('html')).toBeLessThan(0.15);
+  expect(await lum('.panel.right')).toBeLessThan(0.15);
+  expect(await lum('.toolbar')).toBeLessThan(0.15);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
+  expect(await stored()).toBe('dark');
+
+  // reload → still dark (device setting, not part of the project)
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  expect(await lum('html')).toBeLessThan(0.15);
+
+  // the print sheet stays white in dark mode
+  await page.getByRole('button', { name: 'Export ▾' }).click();
+  await page.getByRole('button', { name: /Plan drucken/ }).click();
+  await expect(page.locator('.print-page')).toBeVisible();
+  expect(await lum('.print-page')).toBeGreaterThan(0.99);
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.locator('.print-page')).toHaveCount(0);
+
+  // Hell wins over a dark system theme
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await panel.getByRole('button', { name: 'Projekt', exact: true }).click();
+  await group.getByRole('button', { name: 'Hell', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  expect(await lum('html')).toBeGreaterThan(0.8);
+  expect(await stored()).toBe('light');
+
+  // System follows the operating system
+  await group.getByRole('button', { name: 'System', exact: true }).click();
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeLessThan(0.15);
+  expect(await stored()).toBeNull();
+  await page.emulateMedia({ colorScheme: 'light' });
+  expect(await lum('html')).toBeGreaterThan(0.8);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.reload();
+  await expect(page.locator('input.project-name')).toBeVisible();
+  await expect(html).toHaveAttribute('data-theme', 'system');
+  expect(await lum('html')).toBeLessThan(0.15);
+
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
