@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -14,7 +14,34 @@ const commit = (() => {
   }
 })();
 
-export default defineConfig({
+/**
+ * Claude-Artefakt-Build (#129): `vite build --mode artifact` → dist-artifact/.
+ * Alles Artefakt-Spezifische ist hier gekapselt; der normale Build (dist/) bleibt unverändert.
+ *  - base './': alle Pfade relativ (das Artefakt liegt unter einem unbekannten Unterpfad,
+ *    veröffentlichte Dateien haben keinen führenden Schrägstrich).
+ *  - .mjs-Assets (pdf.js-Worker) bekommen die Endung .js, damit nur gängige Web-Endungen
+ *    entstehen (der Medientyp wird beim Veröffentlichen aus der Endung abgeleitet).
+ */
+function artifactOverrides(): UserConfig {
+  return {
+    base: './',
+    build: {
+      outDir: 'dist-artifact',
+      emptyOutDir: true,
+      chunkSizeWarningLimit: 1500,
+      rolldownOptions: {
+        output: {
+          assetFileNames: (asset) => {
+            const name = asset.names[0] ?? '';
+            return name.endsWith('.mjs') ? 'assets/[name]-[hash].js' : 'assets/[name]-[hash][extname]';
+          },
+        },
+      },
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(commit ? `${pkgVersion} (${commit})` : pkgVersion),
@@ -27,4 +54,5 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },
-});
+  ...(mode === 'artifact' ? artifactOverrides() : {}),
+}));
