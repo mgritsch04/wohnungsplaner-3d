@@ -106,6 +106,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Maus', action: 'Umsehen (nach Klick in die Ansicht)', match: [] },
       { keys: 'Umschalt', action: 'Schneller gehen', match: ['ShiftLeft', 'ShiftRight'] },
       { keys: 'C (halten)', action: 'Ducken', match: ['KeyC'] },
+      { keys: 'X', action: 'Sitzen / Stehen umschalten (Sitzhöhe im Projekt-Panel)', match: ['KeyX'] },
       { keys: 'Klick', action: 'Möbel im Fadenkreuz auswählen bzw. Tür/Fenster öffnen oder schließen', match: [] },
       { keys: 'G', action: 'Möbel tragen / absetzen', match: ['KeyG'] },
       { keys: 'O', action: 'Tür oder Fenster im Fadenkreuz öffnen / schließen', match: ['KeyO'] },

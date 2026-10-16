@@ -22,6 +22,7 @@ import { useCatalogStore } from './catalog/catalogStore';
 import { useImportStore } from './import/importStore';
 import { PrintViewHost } from './export/PrintView';
 import { useCompareStore } from './versions/compareStore';
+import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -103,6 +104,7 @@ export default function App() {
               <Suspense fallback={<div className="empty-state">3D-Ansicht wird geladen…</div>}>
                 <Scene3D />
               </Suspense>
+              <WalkPostureBadge />
             </div>
           )}
         </main>
