@@ -2,7 +2,8 @@ import { FileFormatError } from '../formats/zodErrors';
 import { deleteVersion, listVersions, loadVersion, saveVersion, type VersionMeta } from '../persistence/versions';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
-import { VersionLimitError, autoVersionName, contentHash, restoreVersionContent } from './versions';
+import { VersionLimitError, autoVersionName, contentHash, contentKey, restoreVersionContent } from './versions';
+import type { Project } from '../model/schema';
 
 const store = () => useProjectStore.getState();
 const ui = () => useUiStore.getState();
@@ -28,6 +29,19 @@ export async function saveCurrentVersion(name: string): Promise<VersionMeta | nu
   }
 }
 
+/** An existing state with exactly the content of `p` (hash match, verified by full comparison). */
+async function findIdenticalVersion(p: Project): Promise<VersionMeta | null> {
+  const hash = contentHash(p);
+  const candidates = (await listVersions(p.id)).filter((v) => v.hash === hash);
+  if (!candidates.length) return null;
+  const key = contentKey(p);
+  for (const v of candidates) {
+    const saved = await loadVersion(v.id).catch(() => null);
+    if (saved && contentKey(saved) === key) return v;
+  }
+  return null;
+}
+
 export interface OpenResult {
   /** Automatic state created before switching (null when the current state was already saved). */
   backup: VersionMeta | null;
@@ -46,8 +60,7 @@ export async function openVersion(meta: VersionMeta): Promise<OpenResult | null>
       return null;
     }
     const current = currentProject();
-    const hash = contentHash(current);
-    const existing = (await listVersions(current.id)).find((v) => v.hash === hash);
+    const existing = await findIdenticalVersion(current);
     const backup = existing ? null : await saveVersion(current, autoVersionName(meta.name), { auto: true });
     if (store().txBase) store().commitTransaction();
     store().apply((d) => restoreVersionContent(d, snapshot));

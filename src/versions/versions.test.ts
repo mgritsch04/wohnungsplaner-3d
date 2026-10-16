@@ -136,6 +136,19 @@ describe('opening a state (#66)', () => {
     expect([draft.id, draft.name, draft.createdAt]).toEqual([a.id, a.name, a.createdAt]);
     expect(contentHash(draft)).toBe(contentHash(b));
   });
+
+  it('content hash ignores key order and filled-in defaults, but sees real changes', () => {
+    const a = apartment();
+    const reordered = structuredClone(a);
+    const { id, name, ...rest } = reordered.furniture[0];
+    const partial = { ...rest, name, id } as Record<string, unknown>;
+    delete partial.locked; // default, filled in again when a stored state is parsed
+    reordered.furniture[0] = partial as unknown as Furniture;
+    expect(contentHash(reordered)).toBe(contentHash(a));
+    expect(contentHash(parseProjectJson(serializeProject(a)).project)).toBe(contentHash(a));
+    reordered.furniture[0].x += 0.01;
+    expect(contentHash(reordered)).not.toBe(contentHash(a));
+  });
 });
 
 describe('compatibility and project package', () => {

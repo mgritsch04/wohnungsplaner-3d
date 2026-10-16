@@ -1,4 +1,4 @@
-import type { Project } from '../model/schema';
+import { ProjectSchema, type Project } from '../model/schema';
 
 /**
  * Project versions / saved states (#66, #58) – pure helpers
@@ -27,9 +27,27 @@ export function restoreVersionContent(draft: Project, snapshot: Project): void {
   for (const k of CONTENT_KEYS) target[k] = structuredClone(snapshot[k]);
 }
 
-/** Stable text of the restorable content (identical content → identical key). */
+/** JSON with sorted object keys and without undefined values. */
+function stableStringify(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map((x) => (x === undefined ? 'null' : stableStringify(x))).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    const keys = Object.keys(o)
+      .filter((k) => o[k] !== undefined)
+      .sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+/**
+ * Canonical text of the restorable content: identical content gives an identical
+ * key, independent of key order or schema defaults that are filled in on loading.
+ */
 export function contentKey(p: Project): string {
-  return JSON.stringify(CONTENT_KEYS.map((k) => p[k]));
+  const parsed = ProjectSchema.safeParse(p);
+  const src = parsed.success ? parsed.data : p;
+  return stableStringify(CONTENT_KEYS.map((k) => src[k]));
 }
 
 /** 64-bit (two 32-bit FNV-1a variants) hex hash – used to skip duplicate automatic states. */
