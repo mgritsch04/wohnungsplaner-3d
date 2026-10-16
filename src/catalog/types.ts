@@ -46,5 +46,7 @@ export interface CatalogItem {
   source: 'generic' | 'imported';
   /** Identifier of the imported catalog file, if any. */
   sourceName?: string;
+  /** Name of the .glb file the product list referenced (to attach it later, e.g. when chosen separately). */
+  modelFile?: string;
   description?: string;
 }

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
@@ -1243,6 +1245,46 @@ test('product list + .glb files chosen together: models attached, missing ones r
   expect([item.width, item.depth, item.height]).toEqual([0.8, 0.28, 2.02]);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.waitForTimeout(2500);
+  expect(errors).toEqual([]);
+});
+
+test('IKEA import folder (#12): whole folder incl. bericht.json works; list first and .glb later also attaches the model', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  // SYNTHETIC list (made-up product) in the format scripts/ikea-products.mjs writes, plus its bericht.json
+  const list = {
+    format: 'wohnungsplaner-catalog',
+    version: 1,
+    name: 'Ordnertest',
+    units: 'cm',
+    items: [{ id: 'r1', name: 'TESTORDNER Regal', category: 'storage', width: 80, depth: 28, height: 202, modelFile: '00000001.glb' }],
+  };
+  const dir = await mkdtemp(join(tmpdir(), 'ikea-import-'));
+  await writeFile(join(dir, 'produktliste.json'), JSON.stringify(list));
+  await writeFile(join(dir, 'bericht.json'), JSON.stringify([{ article: '000.000.01', ok: true }]));
+  await writeFile(join(dir, '00000001.glb'), Buffer.from(boxGlb(0.8, 2.02, 0.28)));
+  // 1) whole folder in one go
+  let chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Ordner importieren/ }).click();
+  await (await chooser).setFiles(dir);
+  await expect(page.getByText(/1 Produkt\(e\) importiert, 1 mit 3D-Modell \(übersprungen: bericht\.json\)/)).toBeVisible();
+  // 2) a second list on its own: imported with a hint, then the .glb alone attaches the model
+  const list2 = { ...list, name: 'Einzeltest', items: [{ ...list.items[0], name: 'TESTEINZELN Regal' }] };
+  chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Produktliste importieren/ }).click();
+  await (await chooser).setFiles([{ name: 'produktliste.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(list2)) }]);
+  await expect(page.getByText(/1 Produkt\(e\) importiert\. 1 Produkt\(e\) haben eine 3D-Modelldatei/)).toBeVisible();
+  chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Produktliste importieren/ }).click();
+  await (await chooser).setFiles([{ name: '00000001.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(boxGlb(0.8, 2.02, 0.28)) }]);
+  await expect(page.getByText(/1 von 1 Produkt\(en\) mit 3D-Modell ergänzt/)).toBeVisible();
+  await page.getByPlaceholder(/Suchen/).fill('TESTEINZELN');
+  await page.locator('.panel.left').getByText('TESTEINZELN Regal').click();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'TESTEINZELN Regal')?.model.type).toBe('gltf');
+  await page.getByPlaceholder(/Suchen/).fill('TESTORDNER');
+  await page.locator('.panel.left').getByText('TESTORDNER Regal').click();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { name: string }) => f.name === 'TESTORDNER Regal')?.model.type).toBe('gltf');
   expect(errors).toEqual([]);
 });
 

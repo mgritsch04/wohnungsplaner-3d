@@ -66,12 +66,15 @@ export function splitPlanFiles(texts: { name: string; text: string }[]): { plan:
   const plans: { name: string; text: string }[] = [];
   const lists: CatalogEntry[] = [];
   for (const f of texts) {
-    let format: unknown;
+    let parsed: unknown;
     try {
-      format = (JSON.parse(f.text) as { format?: unknown } | null)?.format;
+      parsed = JSON.parse(f.text);
     } catch {
       throw new FileFormatError(`„${f.name}“ ist kein gültiges JSON.`);
     }
+    // a top-level array is never a plan – e.g. bericht.json written next to the product list (#12)
+    if (Array.isArray(parsed)) continue;
+    const format = (parsed as { format?: unknown } | null)?.format;
     if (format === CATALOG_FORMAT) lists.push(...parseCatalogEntries(f.text).entries);
     else plans.push(f);
   }
