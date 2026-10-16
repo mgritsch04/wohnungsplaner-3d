@@ -150,10 +150,16 @@ test('läuft in einem iframe mit fremder Origin (wie ein Artefakt) inkl. Speiche
   const frame = page.frameLocator('#artifact');
   await expect(frame.locator('[data-testid="editor2d"] svg')).toBeVisible({ timeout: 20000 });
   const name = frame.locator('input.project-name');
+  const saved = frame.locator('.save-state.save-saved');
+  // the editor shows before the last project is restored and autosave is on – an edit made that
+  // early would be replaced by the restore, so wait until the app is ready
+  await expect(frame.locator('.app[data-ready="true"]')).toHaveCount(1, { timeout: 20000 });
   await name.fill('Im iframe gespeichert');
   await name.blur();
-  await expect(frame.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
-  await page.waitForTimeout(1200);
+  // "Gespeichert" is already shown before the edit – wait for it to leave and come back
+  await expect(saved).toHaveCount(0, { timeout: 5000 });
+  await expect(saved).toHaveCount(1, { timeout: 10000 });
+  await expect(name).toHaveValue('Im iframe gespeichert');
   await page.reload();
   await expect(frame.locator('input.project-name')).toHaveValue('Im iframe gespeichert');
   await frame.getByRole('button', { name: '3D', exact: true }).click();

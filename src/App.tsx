@@ -77,7 +77,7 @@ export default function App() {
   const phoneClass = phone ? ` phone${sheet ? ` sheet-${sheet}` : ''}` : '';
 
   return (
-    <div className={`app${phoneClass}`}>
+    <div className={`app${phoneClass}`} data-ready={ready}>
       <div className={locked ? `app-header ${locked}` : 'app-header'} inert={comparing}>
         <Toolbar saveState={autosave.state} />
         {autosave.state === 'error' && autosave.error && <SaveErrorBanner reason={autosave.error} onRetry={autosave.retry} />}
