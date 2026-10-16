@@ -1460,3 +1460,39 @@ test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+test('measures the walking path from the living room to the bedroom and clears it with Esc (#67)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.locator('.panel.left').getByRole('button', { name: /Laufweg/ }).click();
+  const a = { x: 1, y: 0.8 }; // living room
+  const b = { x: 5.7, y: 3 }; // bedroom – the straight line hits the wall next to the door
+  for (const p of [a, b]) {
+    const s = await planToScreen(page, p.x, p.y);
+    await page.mouse.click(s.x, s.y);
+  }
+  const plan = page.locator('[data-testid="editor2d"]');
+  await expect(plan.getByTestId('walk-path-line')).toBeVisible();
+  const label = plan.getByTestId('walk-path-length');
+  await expect(label).toHaveText(/^\d+,\d{2} m$/);
+  const length = Number(await label.getAttribute('data-length-m'));
+  const straight = Math.hypot(b.x - a.x, b.y - a.y);
+  expect(length).toBeGreaterThan(straight + 0.05); // detour through the door, around furniture
+  expect(length).toBeLessThan(straight * 1.6);
+  expect(await getProject(page)).not.toHaveProperty('walkPath'); // display only, nothing stored
+  // the 3D view shows it as a floor line
+  const segments3d = () =>
+    page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scene = (window as any).__wp.three.scene;
+      return scene.getObjectByName('walk-path')?.children.length ?? 0;
+    });
+  await expect.poll(segments3d).toBeGreaterThan(0);
+
+  await page.keyboard.press('Escape');
+  await expect(plan.getByTestId('walk-path')).toHaveCount(0);
+  await expect.poll(segments3d).toBe(0);
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
