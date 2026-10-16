@@ -22,6 +22,7 @@ import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
+import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { calibrateUnderlay } from '../import/underlayTransform';
 
 type Drag =
@@ -699,6 +700,7 @@ export function Editor2D() {
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
           <PlanDrawing project={project} derived={derived} selection={selection} multi={multi} hover={hover} zoom={view.zoom} showDimensions conflicts={conflicts} />
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
+          <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <WalkMarker px={px} />
 
           {/* node handles */}
