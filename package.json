@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:artifact": "node scripts/copy-draco.mjs && tsc -b && vite build --mode artifact && node scripts/artifact-manifest.mjs",
+    "build:artifact": "node scripts/copy-draco.mjs && tsc -b && vite build --mode artifact && node scripts/escape-control-chars.mjs dist-artifact && node scripts/artifact-manifest.mjs",
     "test:artifact": "playwright test -c playwright.artifact.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",

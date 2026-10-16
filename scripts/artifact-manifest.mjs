@@ -86,6 +86,9 @@ export function buildManifest(buildDir) {
     const [contentType, isText] = type;
     const limit = abs === page ? LIMITS.pageBytes : isText ? LIMITS.textFileBytes : LIMITS.binaryFileBytes;
     if (bytes > limit) errors.push(`${published}: ${fmt(bytes)} > ${fmt(limit)}.`);
+    // the artifact service refuses text files with raw control characters (scripts/escape-control-chars.mjs)
+    if (isText && /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(readFileSync(abs, 'latin1')))
+      errors.push(`${published}: enthält Steuerzeichen – „node scripts/escape-control-chars.mjs“ ausführen.`);
     if (abs !== page) files[published] = { from: abs, contentType };
   }
   if (count > LIMITS.maxFiles) errors.push(`${count} Dateien > ${LIMITS.maxFiles}.`);
