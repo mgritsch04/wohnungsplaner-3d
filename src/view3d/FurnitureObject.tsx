@@ -9,6 +9,7 @@ import { useAssetUrl } from '../persistence/useAssetUrl';
 import { DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 import { useUiStore } from '../store/uiStore';
+import { requestLampShadowUpdate } from './lampRegistry';
 
 interface Props {
   item: Furniture;
@@ -122,7 +123,7 @@ export const FurnitureObject = memo(
         {item.model.type === 'gltf' ? (
           <ModelErrorBoundary fallback={fallback}>
             <Suspense fallback={fallback}>
-              <GltfModel item={item} fallback={fallback} castShadow={castShadow} />
+              <GltfModel item={item} fallback={fallback} castShadow={castShadow} receiveShadow={quality === 'realism'} />
             </Suspense>
           </ModelErrorBoundary>
         ) : (
@@ -177,15 +178,15 @@ function SelectionBox({ w, d, h }: { w: number; d: number; h: number }) {
   );
 }
 
-function GltfModel({ item, fallback, castShadow }: { item: Furniture; fallback: ReactNode; castShadow: boolean }) {
+function GltfModel({ item, fallback, castShadow, receiveShadow }: { item: Furniture; fallback: ReactNode; castShadow: boolean; receiveShadow: boolean }) {
   const model = item.model.type === 'gltf' ? item.model : null;
   const { url: assetUrl, missing } = useAssetUrl(model?.assetId);
   const url = model?.url ?? assetUrl;
   if (!url || missing) return <>{fallback}</>;
-  return <LoadedGltf url={url} item={item} castShadow={castShadow} />;
+  return <LoadedGltf url={url} item={item} castShadow={castShadow} receiveShadow={receiveShadow} />;
 }
 
-function LoadedGltf({ url, item, castShadow }: { url: string; item: Furniture; castShadow: boolean }) {
+function LoadedGltf({ url, item, castShadow, receiveShadow }: { url: string; item: Furniture; castShadow: boolean; receiveShadow: boolean }) {
   const gltf = useGLTF(url, DRACO_PATH);
   const scene = useMemo(() => {
     const s = gltf.scene.clone(true);
@@ -199,11 +200,14 @@ function LoadedGltf({ url, item, castShadow }: { url: string; item: Furniture; c
     s.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
         o.castShadow = castShadow;
-        o.receiveShadow = castShadow;
+        // flat items (rugs) cast nothing but still lie in the shadow of walls (#130)
+        o.receiveShadow = receiveShadow;
       }
     });
     return s;
-  }, [gltf, item.width, item.height, item.depth, castShadow]);
+  }, [gltf, item.width, item.height, item.depth, castShadow, receiveShadow]);
+  // a loaded model replaces its placeholder: lamp shadows must see it
+  useEffect(() => requestLampShadowUpdate(), [scene]);
   return <primitive object={scene} />;
 }
 
