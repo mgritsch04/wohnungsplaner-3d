@@ -2068,6 +2068,7 @@ test('clearances (#50): dimension lines to walls and furniture while dragging an
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {
+  test.setTimeout(120_000); // many 3D transitions; slow under software rendering on a busy CI runner
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -2119,8 +2120,9 @@ test('camera bookmarks: save the view, jump back by click and Alt+1, kept after 
   expect(dist(await camPos(), saved)).toBeGreaterThan(1);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.keyboard.press('Alt+1');
-  await page.waitForTimeout(150);
-  expect(dist(await camPos(), saved)).toBeLessThan(0.05);
+  // the jump is applied on the next rendered frame – on a slow CI runner (software rendering, a few fps)
+  // that can take longer than a fixed wait, so poll; the zero transition time itself is unit-tested
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   // Alt+1 must not switch the view mode (plain 1 = 2D)
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('3d');
