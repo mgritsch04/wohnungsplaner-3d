@@ -184,6 +184,19 @@ export const FurnitureSchema = z.object({
   solid: z.boolean().default(true),
   kitchen: KitchenModuleSchema.optional(),
   locked: z.boolean().default(false),
+  /** Member of the furniture group with this id (#65), see `ProjectSchema.groups`; absent = not grouped. */
+  groupId: z.string().min(1).optional(),
+});
+
+/**
+ * Named, permanent group of furniture (#65), e.g. a kitchen run or a dining set: selected,
+ * moved and rotated together. Membership is stored on the items (`Furniture.groupId`), so
+ * an item belongs to at most one group and deleting/copying items needs no list upkeep;
+ * this list only carries the name.
+ */
+export const FurnitureGroupSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(100),
 });
 
 export const LightSchema = z.object({
@@ -321,6 +334,8 @@ export const ProjectSchema = z.object({
   underlay: UnderlaySchema.nullable().default(null),
   /** Saved 3D viewpoints (#55); projects saved before lack the field. */
   cameraBookmarks: z.array(CameraBookmarkSchema).default([]),
+  /** Furniture groups (#65); projects saved before lack the field. */
+  groups: z.array(FurnitureGroupSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -335,6 +350,7 @@ export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 export type KitchenModule = z.infer<typeof KitchenModuleSchema>;
 export type Furniture = z.infer<typeof FurnitureSchema>;
+export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
