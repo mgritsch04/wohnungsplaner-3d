@@ -2064,6 +2064,45 @@ test('keyboard overview: "?" opens all shortcuts (2D, 3D, walking), Esc closes (
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('a new empty project starts without the measuring line and walking path of the previous project (#133)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const plan = page.locator('[data-testid="editor2d"]');
+  const clickAt = async (x: number, y: number) => {
+    const s = await planToScreen(page, x, y);
+    await page.mouse.click(s.x, s.y);
+  };
+  // a measuring line (M) …
+  await page.keyboard.press('m');
+  await clickAt(1, 0.8);
+  await clickAt(3, 0.8);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(1);
+  // … and a walking path (L), the tool stays active
+  await page.keyboard.press('l');
+  await clickAt(1, 0.8);
+  await clickAt(5.7, 3);
+  await expect(plan.getByTestId('walk-path-line')).toBeVisible();
+  // Projekt → „Neues leeres Projekt“: nothing of it is left
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  await expect.poll(async () => (await getProject(page)).walls.length).toBe(0);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(0);
+  await expect(plan.getByTestId('walk-path')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().measurements.length)).toBe(0);
+  // a measurement in the new project works as usual (the start card would cover the plan)
+  await page.getByTestId('start-card').getByRole('button', { name: 'Startkarte schließen' }).click();
+  await page.keyboard.press('m');
+  await clickAt(0, 0);
+  await clickAt(2, 0);
+  await expect(plan.getByTestId('measure-line')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('measures the walking path from the living room to the bedroom and clears it with Esc (#67)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);

@@ -116,6 +116,17 @@ export function Editor2D() {
   const [calib, setCalib] = useState<{ p1: Vec2 | null; p2: Vec2 | null }>({ p1: null, p2: null });
   const [lengthInput, setLengthInput] = useState<string | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+  // another project (new, opened, imported – #133): drop half-drawn walls, a started
+  // measurement and calibration points of the previous one (reset during render, not in an effect)
+  const [stateFor, setStateFor] = useState(project.id);
+  if (stateFor !== project.id) {
+    setStateFor(project.id);
+    setChain([]);
+    setMeasureStart(null);
+    setCalib({ p1: null, p2: null });
+    setLengthInput(null);
+    setPreview({});
+  }
 
   // track container size
   useEffect(() => {
@@ -1008,7 +1019,7 @@ function MeasureLine({ a, b, px }: { a: Vec2; b: Vec2; px: number }) {
   const n = scale(perp(d), 5 * px);
   const mid = scale(add(a, b), 0.5);
   return (
-    <g pointerEvents="none">
+    <g pointerEvents="none" data-testid="measure-line">
       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       <line x1={a.x - n.x} y1={a.y - n.y} x2={a.x + n.x} y2={a.y + n.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       <line x1={b.x - n.x} y1={b.y - n.y} x2={b.x + n.x} y2={b.y + n.y} stroke="#dc2626" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />

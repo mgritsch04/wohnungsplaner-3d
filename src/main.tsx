@@ -7,6 +7,8 @@ import { useProjectStore } from './store/projectStore';
 import { useUiStore } from './store/uiStore';
 import { useImportStore } from './import/importStore';
 import { installErrorCapture } from './ui/bugReport';
+// temporary tool results (measuring lines, tape, walking path, viewpoint) follow the project (#133)
+import './ui/projectSwitch';
 
 installErrorCapture();
 
