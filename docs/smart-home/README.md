@@ -15,6 +15,7 @@ Ziel: eine wartbare, möglichst lokale Smart-Home-Installation mit **Home Assist
 ## Dokumente
 | Datei | Inhalt |
 |---|---|
+| [CONCEPT.md](CONCEPT.md) | **Gesamtkonzept für deine Wohnung**: Zielbild, Geräte je Funktion, Regeln, Phasen, offene Punkte |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Komponenten, Datenmodell, lokal vs. Cloud, APIs, Datenflüsse |
 | [HARDWARE_AND_DEVICES.md](HARDWARE_AND_DEVICES.md) | Host-Vergleich, Funk, Protokolle, Geräteklassen mit Preisen |
 | [INSTALLATION_AND_SETUP.md](INSTALLATION_AND_SETUP.md) | spätere Einrichtung Schritt für Schritt mit offiziellen Links |
