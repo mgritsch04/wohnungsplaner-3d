@@ -490,3 +490,14 @@ describe('rugs (#39)', () => {
     expect(furnitureConflicts(p, d, obs).size).toBe(0);
   });
 });
+
+describe('furniture snapping choice (#52)', () => {
+  it('maps the setting to grid step and wall snapping; Alt always frees', async () => {
+    const { furnitureSnapOptions } = await import('./placement');
+    expect(furnitureSnapOptions('grid5')).toEqual({ grid: 0.05, walls: true });
+    expect(furnitureSnapOptions('grid10')).toEqual({ grid: 0.1, walls: true });
+    expect(furnitureSnapOptions('wall')).toEqual({ grid: null, walls: true });
+    expect(furnitureSnapOptions('off')).toEqual({ grid: null, walls: false });
+    expect(furnitureSnapOptions('grid10', true)).toEqual({ grid: null, walls: false });
+  });
+});

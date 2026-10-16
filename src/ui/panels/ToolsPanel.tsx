@@ -5,7 +5,7 @@ import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
-import { CheckField, NumberField, Section, TextField } from '../fields';
+import { CheckField, NumberField, Section, SelectField, TextField } from '../fields';
 
 const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
   { id: 'select', label: 'Auswählen', key: 'V', hint: 'Elemente auswählen, verschieben, Ecken und Wände ziehen' },
@@ -135,6 +135,18 @@ export function ToolsPanel() {
           }
           title="Alt gedrückt halten, um den Fang vorübergehend zu deaktivieren"
         />
+        <SelectField
+          label="Möbel einrasten"
+          value={settings.furnitureSnap}
+          options={[
+            { value: 'grid5', label: 'Raster 5 cm + Wandkante' },
+            { value: 'grid10', label: 'Raster 10 cm + Wandkante' },
+            { value: 'wall', label: 'nur Wandkante' },
+            { value: 'off', label: 'aus (frei)' },
+          ]}
+          onChange={(v) => apply((d) => void (d.settings.furnitureSnap = v))}
+        />
+        <p className="muted small">Gilt beim Ziehen in 2D und 3D. Alt gedrückt halten = vorübergehend frei platzieren.</p>
       </Section>
 
       <Section title="Beleuchtung">

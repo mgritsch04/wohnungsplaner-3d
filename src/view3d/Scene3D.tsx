@@ -19,7 +19,8 @@ import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
 import { CLICK_THRESHOLD_PX, setPickClipping } from './pointer';
-import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
+import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
+import { snapToGrid } from '../model/operations';
 import { CollisionMarkers } from './CollisionMarkers';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 
@@ -158,7 +159,10 @@ function SceneContent({
   const onDrag = useCallback(
     (id: string, x: number, y: number) =>
       updateTx((d) => {
-        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(x), y: roundMm(y) }, { snap: true, collide: true });
+        // same snapping choice as in 2D (#52)
+        const fs = furnitureSnapOptions(d.settings.furnitureSnap);
+        const p = fs.grid ? snapToGrid({ x, y }, fs.grid) : { x, y };
+        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: true });
       }),
     [updateTx, derived, obstacles],
   );
