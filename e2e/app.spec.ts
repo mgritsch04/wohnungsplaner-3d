@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
+import { clearanceLabel, furnitureClearances } from '../src/model/clearances';
+import { derivePlan } from '../src/model/derived';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
 
@@ -1878,3 +1880,46 @@ test('align and distribute several furniture items: top edge, equal gaps, one un
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('clearances (#50): dimension lines to walls and furniture while dragging an item', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const plan = page.getByTestId('editor2d');
+  const p0 = await getProject(page);
+  const table = p0.furniture.find((f: { catalogId: string }) => f.catalogId === 'generic-coffee-table');
+  const a = await planToScreen(page, table.x, table.y);
+  const b = await planToScreen(page, table.x - 0.6, table.y);
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move((a.x + b.x) / 2, a.y, { steps: 4 });
+  // while the button is held: lines with cm labels, matching the model for the current position
+  const check = async () => {
+    const lines = plan.locator('[data-testid="clearance"]');
+    await expect(lines.first()).toBeVisible();
+    const shown = await lines.evaluateAll((els) =>
+      els.map((el) => ({ side: el.getAttribute('data-side'), cm: Number(el.getAttribute('data-distance-cm')), text: el.textContent })),
+    );
+    const p = await getProject(page);
+    const expected = furnitureClearances(p, derivePlan(p), table.id).map((c) => ({ side: c.side, cm: Math.round(c.distance * 100), text: clearanceLabel(c.distance) }));
+    expect(expected.length).toBeGreaterThan(0);
+    expect(shown).toEqual(expected);
+    for (const s of shown) expect(s.text).toMatch(/^\d+ cm$/);
+    return shown;
+  };
+  const mid = await check();
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  const end = await check();
+  // the values follow the item live (it moved left: less room on the left)
+  const left = (xs: typeof mid) => xs.find((s) => s.side === 'left')?.cm ?? NaN;
+  expect(left(end)).toBeLessThan(left(mid));
+  await page.mouse.up();
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  // Alt held with exactly this item selected shows them again, releasing Alt hides them
+  await page.keyboard.down('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(1);
+  await page.keyboard.up('Alt');
+  await expect(plan.getByTestId('clearances')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
