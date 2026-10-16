@@ -5,9 +5,9 @@ _Zuletzt aktualisiert: 2026-10-16 · Branch `claude/quirky-faraday-0d9uep` · Wo
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Teppich stoppt an Wänden (#39, Teil), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
+- **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #16), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
 - **Deine Aufgaben:** #28 Smart-Home-Rückfragen (Erklärungen in `smart-home/DECISIONS.md`) · #30 Routine einrichten (Label `user-task`); #27 und #29 von dir erledigt
-- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (First-Person: Möbel auswählen/verschieben #39)
+- **Nächster Schritt:** oberste `Ready`-Zeile in [`IDEAS.md`](IDEAS.md) (Auswahlprobleme in 3D aus #31, dann Zoom-Regler #6)
 
 ## Legende
 `DONE` fertig mit Beleg · `PARTIAL` teilweise · `IN PROGRESS` in Arbeit · `PLANNED` geplant · `BLOCKED` blockiert · `NEEDS USER TEST` braucht deinen Praxistest
@@ -29,6 +29,7 @@ Status je Aufgabe: implementiert · automatisiert getestet · User-Test offen (#
 | Augenhöhe + Fadenkreuz (#23, #22): Einstellung „Augenhöhe beim Begehen“ (Projekt › Steuerung (3D), 100–220 cm, Standard 163 cm, vorher fest 165 cm), wirkt sofort ohne Neustart des Begehens, wird gespeichert; Fadenkreuz in der Bildmitte nur beim Begehen | ✅ | ✅ Unit (Schema-Default) + E2E (163 cm, Änderung live auf 180 cm, nach Neuladen erhalten, Fadenkreuz nur beim Begehen) | 🧪 #33 · Screenshot angesehen |
 | G Hover-Info (#9): Karte nach ~0,45 s mit Name, Kategorie, Maße, Preis (Mengen/Schätzung), Marke/Händler, Produktbild (nur https, ohne Referrer); verschwindet bei gedrückter Maustaste, nicht bei Touch; 2D und 3D | ✅ | ✅ E2E (2D: Inhalt, Ziehen blendet aus, leere Fläche) | 🧪 #41 |
 | Teppich stoppt an Wänden (#39, Teil): Teppiche liegen weiter unter Möbeln, werden beim Ziehen aber wie andere Möbel an Wänden gestoppt | ✅ | ✅ Unit | Teil von #39 |
+| First-Person: Möbel auswählen/tragen (#39): Klick aufs Fadenkreuz wählt aus, G trägt (folgt dem Blick 1,1–4 m, Kollision wie beim Ziehen), Klick/G setzt ab (ein Undo-Schritt), Verlassen setzt ab; G schaltet beim Begehen kein 2D-Werkzeug | ✅ | ✅ E2E (anvisieren, tragen, absetzen, Undo-Schritt, Werkzeug unverändert) | 🧪 #42 · Screenshot angesehen |
 
 ## Diese Runde (Arbeitsauftrag 1–8)
 
@@ -93,6 +94,7 @@ Offene `[USERTEST]`-Issues (Label `user-test`; Antwort `BESTANDEN` oder `FEHLGES
 - #31 Möbel drehen (Knöpfe, Q/E, an der Wand)
 - #33 Begehen: Augenhöhe und Fadenkreuz
 - #41 Möbel-Hoverinfo
+- #42 Begehen: Möbel tragen, Teppich an Wänden
 - Hinweis: #26 und #31 hast du vor dem Merge getestet – nach Merge von PR #32 bitte neu
 - #11 Projekt speichern / erneut öffnen
 - #12 IKEA: Artikelliste → Produktliste, PAX-Planung
