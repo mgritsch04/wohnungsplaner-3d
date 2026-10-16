@@ -714,7 +714,7 @@ test('3D: clicking furniture keeps it selected after release; walls stay selecta
   await page.waitForTimeout(400);
   expect(await getSelection(page)).toEqual({ type: 'furniture', id: bed.id });
   // clicking the exposed top of a wall selects that wall
-  await page.getByRole('button', { name: '⟲ Kamera' }).click();
+  await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
   await page.waitForTimeout(800);
   const w = await worldToScreen3d(page, 4.0, 2.6, -0.06);
   await page.mouse.click(w.x, w.y);
@@ -828,8 +828,12 @@ test('realism mode: time-of-day control with presets, one undo step per drag, no
   await page.getByRole('button', { name: 'Realismus' }).click();
   const slider = page.getByLabel('Tageszeit', { exact: true });
   await expect(slider).toBeVisible();
+  // presets are in the toolbar's "Mehr" menu (#100)
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click();
   await page.getByLabel('Tageszeit-Voreinstellung').selectOption({ label: 'Nacht (23:30)' });
   expect((await getProject(page)).settings.timeOfDay).toBe(23.5);
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Tageszeit-Voreinstellung')).toHaveCount(0);
   const pastBefore = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length);
   const b = (await slider.boundingBox())!;
   await page.mouse.move(b.x + b.width * 0.3, b.y + b.height / 2);
@@ -1099,7 +1103,7 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
     });
   const orbitTurn = async (sens: number) => {
     await setSens(sens);
-    await page.getByRole('button', { name: '⟲ Kamera' }).click();
+    await page.getByRole('button', { name: 'Kamera zurücksetzen' }).click();
     await page.waitForTimeout(600);
     const a0 = await azimuth();
     await page.mouse.move(cx, cy + 150);
@@ -1238,7 +1242,11 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Realismus' }).click();
   const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
+    // the lamp switch is in the toolbar's "Mehr" menu (#100)
+    await page.getByRole('button', { name: 'Mehr', exact: true }).click();
     await page.getByLabel('Lampen', { exact: true }).selectOption(lamps);
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Lampen', { exact: true })).toHaveCount(0);
     await page.evaluate((h) => {
       const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: { settings: { timeOfDay: number } }) => void) => void } } } }).__wp;
       wp.useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = h));
@@ -1991,7 +1999,7 @@ test('dark mode: light / dark / system switch in the project panel, kept after r
   expect(await lum('html')).toBeLessThan(0.15);
 
   // the print sheet stays white in dark mode
-  await page.getByRole('button', { name: 'Export ▾' }).click();
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click(); // exports are in the "Mehr" menu (#100)
   await page.getByRole('button', { name: /Plan drucken/ }).click();
   await expect(page.locator('.print-page')).toBeVisible();
   expect(await lum('.print-page')).toBeGreaterThan(0.99);
@@ -2375,7 +2383,7 @@ test('properties panel: groups collapse, keep their state across selections and 
 test('exports the 3D model as a GLB file from the export menu (#87)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
-  await page.getByRole('button', { name: /^Export/ }).click();
+  await page.getByRole('button', { name: 'Mehr', exact: true }).click(); // exports are in the "Mehr" menu (#100)
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '3D-Modell als GLB …' }).click();
   const d = await download;
@@ -2467,5 +2475,118 @@ test('empty project: start card with first steps, "Raum zeichnen" picks the tool
   await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('calmer toolbar: icons with tooltip and name, "Mehr" menu with exports and light, keyboard operation, stand/sit, "Erste Schritte" (#100, #103)', async ({ page }) => {
+  test.setTimeout(240_000); // realism rendering with software WebGL is slow, more so under load
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const toolbar = page.locator('header.toolbar');
+
+  // icon-only buttons: no visible text, a name (aria-label) and a tooltip that starts with it
+  const icons = toolbar.locator('button.icon-btn');
+  expect(await icons.count()).toBeGreaterThanOrEqual(8);
+  for (const b of await icons.all()) {
+    const label = (await b.getAttribute('aria-label')) ?? '';
+    expect(label.length, 'icon button without aria-label').toBeGreaterThan(1);
+    expect((await b.getAttribute('title')) ?? '').toContain(label.split(' ')[0]);
+    expect((await b.innerText()).trim()).toBe('');
+  }
+  // every toolbar button has a name
+  for (const b of await toolbar.locator('button').all()) {
+    const name = (await b.getAttribute('aria-label')) ?? (await b.innerText()).trim();
+    expect(name, 'toolbar button without a name').not.toBe('');
+  }
+  await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveAttribute('title', /Strg\+Z/);
+  await expect(page.getByRole('button', { name: 'Hilfe & Tastenkürzel' })).toHaveAttribute('aria-keyshortcuts', '?');
+  // rarely used: the separate "Export ▾" button is gone, its entries are in "Mehr"
+  await expect(page.getByRole('button', { name: 'Export ▾' })).toHaveCount(0);
+
+  // keyboard: Enter opens "Mehr", the focus goes to the first entry, arrows move, Esc closes and returns
+  const more = page.getByRole('button', { name: 'Mehr', exact: true });
+  await more.focus();
+  await page.keyboard.press('Enter');
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const menu = page.locator('#toolbar-menu-more');
+  for (const entry of ['Projektpaket (.wohnplan.json)', 'Grundriss (apartment-plan.json)', 'Einkaufsliste (CSV)', 'Plan drucken / PDF / PNG…', '3D-Modell als GLB …']) {
+    await expect(menu.getByRole('button', { name: entry })).toBeVisible();
+  }
+  await expect(menu.getByRole('button', { name: 'Projektpaket (.wohnplan.json)' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('button', { name: 'Grundriss (apartment-plan.json)' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('button', { name: '3D-Modell als GLB …' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('button', { name: 'Projektpaket (.wohnplan.json)' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
+  // keyboard focus shows the name as a tooltip, too (the native title only appears on hover)
+  expect(await more.evaluate((el) => getComputedStyle(el, '::after').content)).toBe('"Mehr: Export"');
+  // Enter on "Projekt ▾" opens it with the focus inside
+  await page.getByRole('button', { name: 'Projekt ▾' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Neues leeres Projekt' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
+  // a click outside closes a menu
+  await more.click();
+  await expect(menu).toBeVisible();
+  await page.locator('.save-state').click();
+  await expect(menu).toHaveCount(0);
+
+  // 3D realism: only the slider stays in the toolbar; presets and lamps are in "Mehr"
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Realismus' }).click();
+  await expect(toolbar.getByLabel('Tageszeit', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Lampen', { exact: true })).toHaveCount(0);
+  await more.click();
+  await expect(menu.getByText('Licht (Realismus)')).toBeVisible();
+  await expect(menu.getByLabel('Tageszeit-Voreinstellung')).toBeVisible();
+  await menu.getByLabel('Lampen', { exact: true }).selectOption('on');
+  expect((await getProject(page)).settings.lamps).toBe('on');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  // the toolbar stays on one row – also in a narrow window
+  expect((await toolbar.boundingBox())!.height).toBeLessThan(52);
+  await page.screenshot({ path: 'test-results/toolbar-1440-realism.png', clip: { x: 0, y: 0, width: 1440, height: 60 } });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  expect((await toolbar.boundingBox())!.height).toBeLessThan(52);
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeAttached(); // still there for screen readers
+  await page.screenshot({ path: 'test-results/toolbar-1024-realism.png', clip: { x: 0, y: 0, width: 1024, height: 60 } });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Planung', exact: true }).click();
+
+  // walkthrough: stand / sit next to "Begehen", same state as key X; orbit-only tools hidden
+  await expect(page.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByRole('button', { name: 'Schnitt' })).toHaveCount(0);
+  const stand = page.getByRole('button', { name: 'Stehen', exact: true });
+  const sit = page.getByRole('button', { name: 'Sitzen', exact: true });
+  await expect(stand).toHaveAttribute('aria-pressed', 'true');
+  await sit.click();
+  await expect(sit).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('walk-sit')).toBeVisible();
+  await page.locator('[data-testid="scene3d"]').hover();
+  await page.keyboard.press('x');
+  await expect(stand).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('walk-sit')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByRole('group', { name: 'Haltung beim Begehen' })).toHaveCount(0);
+
+  // "Projekt ▾ › Erste Schritte": disabled for a non-empty project, reopens the start card of an empty one
+  await page.getByRole('button', { name: 'Projekt ▾' }).click();
+  await expect(page.getByRole('button', { name: /^Erste Schritte/ })).toBeDisabled();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Startkarte schließen' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('button', { name: 'Projekt ▾' }).click();
+  await page.locator('#toolbar-menu-project').getByRole('button', { name: /^Erste Schritte/ }).click();
+  await expect(card).toBeVisible();
+  await expect(page.locator('#toolbar-menu-project')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
