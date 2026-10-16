@@ -5,7 +5,7 @@ import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
-import { CheckField, NumberField, Section, SelectField, TextField } from '../fields';
+import { CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 
 const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
   { id: 'select', label: 'Auswählen', key: 'V', hint: 'Elemente auswählen, verschieben, Ecken und Wände ziehen' },
@@ -60,6 +60,9 @@ export function ToolsPanel() {
             </button>
           ))}
         </div>
+        <p className="tool-hint muted small" data-testid="tool-hint">
+          {TOOLS.find((t) => t.id === tool)?.hint}
+        </p>
         {measurements.length > 0 && (
           <button className="link-btn" onClick={clearMeasurements}>
             {measurements.length} Messung(en) entfernen
@@ -67,8 +70,8 @@ export function ToolsPanel() {
         )}
       </Section>
 
-      <Section title="Raum mit Maßen anlegen">
-        <p className="muted small">Innenmaße (lichte Weite) eingeben. Der Raum wird rechts neben den bestehenden Räumen angelegt und kann danach verschoben werden.</p>
+      <PanelGroup groupKey="tools.room" title="Raum mit Maßen anlegen">
+        <p className="muted small">Innenmaße (lichte Weite). Der neue Raum erscheint rechts neben dem Plan und lässt sich danach verschieben.</p>
         <TextField label="Name" value={room.name} onChange={(name) => setRoom({ ...room, name })} />
         <div className="field-row">
           <NumberField label="Breite" value={room.width} factor={100} unit="cm" min={30} max={5000} onChange={(width) => setRoom({ ...room, width })} />
@@ -77,9 +80,9 @@ export function ToolsPanel() {
         <button className="primary block" onClick={createRoom}>
           Raum anlegen
         </button>
-      </Section>
+      </PanelGroup>
 
-      <Section title="Standardwerte für neue Wände">
+      <PanelGroup groupKey="tools.walls" title="Neue Wände" defaultOpen={false}>
         <div className="field-row">
           <NumberField
             label="Dicke"
@@ -108,9 +111,9 @@ export function ToolsPanel() {
             }
           />
         </div>
-      </Section>
+      </PanelGroup>
 
-      <Section title="Raster & Fang">
+      <PanelGroup groupKey="tools.snap" title="Raster & Einrasten" defaultOpen={false}>
         <div className="field-row">
           <NumberField
             label="Raster"
@@ -148,9 +151,9 @@ export function ToolsPanel() {
           onChange={(v) => apply((d) => void (d.settings.furnitureSnap = v))}
         />
         <p className="muted small">Gilt beim Ziehen in 2D und 3D. Alt gedrückt halten = vorübergehend frei platzieren.</p>
-      </Section>
+      </PanelGroup>
 
-      <Section title="Durchgänge">
+      <PanelGroup groupKey="tools.passages" title="Engstellen" defaultOpen={false}>
         <NumberField
           label="Durchgang mindestens"
           value={settings.minPassageWidth}
@@ -170,14 +173,14 @@ export function ToolsPanel() {
           onChange={(v) => apply((d) => void (d.settings.showNarrowPassages = v))}
           title="Lücken zwischen Möbeln, Möbel und Wand sowie Türen schmaler als die Mindestbreite rot markieren (2D und 3D)"
         />
-      </Section>
+      </PanelGroup>
 
-      <Section title="Beleuchtung">
+      <PanelGroup groupKey="tools.lights" title="Beleuchtung" defaultOpen={false}>
         <button className="block" onClick={addLight}>
           + Deckenleuchte hinzufügen
         </button>
         <p className="muted small">Leuchten wirken in der 3D-Ansicht (Lichtfarbe und Helligkeit rechts einstellbar).</p>
-      </Section>
+      </PanelGroup>
     </div>
   );
 }

@@ -47,7 +47,7 @@ Die Produktliste enthält Name, Preis und Maße laut IKEA-Seite und das Datum de
 ## Schritt 4: In den Wohnungsplaner importieren
 1. Wohnungsplaner öffnen, links den Reiter **Import** wählen.
 2. Auf **„IKEA-Planung (JSON) importieren…“** klicken.
-3. Im Dateidialog **beide Dateien gemeinsam** markieren (Strg-Taste gedrückt halten bzw. mit der Maus aufziehen): `planung.json` und `produktliste.json`. Nur `planung.json` zu wählen geht auch – dann ohne Namen und Preise.
+3. Im Dateidialog **beide Dateien gemeinsam** markieren (Strg-Taste gedrückt halten bzw. mit der Maus aufziehen): `planung.json` und `produktliste.json`. Liegen beide im Ordner `ikea-import`, kannst du auch einfach alle Dateien des Ordners markieren (Strg+A); `bericht.json` wird übersprungen. Nur `planung.json` zu wählen geht auch – dann ohne Namen und Preise.
 4. Die Meldung nennt, wie viele Korpusse Namen und Preise bekamen, und weist auf Lücken hin.
 
 ## Wie Namen und Preise zugeordnet werden

@@ -87,6 +87,7 @@ export function entriesToCatalogItems(entries: CatalogEntry[], units: 'm' | 'cm'
       tags: [e.articleNumber ?? ''].filter(Boolean),
       source: 'imported',
       sourceName,
+      ...(e.modelFile ? { modelFile: e.modelFile } : {}),
     } satisfies CatalogItem;
   });
 }

@@ -20,6 +20,7 @@ import { IconCutaway, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, 
  */
 function IconButton({
   label,
+  text,
   tip,
   keys,
   pressed,
@@ -28,6 +29,8 @@ function IconButton({
   children,
 }: {
   label: string;
+  /** Visible caption next to the icon (#122); hidden in narrow windows, the name stays. */
+  text?: string;
   tip?: string;
   /** `aria-keyshortcuts`, e.g. "Control+Z". */
   keys?: string;
@@ -41,7 +44,7 @@ function IconButton({
   return (
     <button
       type="button"
-      className={pressed ? 'icon-btn active' : 'icon-btn'}
+      className={`icon-btn${text ? ' labeled' : ''}${pressed ? ' active' : ''}`}
       aria-label={label}
       aria-pressed={pressed}
       aria-keyshortcuts={keys}
@@ -51,6 +54,7 @@ function IconButton({
       onClick={onClick}
     >
       {children}
+      {text && <span className="btn-label">{text}</span>}
     </button>
   );
 }
@@ -166,16 +170,16 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
       {show3d && (
         <div className="toolbar-group">
           <div className="segmented" role="group" aria-label="Kamera">
-            <IconButton label="Übersicht" tip="Übersicht: umkreisen und inspizieren" pressed={cameraMode === 'orbit'} onClick={() => setCameraMode('orbit')}>
+            <IconButton label="Übersicht" text="Übersicht" tip="Übersicht: umkreisen und inspizieren" pressed={cameraMode === 'orbit'} onClick={() => setCameraMode('orbit')}>
               <IconOrbit />
             </IconButton>
-            <IconButton label="Begehen" tip="Begehen: Ich-Perspektive mit WASD + Maus" pressed={cameraMode === 'walk'} onClick={() => setCameraMode('walk')}>
+            <IconButton label="Begehen" text="Begehen" tip="Begehen: Ich-Perspektive mit WASD + Maus" pressed={cameraMode === 'walk'} onClick={() => setCameraMode('walk')}>
               <IconWalk />
             </IconButton>
           </div>
           {cameraMode === 'orbit' && (
             <>
-              <IconButton label="Schnitt" tip="Schnitt in 1,20 m Höhe – Blick in die Räume" pressed={cutaway} onClick={() => setCutaway(!cutaway)}>
+              <IconButton label="Schnitt" text="Schnitt" tip="Schnitt in 1,20 m Höhe – Blick in die Räume" pressed={cutaway} onClick={() => setCutaway(!cutaway)}>
                 <IconCutaway />
               </IconButton>
               <IconButton label="Kamera zurücksetzen" onClick={resetCamera}>

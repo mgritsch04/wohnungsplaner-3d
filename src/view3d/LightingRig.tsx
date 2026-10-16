@@ -6,7 +6,7 @@ import type { DerivedPlan } from '../model/derived';
 import type { Light, Project, QualityMode } from '../model/schema';
 import { add, pointInPolygon, scale } from '../model/vec';
 import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState } from './lighting';
-import { setLampLevel } from './lampRegistry';
+import { flushLampShadowUpdates, registerShadowLamp, setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
 
 /**
@@ -97,7 +97,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
         project.lights.some((l) => l.on && pointInPolygon(l, g.interior)) ||
         project.furniture.some((f) => f.model.type === 'procedural' && lampShapes.has(f.model.shape) && pointInPolygon(f, g.interior));
       if (hasLight) continue;
-      // reach ≈ distance to the farthest room corner, so little light leaks through walls (point lights cast no shadows here)
+      // reach ≈ distance to the farthest room corner; shadows (within the lamp budget) stop the rest at walls (#130)
       const reach = Math.max(...g.interior.map((p) => Math.hypot(p.x - g.centroid.x, p.y - g.centroid.y))) + 0.8;
       out.push({ pos: [g.centroid.x, project.settings.defaultWallHeight - 0.35, g.centroid.y], reach });
     }
@@ -152,6 +152,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   useEffect(() => useUiStore.subscribe((s) => void (preview.current = s.timePreview)), []);
 
   useFrame((_, dt) => {
+    flushLampShadowUpdates();
     const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
     current.current = approachHour(current.current, goal, dt, BLEND_TAU);
@@ -192,10 +193,10 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
         ))}
       {realism &&
         roomLights.map((r, i) => (
-          <pointLight key={`r${i}`} ref={(el) => void (roomRefs.current[i] = el)} position={r.pos} color={kelvinToColor(3000)} intensity={0} distance={r.reach} decay={2} />
+          <ShadowedLight key={`r${i}`} priority={1} lightRef={(el) => void (roomRefs.current[i] = el)} position={r.pos} color={kelvinToColor(3000)} distance={r.reach} decay={2} />
         ))}
       {configured.map((l, i) => (
-        <InteriorLight key={l.id} light={l} lightRef={(el) => void (configuredRefs.current[i] = el)} />
+        <InteriorLight key={l.id} light={l} shadow={realism} lightRef={(el) => void (configuredRefs.current[i] = el)} />
       ))}
     </>
   );
@@ -203,14 +204,45 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
 
 const interiorIntensity = (l: Light) => l.intensity * 1.5;
 
-function InteriorLight({ light, lightRef }: { light: Light; lightRef: (el: THREE.PointLight | null) => void }) {
+function InteriorLight({ light, shadow, lightRef }: { light: Light; shadow: boolean; lightRef: (el: THREE.PointLight | null) => void }) {
   return (
     <group position={[light.x, light.elevation, light.y]}>
-      <pointLight ref={lightRef} color={kelvinToColor(light.temperature)} intensity={0} distance={8} decay={1.5} />
+      {shadow ? (
+        <ShadowedLight lightRef={lightRef} color={kelvinToColor(light.temperature)} distance={8} decay={1.5} />
+      ) : (
+        <pointLight ref={lightRef} color={kelvinToColor(light.temperature)} intensity={0} distance={8} decay={1.5} />
+      )}
       <mesh>
         <sphereGeometry args={[0.06, 12, 8]} />
         <meshBasicMaterial color={kelvinToColor(light.temperature)} />
       </mesh>
     </group>
+  );
+}
+
+/** Point light whose shadow keeps it out of neighbouring rooms (#130); see registerShadowLamp. */
+function ShadowedLight({
+  lightRef,
+  priority = 0,
+  ...props
+}: {
+  lightRef: (el: THREE.PointLight | null) => void;
+  priority?: number;
+  position?: [number, number, number];
+  color: THREE.ColorRepresentation;
+  distance: number;
+  decay: number;
+}) {
+  const ref = useRef<THREE.PointLight>(null);
+  useEffect(() => (ref.current ? registerShadowLamp(ref.current, priority) : undefined), [priority]);
+  return (
+    <pointLight
+      ref={(el) => {
+        ref.current = el;
+        lightRef(el);
+      }}
+      intensity={0}
+      {...props}
+    />
   );
 }

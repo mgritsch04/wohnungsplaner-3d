@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseCatalogCsv, parseCatalogJson, parseCatalogJsonWithModels, parseCsv } from './catalogFormat';
-import { attachModelFiles } from './catalogImport';
+import { attachModelFiles, classifyImportFiles } from './catalogImport';
 import { GENERIC_CATALOG } from './generic';
 import { FileFormatError } from '../formats/zodErrors';
 
@@ -91,5 +91,25 @@ describe('product list with model files', () => {
     expect(rotated.warnings[0]).toMatch(/gedreht/);
     const off = await attachModelFiles(items.slice(0, 1), modelFiles, files, async () => 'a', fakeCheck({ x: 1.6, y: 1.471, z: 0.4 }));
     expect(off.warnings[0]).toMatch(/weichen um \d+ %/);
+  });
+
+  it('keeps the referenced model file name on the item (to attach it later)', () => {
+    const { items } = parseCatalogJsonWithModels(list, 'liste.json');
+    expect(items.map((i) => i.modelFile)).toEqual(['regal-a.glb', 'fehlt.glb', undefined]);
+  });
+
+  it('sorts a whole chosen folder: product list, models, other JSON skipped (#12)', async () => {
+    const files = [
+      new File([list], 'produktliste.json'),
+      new File(['[{"article":"104.099.32","ok":true}]'], 'bericht.json'),
+      new File([new Uint8Array([1])], '10409932.glb'),
+      new File(['x'], 'notizen.txt'),
+    ];
+    const res = await classifyImportFiles(files);
+    expect(res.list?.name).toBe('produktliste.json');
+    expect(res.glbs.map((f) => f.name)).toEqual(['10409932.glb']);
+    expect(res.ignored).toEqual(['bericht.json', 'notizen.txt']);
+    expect((await classifyImportFiles([files[2]])).list).toBeUndefined();
+    await expect(classifyImportFiles([files[0], new File(['name;breite_cm'], 'b.csv')])).rejects.toThrow(/nur eine Produktliste/);
   });
 });

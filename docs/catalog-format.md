@@ -56,8 +56,12 @@ Nur `http(s)`-Links werden übernommen. Importierte Listen werden lokal (Indexed
 ## 3D-Modelle mitliefern (`modelFile`)
 
 Ein Listeneintrag kann mit `"modelFile": "10409932.glb"` (nur Dateiname, Endung `.glb`) auf eine
-GLB-Datei verweisen. Beim Import im Dateidialog **die Liste und die .glb-Dateien gemeinsam
-auswählen** (Mehrfachauswahl). Jede Datei wird geprüft (gültiges glTF, ladbar, Maße); die Maße der
+GLB-Datei verweisen. Am einfachsten im Katalog **„Ordner importieren (z. B. ikea-import)…“** wählen
+und den ganzen Ordner angeben; alternativ im Dateidialog die Liste und die .glb-Dateien gemeinsam
+markieren (Mehrfachauswahl). Andere JSON-Dateien im Ordner (z. B. `bericht.json`) werden
+übersprungen. Wurde nur die Liste importiert, lassen sich die .glb-Dateien später über
+„Produktliste importieren…“ allein auswählen – sie werden den importierten Produkten zugeordnet, die
+sie per `modelFile` nennen und noch kein Modell haben. Jede Datei wird geprüft (gültiges glTF, ladbar, Maße); die Maße der
 Liste bleiben maßgeblich (das Modell wird darauf skaliert). Bei Abweichungen über 10 % oder
 vertauschter Breite/Tiefe erscheint ein Hinweis; fehlende oder ungültige Dateien → maßstäbliche
 Näherung. (Nur JSON; CSV unterstützt `modell_url`, aber keine mitgelieferten Dateien.)
