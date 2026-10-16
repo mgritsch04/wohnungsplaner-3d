@@ -13,7 +13,7 @@ import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotat
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
-import { placementIssues } from '../../model/placement';
+import { conflictSummary, issueLevel, placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
 import { GroupControls } from './GroupControls';
 import { groupName, selectedGroup } from '../../model/groups';
@@ -409,6 +409,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       if (x) fn(x);
     });
   const issues = placementIssues(project, derivePlan(project), f);
+  const summary = conflictSummary(issues);
   return (
     <div className="panel-scroll">
       {more > 0 && (
@@ -430,9 +431,15 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       <GroupControls />
       <ArrangeControls />
       {issues.length > 0 && (
-        <div className="panel-issues">
+        <div className="panel-issues" data-testid="furniture-issues">
+          {/* why the item is marked in 2D/3D, in a few words (#16) */}
+          {summary && (
+            <p className={summary.level === 'error' ? 'warning small error-text' : 'warning small'} data-testid="conflict-summary" data-level={summary.level}>
+              <strong>{summary.label}:</strong> {summary.reasons.join(' · ')}
+            </p>
+          )}
           {issues.map((i, k) => (
-            <p key={k} className={i.kind === "door-swing" || i.kind === "overlap" ? "warning small" : "warning small error-text"}>
+            <p key={k} className={issueLevel(i.kind) === 'error' ? 'warning small error-text' : 'warning small'}>
               {i.message}
             </p>
           ))}

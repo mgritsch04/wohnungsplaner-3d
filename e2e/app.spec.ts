@@ -848,6 +848,54 @@ test('hover info: name, category, size and price after a short delay; hidden whi
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('marked furniture says why (#16): reason in the properties panel and in the 2D hover card', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p0 = await getProject(page);
+  const sofa = p0.furniture.find((f: any) => f.catalogId === 'generic-sofa-3');
+  const lamp = p0.furniture.find((f: any) => f.catalogId === 'generic-floor-lamp');
+  const panel = page.locator('.panel.right');
+  // not marked: no reason shown
+  const l = await planToScreen(page, lamp.x, lamp.y);
+  await page.mouse.click(l.x, l.y);
+  await expect(panel.getByTestId('conflict-summary')).toHaveCount(0);
+  // Alt: drag the floor lamp into the sofa → both red, the lamp's panel says why
+  const into = await planToScreen(page, sofa.x + 0.7, sofa.y);
+  await page.mouse.move(l.x, l.y);
+  await page.keyboard.down('Alt');
+  await page.mouse.down();
+  await page.mouse.move(into.x, into.y, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  const summary = panel.getByTestId('conflict-summary');
+  await expect(summary).toHaveText('Rot markiert: überlappt mit „Sofa 3-Sitzer“');
+  await expect(summary).toHaveAttribute('data-level', 'error');
+  await expect(panel.getByTestId('furniture-issues')).toContainText('Überschneidet sich mit „Sofa 3-Sitzer“.');
+  // hovering the (unselected) sofa in 2D: the hover card names the reason, too
+  const s = await planToScreen(page, sofa.x - 0.6, sofa.y);
+  await page.mouse.move(s.x, s.y);
+  const card = page.getByTestId('furniture-hover');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(sofa.name);
+  await expect(card.getByTestId('hover-conflict')).toHaveText('Rot markiert: überlappt mit „Stehlampe“');
+  await page.screenshot({ path: 'test-results/conflict-reason-hover.png' });
+  // an item that is not marked shows no reason in its card
+  const tv = p0.furniture.find((f: any) => f.catalogId === 'generic-tv-sideboard');
+  const t = await planToScreen(page, tv.x, tv.y);
+  await page.mouse.move(t.x, t.y);
+  await expect(card).toContainText(tv.name);
+  await expect(card.getByTestId('hover-conflict')).toHaveCount(0);
+  // pushing a sideboard into the wall (Alt): „ragt in die Wand“
+  await page.evaluate((id) => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.furniture.find((f: any) => f.id === id).y = 0.05)), tv.id);
+  await page.mouse.click(t.x, t.y + 2);
+  await expect(panel.getByTestId('conflict-summary')).toContainText('ragt in die Wand');
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('realism mode: time-of-day control with presets, one undo step per drag, no errors', async ({ page }) => {
   // realism rendering with software WebGL takes ~45–55 s alone; under parallel load it overran 60 s
   test.setTimeout(150_000);

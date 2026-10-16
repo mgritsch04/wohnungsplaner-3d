@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
-import { buildPlacementObstacles, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
+import { buildPlacementObstacles, conflictSummary, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
@@ -401,6 +401,39 @@ describe('unified furniture rules', () => {
     generateCountertops(p);
     const d = derivePlan(p);
     expect([...furnitureConflicts(p, d, buildPlacementObstacles(d))].map(([, c]) => c.issues.map((i) => i.message))).toEqual([]);
+  });
+});
+
+describe('why an item is marked (#16)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+
+  it('gives a short reason per issue and one summary line per item', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-3'), { x: 2, y: 1.5 });
+    const lamp = createFurnitureFromCatalog(cat('generic-floor-lamp'), { x: 2.2, y: 1.5 });
+    const shelf = createFurnitureFromCatalog(cat('generic-sideboard'), { x: 2, y: 0.1 }); // 12.5 cm into the north wall
+    p.furniture.push(sofa, lamp, shelf);
+    const c = furnitureConflicts(p, d, obs);
+    expect(conflictSummary(c.get(lamp.id)!.issues)).toEqual({ level: 'error', label: 'Rot markiert', reasons: ['überlappt mit „Sofa 3-Sitzer“'] });
+    expect(conflictSummary(c.get(sofa.id)!.issues)!.reasons).toEqual(['überlappt mit „Stehlampe“']);
+    expect(conflictSummary(c.get(shelf.id)!.issues)!.reasons).toContain('ragt in die Wand');
+    for (const [, k] of c) for (const i of k.issues) expect(i.short.length).toBeGreaterThan(5);
+    expect(conflictSummary([])).toBeNull();
+  });
+
+  it('warnings only: orange', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const wardrobe = createFurnitureFromCatalog(cat('generic-wardrobe-100'), { x: 2, y: 0.3 });
+    const chair = createFurnitureFromCatalog(cat('generic-armchair'), { x: 2, y: 0.6 + 0.3 + 0.41 });
+    p.furniture.push(wardrobe, chair);
+    const s = conflictSummary(furnitureConflicts(p, d, obs).get(wardrobe.id)!.issues)!;
+    expect(s.level).toBe('warn');
+    expect(s.label).toBe('Orange markiert');
+    expect(s.reasons).toEqual(['zu wenig Platz vor den Türen („Sessel“ im Weg)']);
   });
 });
 
