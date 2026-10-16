@@ -2233,3 +2233,24 @@ test('properties panel: groups collapse, keep their state across selections and 
   await expect(group('3D-Modell')).toHaveAttribute('aria-expanded', 'false');
   expect(errors).toEqual([]);
 });
+
+test('exports the 3D model as a GLB file from the export menu (#87)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Export/ }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '3D-Modell als GLB …' }).click();
+  const d = await download;
+  expect(d.suggestedFilename()).toBe('Beispielwohnung.glb');
+  const { readFile } = await import('node:fs/promises');
+  const glb = await readFile((await d.path())!);
+  expect(glb.subarray(0, 4).toString('ascii')).toBe('glTF');
+  expect(glb.readUInt32LE(4)).toBe(2); // glTF version 2
+  expect(glb.readUInt32LE(8)).toBe(glb.length); // declared length matches
+  expect(glb.length).toBeGreaterThan(10_000);
+  const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString('utf8'));
+  const names = json.nodes.map((n: { name?: string }) => n.name);
+  expect(names).toEqual(expect.arrayContaining(['Wände', 'Böden', 'Möbel', 'Wohnzimmer', 'Schlafzimmer', 'Sofa 3-Sitzer']));
+  await expect(page.getByText('3D-Modell als GLB exportiert')).toBeVisible();
+  expect(errors).toEqual([]);
+});
