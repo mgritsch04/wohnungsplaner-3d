@@ -1108,3 +1108,4 @@ textarea {
   gap: 8px;
 }
 .error-text { color: var(--danger); background: #fef2f2; border-color: #fecaca; }
+code { font-family: ui-monospace, monospace; font-size: 11px; background: #f1f5f9; padding: 1px 4px; border-radius: 4px; word-break: break-all; }

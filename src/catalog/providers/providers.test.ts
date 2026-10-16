@@ -53,7 +53,8 @@ describe('product page parsing (structured data)', () => {
   });
 
   it('parses combined dimension notations and ignores unknown units', () => {
-    expect(dimsFromText('Maße: 200 x 90 x 82 cm')).toMatchObject({ width: 200, depth: 90, height: 82 });
+    expect(dimsFromText('B/T/H: 200 x 90 x 82 cm')).toMatchObject({ width: 200, depth: 90, height: 82 });
+    expect(dimsFromText('Maße: 200 x 90 x 82 cm')).toMatchObject({ width: null, depth: null, height: null }); // order unknown → not guessed
     expect(dimsFromText('Breite 1,2 m, Höhe 750 mm')).toMatchObject({ width: 120, depth: null, height: 75 });
     expect(parseProductPage('<script type="application/ld+json">{"@type":"Product","name":"A","width":{"value":3,"unitCode":"INH"}}</script>').dimensions.width).toBeNull();
   });
@@ -83,5 +84,78 @@ describe('providers', () => {
     expect(a.price?.status).toBe('user');
     const b = productToCatalogItem({ product: p, width: 81, depth: 28, height: 202, name: 'x', category: 'storage', shape: 'shelf' });
     expect(b.tags).toContain('maße-teilweise-manuell');
+  });
+});
+
+describe('robust page-source import (regressions)', () => {
+  const ld = (o: unknown, attrs = 'type="application/ld+json"') => `<script ${attrs}>${JSON.stringify(o)}</script>`;
+
+  it('detects the input kind and explains URL-only or empty input', () => {
+    expect(parseProductPage('').errors[0]).toMatch(/einfügen/);
+    const u = parseProductPage('https://www.ikea.com/at/de/p/x-00263850/');
+    expect(u.inputKind).toBe('url');
+    expect(u.errors[0]).toMatch(/CORS/);
+  });
+
+  it('reports broken JSON-LD instead of failing silently', () => {
+    const r = parseProductPage('<html><body><script type="application/ld+json">{"@type":"Product", "name": }</script></body></html>');
+    expect(r.errors.join(' ')).toMatch(/JSON-LD-Block 1 ist fehlerhaftes JSON/);
+    expect(parseProductPage('{"@type": "Product", ').inputKind).toBe('invalid-json');
+  });
+
+  it('accepts namespaced types, unquoted/uppercase attributes, comments and trailing commas', () => {
+    const html = `<html><head><SCRIPT TYPE=application/ld+json><!--{"@context":"http://schema.org","@type":"http://schema.org/Product","name":"A","offers":{"@type":"Offer","price":10,"priceCurrency":"EUR",},}--></SCRIPT></head><body></body></html>`;
+    const r = parseProductPage(html);
+    expect(r.errors).toEqual([]);
+    expect(r.name).toBe('A');
+    expect(r.price?.amount).toBe(10);
+  });
+
+  it('does not confuse seat height/depth with the product height/depth', () => {
+    const html = '<html><body><dl><dt>Sitzhöhe:</dt><dd>45 cm</dd><dt>Sitztiefe:</dt><dd>54 cm</dd><dt>Breite:</dt><dd>218 cm</dd><dt>Tiefe:</dt><dd>88 cm</dd><dt>Höhe:</dt><dd>83 cm</dd></dl></body></html>';
+    expect(parseProductPage(html).dimensions).toMatchObject({ width: 218, depth: 88, height: 83 });
+    expect(dimsFromText('Sitzhöhe: 45 cm, Sitztiefe 54 cm')).toMatchObject({ height: null, depth: null });
+    expect(dimsFromText('Gesamthöhe: 202 cm')).toMatchObject({ height: 202 });
+  });
+
+  it('falls back to Open Graph / product meta tags and microdata', () => {
+    const html = '<html><head><meta property="og:title" content="Kommode Test"><meta property="product:price:amount" content="149,00"><meta property="product:price:currency" content="EUR"><meta property="og:image" content="https://example.com/k.jpg"></head><body><span itemprop="sku">999</span><p>Breite: 80 cm Tiefe: 48 cm Höhe: 90 cm</p></body></html>';
+    const r = parseProductPage(html);
+    expect(r.name).toBe('Kommode Test');
+    expect(r.price).toEqual({ amount: 149, currency: 'EUR', status: 'source' });
+    expect(r.articleNumber).toBe('999');
+    expect(r.quality).toBe('complete-from-source');
+    expect(r.sources).toContain('Meta-Angaben');
+  });
+
+  it('finds dimensions inside embedded page data (JSON-escaped)', () => {
+    const html = `<html><body>${ld({ '@type': 'Product', name: 'B', offers: { price: '5', priceCurrency: 'EUR' } })}<script type="application/json">{"specs":"Breite: 60 cm, Tiefe: 40 cm, H\u00f6he: 75 cm"}</script></body></html>`;
+    expect(parseProductPage(html).dimensions).toMatchObject({ width: 60, depth: 40, height: 75 });
+  });
+
+  it('never executes scripts in pasted HTML', () => {
+    (globalThis as unknown as { __pwned?: boolean }).__pwned = false;
+    parseProductPage('<html><body><script>globalThis.__pwned = true</script><img src=x onerror="globalThis.__pwned=true"></body></html>');
+    expect((globalThis as unknown as { __pwned?: boolean }).__pwned).toBe(false);
+  });
+
+  it('supports the simple JSON fallback format and visible-text input', () => {
+    const j = parseProductPage(JSON.stringify({ name: 'Regal X', width: 80, depth: 30, height: 200, price: 79.9, url: 'https://example.com/x' }));
+    expect(j.inputKind).toBe('json-simple');
+    expect(j.quality).toBe('complete-from-source');
+    expect(j.productUrl).toBe('https://example.com/x');
+    const t = parseProductPage('Regal X\nBreite: 80 cm\nTiefe: 30 cm\nHöhe: 200 cm\n79,90 €');
+    expect(t.inputKind).toBe('text');
+    expect(t.dimensions.width).toBe(80);
+    expect(t.warnings.join(' ')).toMatch(/sichtbarem Seitentext/);
+  });
+
+  it('handles large inputs without pathological slow-downs', () => {
+    // ~1 MB of markup; jsdom is much slower than a real browser, so the bound is generous
+    const big = `<html><body>${'<div>Lorem ipsum dolor sit amet 12 x 34 cm Breite</div>'.repeat(20000)}${ld({ '@type': 'Product', name: 'Groß', offers: { price: '1', priceCurrency: 'EUR' } })}</body></html>`;
+    const t0 = performance.now();
+    const r = parseProductPage(big);
+    expect(r.name).toBe('Groß');
+    expect(performance.now() - t0).toBeLessThan(8000);
   });
 });

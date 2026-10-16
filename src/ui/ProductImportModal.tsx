@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { parseProductPage } from '../catalog/providers/structuredData';
+import { parseProductPage, type InputKind, type ParsedProductPage } from '../catalog/providers/structuredData';
 import { providerForUrl } from '../catalog/providers/registry';
 import { productToCatalogItem } from '../catalog/providers/toCatalog';
-import type { NormalizedProduct } from '../catalog/providers/types';
 import { useCatalogStore } from '../catalog/catalogStore';
 import { CATEGORIES } from '../catalog/types';
 import { formatEuro } from '../model/units';
@@ -16,6 +15,16 @@ const SHAPES: Record<string, string> = {
   textile: 'rug', kitchen: 'k-base', appliance: 'box', bathroom: 'box', decor: 'box',
 };
 
+const KIND_LABEL: Record<InputKind, string> = {
+  empty: 'leer',
+  url: 'nur Adresse',
+  html: 'HTML-Seitenquelltext',
+  jsonld: 'JSON-LD (schema.org)',
+  'json-simple': 'einfaches JSON',
+  text: 'sichtbarer Seitentext',
+  'invalid-json': 'fehlerhaftes JSON',
+};
+
 /**
  * Proof of concept: take over a real product from a retailer page the user copied
  * themselves (URL + page source / JSON-LD). Nothing is fetched from the retailer.
@@ -24,7 +33,7 @@ export function ProductImportModal() {
   const close = useDialogStore((s) => s.closeModal);
   const [url, setUrl] = useState('');
   const [source, setSource] = useState('');
-  const [product, setProduct] = useState<NormalizedProduct | null>(null);
+  const [product, setProduct] = useState<ParsedProductPage | null>(null);
   const [form, setForm] = useState({ name: '', category: 'storage', width: '', depth: '', height: '' });
   const provider = providerForUrl(url);
 
@@ -65,10 +74,17 @@ export function ProductImportModal() {
           </button>
         </header>
         <div className="modal-body">
-          <p className="small">
-            Öffne die Produktseite (z. B. IKEA Österreich oder Möbelix) in deinem Browser, kopiere die Adresse und den Seitenquelltext
-            (Rechtsklick → „Seitenquelltext anzeigen“ → alles markieren → kopieren) und füge beides hier ein. Die App liest nur die strukturierten Produktdaten
-            und Maßangaben aus – es wird nichts vom Händler abgerufen. Fehlende Werte werden nicht geschätzt.
+          <ol className="steps">
+            <li>Produktseite (z. B. IKEA Österreich, Möbelix) im Browser öffnen und die Adresse unten bei „Produkt-URL“ einfügen.</li>
+            <li>
+              <strong>Seitenquelltext</strong> öffnen: <kbd>Strg</kbd>+<kbd>U</kbd> (Mac: <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>U</kbd>), dort <kbd>Strg</kbd>+<kbd>A</kbd>,{' '}
+              <kbd>Strg</kbd>+<kbd>C</kbd> – und unten einfügen.
+            </li>
+          </ol>
+          <p className="muted small">
+            Ebenfalls möglich: ein JSON-LD-Block oder einfaches JSON wie{' '}
+            <code>{'{"name":"Regal","width":80,"depth":30,"height":200,"price":79.9,"url":"https://…"}'}</code> (Maße in cm). Nur sichtbarer Text liefert lediglich
+            Maße. Die App ruft selbst nichts vom Händler ab (Browser-Sicherheit/CORS), führt eingefügte Skripte nicht aus und schätzt keine fehlenden Werte.
           </p>
           <label className="field">
             <span className="field-label">Produkt-URL</span>
@@ -83,16 +99,39 @@ export function ProductImportModal() {
           )}
           <label className="field">
             <span className="field-label">Seitenquelltext oder JSON-LD</span>
-            <textarea rows={6} value={source} onChange={(e) => setSource(e.target.value)} placeholder="<html>… oder {&quot;@type&quot;: &quot;Product&quot;, …}" />
+            <textarea
+              rows={6}
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value);
+                setProduct(null);
+              }}
+              placeholder="<!DOCTYPE html>… (Seitenquelltext) oder JSON"
+              aria-label="Seitenquelltext oder JSON-LD"
+            />
           </label>
+          {source && <p className="muted small">{source.length.toLocaleString('de-AT')} Zeichen eingefügt{source.length < 2000 && /<html/i.test(source) ? ' – auffällig kurz, wurde der Quelltext vollständig kopiert?' : ''}</p>}
           <div className="btn-row">
             <button className="primary" disabled={!source.trim()} onClick={parse}>
               Produktdaten auslesen
             </button>
           </div>
 
-          {product && (
+          {product && product.errors.length > 0 && (
+            <ul className="issues">
+              {product.errors.map((e, i) => (
+                <li key={i} className="warning small error-text">
+                  {e}
+                </li>
+              ))}
+            </ul>
+          )}
+          {product && product.inputKind !== 'url' && product.inputKind !== 'empty' && (
             <div className="product-review">
+              <p className="muted small">
+                Erkannt als: <strong>{KIND_LABEL[product.inputKind]}</strong>
+                {product.sources.length > 0 && <> · Daten aus: {product.sources.join(', ')}</>}
+              </p>
               <p className="small">
                 Qualität:{' '}
                 {product.quality === 'complete-from-source' ? (
