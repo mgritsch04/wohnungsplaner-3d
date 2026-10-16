@@ -37,6 +37,8 @@ export interface IkeaPlannedItem {
   rotation: number;
   /** fittings mounted in this article (shelves, rails, doors …), by category */
   fittings: Record<string, number>;
+  /** the same fittings by article number (8 digits) → count; only those that carry a valid number */
+  fittingArticles: Record<string, number>;
 }
 
 export interface IkeaPlan {
@@ -89,12 +91,15 @@ export function parseIkeaPlannerJson(text: string): IkeaPlan {
       continue;
     }
     const fittings: Record<string, number> = {};
+    const fittingArticles: Record<string, number> = {};
     const visit = (ids: unknown[], depthLeft: number) => {
       for (const id of ids) {
         const c = byId.get(num(id, NaN));
         if (!c || depthLeft <= 0) continue;
         const cat = String(c.category ?? 'Zubehör');
         fittings[cat] = (fittings[cat] ?? 0) + 1;
+        const fitNo = String(c.product_id ?? '').split('-')[1] ?? '';
+        if (/^\d{8}$/.test(fitNo)) fittingArticles[fitNo] = (fittingArticles[fitNo] ?? 0) + 1;
         visit(arr(c.child_ids), depthLeft - 1);
       }
     };
@@ -112,6 +117,7 @@ export function parseIkeaPlannerJson(text: string): IkeaPlan {
       // IKEA: degrees around +y (three.js convention); app: plan rotation = −rotation.y
       rotation: -((((rotY % 360) + 360) % 360) * Math.PI) / 180,
       fittings,
+      fittingArticles,
     });
   }
 

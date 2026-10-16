@@ -1149,6 +1149,22 @@ test('imports a stored IKEA PAX planner design (real structure): room + frames a
   expect(errors).toEqual([]);
 });
 
+test('IKEA PAX design + product list (SYNTHETIC names/prices): frames get names and prices, gaps are reported', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /IKEA-Planung \(JSON\) importieren/ }).click();
+  await (await chooser).setFiles(['src/catalog/providers/fixtures/ikea-pax-design.json', 'src/catalog/providers/fixtures/ikea-pax-products.synthetic.json']);
+  await expect(page.getByText(/IKEA-Planung übernommen: Raum \+ 5 Korpus.*5\/5 mit Produktnamen, 5 mit Preis/)).toBeVisible();
+  await expect(page.getByText(/Nicht in der Produktliste gefunden/)).toBeVisible();
+  const p = await getProject(page);
+  const frames = p.furniture.filter((f: { name: string }) => /SYNTHETISCH Testartikel/.test(f.name));
+  expect(frames).toHaveLength(5);
+  expect(frames.every((f: { price?: { amount: number } }) => (f.price?.amount ?? 0) > 0)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('floor lamp and sofa: overlap is marked in 3D, dragging the lamp into the sofa stops at it (2D)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);

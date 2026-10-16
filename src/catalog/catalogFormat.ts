@@ -99,6 +99,19 @@ export function parseCatalogJson(text: string, fileName: string): CatalogItem[] 
   return parseCatalogJsonWithModels(text, fileName).items;
 }
 
+/** Raw product list entries (units as in the file; no conversion) – e.g. to look up names and prices by article number. */
+export function parseCatalogEntries(text: string): { entries: CatalogEntry[]; units: 'm' | 'cm' | 'mm' } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw new FileFormatError('Die Datei ist kein gültiges JSON.', [e instanceof Error ? e.message : String(e)]);
+  }
+  const res = CatalogFileSchema.safeParse(raw);
+  if (!res.success) throw new FileFormatError('Die Produktliste ist ungültig.', formatZodError(res.error));
+  return { entries: res.data.items, units: res.data.units };
+}
+
 /** Like parseCatalogJson, plus the `modelFile` names per catalog item id. */
 export function parseCatalogJsonWithModels(text: string, fileName: string): { items: CatalogItem[]; modelFiles: Map<string, string> } {
   let raw: unknown;
