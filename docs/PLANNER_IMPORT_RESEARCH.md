@@ -14,7 +14,7 @@ Regeln dieser Untersuchung: nur öffentlich erreichbare Seiten und normale Brows
 | Echtes 3D-Modell (GLB) | ✅ Download + Laden in der App, Maße stimmen – `VERIFIED`; Direktabruf aus der App von IKEA gesperrt (Herkunftsprüfung) | ❌ nicht untersuchbar |
 | Produktliste/Stückliste | ✅ Artikelnummern → Produktliste mit Modellen (Skript + Mehrdatei-Import) – `VERIFIED` | ❌ |
 | Komplette Planung (Raum + Möbel, Positionen) | ✅ PAX/„StorageOne“-Planung als JSON → Raum + Korpusse – `VERIFIED` mit eigener Testplanung; JSON muss der Nutzer selbst aus seinem Browser holen | ❌ |
-| Küchenplanung (METOD) | ❓ Backend aus dieser Umgebung gesperrt – `UNAVAILABLE` | ❌ |
+| Küchenplanung (METOD) | ❌ Layout-Import nicht belegt (Daten im By-Me-Backend, Anmeldung nötig); nur Stückliste über Textimport – siehe 3.2 | ❌ |
 
 **Ehrlich:** Komplettimport funktioniert für IKEA-**Aufbewahrungsplaner** (PAX, getestet), nicht für den Küchenplaner. Die App selbst ruft keine IKEA-Dienste auf; sie verarbeitet, was der Nutzer bereitstellt.
 
@@ -25,9 +25,9 @@ Regeln dieser Untersuchung: nur öffentlich erreichbare Seiten und normale Brows
 | `www.ikea.com` | erreichbar (Runde 3) | 200 | Produktseiten, Planer-Apps |
 | `web-api.ikea.com` | Proxy-Sperre | **erreichbar** | `/dimma/assets/…` GLB: 200 ohne `Origin`, 200 mit `Origin: https://www.ikea.com`, **403 bei fremder Herkunft** (z. B. `http://localhost:4173`). `robots.txt`: `Disallow: /`, `Allow: /dimma/assets/` |
 | `api.dexf.ikea.com` | Proxy-Sperre | **erreichbar** | ohne Schlüssel: `403 {"message":"The API key you provided does not have access…"}`; im Browser sendet IKEAs App einen eigenen `dexf-api-key` |
-| `kitchen.planner.ikea.com` | Proxy-Sperre | 200 (nur die App-Hülle) | Backend `api.kitchen.planner.ikea.com` weiter **gesperrt** (Umgebung) |
+| `kitchen.planner.ikea.com` | Proxy-Sperre | 200 (nur die App-Hülle) | Backend `api.kitchen.planner.ikea.com` inzwischen freigegeben (Service-Discovery 200, Projektdaten nur mit Anmeldung) – siehe 3.2 |
 | `www.moebelix.at` | 403 | 403 | **Cloudflare-Challenge** (`cf-mitigated: challenge`), auch im Browser; `challenges.cloudflare.com` hier gesperrt |
-| weiterhin von der Umgebung gesperrt | | | `sik.search.blue.cdtapps.com` (Suche), `api.salesitem.ingka.com` (Verfügbarkeit), `api.ingka.ikea.com` (Gast-Token, Warenkorb), `content.dexf.ikea.com` (Planer-Modelle/Bilder), `account.dexf.ikea.com`, `api.kitchen.planner.ikea.com`, `www.gstatic.com` (Draco-Decoder des IKEA-Viewers), `api.moebelix.at` |
+| weiterhin von der Umgebung gesperrt | | | `sik.search.blue.cdtapps.com` (Suche), `api.salesitem.ingka.com` (Verfügbarkeit), `api.ingka.ikea.com` (Gast-Token, Warenkorb), `content.dexf.ikea.com` (Planer-Modelle/Bilder), `account.dexf.ikea.com`, `www.gstatic.com` (Draco-Decoder des IKEA-Viewers), `api.moebelix.at` |
 
 ## 2. IKEA – Produkte
 
@@ -67,8 +67,27 @@ Inhalt der gespeicherten JSON:
 
 Grenzen: Korpusse werden als maßgenaue Näherungsmodelle dargestellt (Planer-Modelle liegen auf `content.dexf.ikea.com`, hier gesperrt); Türen/Griffe nicht separat; die Eckeinsatz-Koordinaten im ICF sind uneinheitlich (Teil wird nur als Einbauteil gezählt); Raumöffnungen (Fenster/Türen) im Planer nicht untersucht.
 
-### 3.2 Küchenplaner METOD (`UNAVAILABLE`)
-`kitchen.planner.ikea.com` lädt, braucht aber `api.kitchen.planner.ikea.com` (CSRF-Token, Service-Discovery) – hier gesperrt. Aus dem Code: Routen `/planner/:designId/`, `/designs/:designId/share/`, `/login/` → Planungen sind an Konten gebunden; ob ein ICF-Export wie bei PAX existiert, ist offen (`UNVERIFIED`).
+### 3.2 Küchenplaner METOD – Untersuchung 2026-10-16 (`PARTIALLY VERIFIED`)
+
+**Methode:** 11 Abrufe, nur lesend, ohne Konto, ohne Token, ohne Design-IDs: `kitchen.planner.ikea.com/` (HTML), das Hauptbundle `assets/index-CNQnCBKN.js` (1,3 MB) und die Chunks `Share`, `Planner`, `Designs`, `Print`, `metadata`, `getServices` (alle 200), dazu `api.kitchen.planner.ikea.com/discovery/green/discover` (200) und `kitchen.planner.ikea.com/robots.txt` (404). Es wurde **kein** CSRF-Token geholt, **kein** Backend-Endpunkt mit Design-Bezug aufgerufen und nichts enumeriert. Schlüssel, Client-IDs und Tokens aus der öffentlichen Konfiguration werden hier bewusst nicht wiedergegeben.
+
+**Befunde**
+
+1. **Die Planer-Web-App ist nur eine Hülle.** `kitchen.planner.ikea.com` ist eine React-Anwendung (Routen `/planner/:designId/`, `/designs/`, `/designs/:designId/{edit,share,print,delete,duplicate,itemListPrompt}`, `/validate/:designId`, `/remote/…`, `/login/`). Der eigentliche Planer läuft in einem **iframe** von „By Me“ (3DVIA-Plattform): `{bymePlannerUrl}/Kitchen/?ln={sprache}-{LAND}&projectId={designId}` (Code in `metadata-*.js`). Die Entwurfsdaten liegen also im By-Me-Backend, nicht in der IKEA-Shell. Die Shell redet mit dem iframe per `postMessage`.
+2. **Service-Discovery ist öffentlich.** `GET api.kitchen.planner.ikea.com/discovery/green/discover` antwortete ohne Token mit 200 und JSON (Katalog „public“). Relevante Hosts daraus: Planer-iframe `kitchen.ikea-prod.by.me`, By-Me-Backend `platform.ikea-prod.by.me` (weitere Regionen `apse1-…`, `use1-…`), IKEA-Gateway `api.kitchen.planner.ikea.com/services/green`. Der Client verlangt trotzdem erst ein CSRF-Token (`csrfTokenEndpoint`, Header `x-csrf-token`) – das wurde nicht genutzt. Die Hosts `*.by.me` wurden **nicht** abgerufen (nicht Teil der Freigabe, außerdem nur mit Design-Bezug sinnvoll).
+3. **Backend-Routen im öffentlichen Code** (nur gelesen, nicht aufgerufen):
+   * By Me: `GET {backend}/api/3/projects/{id}/media?typeMediaID=…` (Screenshots) mit Headern `token` (= `externalToken` des angemeldeten Nutzers) und `timestamp`. Der Abruf der eigentlichen Projektdaten steckt im iframe-Code, **nicht** im Shell-Bundle → `UNVERIFIED`.
+   * Gateway: `get-bom-schema-from-project-id/{id}/dexf` (Bearer-Token), `byme/save-design/{provider}`, `byme/duplicate-design`, `online-buying/*` (Prüfung/Warenkorb), `environments-retail-units?retailUnit=…` (CSRF). Alle verlangen Anmeldung bzw. CSRF-Header.
+4. **Teilen/Laden ohne Anmeldung?** Der Teilen-Dialog (`Share-*.js`) erzeugt **nicht** `/designs/:id/share/` als Link, sondern `…/planner/:designId/?ref=share`. Die Routen unter `/designs/…` sind mit `CustomerProtectedRoutes` geschützt (Login); `/planner/:designId` ist in der Shell **nicht** geschützt. Ob By Me die Daten eines geteilten Entwurfs ohne Token an den iframe liefert, ist aus dem Shell-Code **nicht** ableitbar und wurde bewusst nicht getestet (ich habe keine Design-ID und rate keine) → `UNVERIFIED`. Selbst wenn es geht: das ist IKEAs Teilen-Funktion für Menschen im Browser, keine dokumentierte Schnittstelle.
+5. **Datenformat:** Keine ICF-/JSON-Planungsdatei wie bei PAX im Shell-Code (keine Treffer für `icf`, kein Download-/Blob-Export). Belegt sind nur Nachrichten zwischen Shell und iframe: `ProductListWithBOM`/`BOMRequested` (Stückliste), `ProjectInfoGenerated`, `Compute2DPlans`/`Plans2DStop` (2D-Pläne), `LinearExportRequested` (Laufmeter Arbeitsplatte/Wandpaneel/Leiste), `SnapshotRequested`, `LoadProject`. Stücklistenpositionen tragen u. a. `articleNumber` (`ART-xxxxxxxx` bzw. `SCP-…` für Arbeitsplatten/Wandpaneele), `name`, `amount`, `freeTags`, `dbID`, `height`/`commercialDimensions`, `linear`. **Raum, Wände und Positionen der Schränke** sind in diesen Nachrichten nicht belegt; sie liegen im By-Me-Projekt (Format `UNVERIFIED`). Die Struktur ist **nicht** mit PAX/ICF identisch (PAX: DEXF-API mit eigener Konfigurations-JSON).
+6. **Vom Nutzer erreichbare Ausgaben (aus den Routen abgeleitet, im Browser nicht nachgespielt):** „Artikelliste“ (`/designs/:id/itemListPrompt`), „Drucken“ (`/designs/:id/print` mit Auswahl: Titelbild, Stückliste, Ansichten, Draufsicht, Arbeitsplatte, Wandpaneel, Notizen → PDF) und Teilen-Link. Alles menschenlesbar, kein JSON-Export.
+
+**Fazit**
+
+* **(a) Import über eine vom Nutzer gespeicherte Planungsdatei:** **Nicht belegt.** Es gibt im öffentlichen Shell-Code keinen Datei-Export einer Küchenplanung, und der Projektabruf hängt an der Anmeldung (`token`-Header, Bearer) bzw. an By-Me-Interna. Eine Schritt-für-Schritt-Anleitung (DevTools → Antwort speichern) kann ich deshalb **nicht** belegen; ein Weg über die Netzwerkanfragen des eigenen angemeldeten Browsers wäre denkbar, ist aber `UNVERIFIED`.
+* **Machbar ist heute:** die **Stückliste**. Artikelnummern aus der IKEA-Artikelliste/dem PDF-Ausdruck als Text in den vorhandenen Produktimport (`ikeaList.ts`, `scripts/ikea-products.mjs`) einfügen → Produktliste mit Maßen/Modellen, soweit IKEA sie liefert (METOD-Korpusse mit 3D-Modell: `UNVERIFIED`). Das liefert Möbel, aber **keine Anordnung** (Raum, Schrankreihen, Wände).
+* **(b) Was ich vom Nutzer bräuchte:** (1) eine eigene, kleine METOD-Testplanung (3–4 Schränke + Arbeitsplatte); (2) im eigenen Browser mit DevTools (Netzwerk) beim Öffnen der Planung die Antwort der Projektdaten-Anfrage an `platform.ikea-prod.by.me/api/3/projects/…` als Datei speichern (nur den Antwortkörper, keine Header/Tokens); (3) zusätzlich die Artikelliste als Text. Damit ließe sich das Format prüfen und ein Import wie bei PAX bauen.
+* **(c) Empfehlung:** **Direkt-/Linkabruf ablehnen** (Anmeldung, By-Me-Token, keine dokumentierte Schnittstelle, Nutzungsbedingungen ungeprüft). **Layout-Import nur mit Nutzerdatei umsetzen** und zurückstellen, bis eine echte Beispielantwort vorliegt (Erfolgsaussicht ungewiss, da die Geometrie im By-Me-Format liegt). **Die Stückliste ist über den Textimport bereits abgedeckt** – dafür genügt eine kurze Anleitung („Artikelliste kopieren und einfügen“), die mit einer echten Artikelliste getestet werden sollte (`NEEDS USER TEST`).
 
 ### 3.3 Andere Planer
 `/addon-app/space/…` (Raum-/Konfiguratorplattform), `coro3`, `skytta` – nicht untersucht.
@@ -90,7 +109,7 @@ Website und robots.txt antworten mit Cloudflare-Challenge (curl und Browser); di
 Echter Ende-zu-Ende-Lauf (lokal, nicht im Repo): `node scripts/ikea-products.mjs "104.099.32, 2x 106.230.36, S895.792.19" --models` → 3 Produkte, 2 GLB → in der App importiert → platziert → 3D ohne Fehler.
 
 ## 6. Offene Punkte / was ich brauche
-1. **Küchenplaner:** Freigabe von `api.kitchen.planner.ikea.com` (und für Planer-Modelle `content.dexf.ikea.com`) in den Netzwerkeinstellungen der Umgebung – dann untersuche ich, ob METOD-Planungen ein ähnliches Format liefern.
+1. **Küchenplaner:** Siehe 3.2 – für einen Layout-Import brauche ich eine eigene METOD-Testplanung als Antwortdatei aus dem Browser des Nutzers (Details dort). Für Planer-Modelle weiterhin Freigabe von `content.dexf.ikea.com` nötig.
 2. **Testen:** eine eigene PAX-Planung per DevTools-JSON importieren; ob der Weg für dich praktikabel ist.
 3. **Möbelix:** eine Produktseite aus deinem Browser einfügen (Strg+U) und melden, was erkannt wird; sonst bleibt Möbelix blockiert.
 4. **Rechtliches:** IKEAs Nutzungsbedingungen zu Modellen/Planungsdaten nicht geprüft – die App behandelt alles als „privat, nicht weitergeben“.
