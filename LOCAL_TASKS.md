@@ -7,61 +7,35 @@ Regeln: eigener Branch je Aufgabe, kein Push auf main, kein Force-Push, keine PR
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_017X7PnLx9bCA5dQWidUEW86
 
-## Rückmeldung zu Aufgabe 2 (#68 Mindestbreiten)
-Danke, gute Heuristik und saubere Begründung. Ab jetzt bitte nichts mehr auf `claude/min-widths-68` pushen; die Hauptsession integriert.
+## Rückmeldung zu Aufgabe 3 (#67 Laufwege)
+Danke, saubere Arbeit. Ab jetzt bitte nichts mehr auf `claude/walk-paths-67` pushen. Die Taste L trage ich bei der Integration in die neue Tastenkürzel-Übersicht ein (`src/ui/shortcutCatalog.ts`, kommt mit PR #117).
 
-Zu deinen zwei Fehlschlägen auf `main`:
-- „click vs. drag“ ist bereits behoben (Toleranz von einem Rasterschritt, kommt mit der nächsten Integration).
-- „doors and windows (#21)“ untersucht die Hauptsession.
+## Aufgabe 4: E2E-Fehler „doors and windows (#21)“ auf Windows finden und beheben
 
-Bitte nichts davon selbst ändern.
+Der Test `3D: doors and windows open/close …` schlägt bei dir in der **vollen** Suite reproduzierbar fehl („selection null statt Tür-ID“). Einzeln läuft er grün. In der Cloud ist er auch in der vollen Suite grün (42/42), deshalb kannst nur du das untersuchen.
 
-## Aufgabe 3: Laufwege messen (#67)
-
-**Branch:** `claude/walk-paths-67`, Basis ist dein eigener Branch `origin/claude/min-widths-68`, weil du die Hindernis-Logik wiederverwendest:
+**Branch:** `claude/fix-doors-e2e`, Basis ist der Integrations-Branch mit dem neuesten Stand:
 ```
 git fetch origin
-git checkout -b claude/walk-paths-67 origin/claude/min-widths-68
+git checkout -b claude/fix-doors-e2e origin/claude/quirky-faraday-0d9uep
 ```
-Vor dem finalen Push `git merge origin/main` (kein Rebase).
+Dort ist auch „click vs. drag“ schon repariert.
 
-**Ziel (Akzeptanzkriterien aus #67)**
-1. **Werkzeug „Laufweg“** im 2D-Plan, z. B. Taste **L**; vorher prüfen, dass L frei ist.
-   - Zwei Punkte anklicken: Start und Ziel.
-   - Der kürzeste begehbare Weg wird als Linie mit der Länge in Metern angezeigt, z. B. „7,40 m“.
-   - Esc bricht ab, ein neuer Klick beginnt einen neuen Weg.
-   - Der Weg ist **nur Anzeige** und wird nicht im Projekt gespeichert. Damit gibt es keine Schema-Änderung und keinen Undo-Schritt.
-2. **Wegsuche als reine Funktion**, z. B. `src/model/walkPath.ts`: `shortestWalkPath(project, derived, a, b, opts)`.
-   - Hindernisse: Wände; geschlossene Türen (`opening.open === false`) blockieren, offene Türen und Durchgänge sind passierbar; Möbel nach denselben Regeln wie deine Engstellen-Prüfung (Teppiche, Hängeschränke usw. sind kein Hindernis).
-   - Ein Körperradius von ca. 25 cm, damit der Weg nicht an Kanten klebt.
-   - Algorithmus nach Wahl: Raster-A* (z. B. 5 cm) mit anschließender Glättung (String-Pulling), oder Sichtbarkeitsgraph. Begründe die Wahl im Datei-Kommentar.
-   - Ist kein Weg möglich, gibt es eine klare Meldung „Kein Weg gefunden (blockiert durch …)“.
-3. **Performance:** In der Beispielwohnung höchstens ~50 ms pro Berechnung, ein Unit-Test mit Grenze. Neu gerechnet wird nur beim Klicken bzw. beim Ändern von Start/Ziel, nicht in jedem Frame.
-4. **Optional, wenn es sich anbietet:** Den Weg zusätzlich in 3D als dezente Bodenlinie zeigen, als eigene Komponente.
+**Vorgehen**
+1. **Reproduzieren:** `npx playwright test` (voll) mit `--trace on` bzw. `--trace retain-on-failure`. Zusätzlich herausfinden, welcher vorherige Test den Fehler auslöst: nur die Tests davor plus den Türen-Test laufen lassen, halbieren. Ist es Last bzw. Timing (z. B. Kamera noch in Bewegung, Fenstergröße, Fokus, Pointer-Lock, offene Hover-Karte über der Tür)?
+2. **Ursache benennen**, mit Beleg: Trace, Screenshot im Fehlerfall, Konsole.
+3. **Beheben:**
+   - Ist es ein echter App-Fehler (z. B. ein Klick wird verschluckt, ein Zustand aus einem vorherigen Test bleibt hängen), dann den App-Code korrigieren.
+   - Ist es reines Test-Timing, dann den Test robust machen, z. B. warten, bis die Kamera stillsteht, statt einer festen `waitForTimeout`.
+   - **Keinen Test überspringen oder abschwächen**, nur weil er rot ist.
+4. **Prüfen:** Die volle Suite muss danach bei dir **zweimal hintereinander** grün sein.
 
 **Nicht anfassen:**
-- `src/import/**`
-- `src/persistence/**`, `src/versions/**`
-- `src/export/**`
-- `src/budget/**`
 - `docs/IDEAS.md`, `docs/PROJECT_STATUS.md`
-- `src/ui/Modals.tsx`, `src/ui/dialogStore.ts`
-
-**Tests**
-- **Unit:**
-  - gerader Weg in einem leeren Raum hat die Luftlinien-Länge;
-  - Umweg um ein Möbel ist länger als die Luftlinie;
-  - Weg durch eine offene Tür in den Nachbarraum;
-  - geschlossene Tür ergibt keinen Weg bzw. einen Umweg;
-  - Teppich blockiert nicht;
-  - Performance.
-- **E2E** am Ende von `e2e/app.spec.ts`:
-  - Beispielwohnung, Werkzeug Laufweg, Klick im Wohnzimmer und Klick im Schlafzimmer;
-  - die Linie und eine Länge in m sind sichtbar, plausibel größer als die Luftlinie;
-  - Esc entfernt den Weg;
-  - keine Konsolenfehler.
+- Issues, Labels, PRs
+- `src/styles.css` und Farben (ein anderer Agent überarbeitet sie gerade)
+- Ausrichten/Verteilen im Eigenschaften-Panel (ebenfalls ein anderer Agent)
 
 **Fertig, wenn**
-- alle Checks plus die volle E2E-Suite grün sind (bekannte Fehlschläge auf `main` bitte wie bisher getrennt nennen),
-- `git push -u origin claude/walk-paths-67` erfolgt ist,
-- du mir per Nachricht berichtet hast: Commits, Dateien, Algorithmus, Testergebnisse, Schritte für den User-Test.
+- `git push -u origin claude/fix-doors-e2e` erfolgt ist,
+- du mir per Nachricht berichtet hast: Ursache mit Beleg, Änderung, beide Testläufe, Commits.
