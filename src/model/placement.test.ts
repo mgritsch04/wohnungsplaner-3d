@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
-import { addOpening, addPolygonRoom, addRectRoom, closestWall } from './operations';
+import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
-import { buildPlacementObstacles, clipConvex, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
+import { buildPlacementObstacles, clipConvex, moveFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
@@ -273,5 +273,56 @@ describe('collision feedback regions', () => {
     p.furniture.push({ ...small, x: c.x, y: c.y, rotation: c.rotation });
     expect(placementIssues(p, d, p.furniture[1], obs)).toEqual([]);
     expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+});
+
+describe('wall penetration and snapping robustness', () => {
+  it('cannot tunnel through a very thin (2 cm) partition with a fast drag', () => {
+    const p = roomProject();
+    insertWall(p, { x: 2, y: 0 }, { x: 2, y: 3 }, { thickness: 0.02, height: 2.6 });
+    const obs = buildPlacementObstacles(derivePlan(p));
+    for (const target of [3.5, 2.6, 2.45, 2.31]) {
+      const r = constrainMove(pose(1.0, 1.5, 1.2, 0.5), { x: target, y: 1.5 }, obs);
+      expect(r.x + 0.6).toBeLessThanOrEqual(1.99 + 1e-3);
+    }
+    // also when the item is rotated and moved diagonally
+    const r = constrainMove(pose(1.0, 1.5, 1.2, 0.5, 0.4), { x: 3.4, y: 2.2 }, obs);
+    for (const c of furnitureCorners({ ...pose(0, 0, 1.2, 0.5, 0.4), x: r.x, y: r.y })) expect(c.x).toBeLessThan(2.0);
+  });
+
+  it('does not snap to the open part of a wall (door opening / passage)', () => {
+    const p = roomProject();
+    const w = closestWall(p, { x: 2, y: -0.06 })!;
+    addOpening(p, w.wall.id, 'passage', w.s, { width: 2.4 });
+    const d = derivePlan(p);
+    // a 60 cm cabinet in front of the 2.4 m wide passage: no wall behind it
+    const s = snapToWalls(pose(2, 0.2 + 0.06, 0.6, 0.4, 0), d);
+    expect(s.wallIds).toHaveLength(0);
+    // a 1.6 m item overlapping the remaining wall on one side still snaps
+    const s2 = snapToWalls(pose(1.0, 0.2 + 0.06, 1.6, 0.4, 0), d);
+    expect(s2.wallIds).toHaveLength(1);
+  });
+
+  it('keeps a snapped item attached until it is pulled clearly away (no flicker at the threshold)', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    p.furniture.push(createFurnitureFromCatalog(findCatalogItem('generic-tv-sideboard')!, { x: 2, y: 1.5, rotation: 0.1 }));
+    const id = p.furniture[0].id;
+    const depth = p.furniture[0].depth;
+    // approach the wall: snaps flush and aligns
+    moveFurnitureTo(p, d, obs, id, { x: 2, y: depth / 2 + 0.1 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.003, 4);
+    expect(p.furniture[0].rotation).toBeCloseTo(0, 6);
+    // moving the pointer just past the snap distance keeps it at the wall
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.14 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.003, 4);
+    expect(p.furniture[0].x).toBeCloseTo(2.2, 6);
+    // pulled clearly away: released, follows the pointer
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.4 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.4, 4);
+    // and the same pointer position near the threshold does not snap back when approaching from far
+    moveFurnitureTo(p, d, obs, id, { x: 2.2, y: depth / 2 + 0.14 }, { snap: true, collide: true });
+    expect(p.furniture[0].y - depth / 2).toBeCloseTo(0.14, 4);
   });
 });

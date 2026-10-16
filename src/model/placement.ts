@@ -78,21 +78,62 @@ export function mtv(a: Vec2[], b: Vec2[], eps = 1e-6): Vec2 | null {
 
 export type Pose = Pick<Furniture, 'x' | 'y' | 'rotation' | 'width' | 'depth' | 'elevation' | 'height'>;
 
+/** Cheap pre-test: do the bounding boxes of the footprint and the obstacle overlap? */
+function boxesOverlap(fc: Vec2[], o: Obstacle): boolean {
+  const b = obstacleInfo(o);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const c of fc) {
+    if (c.x < minX) minX = c.x;
+    if (c.x > maxX) maxX = c.x;
+    if (c.y < minY) minY = c.y;
+    if (c.y > maxY) maxY = c.y;
+  }
+  return maxX >= b.minX && minX <= b.maxX && maxY >= b.minY && minY <= b.maxY;
+}
+
 export function collidingObstacles(pose: Pose, obstacles: Obstacle[]): Obstacle[] {
   const fc = furnitureCorners(pose);
-  return obstacles.filter((o) => heightOverlap(pose, o) && footprintsOverlap(fc, o.polygon, 1e-4));
+  return obstacles.filter((o) => heightOverlap(pose, o) && boxesOverlap(fc, o) && footprintsOverlap(fc, o.polygon, 1e-4));
 }
+
+const boundsCache = new WeakMap<Obstacle, { minX: number; maxX: number; minY: number; maxY: number; thickness: number }>();
+function obstacleInfo(o: Obstacle) {
+  let b = boundsCache.get(o);
+  if (!b) {
+    const xs = o.polygon.map((q) => q.x);
+    const ys = o.polygon.map((q) => q.y);
+    // minimum width of the convex polygon: smallest extent perpendicular to one of its edges
+    let thickness = Infinity;
+    for (let i = 0; i < o.polygon.length; i++) {
+      const a = o.polygon[i];
+      const n = normalize(perp(sub(o.polygon[(i + 1) % o.polygon.length], a)));
+      if (n.x === 0 && n.y === 0) continue;
+      const proj = o.polygon.map((q) => dot(sub(q, a), n));
+      thickness = Math.min(thickness, Math.max(...proj) - Math.min(...proj));
+    }
+    b = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys), thickness };
+    boundsCache.set(o, b);
+  }
+  return b;
+}
+const obstacleBounds = obstacleInfo;
+const obstacleThickness = (o: Obstacle) => obstacleInfo(o).thickness;
 
 /** Push a pose out of all overlapping obstacles (a few iterations handle corners). */
 function resolve(pose: Pose, obstacles: Obstacle[]): Pose {
   let p = { ...pose };
   for (let it = 0; it < 6; it++) {
     let moved = false;
+    let fc = furnitureCorners(p);
     for (const o of obstacles) {
-      if (!heightOverlap(p, o)) continue;
-      const m = mtv(furnitureCorners(p), o.polygon);
+      if (!heightOverlap(p, o) || !boxesOverlap(fc, o)) continue;
+      const m = mtv(fc, o.polygon);
       if (!m) continue;
       p = { ...p, x: p.x + m.x, y: p.y + m.y };
+      fc = furnitureCorners(p);
       moved = true;
     }
     if (!moved) break;
@@ -117,7 +158,23 @@ export function constrainMove(
   maxStep = 0.02,
   current: Pose = start,
 ): { x: number; y: number; blocked: boolean } {
-  const relevant = obstacles.filter((o) => heightOverlap(start, o));
+  // only obstacles near the swept area matter (cheap bounding-box test)
+  const reach = Math.hypot(start.width, start.depth) / 2 + 0.05;
+  const sweep = {
+    minX: Math.min(start.x, target.x, current.x) - reach,
+    maxX: Math.max(start.x, target.x, current.x) + reach,
+    minY: Math.min(start.y, target.y, current.y) - reach,
+    maxY: Math.max(start.y, target.y, current.y) + reach,
+  };
+  const relevant = obstacles.filter((o) => {
+    if (!heightOverlap(start, o)) return false;
+    const b = obstacleBounds(o);
+    return b.maxX >= sweep.minX && b.minX <= sweep.maxX && b.maxY >= sweep.minY && b.minY <= sweep.maxY;
+  });
+  // a step must stay well below the thinnest obstacle, otherwise the push-out could
+  // resolve to the far side of a thin partition (tunnelling)
+  const thinnest = relevant.reduce((m, o) => Math.min(m, obstacleThickness(o)), Infinity);
+  maxStep = Math.max(0.004, Math.min(maxStep, thinnest / 3));
   const stuck = new Set(collidingObstacles(current, relevant));
   const active = () => relevant.filter((o) => !stuck.has(o));
   const dx = target.x - start.x;
@@ -130,12 +187,25 @@ export function constrainMove(
     const desired = { x: start.x + (dx * i) / steps, y: start.y + (dy * i) / steps };
     // keep accumulated sliding offsets: move by the step delta from the current pose
     const prevDesired = { x: start.x + (dx * (i - 1)) / steps, y: start.y + (dy * (i - 1)) / steps };
+    const before = p;
     p = { ...p, x: p.x + desired.x - prevDesired.x, y: p.y + desired.y - prevDesired.y };
-    if (stuck.size) for (const o of [...stuck]) if (!collidingObstacles(p, [o]).length) stuck.delete(o);
+    const freed = stuck.size > 0 && [...stuck].some((o) => !collidingObstacles(p, [o]).length && stuck.delete(o));
     p = resolve(p, active());
+    // completely blocked: every further step would end in the same place
+    if (!freed && Math.abs(p.x - before.x) < 1e-9 && Math.abs(p.y - before.y) < 1e-9) break;
   }
   const blocked = Math.hypot(p.x - target.x, p.y - target.y) > 1e-3;
   return { x: p.x, y: p.y, blocked };
+}
+
+/** Length of [t0, t1] ∩ [0, L] that is not inside one of the open ranges. */
+function solidLength(t0: number, t1: number, L: number, open: [number, number][]): number {
+  const a = Math.max(0, t0);
+  const b = Math.min(L, t1);
+  if (b <= a) return 0;
+  let len = b - a;
+  for (const [o0, o1] of open) len -= Math.max(0, Math.min(b, o1) - Math.max(a, o0));
+  return len;
 }
 
 export interface WallSnap {
@@ -150,15 +220,26 @@ export interface WallSnap {
  * `distance` of a wall face it faces (±`angleTol`), rotate it parallel and move it flush.
  * Applied to the raw drag target each time, so it is deterministic (no jitter build-up).
  */
-export function snapToWalls(pose: Pose, d: DerivedPlan, distance = 0.12, angleTol = (20 * Math.PI) / 180, gap = 0.003): WallSnap {
+export function snapToWalls(
+  pose: Pose,
+  d: DerivedPlan,
+  distance = 0.12,
+  angleTol = (20 * Math.PI) / 180,
+  gap = 0.003,
+  /** Walls the item is attached to right now: they hold it up to `releaseDistance` (hysteresis). */
+  attachedTo: readonly string[] = [],
+  releaseDistance = 0.2,
+): WallSnap {
   let p = { ...pose };
   const wallIds: string[] = [];
-  const faces: { wallId: string; point: Vec2; n: Vec2; dir: Vec2; a: Vec2; b: Vec2 }[] = [];
+  const faces: { wallId: string; point: Vec2; n: Vec2; dir: Vec2; a: Vec2; b: Vec2; open: [number, number][] }[] = [];
   for (const [wallId, fp] of d.footprints) {
+    // door openings and passages are no wall to stand against
+    const open = (d.openings.get(wallId) ?? []).filter((r) => r.opening.kind !== 'window').map((r) => [r.s0, r.s1] as [number, number]);
     for (const s of [1, -1] as const) {
       const n = scale(fp.normal, s);
       const off = scale(n, fp.thickness / 2);
-      faces.push({ wallId, point: add(fp.a, off), n, dir: fp.dir, a: add(fp.a, off), b: add(fp.b, off) });
+      faces.push({ wallId, point: add(fp.a, off), n, dir: fp.dir, a: add(fp.a, off), b: add(fp.b, off), open });
     }
   }
   const back = (r: number) => ({ x: Math.sin(r), y: -Math.cos(r) }); // rotate((0,-1), r)
@@ -167,17 +248,17 @@ export function snapToWalls(pose: Pose, d: DerivedPlan, distance = 0.12, angleTo
       const c = { x: p.x, y: p.y };
       const side = dot(sub(c, f.point), f.n);
       if (side <= 0) return null; // object is behind this face
-      // object's projection along the face must overlap the face extent
+      // the item (once aligned, its width runs along the face) must have solid wall behind it
       const L = dot(sub(f.b, f.a), f.dir);
       const t = dot(sub(c, f.a), f.dir);
-      const half = Math.max(p.width, p.depth) / 2;
-      if (t < -half || t > L + half) return null;
+      const solid = solidLength(t - p.width / 2, t + p.width / 2, L, f.open);
+      if (solid < Math.min(0.2, 0.3 * p.width)) return null;
       const bdir = back(p.rotation);
       const angle = Math.acos(Math.max(-1, Math.min(1, -dot(bdir, f.n))));
       if (angle > angleTol) return null;
       // distance of the rear side to the face if the item were aligned
       const g = side - p.depth / 2;
-      if (g < -p.depth / 2 || g > distance) return null;
+      if (g < -p.depth / 2 || g > (attachedTo.includes(f.wallId) ? releaseDistance : distance)) return null;
       return { f, g };
     })
     .filter((x): x is NonNullable<typeof x> => !!x)
@@ -405,7 +486,9 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   // rugs and wall-mounted items (curtains, mirrors…) are not snapped/blocked the same way
   const free = f.category === 'textile' && f.height < 0.05;
   if (opts.snap && !free) {
-    const s = snapToWalls({ ...f, x: goal.x, y: goal.y }, derived);
+    // walls the item stands flush against now keep holding it a bit longer (no flicker)
+    const attached = snapToWalls(f, derived, 0.01).wallIds;
+    const s = snapToWalls({ ...f, x: goal.x, y: goal.y }, derived, undefined, undefined, undefined, attached);
     if (s.wallIds.length) {
       goal = { x: s.x, y: s.y };
       rotation = s.rotation;
