@@ -1759,3 +1759,16 @@ test('marks a narrow passage (~60 cm) in 2D and 3D and follows the minimum width
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+test('keyboard overview: "?" opens all shortcuts (2D, 3D, walking), Esc closes (#59)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => undefined);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Hilfe & Tastenkürzel' });
+  await expect(dialog).toBeVisible();
+  for (const text of ['Werkzeuge', '3D-Begehung', 'Ducken', 'Möbel tragen / absetzen', 'Möbel kopieren / einfügen', 'Diese Übersicht öffnen']) await expect(dialog).toContainText(text);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});
