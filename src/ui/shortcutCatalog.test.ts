@@ -17,6 +17,11 @@ describe('keyboard overview (#59)', () => {
     expect([...keys].filter((k) => !listed.has(k))).toEqual([]);
   });
 
+  it('lists the Alt+digit camera bookmark keys the editor handler reacts to (#55)', () => {
+    expect(shortcutsSource).toMatch(/\^Digit\(\[1-9\]\)\$/);
+    for (let i = 1; i <= 9; i++) expect(listed.has(`Digit${i}`)).toBe(true);
+  });
+
   it('lists every key the walkthrough reacts to', () => {
     const code = walkSource;
     const codes = new Set<string>();

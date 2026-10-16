@@ -11,6 +11,7 @@ import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
 import type { Vec2 } from '../model/vec';
 import { toggleOpening } from '../ui/actions';
+import { registerWalkRig } from './cameraBookmarks';
 
 interface Props {
   derived: DerivedPlan;
@@ -268,6 +269,22 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     };
     return () => void delete wp.walk;
   }, []);
+
+  // camera bookmarks (#55) read and set the pose
+  useEffect(
+    () =>
+      registerWalkRig({
+        get: () => ({ x: camera.position.x, z: camera.position.z, eye: eyeRef.current, yaw: yaw.current, pitch: pitch.current }),
+        set: (p) => {
+          camera.position.x = p.x;
+          camera.position.z = p.z;
+          eyeRef.current = eyeNow.current = p.eye;
+          yaw.current = p.yaw;
+          pitch.current = p.pitch;
+        },
+      }),
+    [camera],
+  );
 
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);

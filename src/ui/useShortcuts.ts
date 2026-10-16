@@ -3,6 +3,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useDialogStore } from './dialogStore';
 import { TOOL_KEYS } from './shortcutCatalog';
+import { BOOKMARK_KEYS, jumpToBookmarkIndex } from '../view3d/cameraBookmarks';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 
@@ -18,6 +19,15 @@ export function useShortcuts() {
       const key = e.key.toLowerCase();
       // walking keys (G = carry furniture #39, C = crouch #20, O = open the door/window in sight #21) belong to the walkthrough
       if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'o'].includes(key) && !mod) return;
+      // Alt+1 … Alt+9: camera bookmarks (#55). Matched by e.code, so it works with every layout
+      // (Option+digit types other characters on macOS); only while the 3D view is visible.
+      const digit = /^Digit([1-9])$/.exec(e.code);
+      if (digit && e.altKey && !mod && !e.shiftKey) {
+        e.preventDefault();
+        const n = Number(digit[1]);
+        if (ui.viewMode !== '2d' && n <= BOOKMARK_KEYS && !jumpToBookmarkIndex(n - 1)) ui.toast(`Keine gespeicherte Ansicht ${n} (Menü „Ansichten“ in der 3D-Ansicht)`, 'info');
+        return;
+      }
       if (mod && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         ps.undo();

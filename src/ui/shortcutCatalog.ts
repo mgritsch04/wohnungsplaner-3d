@@ -79,6 +79,17 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: '3D-Ansichten',
+    where: '3D (Übersicht und Begehen)',
+    items: [
+      {
+        keys: 'Alt+1 … Alt+9',
+        action: 'Gespeicherte Ansicht 1–9 anspringen (speichern im Menü „Ansichten“ oben rechts in 3D)',
+        match: Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`),
+      },
+    ],
+  },
+  {
     title: '3D-Begehung',
     where: '3D, Modus „Begehen“',
     items: [

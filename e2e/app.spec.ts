@@ -2013,3 +2013,117 @@ test('clearances (#50): dimension lines to walls and furniture while dragging an
   await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('camera bookmarks: save the view, jump back by click and Alt+1, kept after reload, walk bookmark switches mode (#55)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(1000);
+  type V = { x: number; y: number; z: number };
+  const camPos = (): Promise<V> =>
+    page.evaluate(() => {
+      const c = (window as any).__wp.three.camera.position;
+      return { x: c.x, y: c.y, z: c.z };
+    });
+  const dist = (a: V, b: V) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const cameraMode = () => page.evaluate(() => (window as any).__wp.useUiStore.getState().cameraMode as string);
+  const menu = page.getByTestId('bookmarks-menu');
+  const toggleMenu = () => menu.getByRole('button', { name: /^Ansichten/ }).click();
+  const saveAs = async (name: string) => {
+    await menu.getByRole('button', { name: 'Aktuelle Ansicht speichern …' }).click();
+    await menu.getByLabel('Name der Ansicht').fill(name);
+    if (name === 'Eingang') await page.screenshot({ path: 'test-results/camera-bookmarks-save-form.png' });
+    await menu.getByRole('button', { name: 'Speichern' }).click();
+  };
+  const zoom = async (dir: 'hinein' | 'heraus', n: number) => {
+    for (let i = 0; i < n; i++) await page.getByRole('button', { name: `Zoom 3D: ${dir}zoomen` }).click();
+    await page.waitForTimeout(600);
+  };
+
+  // change the camera, then save it as "Eingang"
+  await zoom('hinein', 4);
+  const saved = await camPos();
+  await toggleMenu();
+  await expect(menu.getByText('Noch keine Ansicht gespeichert.')).toBeVisible();
+  await saveAs('Eingang');
+  await expect(menu.getByRole('button', { name: /^Eingang/ })).toBeVisible();
+  const bm = (await getProject(page)).cameraBookmarks[0];
+  expect(bm).toMatchObject({ name: 'Eingang', mode: 'orbit', cutaway: false });
+  expect(dist(bm.position, saved)).toBeLessThan(0.01);
+  await page.screenshot({ path: 'test-results/camera-bookmarks-menu.png' });
+
+  // change the camera again; a click on the bookmark brings it back (smooth transition ≈ 0.5 s)
+  await zoom('heraus', 7);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(1);
+  await menu.getByRole('button', { name: /^Eingang/ }).click();
+  await page.waitForTimeout(120);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(0.05); // not a hard cut
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
+
+  // the same with Alt+1 – with reduced motion it jumps immediately
+  await toggleMenu(); // close
+  await zoom('heraus', 7);
+  expect(dist(await camPos(), saved)).toBeGreaterThan(1);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.keyboard.press('Alt+1');
+  await page.waitForTimeout(150);
+  expect(dist(await camPos(), saved)).toBeLessThan(0.05);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  // Alt+1 must not switch the view mode (plain 1 = 2D)
+  expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().viewMode)).toBe('3d');
+
+  // walk bookmark: saved in "Begehen", restored from "Übersicht" (mode switches)
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await page.waitForTimeout(800);
+  const startPos = await camPos();
+  // step aside (the walkthrough keeps its position in the camera) and look around
+  await page.evaluate(() => {
+    const c = (window as any).__wp.three.camera;
+    c.position.x += 0.6;
+    c.position.z -= 0.4;
+    (window as any).__wp.walk.look(1.2, -0.1);
+  });
+  await page.waitForTimeout(300);
+  const walkPos = await camPos();
+  expect(dist(walkPos, startPos)).toBeGreaterThan(0.2);
+  await toggleMenu();
+  await saveAs('Flur');
+  const flur = (await getProject(page)).cameraBookmarks[1];
+  expect(flur).toMatchObject({ name: 'Flur', mode: 'walk' });
+  expect(flur.eyeHeight).toBeCloseTo(walkPos.y, 2);
+  await toggleMenu();
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await page.waitForTimeout(800);
+  expect(dist(await camPos(), walkPos)).toBeGreaterThan(1);
+  await toggleMenu();
+  await menu.getByRole('button', { name: /^Flur/ }).click();
+  await expect.poll(cameraMode).toBe('walk');
+  await expect.poll(async () => dist(await camPos(), walkPos), { timeout: 3000 }).toBeLessThan(0.05);
+  expect(dist(walkPos, startPos)).toBeGreaterThan(0.2);
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.three.camera.rotation.y), { timeout: 3000 }).toBeCloseTo(1.2, 2);
+  // and back to the orbit bookmark with Alt+1
+  await page.keyboard.press('Alt+1');
+  await expect.poll(cameraMode).toBe('orbit');
+  await expect.poll(async () => dist(await camPos(), saved), { timeout: 3000 }).toBeLessThan(0.05);
+
+  // rename and delete (one undo step each)
+  await menu.getByRole('button', { name: '„Flur“ umbenennen' }).click();
+  await menu.getByLabel('Neuer Name für „Flur“').fill('Gang');
+  await menu.getByRole('button', { name: 'OK' }).click();
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toBeVisible();
+  await menu.getByRole('button', { name: '„Gang“ löschen' }).click();
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(menu.getByRole('button', { name: /^Gang/ })).toBeVisible();
+
+  // kept in the project after a reload
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).cameraBookmarks.map((b: { name: string }) => b.name)).toEqual(['Eingang', 'Gang']);
+  await page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Ansichten/ }).click();
+  await expect(page.getByTestId('bookmarks-menu').getByRole('button', { name: /^Eingang/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */

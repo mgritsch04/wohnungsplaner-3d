@@ -26,6 +26,9 @@ import { NarrowPassageMarkers } from './NarrowPassageMarkers';
 import { WalkPathMarkers } from './WalkPathMarkers';
 import { useOrbitZoom, ZoomSlider } from '../ui/ZoomSlider';
 import { toggleOpening } from '../ui/actions';
+import { BookmarksMenu } from './BookmarksMenu';
+import { CameraBookmarkDriver } from './CameraBookmarkDriver';
+import { orbitFitSuppressed, registerOrbitRig } from './cameraBookmarks';
 
 export function Scene3D() {
   const project = useProjectStore((s) => s.project);
@@ -73,6 +76,7 @@ export function Scene3D() {
         </Canvas>
       </WebGLBoundary>
       {cameraMode === 'orbit' && <OrbitZoomSlider />}
+      <BookmarksMenu />
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && ducking && (
         <div className="walk-duck" data-testid="walk-duck">
@@ -222,6 +226,7 @@ function SceneContent({
           <RealismEffects />
         </EffectsBoundary>
       )}
+      <CameraBookmarkDriver />
       {cameraMode === 'orbit' ? (
         <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
       ) : (
@@ -282,6 +287,7 @@ function OrbitCamera({
   const viewMode = useUiStore((s) => s.viewMode);
   useEffect(() => {
     const fit = () => {
+      if (orbitFitSuppressed()) return; // a camera bookmark (#55) is being shown
       // fit the apartment's bounding sphere into the narrower field of view
       const size = get().size;
       const cam = camera as THREE.PerspectiveCamera;
@@ -317,7 +323,17 @@ function OrbitCamera({
       c.update();
       report();
     });
+    // camera bookmarks (#55) read and set the pose
+    const unregister = registerOrbitRig({
+      get: () => ({ position: camera.position.clone(), target: c.target.clone() }),
+      set: (p, t) => {
+        camera.position.set(p.x, p.y, p.z);
+        c.target.set(t.x, t.y, t.z);
+        c.update();
+      },
+    });
     return () => {
+      unregister();
       c.removeEventListener('change', report);
       useOrbitZoom.getState().setApply(null);
     };
