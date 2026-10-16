@@ -603,3 +603,11 @@ export function surfaceTopAt(d: Project, exceptId: string, p: Vec2): number {
   }
   return top;
 }
+
+/** Furniture snapping setting (#52) → grid step in metres (null = no grid) and whether walls attract. */
+export function furnitureSnapOptions(mode: 'grid5' | 'grid10' | 'wall' | 'off', altKey = false): { grid: number | null; walls: boolean } {
+  if (altKey || mode === 'off') return { grid: null, walls: false };
+  if (mode === 'wall') return { grid: null, walls: true };
+  return { grid: mode === 'grid10' ? 0.1 : 0.05, walls: true };
+}
+

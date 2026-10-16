@@ -19,7 +19,7 @@ import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
 import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
-import { buildPlacementObstacles, furnitureConflicts, moveFurnitureTo } from '../model/placement';
+import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -367,12 +367,14 @@ export function Editor2D() {
         case 'furniture': {
           dr.moved = true;
           let c = sub(w, dr.grab);
-          if (!e.altKey && grid) c = snapToGrid(c, Math.min(grid, 0.05));
+          // snapping as chosen under Werkzeuge › „Möbel einrasten“ (#52); Alt = free placement
+          const fs = furnitureSnapOptions(settings.furnitureSnap, e.altKey);
+          if (fs.grid) c = snapToGrid(c, fs.grid);
           // wall snapping + collision (Alt = free placement)
           let snapped: string[] = [];
           updateTx((d) => {
             // a group moves rigidly (no wall snapping), each item still stops at walls/furniture
-            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: !e.altKey && !dr.group.length, collide: !e.altKey });
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls && !dr.group.length, collide: !e.altKey });
             const moved = d.furniture.find((x) => x.id === dr.id);
             if (!moved || !dr.group.length) return;
             const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
