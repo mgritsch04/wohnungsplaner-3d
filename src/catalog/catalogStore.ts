@@ -10,6 +10,7 @@ interface CatalogStore {
   load: () => Promise<void>;
   addItems: (items: CatalogItem[]) => Promise<number>;
   removeSource: (sourceName: string) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
 }
 
 /** User-imported catalog entries, persisted locally (IndexedDB). */
@@ -30,6 +31,11 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
   },
   removeSource: async (sourceName) => {
     const next = get().items.filter((i) => i.sourceName !== sourceName);
+    set({ items: next });
+    await db.putMeta(KEY, next);
+  },
+  removeItem: async (id) => {
+    const next = get().items.filter((i) => i.id !== id);
     set({ items: next });
     await db.putMeta(KEY, next);
   },

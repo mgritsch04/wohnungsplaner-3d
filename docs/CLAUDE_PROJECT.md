@@ -25,11 +25,11 @@ Sprache: Mit mir immer Deutsch sprechen. Kurz und klar, ohne Fachjargon, wenn es
 Zu Beginn jedes Threads: CLAUDE.md, docs/PROJECT_STATUS.md, docs/IDEAS.md und docs/DEVELOPMENT_WORKFLOW.md lesen. PROJECT_STATUS.md nach jedem Meilenstein aktualisieren.
 
 Arbeitsablauf (Details in docs/DEVELOPMENT_WORKFLOW.md):
-1. Zuerst GitHub-Issues prüfen: Antworten auf [USERTEST]-Issues (BESTANDEN → schließen, Label done; FEHLGESCHLAGEN → Label needs-fix + priority: high, Korrektur einplanen), neue idea-inbox-Issues sichten und in docs/IDEAS.md aufnehmen (Label planned), offene user-task-Issues.
+1. Zuerst GitHub-Issues prüfen: Antworten in Issues mit Label user-test (BESTANDEN → schließen, Label done; FEHLGESCHLAGEN → Label needs-fix + priority: high, Korrektur einplanen), neue idea-inbox-Issues sichten und in docs/IDEAS.md aufnehmen (Label planned), offene user-task-Issues.
 2. Dann fehlgeschlagene Tests korrigieren, danach priority: high, danach die oberste unblockierte Ready-Zeile in docs/IDEAS.md.
 3. Arbeit in kleinen, fokussierten Commits mit Präfix (feat:, fix:, test:, perf:, docs:). Vor jedem Commit: npx tsc -b, npm run lint, npm test, npm run build; vor einem PR die volle E2E-Suite (npx playwright test).
-4. Mehrere Features als Sammel-PR nach main; mergen erst bei grüner CI. Nach dem Merge: in den zugehörigen [USERTEST]-Issues „Jetzt in main“ kommentieren, Feature-Issues schließen, Dashboard und Doku aktualisieren.
-5. Für jedes fertige Feature ein [USERTEST]-Issue mit nummerierten Schritten anlegen. Nie einen Test als bestanden markieren, den ich nicht selbst bestätigt habe. Visuelle Änderungen nur als geprüft melden, wenn du sie tatsächlich angesehen hast (Screenshot).
+4. Mehrere Features als Sammel-PR nach main; mergen erst bei grüner CI. PRs schreiben „Refs #…“, nie „Closes #…“. Nach dem Merge bleibt das Feature-Issue offen; Dashboard und Doku aktualisieren.
+5. Für jedes fertige Feature einen Kommentar „## Testschritte“ (nummerierte Schritte mit „→ Erwartet: …“) ins Feature-Issue schreiben und das Label auto-user-test setzen; die automatische Prüfung schließt es bei eindeutigem Ergebnis („Automatisch BESTANDEN“), sonst Label user-test und ich teste im selben Issue. Kein eigenes [USERTEST]-Issue mehr (alte ziehen ins Original-Feature-Issue um, siehe DEVELOPMENT_WORKFLOW Schritt 6). Nie einen Test als bestanden markieren, den weder ich noch ein eindeutiger automatischer Lauf bestätigt hat. Visuelle Änderungen nur als geprüft melden, wenn du sie tatsächlich angesehen hast (Screenshot).
 
 Parallele Arbeit: Opus-Agents in eigenen Git-Worktrees (eigener Branch, eigener E2E-Port PW_PORT), Ergebnisse in einen Integrations-Branch zusammenführen; e2e/app.spec.ts-Konflikte sind meist nur Anhänge (beide Seiten behalten, angepasste Bestandstests per Drei-Wege-Abgleich übernehmen). Keine Git-Konflikte riskieren: Agents klare „nicht anfassen“-Listen geben.
 

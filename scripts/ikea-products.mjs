@@ -22,8 +22,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { JSDOM } from 'jsdom';
-import { createServer } from 'vite';
+import { fetchArticle, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -39,18 +38,10 @@ if (!input && !planFile) {
 const outDir = resolve(opt('--out', 'ikea-import'));
 const withModels = args.includes('--models');
 const max = Math.min(50, Number(opt('--max', planFile ? 50 : 25)) || 25);
-const DELAY_MS = 1500;
-const UA = 'wohnungsplaner-3d/0.1 (privates Planungswerkzeug; einzelne Produktseiten auf Nutzeranfrage)';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// the parser needs a DOM – provide jsdom's DOMParser in Node
-globalThis.DOMParser = new JSDOM('').window.DOMParser;
-
-const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
+const mods = await loadIkeaModules();
+const { vite } = mods;
 try {
-  const { parseArticleList, ikeaProductUrl, formatArticle, pageToCatalogEntry } = await vite.ssrLoadModule('/src/catalog/providers/ikeaList.ts');
-  const { parseProductPage } = await vite.ssrLoadModule('/src/catalog/providers/structuredData.ts');
-
   let articles;
   if (planFile) {
     const { parseIkeaPlannerJson } = await vite.ssrLoadModule('/src/catalog/providers/ikeaPlanner.ts');
@@ -59,46 +50,29 @@ try {
     console.log(`${articles.length} verschiedene Artikel in der Planung.`);
   } else {
     const text = existsSync(input) ? readFileSync(input, 'utf-8') : input;
-    articles = parseArticleList(text);
+    articles = mods.parseArticleList(text);
   }
   if (!articles.length) throw new Error('Keine IKEA-Artikelnummern gefunden (Format z. B. 104.099.32 oder S895.792.19).');
   if (articles.length > max) console.warn(`${articles.length} Artikel gefunden – nur die ersten ${max} werden abgerufen (--max).`);
   mkdirSync(outDir, { recursive: true });
 
+  const get = politeFetcher();
   const items = [];
   const report = [];
   for (const a of articles.slice(0, max)) {
-    const art = formatArticle(a);
-    const url = ikeaProductUrl(a);
-    process.stdout.write(`${art} … `);
-    const res = await fetch(url, { headers: { 'user-agent': UA, 'accept-language': 'de-AT' }, redirect: 'follow' });
-    await sleep(DELAY_MS);
-    if (!res.ok) {
-      console.log(`HTTP ${res.status} – übersprungen`);
-      report.push({ article: art, ok: false, reason: `HTTP ${res.status}` });
+    process.stdout.write(`${mods.formatArticle(a)} … `);
+    const r = await fetchArticle(mods, get, a, { withModel: withModels });
+    if (r.model) writeFileSync(join(outDir, r.model.file), r.model.bytes);
+    if (!r.entry) {
+      console.log(`${r.reason} – übersprungen`);
+      report.push({ article: r.article, ok: false, reason: r.reason, quality: r.page?.quality });
       continue;
     }
-    const page = parseProductPage(await res.text(), res.url);
-    let modelFile;
-    if (withModels && page.modelUrl) {
-      const m = await fetch(page.modelUrl, { headers: { 'user-agent': UA } });
-      await sleep(DELAY_MS);
-      if (m.ok && /gltf-binary|octet-stream/.test(m.headers.get('content-type') ?? '')) {
-        modelFile = `${a.combination ? 's' : ''}${a.digits}.glb`;
-        writeFileSync(join(outDir, modelFile), Buffer.from(await m.arrayBuffer()));
-      } else {
-        report.push({ article: art, ok: true, note: `Modell nicht geladen (HTTP ${m.status})` });
-      }
-    }
-    const entry = pageToCatalogEntry(page, modelFile);
-    if (!entry) {
-      console.log('unvollständige Maße/Name – übersprungen');
-      report.push({ article: art, ok: false, reason: 'Maße oder Name fehlen auf der Seite', quality: page.quality });
-      continue;
-    }
+    const entry = r.entry;
     items.push(entry); // the catalog lists each product once; the quantity is in bericht.json
-    console.log(`${entry.name} · ${entry.width}×${entry.depth}×${entry.height} cm · ${entry.price ?? '–'} €${modelFile ? ' · Modell ' + modelFile : page.modelUrl ? ' · Modell verfügbar' : ' · kein Modell'}`);
-    report.push({ article: art, ok: true, quantity: a.quantity, name: entry.name, model: modelFile ?? null, modelVariants: page.modelCandidates.length });
+    console.log(`${entry.name} · ${entry.width}×${entry.depth}×${entry.height} cm · ${entry.price ?? '–'} €${r.model ? ' · Modell ' + r.model.file : r.page.modelUrl ? ' · Modell verfügbar' : ' · kein Modell'}`);
+    if (r.note) report.push({ article: r.article, ok: true, note: r.note });
+    report.push({ article: r.article, ok: true, quantity: a.quantity, name: entry.name, model: r.model?.file ?? null, modelVariants: r.page.modelCandidates.length });
   }
 
   const list = { format: 'wohnungsplaner-catalog', version: 1, name: `IKEA Österreich ${new Date().toISOString().slice(0, 10)}`, units: 'cm', items };
