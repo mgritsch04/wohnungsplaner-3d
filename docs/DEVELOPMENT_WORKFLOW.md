@@ -1,18 +1,17 @@
 # Entwicklungs-Workflow
 
-_Stand 2026-10-16 – beschreibt, was in diesem Repository und dieser Umgebung tatsächlich gilt._
+_Stand 2026-10-17 – beschreibt, was in diesem Repository und dieser Umgebung tatsächlich gilt._
 
 ## Repository
-- GitHub: `mgritsch04/wohnungsplaner-3d`, Standard-Branch `main`.
-- Branch-Schutz: **keiner** (geprüft über die GitHub-API am 2026-10-16). Keine Pflicht-Checks.
-- CI: `.github/workflows/ci.yml` – Lint, Typprüfung, Unit-Tests, Build; danach E2E (Playwright). Läuft auf Pushes nach `main` und auf Pull Requests.
+- GitHub: `mgritsch04/wohnungsplaner-3d` (**öffentlich** seit 2026-10-17), Standard-Branch `main`.
+- `main` hat laut GitHub-API keine Branch-Schutzregel (geprüft 2026-10-17); trotzdem gilt: nie direkt auf `main` pushen, Integration nur per PR bei grüner CI.
+- CI: `.github/workflows/ci.yml` mit den Jobs `checks` (Lint, Typprüfung, Unit-Tests, Build) und `e2e` (Playwright). Läuft auf Pushes nach `main` und auf Pull Requests.
+- Labels anlegen bzw. Farben angleichen: `scripts/setup-labels.sh` (braucht die GitHub-CLI `gh`, idempotent).
 
 ## Branches
-- Entwicklung durch Claude Code (Cloud) auf dem sitzungsgebundenen Branch `claude/quirky-faraday-0d9uep` (Push-Rechte dieser Umgebung sind darauf ausgelegt).
-- Integration nach `main` per **Pull Request mit Merge-Commit**, sobald ein Stand lokal vollständig geprüft ist (Lint, `tsc -b`, `npm test`, `npm run build`, `npx playwright test`). Der Nutzer hat autonome Integration getesteter Stände erlaubt.
-- Kein Branch pro Kleinigkeit; neue Branches nur für riskante/experimentelle Arbeiten.
-- Merge erst, wenn auch die GitHub-CI des PR grün ist; danach `main` per `git fetch` prüfen und den Arbeits-Branch per Fast-Forward auf `main` nachziehen (keine History-Umschreibung).
-- Verlauf: PR #1 (Stand bis CI-Einführung) am 2026-10-16 nach grüner CI gemergt (`5797457`).
+- Jeder Thread arbeitet auf seinem eigenen, sitzungsgebundenen Branch `claude/…` (Name kommt aus der Umgebung). Mehrere Branches parallel sind normal; jeder Thread fasst nur seine eigenen Dateien an.
+- Integration nach `main` per **Pull Request mit Merge-Commit**, sobald der Stand lokal geprüft ist (Lint, `tsc -b`, `npm test`, `npm run build`, `npx playwright test`) und die GitHub-CI des PR grün ist. Der Nutzer hat autonome Integration getesteter Stände erlaubt.
+- Nach dem Merge den eigenen Branch auf das neue `main` setzen (er enthält dann nur gemergte Historie); nie fremde Branches umschreiben.
 
 ## Commits
 - Klein und thematisch: `feat:`, `fix:`, `test:`, `perf:`, `docs:`, `ci:`.
@@ -33,8 +32,11 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 ## Ideen, Aufgaben und Abnahme über GitHub-Issues
 
 **Rollen**
-- **Neben-Session (mobil, Ideenerfassung):** legt ausschließlich GitHub-Issues mit Label `idea-inbox` an oder ergänzt offene `idea-inbox`-Issues per Kommentar. Ändert **keine** Projektdateien, keine Labels anderer Issues, keine PRs. Anleitung: [`IDEA_CAPTURE.md`](IDEA_CAPTURE.md).
-- **Hauptsession (Entwicklung):** einzige Stelle, die `docs/IDEAS.md` pflegt; übernimmt Ideen, setzt um, testet, schreibt die Testschritte ins Feature-Issue, integriert.
+- **Ideen-Thread (mobil, Ideenerfassung):** legt ausschließlich GitHub-Issues mit Label `idea-inbox` an oder ergänzt offene `idea-inbox`-Issues per Kommentar. Ändert **keine** Projektdateien, keine Labels anderer Issues, keine PRs. Anleitung: [`IDEA_CAPTURE.md`](IDEA_CAPTURE.md).
+- **Haupt-Thread:** einzige Stelle, die `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` pflegt; übernimmt Ideen, sortiert Issues ein, plant Aufgaben.
+- **Feature-Threads:** setzen je eine Aufgabe um, testen, öffnen und mergen ihre PR, schreiben danach Testschritte und Label in ihr Issue (Schritt 6) und melden dem Haupt-Thread, was in Backlog und Status nachzuziehen ist. Höchstens 3 Feature-Threads gleichzeitig je Projekt.
+- **Test-Thread:** führt die automatischen User-Tests aus (siehe „Automatische User-Tests“) und pflegt `scripts/usertest`.
+- **Koordination und Leiter:** Die Koordination des Projekts startet die Threads und entscheidet die Reihenfolge; das Projekt „Leiter“ ist dein Ansprechpartner für alle Projekte, sagt das Usage-Budget an und vermittelt zwischen den Projekten.
 - **Du (Nutzer):** Ideen erfassen, User-Tests durchführen, wenn ein Issue das Label `user-test` trägt, und im selben Issue mit `BESTANDEN` bzw. `FEHLGESCHLAGEN: …` antworten (eindeutige Tests erledigt vorher die automatische Prüfung, siehe unten), Entscheidungen treffen.
 
 **Labels (Status; je Issue genau eines)**
@@ -47,7 +49,7 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `user-test` | manuelle Prüfung durch dich offen, im Feature-Issue |
 | `needs-fix` | dein User-Test ist fehlgeschlagen (Issue bleibt offen) |
 | `done` | vollständig abgeschlossen (mit User-Test: von dir oder eindeutig automatisch bestanden) |
-| `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
+| `user-task` | `[AUFGABE]`-Issue: der Haupt-Thread braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
 
 Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte, vor neuen Ideen bearbeiten), `info` (erledigt, enthält aber eine wichtige Info für dich – du schließt es), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
 
@@ -59,27 +61,28 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
 5. Neue `idea-inbox`-Issues übernehmen, dann die oberste `Ready`-Zeile in `docs/IDEAS.md`.
 
 **Issue-Pflege (#35, #36)**
-- Issue-Check **zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe** (nach Commit/PR): neue/geänderte Issues seit dem letzten Check lesen. Einen dauerhaft im Hintergrund laufenden Prüfer gibt es innerhalb einer Sitzung nicht (kein Pollen); zwischen Sitzungen übernimmt das die Routine (#30). Für das Auflisten/Zusammenfassen dürfen Hilfsagenten mit kleinem Modell eingesetzt werden (siehe „Modellwahl“).
+- Feature-artige Arbeit (neue Funktion, Fehlerbehebung, sichtbare Änderung) bekommt **sofort ein Issue**, bevor sie beginnt – auch wenn der Auftrag im Chat kam. Daran hängen später Testschritte und Abnahme.
+- Issue-Check **zu Sitzungsbeginn, nach jeder abgeschlossenen Aufgabe** (nach Commit/PR) **und spätestens alle 30–60 Minuten**: neue/geänderte Issues seit dem letzten Check lesen. Einen dauerhaft im Hintergrund laufenden Prüfer gibt es innerhalb einer Sitzung nicht (kein Pollen); zwischen Sitzungen übernimmt das die Routine (#30). Für das Auflisten/Zusammenfassen dürfen Hilfsagenten mit kleinem Modell eingesetzt werden (siehe „Modellwahl“).
 - **Fertige Aufgaben werden geschlossen** (Label `done`), sobald der Stand in `main` ist und kein Test mehr offen ist (siehe Schritt 6) – nicht nur kommentiert. Steht noch eine wichtige Info für dich drin, bekommt das Issue zusätzlich das Label **`info`** und bleibt offen; du schließt es selbst oder per Kommentar. Wirklich offene Aufgaben bleiben offen.
 - `user-task`-Issues werden geschlossen, sobald deine Antwort umgesetzt bzw. in `docs/IDEAS.md` eingeplant ist.
 
 **Hilfsagent für Issue-Pflege (auf deinen Wunsch)**
-- Die Hauptsession startet zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe einen Hilfsagenten mit kleinem Modell (Haiku) im Hintergrund. Er **liest** alle offenen Issues und bereitet eine **Arbeitsliste** für die Hauptsession vor: Reihenfolge nach den Prioritäten oben (fehlgeschlagene Tests → `priority: high`, vor allem deine `idea-inbox`-High-Prio-Issues → Kommentare → Ideen), je Issue empfohlene Aktion, Entwurf für die `IDEAS.md`-Zeile (Beschreibung, Nutzen, Priorität, Abhängigkeiten, Abnahme) und Label-Auffälligkeiten.
-- Er darf nur eindeutige Label-Korrekturen vornehmen und kurze Hinweis-Kommentare schreiben; er ändert **keine Dateien, kein Git, schließt keine Issues** und fasst `user-test`/`user-task`-Entscheidungen nicht an – so entstehen keine Konflikte mit der Hauptsession. Entscheiden, umsetzen und `docs/IDEAS.md` pflegen bleibt bei der Hauptsession, die die Arbeitsliste direkt übernimmt.
+- Der Haupt-Thread startet zu Sitzungsbeginn und nach jeder abgeschlossenen Aufgabe einen Hilfsagenten mit kleinem Modell (Haiku) im Hintergrund. Er **liest** alle offenen Issues und bereitet eine **Arbeitsliste** für den Haupt-Thread vor: Reihenfolge nach den Prioritäten oben (fehlgeschlagene Tests → `priority: high`, vor allem deine `idea-inbox`-High-Prio-Issues → Kommentare → Ideen), je Issue empfohlene Aktion, Entwurf für die `IDEAS.md`-Zeile (Beschreibung, Nutzen, Priorität, Abhängigkeiten, Abnahme) und Label-Auffälligkeiten.
+- Er darf nur eindeutige Label-Korrekturen vornehmen und kurze Hinweis-Kommentare schreiben; er ändert **keine Dateien, kein Git, schließt keine Issues** und fasst `user-test`/`user-task`-Entscheidungen nicht an – so entstehen keine Konflikte mit dem Haupt-Thread. Entscheiden, umsetzen und `docs/IDEAS.md` pflegen bleibt beim Haupt-Thread, der die Arbeitsliste direkt übernimmt.
 
 **`docs/IDEAS.md` und Branches (#40)**
-- Direkte Pushes auf `main` sind tabu (Schutzregel). Deshalb wird `docs/IDEAS.md` auf dem Arbeits-Branch gepflegt und **zügig per PR in `main` integriert**; der Stand in `main` ist maßgeblich. Bearbeitest du die Datei selbst (z. B. im GitHub-Web), bitte auf `main` oder auf dem Arbeits-Branch – die Hauptsession holt die Änderung vor dem eigenen Bearbeiten per Merge/Fast-Forward und überschreibt sie nie.
+- Direkte Pushes auf `main` sind tabu (Schutzregel). Deshalb wird `docs/IDEAS.md` auf dem Arbeits-Branch gepflegt und **zügig per PR in `main` integriert**; der Stand in `main` ist maßgeblich. Bearbeitest du die Datei selbst (z. B. im GitHub-Web), bitte auf `main` oder auf dem Arbeits-Branch – der Haupt-Thread holt die Änderung vor dem eigenen Bearbeiten per Merge/Fast-Forward und überschreibt sie nie.
 - Mehrere Branches sind erlaubt, wenn sinnvoll (z. B. ein reiner Doku-PR parallel zu einer Feature-Arbeit), immer `claude/…`-Präfix, jeder über PR mit grüner CI. Bei parallelen Änderungen an `docs/IDEAS.md` auf verschiedenen Branches Konflikte vor dem Merge auflösen, nie per Force-Push.
 
-**Kontingent (#13):** Nur das Kontingent deines Pro-Plans. Die Hauptsession kauft nichts, aktiviert keine „usage credits“ oder Zusatznutzung und ändert keine Abrechnungseinstellungen (kann sie auch nicht). Ist das Kontingent erschöpft, stoppt die laufende Sitzung; sie kann sich **nicht** selbst nach dem Zurücksetzen neu starten. Fortgesetzt wird durch deine Nachricht („weiter“) oder den nächsten planmäßigen Routine-Lauf (#30). Ein abgelehnter Routine-Lauf wird nicht nachgeholt; der nächste planmäßige startet normal.
+**Kontingent (#13):** Nur das Kontingent deines Pro-Plans. Kein Thread kauft etwas, aktiviert keine „usage credits“ oder Zusatznutzung und ändert keine Abrechnungseinstellungen (kann sie auch nicht). Ist das Kontingent erschöpft, stoppt die laufende Sitzung; sie kann sich **nicht** selbst nach dem Zurücksetzen neu starten. Fortgesetzt wird durch deine Nachricht („weiter“) oder den nächsten planmäßigen Routine-Lauf (#30). Ein abgelehnter Routine-Lauf wird nicht nachgeholt; der nächste planmäßige startet normal.
 
-**Ablauf je Durchlauf der Hauptsession (ohne konkreten Auftrag)**
+**Ablauf je Durchlauf (Haupt-Thread bzw. Feature-Thread, ohne konkreten Auftrag)**
 1. `git status`/`git fetch` prüfen; fremde uncommittete Änderungen nie überschreiben.
 2. Offene Issues mit `user-test` auf neue Kommentare prüfen: `BESTANDEN` → Abnahme in `PROJECT_STATUS.md` vermerken, Label `done`, Issue schließen. `FEHLGESCHLAGEN` → Label `needs-fix`, Ursache suchen, beheben, nach dem Merge neue Testschritte kommentieren und wieder `auto-user-test` setzen (siehe Schritt 6). Ein fehlgeschlagener Test wird nie als bestanden markiert.
 3. Offene `user-task`-Issues auf Antworten prüfen und umsetzen (z. B. Freigabe → Aufgabe von `Blocked` nach `Ready`); erledigte schließen.
 4. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
 5. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
-6. **Nach dem Merge bleibt das Feature-Issue offen**; ein eigenes `[USERTEST]`-Issue gibt es nicht mehr. Ist eine Abnahme sinnvoll: Kommentar mit den Testschritten ins Feature-Issue (Format unten) und Label `in-progress` → `auto-user-test`. Danach läuft die automatische Prüfung (siehe „Automatische User-Tests“). Dabei gilt:
+6. **Nach dem Merge bleibt das Feature-Issue offen**; ein eigenes `[USERTEST]`-Issue gibt es nicht mehr. Ist eine Abnahme sinnvoll: Der **Feature-Thread, der die PR gemergt hat**, schreibt den Kommentar mit den Testschritten ins Feature-Issue (Format unten) und setzt das Label `in-progress` → `auto-user-test`; der Haupt-Thread zieht nur Backlog und Status nach. Danach läuft die automatische Prüfung (siehe „Automatische User-Tests“). Dabei gilt:
    - PRs schreiben „Refs #…“, **nie** „Closes #…“, damit der Merge das Issue nicht schließt.
    - Ist kein User-Test nötig (z. B. reine Test- oder Doku-Änderung), wird das Issue nach dem Merge mit Label `done` geschlossen; der Abschluss-Kommentar sagt das ausdrücklich („kein User-Test nötig“).
    - Geschlossen wird ein Issue mit Test nur durch dein `BESTANDEN`, durch dich selbst oder durch ein eindeutiges „Automatisch BESTANDEN“. Beim Schließen das Status-Label auf `done` setzen (kein `planned`/`in-progress`/`auto-user-test`/`user-test` an geschlossenen Issues).
@@ -95,12 +98,16 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
      ```
      Erlaubt sind auch `### Testschritte` und `**Testschritte**` als erste Zeile.
    - **Umzug der alten `[USERTEST]`-Issues (2026-10-17, dein Wunsch):** Jedes offene `[USERTEST]`-Issue zieht ins Original-Feature-Issue um. Das Feature-Issue wird wieder geöffnet und bekommt einen `## Testschritte`-Kommentar (aus dem alten Test übernommen), einen Verlauf-Kommentar (PR, Link zum alten Test-Issue, bisherige Vorprüfungen und deine Antworten) und das passende Label: `auto-user-test`, wenn noch keine Vorprüfung lief, sonst `user-test` mit dem Hinweis, was du anschauen sollst. Deckt ein Test mehrere Features ab, läuft er im Haupt-Issue; die anderen bleiben geschlossen mit dem Kommentar „Test läuft in #…“. Das alte `[USERTEST]`-Issue wird mit „Verschoben nach #… (neues Issue-Modell)“ geschlossen (Grund „not planned“); deine Antworten bleiben dort lesbar.
-7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
+7. Braucht ein Thread etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
 8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
 
-**Statusbegriffe (Projektstatus):** implementiert · automatisiert getestet · User-Test offen (#Issue) · automatisch bestätigt (Datum) · vom Nutzer bestätigt (Datum) · fehlgeschlagen/Nachbesserung (#Issue) · blockiert. „Done“ im Backlog bedeutet **nicht** automatisch „von dir bestätigt“.
+**Statusbegriffe (Projektstatus):** implementiert · automatisiert getestet · automatischer User-Test offen (#Issue) · User-Test offen (#Issue) · automatisch bestätigt (Datum) · vom Nutzer bestätigt (Datum) · fehlgeschlagen/Nachbesserung (#Issue) · blockiert. „Done“ im Backlog bedeutet **nicht** automatisch „von dir bestätigt“.
 
 Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nächsten Durchlauf gelesen.
+
+## Rückmeldungen an dich und Dashboard
+- **Rückmeldungen (#195):** Ergebnisse stehen im Thread, der die Arbeit gemacht hat; sonst meldet sich ein Thread nur, wenn er etwas von dir braucht (Entscheidung, Test, Freigabe). Keine Fortschrittsmeldungen.
+- **Dashboard:** Gesamtansicht und Updater sind im Fitness-Projekt beschrieben: [`fitness-coach/docs/DASHBOARD.md`](https://github.com/mgritsch04/fitness-coach/blob/main/docs/DASHBOARD.md). Bis das Leiter-Projekt die Dashboard-Zeilen übernimmt (#195 Punkt 6), trägt jeder Thread seine Zeile selbst in die Zulieferung ein (siehe [`CLAUDE_PROJECT.md`](CLAUDE_PROJECT.md)).
 
 ## Automatische User-Tests
 
@@ -127,15 +134,15 @@ Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kon
 | normale Feature-Arbeit (UI, Komponenten), Tests, übliche Fehlersuche, Recherche im Code | Sonnet |
 | Kern-Geometrie/Datenmodell (`src/model`, `derivePlan()`, Kollision/Platzierung, Schema-Migrationen), schwierige Fehlersuche (z. B. Rendering-Ursachen), Entscheidungen mit weitreichenden Folgen | Opus |
 
-**Entscheidung:** Die Hauptsession wählt das Modell für Hilfsagenten selbst nach dieser Tabelle (dein Auftrag vom 2026-10-16).
+**Entscheidung:** Jeder Thread wählt das Modell für Hilfsagenten selbst nach dieser Tabelle (dein Auftrag vom 2026-10-16).
 
-**Paralleler Coding-Agent (auf deinen Wunsch):** Für eine klar abgegrenzte Aufgabe, die kaum Dateien mit der Hauptsession teilt, kann ein zweiter Agent in einem eigenen Git-Worktree auf eigenem Branch `claude/…` arbeiten (Modell nach Tabelle, meist Sonnet). Regeln: eigener E2E-Port (`PW_PORT=4174`), nie fremde Server/Prozesse beenden, keine Änderungen an `docs/IDEAS.md`/`docs/PROJECT_STATUS.md` (pflegt die Hauptsession beim Integrieren), kein PR/keine Issue-Änderungen durch den Agenten – die Hauptsession prüft sein Ergebnis, öffnet den PR und integriert nach grüner CI. Kosten: verbraucht dein Kontingent entsprechend schneller.
+**Paralleler Coding-Agent (auf deinen Wunsch):** Für eine klar abgegrenzte Aufgabe, die kaum Dateien mit dem eigenen Thread teilt, kann ein zweiter Agent in einem eigenen Git-Worktree auf eigenem Branch `claude/…` arbeiten (Modell nach Tabelle, meist Sonnet). Regeln: eigener E2E-Port (`PW_PORT=4174`), nie fremde Server/Prozesse beenden, keine Änderungen an `docs/IDEAS.md`/`docs/PROJECT_STATUS.md` (pflegt der Haupt-Thread), kein PR/keine Issue-Änderungen durch den Agenten – der startende Thread prüft sein Ergebnis, öffnet den PR und integriert nach grüner CI. Kosten: verbraucht dein Kontingent entsprechend schneller.
 
 **Was tatsächlich steuerbar ist:**
 - Eine laufende Sitzung kann ihr **eigenes** Modell nicht selbst wechseln; das Modell wird beim Start festgelegt (bei dir: Modellauswahl bzw. `/model`, bei Routinen in deren Einstellungen).
-- Die Hauptsession **delegiert** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
-- **Routine:** Für einen Lauf mit höchstens einer Aufgabe reicht meist Sonnet. Du kannst das Modell der Routine unter https://claude.ai/code/routines einstellen; die Hauptsession ändert es nicht eigenmächtig.
-- Wechselt die Hauptsession für eine Aufgabe das Modell bzw. gibt sie an ein anderes Modell ab und ändert das die Arbeit (z. B. Opus-Sitzung nötig), sagt sie dir das kurz im Chat bzw. im Issue.
+- Threads **delegieren** passende Teilaufgaben an Hilfsagenten mit kleinerem Modell (Haiku/Sonnet), z. B. Housekeeping oder breite Codesuche, und prüft deren Ergebnis.
+- **Routine:** Für einen Lauf mit höchstens einer Aufgabe reicht meist Sonnet. Du kannst das Modell der Routine unter https://claude.ai/code/routines einstellen; kein Thread ändert es eigenmächtig.
+- Wechselt ein Thread für eine Aufgabe das Modell bzw. gibt sie an ein anderes Modell ab und ändert das die Arbeit (z. B. Opus-Sitzung nötig), sagt sie dir das kurz im Chat bzw. im Issue.
 - Scheitert eine Aufgabe mit dem kleineren Modell (Tests rot, Ursache unklar), wird sie mit Begründung im Issue an das nächsthöhere Modell bzw. eine von dir gestartete Opus-Sitzung übergeben.
 
 ## Geplante Durchläufe (Routine)

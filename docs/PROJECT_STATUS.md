@@ -1,6 +1,6 @@
 # Projektstatus – Wohnungsplaner 3D
 
-_Zuletzt aktualisiert: 2026-10-17 · Branch `claude/quirky-faraday-0d9uep` · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
+_Zuletzt aktualisiert: 2026-10-17 · Arbeit auf `claude/…`-Branches je Thread · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
 
 ## Aktuell
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
