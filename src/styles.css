@@ -2184,3 +2184,62 @@ code {
 .app.phone .orbit-help {
   display: none;
 }
+
+/* furnishing suggestion (#137) */
+.furnish-room {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.furnish-room h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+.wish-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+.wish-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.wish-list li span {
+  flex: 1;
+}
+.wish-list .w-num {
+  width: 52px;
+}
+.wish-list button {
+  padding: var(--space-0) var(--space-2);
+}
+.furnish-result-room p {
+  margin: var(--space-1) 0 var(--space-2);
+}
+.furnish-ghost {
+  fill: var(--color-accent);
+  fill-opacity: 0.12;
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+.furnish-ghost-label {
+  fill: var(--color-accent);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  font-weight: 600;
+}
+/* five tabs on the left (#137): slightly smaller labels so none is cut off */
+.panel.left .tabs button {
+  font-size: var(--font-size-sm);
+  padding-inline: 0;
+}
