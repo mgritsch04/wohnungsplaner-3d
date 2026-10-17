@@ -649,6 +649,17 @@ test('plans a kitchen run along a selected wall', async ({ page }) => {
   await page.mouse.click(s.x, s.y);
   expect((await getSelection(page))?.type).toBe('wall');
   await page.locator('.panel.left').getByRole('button', { name: 'Küche' }).click();
+  // the TV lowboard stands in front of the wall: the planner says beforehand which modules do not fit (#220)
+  const blocked = page.getByTestId('kitchen-run-blocked');
+  await expect(blocked).toContainText('überschneidet sich mit „TV-Lowboard“');
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { name: string }[] }) => {
+      d.furniture = d.furniture.filter((f) => f.name !== 'TV-Lowboard');
+    });
+  });
+  await expect(blocked).toHaveCount(0);
   await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
   const q = await getProject(page);
   const kitchen = q.furniture.filter((f: { kitchen?: unknown }) => f.kitchen);
@@ -2421,6 +2432,14 @@ test('shows the kitchen work triangle with lengths, follows moved appliances and
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Küche' }).click();
   await left.getByRole('combobox', { name: 'Modul' }).first().selectOption({ label: 'Kühlschrank freistehend' });
+  // the TV lowboard would block the run (#220)
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { name: string }[] }) => {
+      d.furniture = d.furniture.filter((f) => f.name !== 'TV-Lowboard');
+    });
+  });
   await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
 
   const plan = page.locator('[data-testid="editor2d"]');
