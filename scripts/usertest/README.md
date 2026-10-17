@@ -8,7 +8,11 @@ Abnahme: `BESTANDEN` schreibt nur der Nutzer, Labels bleiben unverändert.
 node scripts/usertest/run.mjs 178               # baut die App, eigener Port 4180
 node scripts/usertest/run.mjs 178 --no-build    # vorhandenes dist/ verwenden
 node scripts/usertest/run.mjs 178 --report-only # nur Bericht aus report.json neu erzeugen
+node scripts/usertest/run.mjs 166 --gpu         # auf einem PC: echte Grafikkarte statt Software-Grafik
 ```
+
+Lokal ohne `/opt/pw-browsers/chromium` wird Playwrights eigenes Chromium genommen (einmalig `npx playwright install chromium`).
+Optik-Tests (Realismus, Materialien, Licht) sind mit `--gpu` auf einem PC aussagekräftiger; ein iPhone ersetzt das nicht.
 
 Ergebnis in `usertest-reports/<nr>/` (nicht im Git):
 - `report.md` – Text für den Issue-Kommentar („Automatische Vorprüfung“)

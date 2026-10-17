@@ -2,7 +2,7 @@
 /*
  * Automatische Vorprüfung eines [USERTEST]-Issues (wiederverwendbar für künftige User-Tests).
  *
- *   node scripts/usertest/run.mjs <issue-nr> [--port 4180] [--out usertest-reports] [--no-build] [--report-only]
+ *   node scripts/usertest/run.mjs <issue-nr> [--port 4180] [--out usertest-reports] [--no-build] [--report-only] [--gpu]
  *
  * Baut die App (npm run build), startet `vite preview` auf einem eigenen Port, führt das Szenario
  * scripts/usertest/scenarios/<issue-nr>.mjs Schritt für Schritt in Chromium (Playwright) aus,
@@ -70,9 +70,11 @@ for (let i = 0; ; i++) {
 }
 
 const localChromium = process.env.PW_CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
+// --gpu: use the real graphics card (e.g. on a PC); default is software rendering as in the cloud
+const gpu = args.includes('--gpu');
 const browser = await chromium.launch({
   executablePath: existsSync(localChromium) ? localChromium : undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const IPHONE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -213,6 +215,7 @@ const report = {
   commit,
   branch,
   date: new Date().toISOString(),
+  gpu,
   realDevice: scenario.realDevice ?? [],
   results,
   consoleErrors: errors,
@@ -235,7 +238,7 @@ function markdown(r) {
   const lines = [
     `**Automatische Vorprüfung** (kein Ersatz für deinen Test – \`BESTANDEN\` schreibst nur du)`,
     '',
-    `Stand: \`${r.commit}\` (${r.branch}) · Browser: Chromium in der Cloud, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, Software-Grafik · ${r.date.slice(0, 16).replace('T', ' ')} UTC`,
+    `Stand: \`${r.commit}\` (${r.branch}) · Browser: Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'} · ${r.date.slice(0, 16).replace('T', ' ')} UTC`,
     '',
     `Ergebnis: ${c.ok} erfüllt · ${c.fail} nicht erfüllt · ${c.look} nur am Bild beurteilbar · ${c.device} nur am echten Gerät prüfbar${c.skip ? ` · ${c.skip} optional übersprungen` : ''}`,
     '',
@@ -283,7 +286,7 @@ figcaption{color:var(--muted);font-size:12px;margin-top:4px}ul{margin:6px 0 0;pa
 @media (max-width:560px){dl{grid-template-columns:1fr}}
 </style></head><body><main>
 <h1>Automatische Vorprüfung · #${r.issue} ${esc(r.name ?? '')}</h1>
-<p class="meta">${esc(r.title)}<br>Stand ${esc(r.commit)} (${esc(r.branch)}) · Chromium in der Cloud, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, Software-Grafik · ${esc(r.date.slice(0, 16).replace('T', ' '))} UTC</p>
+<p class="meta">${esc(r.title)}<br>Stand ${esc(r.commit)} (${esc(r.branch)}) · Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'} · ${esc(r.date.slice(0, 16).replace('T', ' '))} UTC</p>
 <div class="note">Diese Vorprüfung klickt die Schritte aus dem Issue automatisch durch und vergleicht Erwartung und Ergebnis. Sie ersetzt deinen Test nicht: <strong>BESTANDEN</strong> schreibst nur du.${r.realDevice.length ? `<br><strong>Nur auf einem echten Gerät prüfbar:</strong><ul>${r.realDevice.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}</div>
 <div class="sum"><span>${c.ok} erfüllt</span><span>${c.fail} nicht erfüllt</span><span>${c.look} am Bild beurteilen</span><span>${c.device} nur am Gerät</span>${r.consoleErrors.length ? `<span>${r.consoleErrors.length} Konsolenfehler</span>` : ''}</div>
 ${steps}
