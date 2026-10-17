@@ -3,7 +3,7 @@ import type { Project } from '../model/schema';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useImportStore } from '../import/importStore';
-import { importPlanFile } from '../import/underlayImport';
+import { ensurePlanVisible, importPlanFile } from '../import/underlayImport';
 import { newProject } from './actions';
 
 /**
@@ -90,8 +90,11 @@ export function StartCard() {
           <button
             className="primary"
             onClick={() => {
+              // the card would cover the plan where the room is drawn – "Erste Schritte" brings it back (#214)
+              ensurePlanVisible();
               ui().setLeftTab('tools');
               ui().setTool('room');
+              setFor(true);
             }}
           >
             Raum zeichnen

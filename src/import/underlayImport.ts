@@ -6,6 +6,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { reportError } from '../ui/actions';
 import { pickFile } from '../ui/fileUtils';
+import { isPhoneLayout } from '../ui/phoneLayout';
 import { confirmDialog, useDialogStore } from '../ui/dialogStore';
 import { matchDimensions } from './dimensions';
 import { MAX_IMAGE_PIXELS, PlanFileError, validatePlanFile, type PlanFileKind } from './fileValidation';
@@ -27,9 +28,20 @@ export async function importPlanFile() {
   if (file) await startPlanImport(file);
 }
 
+/**
+ * The plan underlay and room drawing only exist in the 2D plan. In the 3D-only view (the default on
+ * phones) a click on "Raum zeichnen" or a freshly imported plan showed nothing at all (#214):
+ * switch to a view that contains the 2D plan.
+ */
+export function ensurePlanVisible() {
+  const ui = useUiStore.getState();
+  if (ui.viewMode === '3d') ui.setViewMode(isPhoneLayout() ? '2d' : 'split');
+}
+
 /** Entry point: validate the file, ask for a PDF page if needed, create the underlay. */
 export async function startPlanImport(file: File) {
   const progress = useImportStore.getState().setProgress;
+  ensurePlanVisible();
   try {
     const existing = useProjectStore.getState().project.underlay;
     if (existing && !(await confirmDialog('Der bestehende Plan-Hintergrund wird ersetzt. Fortfahren?', { confirmLabel: 'Ersetzen' }))) return;

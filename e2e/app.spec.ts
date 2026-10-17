@@ -3048,10 +3048,12 @@ test('empty project: start card with first steps, "Raum zeichnen" picks the tool
   await page.getByTestId('start-card-reopen').click();
   await expect(card).toBeVisible();
 
-  // "Raum zeichnen" selects the room tool
+  // "Raum zeichnen" selects the room tool and frees the plan (the card would cover it, #214)
   await card.getByRole('button', { name: 'Raum zeichnen' }).click();
   expect(await page.evaluate(() => (window as unknown as { __wp: { useUiStore: { getState: () => { tool: string } } } }).__wp.useUiStore.getState().tool)).toBe('room');
   await expect(page.locator('.editor-hint')).toContainText('Rechteck');
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toBeVisible();
 
   // first room → the card disappears
   await page.locator('.panel.left').getByRole('button', { name: 'Raum anlegen' }).click();
@@ -3934,6 +3936,50 @@ test('empty project: "Grundriss importieren" on the start card opens the file pi
   // the plan is the next step – the card no longer covers it
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+async function newEmptyProjectIn3dOnly(page: Page) {
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  await expect(page.getByTestId('editor2d')).toHaveCount(0);
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  return card;
+}
+
+test('empty project in the 3D-only view: "Raum zeichnen" shows the 2D plan and a dragged rectangle becomes a room (#214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const card = await newEmptyProjectIn3dOnly(page);
+  await card.getByRole('button', { name: 'Raum zeichnen' }).click();
+  const plan = page.getByTestId('editor2d');
+  await expect(plan).toBeVisible();
+  await expect(card).toHaveCount(0);
+  await page.waitForTimeout(600); // view re-fits after the layout change
+  const box = (await plan.boundingBox())!;
+  const x = box.x + box.width * 0.3;
+  const y = box.y + box.height * 0.3;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 160, y + 120, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('empty project in the 3D-only view: "Grundriss importieren" shows the imported plan in 2D instead of an empty view (#214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const card = await newEmptyProjectIn3dOnly(page);
+  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+  await card.getByRole('button', { name: 'Grundriss importieren' }).click();
+  await (await chooser).setFiles({ name: 'grundriss.png', mimeType: 'image/png', buffer: syntheticPlanPng() });
+  await expect.poll(async () => !!(await getProject(page)).underlay).toBe(true);
+  await expect(page.getByTestId('editor2d')).toBeVisible();
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

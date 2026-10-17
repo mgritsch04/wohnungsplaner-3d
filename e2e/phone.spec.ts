@@ -409,3 +409,24 @@ test('Handy 3D: Möbel per Finger antippen und ziehen, ein Finger auf leerer Fl�
     .toBeGreaterThan(0.5);
   expect(errors).toEqual([]);
 });
+
+test('Handy: leeres Projekt – „Raum zeichnen“ wechselt aus der 3D-Ansicht in den 2D-Plan, ein Finger zieht den Raum auf (#214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).tap();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).tap();
+  await page.getByRole('button', { name: 'Neu anlegen' }).tap();
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+  // phones start in the 3D-only view – there is no plan to draw in yet
+  await expect(page.getByTestId('editor2d')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Raum zeichnen' }).tap();
+  await expect(page.locator('[data-testid="editor2d"] svg')).toBeVisible();
+  await expect(card).toHaveCount(0);
+  await page.waitForTimeout(500);
+  const plan = await center(page, '[data-testid="editor2d"]');
+  const fingers = await Fingers.on(page);
+  await fingers.gesture([{ x: plan.x - 80, y: plan.y - 60 }], [{ x: plan.x + 80, y: plan.y + 60 }], 10);
+  await expect.poll(async () => (await getProject(page)).rooms.length).toBe(1);
+  expect(errors).toEqual([]);
+});
