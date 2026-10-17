@@ -3775,3 +3775,27 @@ test('walkthrough: a click selects the furniture in the crosshair, not the wall 
   await expect.poll(() => getSelection(page)).toEqual({ type: 'furniture', id: table.id });
   expect(errors).toEqual([]);
 });
+
+test('Budget: Gruppierung bleibt nach Auswahl eines Möbels, Panelwechsel und Neuladen erhalten (#206)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const right = page.locator('.panel.right');
+  await right.getByRole('button', { name: 'Budget' }).click();
+  const grouping = page.getByRole('combobox', { name: 'Gruppierung' });
+  await grouping.selectOption('room');
+  await expect(page.locator('.budget-group-head').first()).toContainText('Schlafzimmer');
+
+  // selecting furniture switches the right panel to the properties
+  const id = (await getProject(page)).furniture[0].id;
+  await page.evaluate((fid) => (window as any).__wp.useUiStore.getState().selectFurniture([fid]), id);
+  await expect(grouping).toHaveCount(0);
+  await right.getByRole('button', { name: 'Budget' }).click();
+  await expect(grouping).toHaveValue('room');
+
+  // device setting: kept after reloading
+  await page.reload();
+  await expect(page.getByText('Beispielwohnung').or(page.locator('input.project-name'))).toBeVisible();
+  await right.getByRole('button', { name: 'Budget' }).click();
+  await expect(grouping).toHaveValue('room');
+  expect(errors).toEqual([]);
+});

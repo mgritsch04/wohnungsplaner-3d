@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useBudgetGroupStore, type BudgetGrouping } from '../budgetGroupStore';
 import { computeBudget, priceStatusLabel } from '../../budget/budget';
 import { exportShoppingCsv } from '../../budget/budgetActions';
 import { furnitureRoomLookup } from '../../budget/rooms';
@@ -17,7 +18,8 @@ export function BudgetPanel() {
   const apply = useProjectStore((s) => s.apply);
   const roomOf = useMemo(() => furnitureRoomLookup({ rooms }, derivePlan({ nodes, walls, openings, rooms })), [nodes, walls, openings, rooms]);
   const b = useMemo(() => computeBudget(furniture, roomOf), [furniture, roomOf]);
-  const [group, setGroup] = useState<'category' | 'retailer' | 'room'>('category');
+  const group = useBudgetGroupStore((s) => s.grouping);
+  const setGroup = useBudgetGroupStore((s) => s.setGrouping);
 
   if (b.lines.length === 0) {
     return (
@@ -61,7 +63,7 @@ export function BudgetPanel() {
       <Section
         title="Einkaufsliste"
         actions={
-          <select value={group} onChange={(e) => setGroup(e.target.value as typeof group)} aria-label="Gruppierung">
+          <select value={group} onChange={(e) => setGroup(e.target.value as BudgetGrouping)} aria-label="Gruppierung">
             <option value="category">nach Kategorie</option>
             <option value="retailer">nach Händler</option>
             <option value="room">nach Raum</option>
