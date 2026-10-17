@@ -6,6 +6,7 @@ import { useDialogStore } from './dialogStore';
 import { exportPackage, importProjectFile, newProject, saveNow } from './actions';
 import type { SaveState } from '../persistence/useAutosave';
 import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPlanActions';
+import { importPlanFile } from '../import/underlayImport';
 import { exportShoppingCsv } from '../budget/budgetActions';
 import { openPrintView } from '../export/PrintView';
 import { exportGlbFile } from '../export/exportGlbFile';
@@ -149,7 +150,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
           <hr />
           <button onClick={closeAfter(importProjectFile)}>Projekt importieren (.wohnplan.json)…</button>
           <button onClick={closeAfter(importFloorPlanJsonFile)}>Grundriss-JSON importieren…</button>
-          <button onClick={closeAfter(() => useUiStore.getState().setLeftTab('import'))}>Plan als PDF/Bild importieren…</button>
+          <button onClick={closeAfter(importPlanFile)}>Plan als PDF/Bild importieren…</button>
         </ToolbarMenu>
         <IconButton label="Rückgängig" tip="Rückgängig (Strg+Z)" keys="Control+Z" onClick={undo} disabled={!canUndo}>
           <IconUndo />

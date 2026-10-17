@@ -3,7 +3,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { CheckField, NumberField, Section, Badge, SelectField } from '../fields';
 import { importIkeaPlannerFile } from '../../import/ikeaPlanActions';
-import { applyScaleNotation, removeUnderlay, startPlanImport } from '../../import/underlayImport';
+import { applyScaleNotation, PLAN_FILE_ACCEPT, removeUnderlay, startPlanImport } from '../../import/underlayImport';
 import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActions';
 import { useImportStore, useSourceAnalysis } from '../../import/importStore';
 import { dist } from '../../model/vec';
@@ -54,7 +54,7 @@ export function ImportPanel() {
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+          accept={PLAN_FILE_ACCEPT}
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];

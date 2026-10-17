@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import { importPlanFile } from '../import/underlayImport';
 import { newProject } from './actions';
 
 /**
@@ -79,13 +80,7 @@ export function StartCard() {
       <p className="muted small">Drei Wege zum ersten Grundriss:</p>
       <ol className="start-card-steps">
         <li>
-          <button
-            onClick={() => {
-              ui().setLeftTab('import');
-            }}
-          >
-            Grundriss importieren
-          </button>
+          <button onClick={() => void importPlanFile()}>Grundriss importieren</button>
           <span className="muted small">Plan als PDF oder Bild laden, Maßstab setzen, Wände übernehmen.</span>
         </li>
         <li>
