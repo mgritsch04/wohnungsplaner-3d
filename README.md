@@ -50,6 +50,7 @@ Origin); Export/Import des Projektpakets ist die Brücke.
 | Automatische Erkennung (Beta): Vektor-PDFs und Rasterbilder, achsparallele Wände + Öffnungskandidaten, Prüfansicht mit Status | ✅ (Heuristik, siehe Grenzen) |
 | `apartment-plan.json`: Import (mit Prüfung) und Export, dokumentiert, versioniert | ✅ |
 | Katalog: ~50 generische Objekte mit typischen Maßen, Suche/Filter, prozedurale Modelle | ✅ |
+| Katalog per Drag and Drop: Produkt in den 2D-Plan oder die 3D-Ansicht ziehen, Vorschau des Umrisses, Einrasten wie beim Verschieben (Alt = frei), außerhalb eines Raums abgelehnt (#131) | ✅ |
 | GLB/glTF-Import: Upload (.glb, eigenständige .gltf, Draco lokal), Prüfung, Maße aus Modell mit Einheitenvorschlag, als Katalogobjekt oder Modell für ein vorhandenes Möbel, Ersatzmodell bei Fehlern, im Projektexport enthalten | ✅ |
 | Echte Produkte: „Produkt von Händlerseite übernehmen“ (schema.org-Daten aus eingefügter Seite) und Produktlisten (CSV/JSON) – keine offizielle IKEA/Möbelix-API | ✅ (siehe [docs/INTEGRATIONS_IKEA.md](docs/INTEGRATIONS_IKEA.md)) |
 | Küchenplaner: Module an Wand ausrichten, Breiten, Frontfarbe, Arbeitsplatten-Generierung, Konfliktprüfung, Stückliste | ✅ |

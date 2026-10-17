@@ -6,7 +6,7 @@ import { deleteFurniture, deleteNode, deleteRoom, deleteWalls, duplicateFurnitur
 import { createSampleProject } from '../model/sample';
 import { roundMm } from '../model/units';
 import { pointInPolygon } from '../model/vec';
-import { buildPlacementObstacles, moveFurnitureTo, rotateFurnitureTo } from '../model/placement';
+import { buildPlacementObstacles, moveFurnitureTo, canDropAt, placeDroppedFurniture, rotateFurnitureTo } from '../model/placement';
 import { buildPackage, parsePackageOrProject } from '../formats/project/packageFile';
 import { FileFormatError } from '../formats/zodErrors';
 import { db } from '../persistence/db';
@@ -182,6 +182,28 @@ export function addCatalogItem(item: CatalogItem) {
   });
   ui().setSelection({ type: 'furniture', id: f.id });
   ui().toast(`„${item.name}“ hinzugefügt – im Plan verschieben oder Maße rechts anpassen.`, 'success');
+}
+
+/**
+ * Catalog entry dropped into the 2D plan or the 3D view (#131): placed at the dropped point with
+ * snapping; a point outside every room is rejected with a hint, nothing changes.
+ */
+export function dropCatalogItemAt(item: CatalogItem, at: { x: number; y: number }, altKey = false): boolean {
+  const derived = derivePlan(store().project);
+  // check first, so a rejected drop does not leave an empty undo step
+  if (!canDropAt(derived, at)) {
+    ui().toast(`„${item.name}“ nicht abgelegt – bitte in einen Raum ziehen.`, 'info');
+    return false;
+  }
+  const f = createFurnitureFromCatalog(item, at);
+  let placed = false;
+  store().apply((d) => {
+    placed = placeDroppedFurniture(d, derived, f, at, altKey);
+  });
+  if (!placed) return false;
+  ui().setSelection({ type: 'furniture', id: f.id });
+  ui().toast(`„${item.name}“ platziert.`, 'success');
+  return true;
 }
 
 export function addLight() {
