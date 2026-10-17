@@ -40,3 +40,14 @@ export function niceGridStep(base: number, zoom: number, minPx = 8): number {
   while (step * zoom < minPx) step *= step === base && base < 0.5 ? 5 : 2;
   return step;
 }
+
+/**
+ * Two-finger pinch on a touch screen (#164): the world point that was under the midpoint of
+ * both fingers at the start stays under their current midpoint; the zoom follows the finger
+ * distance. Moving both fingers without spreading them pans the plan.
+ */
+export function pinchView(start: View2D, vp: Viewport, startMid: Vec2, startDist: number, mid: Vec2, dist: number): View2D {
+  const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, start.zoom * (dist / Math.max(1, startDist))));
+  const w = screenToWorld(startMid, start, vp);
+  return { cx: w.x - (mid.x - vp.width / 2) / zoom, cy: w.y - (mid.y - vp.height / 2) / zoom, zoom };
+}

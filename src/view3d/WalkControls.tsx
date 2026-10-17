@@ -14,6 +14,7 @@ import { toggleOpening } from '../ui/actions';
 import { registerWalkRig } from './cameraBookmarks';
 import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
 import { createLookFilter } from './lookFilter';
+import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 
 interface Props {
   derived: DerivedPlan;
@@ -172,6 +173,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (opening) toggleOpening(opening);
     };
     walkApi.current = { toggleCarry, pickOrDrop, target, targetOpening, toggleOpening: toggleAimedOpening };
+    walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
@@ -224,7 +226,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         dragLook.current = { x: e.clientX, y: e.clientY };
       }
     };
+    // touch (#164): the finger that turns the view; the mouse events a phone fires after a tap
+    // (lastTouch) must not ask for pointer lock
+    let touchLook: { id: number; x: number; y: number; sx: number; sy: number; t: number } | null = null;
+    let lastTouch = 0;
     const onDown = (e: MouseEvent) => {
+      if (performance.now() - lastTouch < 1000) return;
       if (document.pointerLockElement === el) {
         // locked: a click selects the furniture under the crosshair (or opens/closes the door or
         // window there), or drops the carried one
@@ -241,6 +248,28 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       } else dragLook.current = { x: e.clientX, y: e.clientY };
     };
     const onUp = () => (dragLook.current = null);
+    // a finger drag turns the view, a short tap selects / opens like a click
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      lastTouch = performance.now();
+      if (touchLook) return;
+      touchLook = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() };
+      el.setPointerCapture?.(e.pointerId);
+    };
+    const onTouchMove = (e: PointerEvent) => {
+      if (!touchLook || e.pointerId !== touchLook.id) return;
+      const k = TOUCH_LOOK_FACTOR;
+      look((e.clientX - touchLook.x) * k, (e.clientY - touchLook.y) * k);
+      touchLook.x = e.clientX;
+      touchLook.y = e.clientY;
+    };
+    const onTouchUp = (e: PointerEvent) => {
+      if (!touchLook || e.pointerId !== touchLook.id) return;
+      const tap = Math.hypot(e.clientX - touchLook.sx, e.clientY - touchLook.sy) < 10 && performance.now() - touchLook.t < 600;
+      touchLook = null;
+      lastTouch = performance.now();
+      if (tap && e.type === 'pointerup') pickOrDrop();
+    };
     const onLock = () => {
       if (document.pointerLockElement === el) lookFilter.reset();
       onLockChange(document.pointerLockElement === el);
@@ -256,7 +285,15 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     document.addEventListener('pointerlockchange', onLock);
     el.addEventListener('mousedown', onDown);
     window.addEventListener('mouseup', onUp);
+    el.addEventListener('pointerdown', onTouchDown);
+    el.addEventListener('pointermove', onTouchMove);
+    el.addEventListener('pointerup', onTouchUp);
+    el.addEventListener('pointercancel', onTouchUp);
     return () => {
+      el.removeEventListener('pointerdown', onTouchDown);
+      el.removeEventListener('pointermove', onTouchMove);
+      el.removeEventListener('pointerup', onTouchUp);
+      el.removeEventListener('pointercancel', onTouchUp);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clear);
@@ -267,6 +304,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       window.removeEventListener('mouseup', onUp);
       if (document.pointerLockElement === el) document.exitPointerLock();
       pressed.clear();
+      walkCommands.toggleCarry = null;
       endCarry();
       walkApi.current = null;
       useWalkPose.getState().setPose(null);
@@ -350,11 +388,14 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     if (k.has('KeyS') || k.has('ArrowDown')) fz -= 1;
     if (k.has('KeyD') || k.has('ArrowRight')) fx += 1;
     if (k.has('KeyA') || k.has('ArrowLeft')) fx -= 1;
+    // on-screen stick on phones (#164): analog, a half-pushed stick walks at half speed
+    fx += touchWalk.x;
+    fz += touchWalk.z;
     if (fx === 0 && fz === 0) return;
     forward.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     right.set(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
     const len = Math.hypot(fx, fz);
-    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * walkSpeedFactor({ sitting: seated, ducking }) * dt) / len;
+    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * walkSpeedFactor({ sitting: seated, ducking }) * dt * Math.min(1, len)) / len;
     // sub-steps prevent tunnelling through thin walls at high speed
     const steps = Math.max(1, Math.ceil(v / 0.05));
     let p = { x: camera.position.x, y: camera.position.z };
