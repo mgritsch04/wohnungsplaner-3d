@@ -1828,6 +1828,21 @@ code {
   font-size: var(--font-size-xs);
   opacity: 0.85;
 }
+/* smart-home device names in 3D (#233) */
+.device-label {
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.device-label-selected {
+  background: var(--color-accent, #2563eb);
+  opacity: 1;
+  font-weight: 600;
+}
 
 /* ---------- toolbar: icon buttons, tooltips, menus (#100, #103) ---------- */
 .toolbar button {

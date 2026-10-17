@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Vec2 } from '../model/vec';
 
-export type SelectionType = 'wall' | 'node' | 'room' | 'opening' | 'furniture' | 'light';
+export type SelectionType = 'wall' | 'node' | 'room' | 'opening' | 'furniture' | 'light' | 'device';
 export interface Selection {
   type: SelectionType;
   id: string;

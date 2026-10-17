@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { DeviceInfo } from '../../smarthome/DeviceInfo';
 import { derivePlan } from '../../model/derived';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
@@ -40,6 +41,8 @@ export function PropertiesPanel() {
       return <FurnitureProps id={selection.id} project={project} />;
     case 'light':
       return <LightProps id={selection.id} project={project} />;
+    case 'device':
+      return <DeviceInfo id={selection.id} project={project} />;
   }
 }
 

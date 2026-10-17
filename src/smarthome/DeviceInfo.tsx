@@ -1,0 +1,205 @@
+import { useMemo } from 'react';
+import { derivePlan } from '../model/derived';
+import type { Project, SmartDevice } from '../model/schema';
+import { useUiStore } from '../store/uiStore';
+import { Badge, NumberField, SelectField, TextField } from '../ui/fields';
+import { deleteSelection, toggleOpening } from '../ui/actions';
+import { addAutomationFor, roomAt, updateDevice } from './actions';
+import { KIND_LABEL, productById } from './catalog';
+import { DeviceGlyph, KIND_COLOR } from './glyphs';
+import { rulesOf, ruleSentence } from './rules';
+import { sensorParams } from './simulation';
+import { useSimStore } from './simStore';
+import css from './SmartHomePanel.module.css';
+
+const isSensor = (d: SmartDevice) => d.kind === 'motion' || d.kind === 'presence';
+const deg = (rad: number) => Math.round(((((rad * 180) / Math.PI) % 360) + 360) % 360);
+
+/** Status text of a device in the simulation (or its resting state while it is stopped). */
+export function statusLabel(d: SmartDevice, on: boolean, brightness?: number): string {
+  if (d.kind === 'contact') return on ? 'offen' : 'zu';
+  if (d.kind === 'light') return on ? `an ${brightness ?? 100} %` : 'aus';
+  if (d.kind === 'plug') return on ? 'an' : 'aus';
+  return on ? 'Bewegung' : 'ruhig';
+}
+
+/** Current on/off state: simulation if running, else the planned state (lamp switch, door/window). */
+export function deviceOn(project: Project, d: SmartDevice, entities: Record<string, { on: boolean; brightness?: number }> | undefined): { on: boolean; brightness?: number } {
+  const e = entities?.[d.id];
+  if (e) return e;
+  if (d.kind === 'contact') return { on: project.openings.find((o) => o.id === d.openingId)?.open ?? false };
+  return { on: false };
+}
+
+/**
+ * Info panel of a smart-home device (#233), shown under „Eigenschaften“ when a device is
+ * clicked in 2D or 3D: name, room, status, switch/trigger, its rules, details, delete.
+ */
+export function DeviceInfo({ id, project }: { id: string; project: Project }) {
+  const d = project.devices.find((x) => x.id === id);
+  const entities = useSimStore((s) => s.state?.entities);
+  const running = useSimStore((s) => s.running);
+  const derived = useMemo(() => derivePlan(project), [project]);
+  if (!d) return <p className="muted small panel-section">Gerät nicht mehr vorhanden.</p>;
+  const room = project.rooms.find((r) => r.id === roomAt(project, derived, d));
+  const product = productById(d.productId);
+  const st = deviceOn(project, d, entities);
+  const rules = rulesOf(project, d.id);
+  const sim = useSimStore.getState();
+  const openRules = () => {
+    useUiStore.getState().setLeftTab('smarthome');
+    sim.setStep('rules');
+  };
+  const params = isSensor(d) ? sensorParams(d) : null;
+  const assumed = (
+    <Badge kind="warn" title="Kein Datenblattwert – Annahme, bitte prüfen">
+      Annahme
+    </Badge>
+  );
+
+  return (
+    <div className="panel-scroll" data-testid="device-info">
+      <section className="panel-section">
+        <header className={css.infoHead}>
+          <span className={css.glyph} style={{ color: KIND_COLOR[d.kind] }}>
+            <DeviceGlyph kind={d.kind} size={28} />
+          </span>
+          <div>
+            <h3>{d.name}</h3>
+            <p className="muted small">
+              {KIND_LABEL[d.kind]}
+              {room ? ` · ${room.name}` : ' · außerhalb der Räume'}
+            </p>
+          </div>
+        </header>
+        <div className="panel-section-body">
+          <p className="small">
+            Status: <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness)}</Badge>
+            {!running && <span className="muted"> (Simulation aus)</span>}
+          </p>
+          <div className="btn-row">
+            {(d.kind === 'light' || d.kind === 'plug') && (
+              <button className="primary" onClick={() => sim.setEntity(d.id, !st.on)} data-testid="device-toggle">
+                {st.on ? 'Ausschalten' : 'Einschalten'}
+              </button>
+            )}
+            {isSensor(d) && (
+              <button className="primary" onClick={() => sim.trigger(d.id)} data-testid="device-trigger" title="Meldet sofort „Bewegung“, als wäre jemand vorbeigegangen">
+                Auslösen (testen)
+              </button>
+            )}
+            {d.kind === 'contact' && d.openingId && (
+              <button className="primary" onClick={() => toggleOpening(d.openingId!)} data-testid="device-toggle">
+                {st.on ? 'Schließen' : 'Öffnen'}
+              </button>
+            )}
+          </div>
+          <p className="muted small">Verschieben: im 2D-Plan ziehen{isSensor(d) ? ', Blickrichtung mit dem blauen Griff' : ''}.</p>
+        </div>
+      </section>
+
+      <section className="panel-section">
+        <header>
+          <h3>Regeln ({rules.length})</h3>
+        </header>
+        <div className="panel-section-body">
+          {rules.length === 0 && <p className="muted small">Noch keine Regel mit diesem Gerät.</p>}
+          <ul className={css.list}>
+            {rules.map((a) => {
+              const s = ruleSentence(project, a);
+              return (
+                <li key={a.id} className={`small ${css.rule}`} data-testid="device-rule">
+                  {s.when}, {s.then}.{!a.enabled && <span className="muted"> (aus)</span>}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="btn-row">
+            {(isSensor(d) || d.kind === 'contact') && (
+              <button
+                onClick={() => {
+                  addAutomationFor(d.id);
+                  openRules();
+                }}
+                data-testid="automation-add"
+              >
+                Regel anlegen
+              </button>
+            )}
+            {rules.length > 0 && <button onClick={openRules}>Regeln bearbeiten</button>}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel-section">
+        <header>
+          <h3>Einstellungen</h3>
+        </header>
+        <div className="panel-section-body">
+          <TextField label="Name" value={d.name} onChange={(name) => updateDevice(d.id, { name })} />
+          {params && (
+            <>
+              <div className={css.inline}>
+                <NumberField label="Reichweite" unit="m" value={params.rangeM} min={0.5} max={20} onChange={(rangeM) => updateDevice(d.id, { rangeM })} />
+                {params.assumed.range && assumed}
+              </div>
+              <div className={css.inline}>
+                <NumberField label="Winkel" unit="°" digits={0} value={params.angleDeg} min={10} max={360} onChange={(angleDeg) => updateDevice(d.id, { angleDeg })} />
+                {params.assumed.angle && assumed}
+              </div>
+              <div className={css.inline}>
+                <NumberField
+                  label="Haltezeit"
+                  unit="s"
+                  digits={0}
+                  value={params.holdS}
+                  min={1}
+                  max={3600}
+                  onChange={(holdS) => updateDevice(d.id, { holdS })}
+                  title="So lange meldet der Sensor nach der letzten Bewegung noch „Bewegung“"
+                />
+                {params.assumed.hold && assumed}
+              </div>
+              <NumberField label="Blickrichtung" unit="°" digits={0} value={deg(d.rotation)} min={0} max={360} onChange={(v) => updateDevice(d.id, { rotation: (v * Math.PI) / 180 })} />
+            </>
+          )}
+          {d.kind === 'contact' && (
+            <SelectField
+              label="Fenster/Tür"
+              value={d.openingId ?? ''}
+              options={[{ value: '', label: '–' }, ...project.openings.filter((o) => o.kind !== 'passage').map((o, i) => ({ value: o.id, label: `${o.kind === 'door' ? 'Tür' : 'Fenster'} ${i + 1}` }))]}
+              onChange={(openingId) => updateDevice(d.id, { openingId: openingId || undefined })}
+            />
+          )}
+          <NumberField label="Höhe" unit="m" digits={2} value={d.elevation} min={0} max={10} onChange={(elevation) => updateDevice(d.id, { elevation })} />
+          <details className={`small ${css.product}`}>
+            <summary>{product ? `${product.brand} ${product.model}` : 'Allgemeines Gerät (ohne Produktdaten)'}</summary>
+            {product && (
+              <>
+                <p>
+                  {product.protocol} · {product.power}
+                  {product.batteryLife ? ` · Batterie ${product.batteryLife}` : ''}
+                  <br />
+                  Mesh-Router: {product.router === 'stated' ? 'ja' : product.router === 'inferred' ? 'vermutlich (Netzbetrieb)' : product.router === 'no' ? 'nein (Batterie)' : 'unbekannt'}
+                </p>
+                {product.note && <p className="muted">{product.note}</p>}
+                <p className="muted">
+                  {product.sourceKind === 'manufacturer' ? 'Quelle Hersteller' : 'Quelle Händler/Presse'}:{' '}
+                  {product.sources.map((s, i) => (
+                    <a key={s} href={s} target="_blank" rel="noreferrer">
+                      [{i + 1}]
+                    </a>
+                  ))}{' '}
+                  · Stand 17.10.2026, vor dem Kauf prüfen
+                </p>
+              </>
+            )}
+          </details>
+          <button className="danger block" onClick={() => void deleteSelection()} data-testid="device-delete">
+            Gerät löschen
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -45,6 +45,8 @@ export interface SimInput {
   person: Vec2 | null;
   /** did the person move in the last moment? (PIR sensors need movement) */
   moving: boolean;
+  /** sensors triggered by hand ("Auslösen" in the device info) */
+  triggered?: ReadonlySet<string>;
 }
 
 export interface SensorParams {
@@ -139,7 +141,7 @@ export function step(project: Project, occluders: Segment[], prev: SimState, dt:
     const was = e.on;
     if (isSensor(d)) {
       const params = sensorParams(d);
-      const sees = !!input.person && (d.kind === 'presence' || input.moving) && inDetectionArea(d, params, input.person, occluders);
+      const sees = !!input.triggered?.has(d.id) || (!!input.person && (d.kind === 'presence' || input.moving) && inDetectionArea(d, params, input.person, occluders));
       if (sees) {
         e.lastSeen = t;
         e.on = true;

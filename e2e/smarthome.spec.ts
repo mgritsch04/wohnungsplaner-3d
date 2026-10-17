@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { getProject as rawProject } from './fixtures';
+import { getProject as rawProject, getSelection, planToScreen, worldToScreen3d } from './fixtures';
 import type { Project } from '../src/model/schema';
 
 const getProject = async (page: Page) => (await rawProject(page)) as Project;
@@ -26,24 +26,29 @@ test('Smart Home (#170): Melder und Lampe platzieren, Automation, Person löst L
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Smart Home' }).click();
   const panel = left.getByTestId('smarthome-panel');
+  const right = page.locator('.panel.right');
   await panel.getByLabel('Raum').selectOption({ label: 'Wohnzimmer' });
   await expect(panel.getByLabel('Produkt')).toHaveValue('ikea-vallhorn');
   await panel.getByTestId('device-add').click();
-  await panel.getByLabel('Art').selectOption({ label: 'Smarte Lampe' });
+  await panel.locator('[data-testid="device-kind"][data-kind="light"]').click();
   await panel.getByTestId('device-add').click();
   await expect(page.getByTestId('device-2d')).toHaveCount(2);
 
   // datasheet values with source, hold time marked as assumption
   await panel.getByTestId('device-row').filter({ hasText: 'Bewegungsmelder' }).click();
-  const details = panel.getByTestId('device-details');
-  await expect(details).toContainText('VALLHORN');
-  await expect(details.getByLabel('Reichweite')).toHaveValue('5');
-  await expect(details.getByText('Annahme')).toHaveCount(1);
-  await details.getByTestId('automation-add').click();
+  const info = right.getByTestId('device-info');
+  await expect(info).toContainText('VALLHORN');
+  await expect(info.getByLabel('Reichweite')).toHaveValue('5');
+  await expect(info.getByText('Annahme')).toHaveCount(1);
+  await info.getByTestId('automation-add').click();
+  await expect(panel.getByTestId('sh-step-rules')).toHaveAttribute('aria-pressed', 'true');
+  await expect(info.getByTestId('device-rule')).toContainText('Wenn Bewegungsmelder Wohnzimmer Bewegung meldet');
   const auto = panel.getByTestId('automation');
   await expect(auto).toHaveCount(1);
+  await auto.locator('summary').click();
   await expect(auto.getByLabel(/Smarte Lampe Wohnzimmer/)).toBeChecked();
   await auto.getByLabel('Nur wenn es dunkel ist').uncheck(); // the sample is set to the afternoon
+  await panel.getByTestId('sh-step-test').click();
 
   const p = await getProject(page);
   expect(p.schemaVersion).toBe(2);
@@ -66,6 +71,7 @@ test('Smart Home (#170): Melder und Lampe platzieren, Automation, Person löst L
   expect((await getProject(page)).lights.find((l) => l.id === light.id)!.on).toBe(false);
   await panel.getByTestId('sim-stop').click();
   await expect(lamp).toHaveAttribute('data-on', 'false');
+  await panel.getByTestId('sh-step-rules').click();
 
   const download = page.waitForEvent('download');
   await panel.getByTestId('ha-export').click();
@@ -78,5 +84,69 @@ test('Smart Home (#170): Melder und Lampe platzieren, Automation, Person löst L
   await page.reload();
   await expect.poll(async () => (await getProject(page)).devices.length).toBe(2);
   expect((await getProject(page)).automations).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test('Smart Home (#232, #233): Raum wählen, im Plan klicken, Geräte in 2D und 3D anklicken, schalten, auslösen, löschen', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  const right = page.locator('.panel.right');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  const info = right.getByTestId('device-info');
+
+  // #232: the chosen room is used (not always the first one)
+  await panel.getByLabel('Raum').selectOption({ label: 'Schlafzimmer' });
+  await panel.locator('[data-testid="device-kind"][data-kind="light"]').click();
+  await panel.getByTestId('device-add').click();
+  await expect(info).toContainText('Smarte Lampe Schlafzimmer');
+  await expect(page.getByText('in „Schlafzimmer“ platziert')).toBeVisible();
+  const lamp = page.locator('[data-testid="device-2d"][data-device="Smarte Lampe Schlafzimmer"]');
+  await expect(lamp).toHaveAttribute('data-selected', 'true');
+  await expect(page.getByTestId('device-flash')).toHaveCount(1);
+  await info.getByTestId('device-toggle').click();
+  await expect(lamp).toHaveAttribute('data-on', 'true');
+  await info.getByTestId('device-toggle').click();
+  await expect(lamp).toHaveAttribute('data-on', 'false');
+
+  // place by a click into the plan; Esc cancels
+  await panel.locator('[data-testid="device-kind"][data-kind="motion"]').click();
+  await panel.getByTestId('device-place-click').click();
+  await expect(panel.getByTestId('device-placing-hint')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel.getByTestId('device-placing-hint')).toBeHidden();
+  await panel.getByTestId('device-place-click').click();
+  const at = await planToScreen(page, 6.4, 1.2);
+  await page.mouse.click(at.x, at.y);
+  await expect(panel.getByTestId('device-placing-hint')).toBeHidden();
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(2);
+  const sensor = (await getProject(page)).devices[1];
+  expect(sensor).toMatchObject({ kind: 'motion', name: 'Bewegungsmelder Schlafzimmer' });
+  expect(sensor.x).toBeCloseTo(6.4, 1);
+  expect(sensor.y).toBeCloseTo(1.2, 1);
+  await expect(info).toContainText('Bewegungsmelder Schlafzimmer');
+  const motion = page.locator('[data-testid="device-2d"][data-device="Bewegungsmelder Schlafzimmer"]');
+  await info.getByTestId('device-trigger').click();
+  await expect(motion).toHaveAttribute('data-on', 'true');
+
+  // a click on a device in 2D selects it without changing the project
+  const before = (await getProject(page)).devices;
+  await lamp.getByTestId('device-hit').click();
+  await expect(info).toContainText('Smarte Lampe Schlafzimmer');
+  expect((await getProject(page)).devices).toEqual(before);
+
+  // … and in 3D
+  const s3 = await worldToScreen3d(page, sensor.x, sensor.elevation, sensor.y);
+  await page.mouse.click(s3.x, s3.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe(sensor.id);
+  await expect(info).toContainText('Bewegungsmelder Schlafzimmer');
+
+  // delete and undo
+  await info.getByTestId('device-delete').click();
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(1);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(2);
   expect(errors).toEqual([]);
 });
