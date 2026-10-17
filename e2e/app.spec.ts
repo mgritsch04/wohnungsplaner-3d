@@ -1675,7 +1675,7 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     { b64: last.png.toString('base64'), clip: last.clip },
   );
   const nightOff = await brightness(23.5, 'off');
-  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  lamps off: ${await lightReport()}`);
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
   expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
   expect((await getProject(page)).settings.lamps).toBe('off');
   expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
