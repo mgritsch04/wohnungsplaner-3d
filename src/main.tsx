@@ -6,6 +6,7 @@ import './styles.css';
 import { useProjectStore } from './store/projectStore';
 import { useUiStore } from './store/uiStore';
 import { useImportStore } from './import/importStore';
+import { usePerformanceStore } from './view3d/performanceStore';
 import { installErrorCapture } from './ui/bugReport';
 // temporary tool results (measuring lines, tape, walking path, viewpoint) follow the project (#133)
 import './ui/projectSwitch';
@@ -14,7 +15,7 @@ installErrorCapture();
 
 // Test/debug hook: exposes the stores for end-to-end tests (?e2e) and during development.
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('e2e')) {
-  (window as unknown as Record<string, unknown>).__wp = { useProjectStore, useUiStore, useImportStore };
+  (window as unknown as Record<string, unknown>).__wp = { useProjectStore, useUiStore, useImportStore, usePerformanceStore };
 }
 
 createRoot(document.getElementById('root')!).render(
