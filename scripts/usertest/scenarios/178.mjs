@@ -7,6 +7,20 @@ const device2d = (t, name) => t.page.locator(`[data-testid="device-2d"][data-dev
 const ROOM = 'Wohnzimmer';
 const MOTION = `Bewegungsmelder ${ROOM}`;
 const LAMP = `Smarte Lampe ${ROOM}`;
+const ROOM_CENTER = { x: 2.5, y: 2.0 }; // living room of the sample apartment (5 m × 4 m)
+
+/** Point the 3D view at a device from inside the room, so the device itself is visible. */
+async function closeUp3d(t, kind, distance = 1.5) {
+  const d = (await t.project()).devices.find((x) => x.kind === kind);
+  let dx = ROOM_CENTER.x - d.x;
+  let dy = ROOM_CENTER.y - d.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.5) [dx, dy] = [0.8, 0.6]; // device in the room centre: look from the far corner
+  else [dx, dy] = [dx / len, dy / len];
+  const target = { x: d.x, y: d.elevation ?? 1, z: d.y };
+  await t.lookAt({ x: d.x + dx * distance, y: 1.5, z: d.y + dy * distance }, target);
+  await t.page.waitForTimeout(1500);
+}
 
 export default {
   issue: 178,
@@ -42,6 +56,7 @@ export default {
         const ok = await t.poll(async () => (await device2d(t, MOTION).count()) === 1);
         const p = await t.project();
         const d = p.devices.find((x) => x.kind === 'motion');
+        if (ok) await closeUp3d(t, 'motion');
         return {
           status: ok ? 'look' : 'fail',
           observed: ok
@@ -136,7 +151,7 @@ export default {
         const motion = await device2d(t, MOTION).getAttribute('data-on');
         const log = (await panel(t).getByTestId('sim-log').innerText().catch(() => '')).replace(/\s+/g, ' ');
         const row = (await panel(t).getByTestId('device-row').filter({ hasText: 'Bewegungsmelder' }).innerText()).replace(/\s+/g, ' ');
-        await page.waitForTimeout(1500);
+        await closeUp3d(t, 'light', 2.6);
         return {
           status: on && motion === 'true' && /Bewegung erkannt/.test(log) && / an/.test(log) ? 'ok' : 'fail',
           observed: `Melder: „${row}“. Lampe an: ${on ? 'ja' : 'nein'}. Protokoll: „${log.slice(0, 140)}“. Gelber Schein und Licht in 3D am Bild.`,
