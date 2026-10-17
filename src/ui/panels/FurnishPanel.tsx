@@ -17,6 +17,8 @@ import {
   type WishItem,
 } from '../../suggest/furnishing';
 import { useFurnishStore } from '../../suggest/furnishStore';
+import { AssistantPanel } from '../../assistant/AssistantPanel';
+import { useAssistantStore } from '../../assistant/assistantStore';
 import { useCatalogStore } from '../../catalog/catalogStore';
 import type { CatalogItem } from '../../catalog/types';
 import { Badge, Section, SelectField } from '../fields';
@@ -43,6 +45,8 @@ export function FurnishPanel() {
   const { roomTypes, wishes, preview, setRoomType, setWishes, setPreview } = useFurnishStore();
   const extraCatalog = useCatalogStore((s) => s.items);
   const [choice, setChoice] = useState<string | null>(null);
+  // a preview built from a Claude suggestion (#151) is shown and taken over in the Claude panel
+  const fromAssistant = useAssistantStore((s) => s.preview) === preview && preview !== null;
   // generic catalogue plus the user's own imported products (built-in kitchen modules → kitchen planner)
   const offer = useMemo(() => [...WISH_CATALOG, ...extraCatalog.filter((c) => !c.kitchen)], [extraCatalog]);
 
@@ -81,6 +85,7 @@ export function FurnishPanel() {
 
   return (
     <div className="panel-scroll furnish-panel">
+      <AssistantPanel />
       <Section title="Einrichtungsvorschlag">
         <p className="muted small">
           Raumtyp und Wunschliste wählen, dann „Vorschlag erstellen“. Der Vorschlag stellt die Möbel regelbasiert ohne Kollisionen auf (z. B. Bett an die längste freie Wand, Stühle um den Tisch) und
@@ -105,7 +110,7 @@ export function FurnishPanel() {
           </>
         )}
       </Section>
-      {preview && (
+      {preview && !fromAssistant && (
         <Section title="Vorschlag" actions={<Badge kind="info">noch nicht übernommen</Badge>}>
           <div className="furnish-result" data-testid="furnish-result">
             {preview.rooms.map((r) => (
