@@ -121,3 +121,35 @@ export const IconMore = () => (
     <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
   </Svg>
 );
+
+/** Turn left / right (#164, phone selection bar). */
+export const IconRotateLeft = () => (
+  <Svg>
+    <path d="M3.5 4.5v5h5" />
+    <path d="M4 9.5a8 8 0 1 1 1.9 8.4" />
+  </Svg>
+);
+
+export const IconRotateRight = () => (
+  <Svg>
+    <path d="M20.5 4.5v5h-5" />
+    <path d="M20 9.5a8 8 0 1 0-1.9 8.4" />
+  </Svg>
+);
+
+/** Two overlapping sheets: duplicate. */
+export const IconDuplicate = () => (
+  <Svg>
+    <rect x="8.5" y="8.5" width="12" height="12" rx="2" />
+    <path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3" />
+  </Svg>
+);
+
+/** Waste bin: delete. */
+export const IconTrash = () => (
+  <Svg>
+    <path d="M4 6.5h16M9.5 6.5V4h5v2.5" />
+    <path d="M6 6.5 7 20h10l1-13.5" />
+    <path d="M10 10.5v6M14 10.5v6" />
+  </Svg>
+);

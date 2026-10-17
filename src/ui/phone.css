@@ -1,0 +1,431 @@
+/* ---------- Handy-Ansicht (#129, überarbeitet in #164) ----------
+ * Gilt nur mit der Klasse .app.phone (Schwelle: PHONE_QUERY in src/ui/phoneLayout.ts) bzw.
+ * auf Touch-Geräten ohne Maus (TOUCH_QUERY). PC-Fenster mit Maus sind nie betroffen.
+ * Plan/3D füllen den Bildschirm; die Panels öffnen sich über die untere Leiste (MobileBar) als
+ * Blatt, das den Plan/3D-Bereich nach oben schiebt (der Raum bleibt sichtbar); die Statusleiste entfällt. */
+
+/* --- Touch: keine Textmarkierung, kein iOS-Fenster „Kopieren/Nachschlagen“, kein Seiten-Zoom --- */
+.app.phone,
+.app.phone * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (pointer: coarse) and (hover: none) {
+  .app,
+  .app * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+/* Eingabefelder bleiben normal bearbeitbar (Text markieren, Cursor setzen) */
+.app input,
+.app textarea,
+.app select,
+.app [contenteditable]:not([contenteditable='false']) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+.app.phone {
+  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  /* kein Doppeltipp-Zoom, kein Gummiband-Scrollen der ganzen Seite */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+.app.phone .scene3d,
+.app.phone .scene3d canvas {
+  touch-action: none;
+}
+/* iOS zoomt die Seite beim Antippen eines Feldes mit weniger als 16px Schrift */
+.app.phone input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.app.phone select,
+.app.phone textarea {
+  font-size: 16px;
+}
+
+/* --- Aufteilung: Ansicht oben, Blatt unten --- */
+.app.phone .main {
+  flex-direction: column;
+  position: relative;
+}
+.app.phone .workspace {
+  order: 0;
+  height: auto;
+  flex: 1 1 0;
+  min-height: 120px;
+}
+.app.phone .panel {
+  display: none;
+}
+.app.phone.sheet-left .panel.left,
+.app.phone.sheet-right .panel.right {
+  display: flex;
+  order: 1;
+  position: relative;
+  width: auto;
+  height: var(--sheet-height, 55%);
+  max-height: calc(100% - 120px);
+  flex: 0 0 auto;
+  z-index: 40;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.app.phone .panel-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+/* Griff zum Ziehen der Blatthöhe */
+.sheet-grip {
+  display: none;
+}
+.app.phone .sheet-grip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 22px;
+  flex: 0 0 22px;
+  touch-action: none;
+  cursor: ns-resize;
+  background: var(--color-surface-alt);
+}
+.app.phone .sheet-grip::before {
+  content: '';
+  width: 40px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-hover);
+}
+/* fünf Tabs passen nicht immer: waagerecht wischen statt abschneiden */
+.app.phone .tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.app.phone .tabs::-webkit-scrollbar {
+  display: none;
+}
+.app.phone .tabs button {
+  flex: 1 0 auto;
+  padding: var(--space-3) var(--space-3);
+  min-height: 44px;
+  font-size: var(--font-size-md);
+}
+
+/* --- Werkzeugleiste: zwei Zeilen (Projekt oben, Ansicht/Kamera unten) --- */
+.app.phone .toolbar {
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  row-gap: var(--space-1);
+  flex-wrap: wrap;
+}
+.app.phone .toolbar-break {
+  flex-basis: 100%;
+  height: 0;
+  order: 3;
+}
+.app.phone .toolbar > .brand {
+  order: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: var(--space-2);
+}
+.app.phone .toolbar > .project-group {
+  order: 1;
+}
+.app.phone .toolbar > .toolbar-group.right {
+  order: 2;
+  margin-left: 0;
+}
+.app.phone .toolbar > .segmented,
+.app.phone .toolbar > .camera-group {
+  order: 4;
+}
+.app.phone .brand svg {
+  flex-shrink: 0;
+}
+.app.phone .project-name {
+  width: 0 !important;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: var(--space-1);
+  text-overflow: ellipsis;
+}
+.app.phone .save-state {
+  flex-shrink: 0;
+}
+.app.phone .save-state:not(.save-error) .save-dot {
+  display: inline-block;
+}
+.app.phone .save-state:not(.save-error) .save-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* größere Tippflächen */
+.app.phone .toolbar button {
+  min-height: 38px;
+  min-width: 38px;
+}
+.app.phone .toolbar .icon-btn.labeled .btn-label {
+  display: none;
+}
+/* Menüs klappen in voller Breite unter der Werkzeugleiste auf – nichts ragt aus dem Bildschirm */
+.app.phone .toolbar {
+  position: relative;
+}
+.app.phone .toolbar .menu-wrap {
+  position: static;
+}
+.app.phone .toolbar .menu {
+  left: var(--space-2);
+  right: var(--space-2);
+  top: calc(100% + 2px);
+  min-width: 0;
+  max-height: min(70dvh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app.phone .menu button {
+  min-height: 44px;
+}
+.menu-segmented {
+  display: flex;
+  margin: 0 var(--space-3) var(--space-2);
+}
+.menu-segmented button {
+  flex: 1;
+  text-align: center;
+}
+.app.phone .menu .menu-segmented button {
+  border: 1px solid var(--color-border-control);
+}
+
+/* Überblick zur Maus-/Tastaturbedienung über der 3D-Ansicht entfällt am Handy */
+.app.phone .orbit-help {
+  display: none;
+}
+
+/* --- untere Leiste --- */
+.mobile-bar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  padding-left: max(var(--space-2), env(safe-area-inset-left));
+  padding-right: max(var(--space-2), env(safe-area-inset-right));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.mobile-bar button {
+  flex: 1;
+  min-height: 44px;
+  position: relative;
+}
+.mobile-bar button.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  border-color: var(--color-accent-soft-border);
+}
+.mobile-bar .mobile-bar-close {
+  flex: 0 0 48px;
+}
+.mobile-bar-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  vertical-align: middle;
+}
+
+/* --- Auswahl-Leiste: was ausgewählt ist + Drehen/Duplizieren/Löschen ---
+ * liegt über dem unteren Rand der Ansicht (kein Springen der Ansicht beim Auswählen) */
+.mobile-bottom {
+  position: relative;
+}
+.mobile-selection {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.mobile-selection-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  padding-left: var(--space-1);
+}
+.mobile-selection button {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-2);
+  flex-shrink: 0;
+}
+
+/* --- Dialoge und Hinweise passen auf den Bildschirm --- */
+.app.phone .modal-backdrop {
+  padding: var(--space-3);
+  align-items: flex-end;
+}
+.app.phone .modal {
+  max-height: calc(100dvh - 24px);
+  width: 100%;
+}
+.app.phone .modal.small {
+  padding: var(--space-5);
+}
+.app.phone .modal-head button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.app.phone .toasts {
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  max-width: none;
+}
+
+/* --- Begehen mit Touch: Stick unten links, Knöpfe unten rechts --- */
+.touch-walk {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 var(--space-4);
+  pointer-events: none;
+  z-index: 3;
+}
+.touch-stick {
+  pointer-events: auto;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-overlay) 45%, transparent);
+  border: 2px solid color-mix(in srgb, var(--color-on-overlay) 50%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.touch-stick-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-on-overlay) 85%, transparent);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+.touch-walk-actions {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.touch-walk-actions button {
+  min-width: 88px;
+  min-height: 44px;
+  background: var(--color-surface-floating);
+}
+.touch-walk-actions button.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  border-color: var(--color-accent-soft-border);
+}
+.app.phone .walk-overlay {
+  bottom: auto;
+  top: 56px;
+  max-width: calc(100% - 24px);
+  font-size: var(--font-size-xs, 12px);
+  padding: var(--space-1) var(--space-4);
+}
+
+/* Zoom-Regler rückt über die Auswahl-Leiste */
+.app.phone.has-selection .zoom-slider {
+  bottom: 64px;
+}
+
+/* --- Querformat: Werkzeugleiste in einer Zeile, Blatt rechts neben der Ansicht --- */
+@media (orientation: landscape) {
+  .app.phone .toolbar-break {
+    display: none;
+  }
+  .app.phone .toolbar > .segmented {
+    order: 2;
+  }
+  .app.phone .toolbar > .camera-group {
+    order: 3;
+  }
+  .app.phone .toolbar > .toolbar-group.right {
+    order: 4;
+  }
+  .app.phone .toolbar button {
+    min-height: 34px;
+  }
+  .app.phone .main {
+    flex-direction: row;
+  }
+  .app.phone.sheet-left .panel.left,
+  .app.phone.sheet-right .panel.right {
+    height: auto;
+    max-height: none;
+    width: min(48%, 420px);
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  }
+  .app.phone .sheet-grip {
+    display: none;
+  }
+  .app.phone .tabs button {
+    min-height: 38px;
+    padding-block: var(--space-2);
+  }
+  .mobile-bar {
+    padding-top: var(--space-1);
+    padding-bottom: max(var(--space-1), env(safe-area-inset-bottom));
+  }
+  .mobile-bar button {
+    min-height: 36px;
+  }
+  .mobile-selection button {
+    min-height: 38px;
+  }
+  .touch-walk {
+    bottom: 12px;
+  }
+  .touch-stick {
+    width: 96px;
+    height: 96px;
+  }
+}

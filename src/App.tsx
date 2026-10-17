@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Editor2D } from './editor2d/Editor2D';
 import { useProjectStore } from './store/projectStore';
 import { useUiStore } from './store/uiStore';
@@ -26,7 +26,8 @@ import { useCompareStore } from './versions/compareStore';
 import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
 import { MobileBar } from './ui/MobileBar';
-import { isPhoneLayout, usePhoneLayout, type PhoneSheet } from './ui/phoneLayout';
+import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
+import './ui/phone.css';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -75,16 +76,31 @@ export default function App() {
   // phone view (#129): plan/3D get the whole screen, the side panels open as a sheet from the bottom
   const phone = usePhoneLayout();
   const [sheet, setSheet] = useState<PhoneSheet>(null);
-  const phoneClass = phone ? ` phone${sheet ? ` sheet-${sheet}` : ''}` : '';
+  const hasSelection = useUiStore((s) => s.selection !== null);
+  const phoneClass = phone ? ` phone${sheet ? ` sheet-${sheet}` : ''}${hasSelection && !sheet ? ' has-selection' : ''}` : '';
+  const [sheetHeight, setSheetHeight] = useState(0.55);
+  // touch screens (#164): long press / drag must never select page text (iOS shows its
+  // copy/look-up bubble then); input fields keep normal selection
+  const touchUi = useTouchUi();
+  useEffect(() => {
+    if (!touchUi) return;
+    const onSelectStart = (e: Event) => {
+      if (!isEditableTarget(e.target)) e.preventDefault();
+    };
+    document.addEventListener('selectstart', onSelectStart);
+    return () => document.removeEventListener('selectstart', onSelectStart);
+  }, [touchUi]);
+  const grip = phone ? <SheetGrip height={sheetHeight} onHeight={setSheetHeight} /> : null;
 
   return (
-    <div className={`app${phoneClass}`} data-ready={ready}>
+    <div className={`app${phoneClass}`} data-ready={ready} style={phone ? ({ '--sheet-height': `${Math.round(sheetHeight * 100)}%` } as CSSProperties) : undefined}>
       <div className={locked ? `app-header ${locked}` : 'app-header'} inert={comparing}>
         <Toolbar saveState={autosave.state} />
         {autosave.state === 'error' && autosave.error && <SaveErrorBanner reason={autosave.error} onRetry={autosave.retry} />}
       </div>
       <div className="main">
         <aside className={`panel left ${locked ?? ''}`.trim()} aria-label="Werkzeuge und Katalog" inert={comparing}>
+          {grip}
           <nav className="tabs">
             {(
               [
@@ -123,6 +139,7 @@ export default function App() {
           )}
         </main>
         <aside className={`panel right ${locked ?? ''}`.trim()} aria-label="Eigenschaften" inert={comparing}>
+          {grip}
           <nav className="tabs">
             {(
               [
@@ -149,5 +166,42 @@ export default function App() {
       <Toasts />
       <FurnitureHoverCard />
     </div>
+  );
+}
+
+/**
+ * Griff oben am Handy-Blatt (#164): nach oben/unten ziehen ändert die Höhe (25–85 % des Platzes
+ * unter der Werkzeugleiste); Plan/3D darüber werden entsprechend kleiner oder größer.
+ */
+function SheetGrip({ height, onHeight }: { height: number; onHeight: (h: number) => void }) {
+  const drag = useRef<{ id: number; y: number; h: number; total: number } | null>(null);
+  return (
+    <div
+      className="sheet-grip"
+      role="slider"
+      aria-label="Höhe des Blatts"
+      aria-orientation="vertical"
+      aria-valuemin={25}
+      aria-valuemax={85}
+      aria-valuenow={Math.round(height * 100)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowUp') onHeight(Math.min(0.85, height + 0.1));
+        if (e.key === 'ArrowDown') onHeight(Math.max(0.25, height - 0.1));
+      }}
+      onPointerDown={(e) => {
+        const main = e.currentTarget.closest('.main');
+        if (!main) return;
+        drag.current = { id: e.pointerId, y: e.clientY, h: height, total: main.getBoundingClientRect().height };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        onHeight(Math.max(0.25, Math.min(0.85, d.h + (d.y - e.clientY) / d.total)));
+      }}
+      onPointerUp={() => (drag.current = null)}
+      onPointerCancel={() => (drag.current = null)}
+    />
   );
 }

@@ -12,6 +12,7 @@ import { exportGlbFile } from '../export/exportGlbFile';
 import { LampsSelect, TimeOfDayControl, TimePresetSelect } from './TimeOfDayControl';
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
+import { usePhoneLayout } from './phoneLayout';
 import { IconCutaway, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconUndo, IconWalk } from './icons';
 
 /**
@@ -85,6 +86,9 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
   const resetCamera = usePerformanceStore((s) => s.resetCamera);
   const openModal = useDialogStore((s) => s.openModal);
   const [menu, setMenu] = useState<'file' | 'more' | null>(null);
+  // phone (#164): two rows – project/undo/more on top, view and camera below; the quality
+  // switch moves into "Mehr", 2D + 3D side by side and the shortcut help are left out
+  const phone = usePhoneLayout();
   const show3d = viewMode !== '2d';
   const realism = quality === 'realism';
   const saveLabel = saveState === 'saved' ? 'Gespeichert' : saveState === 'error' ? 'Speicherfehler' : 'Speichert…';
@@ -127,7 +131,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
         </span>
       </div>
 
-      <div className="toolbar-group">
+      <div className="toolbar-group project-group">
         <ToolbarMenu id="toolbar-menu-project" label="Projekt ▾" title="Neu, öffnen, speichern, Versionen, importieren" {...menuProps('file')}>
           <button onClick={closeAfter(() => newProject(false))}>Neues leeres Projekt</button>
           <button onClick={closeAfter(() => newProject(true))}>Neues Beispielprojekt</button>
@@ -155,20 +159,23 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
         </IconButton>
       </div>
 
+      {phone && <div className="toolbar-break" aria-hidden />}
       <div className="toolbar-group segmented" role="group" aria-label="Ansicht">
         <button className={viewMode === '2d' ? 'active' : ''} aria-pressed={viewMode === '2d'} aria-keyshortcuts="1" onClick={() => setViewMode('2d')} title="Nur 2D-Plan (Taste 1)">
           2D
         </button>
-        <IconButton label="2D + 3D" tip="2D-Plan und 3D nebeneinander (Taste 2)" keys="2" pressed={viewMode === 'split'} onClick={() => setViewMode('split')}>
-          <IconSplitView />
-        </IconButton>
+        {!phone && (
+          <IconButton label="2D + 3D" tip="2D-Plan und 3D nebeneinander (Taste 2)" keys="2" pressed={viewMode === 'split'} onClick={() => setViewMode('split')}>
+            <IconSplitView />
+          </IconButton>
+        )}
         <button className={viewMode === '3d' ? 'active' : ''} aria-pressed={viewMode === '3d'} aria-keyshortcuts="3" onClick={() => setViewMode('3d')} title="Nur 3D (Taste 3)">
           3D
         </button>
       </div>
 
       {show3d && (
-        <div className="toolbar-group">
+        <div className="toolbar-group camera-group">
           <div className="segmented" role="group" aria-label="Kamera">
             <IconButton label="Übersicht" text="Übersicht" tip="Übersicht: umkreisen und inspizieren" pressed={cameraMode === 'orbit'} onClick={() => setCameraMode('orbit')}>
               <IconOrbit />
@@ -200,24 +207,28 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
         </div>
       )}
 
-      {show3d && realism && (
+      {show3d && realism && !phone && (
         <div className="toolbar-group">
           <TimeOfDayControl compact />
         </div>
       )}
 
       <div className="toolbar-group right">
-        <div className="segmented" role="group" aria-label="Qualität">
-          <button className={quality === 'planning' ? 'active' : ''} aria-pressed={quality === 'planning'} onClick={() => setQuality('planning')} title="Planungsmodus: schnell, einfache Materialien, keine Schatten">
-            Planung
-          </button>
-          <button className={realism ? 'active' : ''} aria-pressed={realism} onClick={() => setQuality('realism')} title="Realismus: Texturen, Schatten, Umgebungslicht">
-            Realismus
-          </button>
-        </div>
-        <IconButton label="Hilfe & Tastenkürzel" tip="Hilfe & Tastenkürzel (?)" keys="?" onClick={() => openModal('help')}>
-          <IconHelp />
-        </IconButton>
+        {!phone && (
+          <>
+            <div className="segmented" role="group" aria-label="Qualität">
+              <button className={quality === 'planning' ? 'active' : ''} aria-pressed={quality === 'planning'} onClick={() => setQuality('planning')} title="Planungsmodus: schnell, einfache Materialien, keine Schatten">
+                Planung
+              </button>
+              <button className={realism ? 'active' : ''} aria-pressed={realism} onClick={() => setQuality('realism')} title="Realismus: Texturen, Schatten, Umgebungslicht">
+                Realismus
+              </button>
+            </div>
+            <IconButton label="Hilfe & Tastenkürzel" tip="Hilfe & Tastenkürzel (?)" keys="?" onClick={() => openModal('help')}>
+              <IconHelp />
+            </IconButton>
+          </>
+        )}
         <ToolbarMenu
           id="toolbar-menu-more"
           label={<IconMore />}
@@ -227,6 +238,20 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
           align="right"
           {...menuProps('more')}
         >
+          {phone && (
+            <>
+              <div className="menu-heading">Darstellung</div>
+              <div className="segmented menu-segmented" role="group" aria-label="Qualität">
+                <button className={quality === 'planning' ? 'active' : ''} aria-pressed={quality === 'planning'} onClick={() => setQuality('planning')}>
+                  Planung
+                </button>
+                <button className={realism ? 'active' : ''} aria-pressed={realism} onClick={() => setQuality('realism')}>
+                  Realismus
+                </button>
+              </div>
+              <hr />
+            </>
+          )}
           <div className="menu-heading">Exportieren</div>
           <button onClick={closeAfter(exportPackage)}>Projektpaket (.wohnplan.json)</button>
           <button onClick={closeAfter(exportFloorPlanJson)}>Grundriss (apartment-plan.json)</button>
