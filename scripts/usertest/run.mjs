@@ -108,19 +108,35 @@ const devices = {
   phone: { viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: IPHONE_UA },
 };
 const context = await browser.newContext({ baseURL, acceptDownloads: true, ...devices[scenario.device ?? 'desktop'] });
-const page = await context.newPage();
 const errors = [];
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i, /WebGL/];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error' && !IGNORED.some((r) => r.test(m.text()))) errors.push(m.text());
-});
+/** Open a tab that reports its errors (the first one, and a reopened one after closing the tab). */
+async function openTab() {
+  const p = await context.newPage();
+  p.on('pageerror', (e) => errors.push(e.message));
+  p.on('console', (m) => {
+    if (m.type() === 'error' && !IGNORED.some((r) => r.test(m.text()))) errors.push(m.text());
+  });
+  return p;
+}
+let page = await openTab();
 
 /** Helpers handed to every step. */
 const t = {
   page,
   context,
   outDir,
+  /** Close the browser tab and open the app in a new one (same browser storage), like a user would. */
+  async reopenTab() {
+    const old = page;
+    page = await openTab();
+    t.page = page;
+    t._cdp = undefined;
+    await old.close();
+    await page.goto('/?e2e');
+    await page.locator('input.project-name').waitFor();
+    await page.waitForTimeout(800);
+  },
   /** Same start as the E2E tests: empty storage, sample apartment, debug hooks via ?e2e. */
   async freshStart() {
     await page.goto('/?e2e');
