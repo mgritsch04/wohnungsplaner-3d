@@ -6,6 +6,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import type { PlanText } from './dimensions';
 import { PlanFileError } from './fileValidation';
 import { isAreaTone } from './areaTone';
+import { clipSegment, type ClipArea } from './clipPath';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -78,6 +79,8 @@ export interface PdfSegment {
   darkFill?: boolean;
   /** Stroke in a light tone (white masking lines, faint guides) – never a wall face. */
   faint?: boolean;
+  /** Path number of a light-filled area (stroked or not): its edges together outline one area, e.g. a balcony floor (#214). */
+  path?: number;
 }
 
 
@@ -104,6 +107,33 @@ const mul = (m: Matrix, n: Matrix): Matrix => [
 ];
 const apply = (m: Matrix, x: number, y: number) => ({ x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] });
 
+/** Closed subpaths of a path (curves reduced to their end points), in rendered pixels. */
+function pathPolygons(data: ArrayLike<number>, ctm: Matrix): ClipArea {
+  const out: ClipArea = [];
+  let cur: { x: number; y: number }[] = [];
+  const close = () => {
+    if (cur.length >= 3) out.push(cur);
+    cur = [];
+  };
+  for (let k = 0; k < data.length; ) {
+    const op = data[k++];
+    if (op === 0) {
+      close();
+      cur.push(apply(ctm, data[k++], data[k++]));
+    } else if (op === 1) cur.push(apply(ctm, data[k++], data[k++]));
+    else if (op === 2) {
+      k += 4;
+      cur.push(apply(ctm, data[k++], data[k++]));
+    } else if (op === 3) {
+      k += 2;
+      cur.push(apply(ctm, data[k++], data[k++]));
+    } else if (op === 4) close();
+    else break;
+  }
+  close();
+  return out;
+}
+
 /**
  * Classify a PDF page as vector/raster drawing and extract straight line
  * segments from its drawing operators (vector PDFs exported from CAD tools).
@@ -117,7 +147,12 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
   let lineWidth = 1;
   let fillColor = '#000000';
   let strokeColor = '#000000';
-  const lwStack: { lineWidth: number; fillColor: string; strokeColor: string }[] = [];
+  const lwStack: { lineWidth: number; fillColor: string; strokeColor: string; clips: ClipArea[] }[] = [];
+  // active clipping paths (rendered pixels); the path after a clip operator defines the new area (#214)
+  let clips: ClipArea[] = [];
+  // viewports may end inside a wall (half of it hidden) – lines just outside still count; ≈ 0.3 m at 1:75
+  const clipMargin = 12 * pixelsPerPoint;
+  let pendingClip = false;
   let pathCount = 0;
   let imageCount = 0;
   const segments: PdfSegment[] = [];
@@ -130,11 +165,13 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
     const args = ops.argsArray[i] as unknown[];
     if (fn === O.save) {
       stack.push(ctm);
-      lwStack.push({ lineWidth, fillColor, strokeColor });
+      lwStack.push({ lineWidth, fillColor, strokeColor, clips });
     } else if (fn === O.restore) {
       ctm = stack.pop() ?? ctm;
       const g = lwStack.pop();
-      if (g) ({ lineWidth, fillColor, strokeColor } = g);
+      if (g) ({ lineWidth, fillColor, strokeColor, clips } = g);
+    } else if (fn === O.clip || fn === O.eoClip) {
+      pendingClip = true;
     } else if (fn === O.setFillRGBColor) {
       fillColor = typeof args[0] === 'string' ? args[0] : fillColor;
     } else if (fn === O.setStrokeRGBColor) {
@@ -150,6 +187,11 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
       if (segments.length >= maxSegments) continue;
       const paintOp = args[0] as number;
       const data = (args[1] as unknown[] | undefined)?.[0] as ArrayLike<number> | null | undefined;
+      if (pendingClip) {
+        pendingClip = false;
+        const area = data ? pathPolygons(data, ctm) : [];
+        if (area.length > 0) clips = [...clips, area];
+      }
       if (!data) continue;
       const stroked = strokeOps.has(paintOp);
       const filled = fillOps.has(paintOp);
@@ -160,8 +202,13 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
       const areaFill = !stroked && light;
       const darkFill = filled && !light;
       const faint = stroked && !darkFill && isAreaTone(strokeColor);
-      const seg = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(darkFill ? { darkFill } : {}), ...(faint ? { faint } : {}) });
+      const push = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(filled && light ? { path: pathCount } : {}), ...(darkFill ? { darkFill } : {}), ...(faint ? { faint } : {}) });
+      // only what is visible on the sheet: lines outside the active clip are dropped or cut
+      const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+        if (clips.length === 0) push(a, b);
+        else for (const [p, q] of clipSegment(a, b, clips, clipMargin)) push(p, q);
+      };
       let cur: { x: number; y: number } | null = null;
       let start: { x: number; y: number } | null = null;
       for (let k = 0; k < data.length; ) {

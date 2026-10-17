@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cadFilledPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
+import { cadFilledPlanPdf, clippedCadPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
@@ -3891,5 +3891,51 @@ test('empty project: "Grundriss importieren" on the start card opens the file pi
   // the plan is the next step – the card no longer covers it
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it is kept, the balcony becomes a room with railings (#37, #214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'grundriss-layout.pdf', mimeType: 'application/pdf', buffer: clippedCadPlanPdf() });
+  await expect(page.getByRole('button', { name: 'Aus Angabe übernehmen' })).toBeVisible({ timeout: 15000 });
+  await page.locator('.field-row.compact input').fill('75');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await page.evaluate(() => {
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  type W = { a: { x: number; y: number }; b: { x: number; y: number }; thickness: number; height: number };
+  type R = { name: string; area: number; statedArea?: number };
+  const draft: { walls: W[]; rooms: R[] } = await page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
+  // the neighbouring flat behind the viewport is not proposed
+  const names = draft.rooms.map((r) => r.name).sort();
+  expect(names).toEqual(['Balkon', 'Schlafen', 'Wohnen']);
+  // the east wall, half of it outside the viewport, is still a full wall – the flat is 8 m wide
+  const xs = draft.walls.filter((w) => w.height > 2).flatMap((w) => [w.a.x, w.b.x]);
+  expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(9);
+  const bedroom = draft.rooms.find((r) => r.name === 'Schlafen')!;
+  expect(bedroom.area).toBeGreaterThan(17);
+  expect(bedroom.area).toBeLessThan(21);
+  // balcony: three railings (1 m high), its floor area as a room
+  expect(draft.walls.filter((w) => w.height === 1)).toHaveLength(3);
+  const balcony = draft.rooms.find((r) => r.name === 'Balkon')!;
+  expect(balcony.statedArea).toBe(5.8);
+  expect(balcony.area).toBeGreaterThan(4.5);
+  expect(balcony.area).toBeLessThan(7);
+  await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
+  const confirm = page.getByRole('alertdialog');
+  if (await confirm.isVisible().catch(() => false)) await confirm.getByRole('button').last().click();
+  // (added to the sample flat, whose rooms stay)
+  await expect.poll(async () => (await getProject(page)).rooms.map((r: { name: string }) => r.name)).toEqual(expect.arrayContaining(['Balkon', 'Schlafen', 'Wohnen']));
   expect(errors).toEqual([]);
 });
