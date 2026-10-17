@@ -8,8 +8,27 @@ import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
 import { useDialogStore } from '../dialogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
+import { IkeaSection } from './IkeaSection';
+import s from './IkeaSection.module.css';
 
 export function CatalogPanel() {
+  const [view, setView] = useState<'catalog' | 'ikea'>('catalog');
+  return (
+    <div className="panel-scroll catalog">
+      <div className={`segmented ${s.views}`} role="group" aria-label="Katalog-Ansicht">
+        <button className={view === 'catalog' ? 'active' : ''} aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>
+          Alle Möbel
+        </button>
+        <button className={view === 'ikea' ? 'active' : ''} aria-pressed={view === 'ikea'} onClick={() => setView('ikea')}>
+          IKEA
+        </button>
+      </div>
+      {view === 'ikea' ? <IkeaSection /> : <CatalogList />}
+    </div>
+  );
+}
+
+function CatalogList() {
   const imported = useCatalogStore((s) => s.items);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -29,7 +48,7 @@ export function CatalogPanel() {
   }, [all, query, category, maxWidth, source]);
 
   return (
-    <div className="panel-scroll catalog">
+    <>
       <div className="catalog-filters">
         <input type="search" placeholder="Suchen (z. B. Sofa, Bett, Spüle)…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Katalog durchsuchen" />
         <div className="chips">
@@ -92,7 +111,7 @@ export function CatalogPanel() {
           können per Produktliste importiert werden – siehe Dokumentation.
         </p>
       </div>
-    </div>
+    </>
   );
 }
 

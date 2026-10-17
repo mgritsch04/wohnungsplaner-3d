@@ -103,7 +103,7 @@ async function looksLikeCatalog(file: File): Promise<boolean> {
   }
 }
 
-const storeAsset = async (blob: Blob) => {
+export const storeAsset = async (blob: Blob) => {
   const id = newId('asset');
   await db.putAsset(id, blob);
   return id;

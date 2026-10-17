@@ -9,6 +9,7 @@
     "build:artifact": "node scripts/copy-draco.mjs && tsc -b && vite build --mode artifact && node scripts/escape-control-chars.mjs dist-artifact && node scripts/artifact-manifest.mjs",
     "test:artifact": "playwright test -c playwright.artifact.config.ts",
     "preview": "vite preview",
+    "ikea-helper": "node scripts/ikea-helper.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
