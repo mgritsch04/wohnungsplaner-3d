@@ -44,7 +44,7 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `planned` | geprüft und in `docs/IDEAS.md` aufgenommen (Ready/Blocked/Inbox dort) |
 | `in-progress` | wird umgesetzt |
 | `auto-user-test` | in `main`, Testschritte stehen als Kommentar im Issue; die automatische Prüfung ist dran |
-| `user-test` | manuelle Prüfung durch dich offen (im Feature-Issue; bei alten `[USERTEST]`-Issues dort) |
+| `user-test` | manuelle Prüfung durch dich offen, im Feature-Issue |
 | `needs-fix` | dein User-Test ist fehlgeschlagen (Issue bleibt offen) |
 | `done` | vollständig abgeschlossen (mit User-Test: von dir oder eindeutig automatisch bestanden) |
 | `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
@@ -94,7 +94,7 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
         → Erwartet: …
      ```
      Erlaubt sind auch `### Testschritte` und `**Testschritte**` als erste Zeile.
-   - **Übergang:** Offene `[USERTEST]`-Issues (Stand 2026-10-17: #122, #166, #173, #178, #180, #190) und schon geschlossene Feature-Issues bleiben, wie sie sind, und laufen nach altem Muster zu Ende: Schritte stehen dort im Issue-Text, `BESTANDEN` bzw. „Automatisch BESTANDEN“ schließt das `[USERTEST]`-Issue. Alle noch offenen Feature-Issues (z. B. `planned`, `in-progress`) folgen dem neuen Ablauf.
+   - **Umzug der alten `[USERTEST]`-Issues (2026-10-17, dein Wunsch):** Jedes offene `[USERTEST]`-Issue zieht ins Original-Feature-Issue um. Das Feature-Issue wird wieder geöffnet und bekommt einen `## Testschritte`-Kommentar (aus dem alten Test übernommen), einen Verlauf-Kommentar (PR, Link zum alten Test-Issue, bisherige Vorprüfungen und deine Antworten) und das passende Label: `auto-user-test`, wenn noch keine Vorprüfung lief, sonst `user-test` mit dem Hinweis, was du anschauen sollst. Deckt ein Test mehrere Features ab, läuft er im Haupt-Issue; die anderen bleiben geschlossen mit dem Kommentar „Test läuft in #…“. Das alte `[USERTEST]`-Issue wird mit „Verschoben nach #… (neues Issue-Modell)“ geschlossen (Grund „not planned“); deine Antworten bleiben dort lesbar.
 7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
 8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
 
@@ -104,7 +104,7 @@ Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nä
 
 ## Automatische User-Tests
 
-Issues mit Label `auto-user-test` (und noch offene alte `[USERTEST]`-Issues) werden automatisch geprüft, bevor du selbst testest. Werkzeug und Szenario-Format: [`scripts/usertest/README.md`](../scripts/usertest/README.md).
+Issues mit Label `auto-user-test` werden automatisch geprüft, bevor du selbst testest. Werkzeug und Szenario-Format: [`scripts/usertest/README.md`](../scripts/usertest/README.md).
 
 - **Einplanen:** Die Koordination plant die Testläufe wie normale Aufgaben ein (Kontingent, keine Datei-Überschneidung). Es entstehen **keine neuen Issues**; geprüft wird im vorhandenen Issue. Ein Testlauf baut nichts ein: Wünsche oder Auffälligkeiten kommen als Kommentar ins Issue, die Koordination entscheidet, wann sie drankommen.
 - **Schritte:** Bei Feature-Issues kommen sie aus dem neuesten `## Testschritte`-Kommentar, bei alten `[USERTEST]`-Issues aus dem Issue-Text.
@@ -113,8 +113,8 @@ Issues mit Label `auto-user-test` (und noch offene alte `[USERTEST]`-Issues) wer
 - **Cloud oder PC (automatisch):** `node scripts/usertest/run.mjs <nr> --plan` gibt `cloud` oder `pc` aus. `pc` gilt, wenn das Szenario `pc: true` setzt, also ein Schritt die 3D-Optik beurteilt (Material, Licht, Realismus). Ein Cloud-Lauf eines `pc`-Szenarios endet mit dem Urteil `pc` und wird nicht ins Issue geschrieben, sondern auf deinem PC wiederholt.
 - **PC-Lauf:** Remote-Control-Sitzung im Ordner `C:\Users\maxim\wohnungsplaner-3d-tests` (Klon in `wp-vorpruefung`): `git fetch origin main && git checkout --detach origin/main`, bei geändertem `package-lock.json` `npm ci`, dann `node scripts/usertest/run.mjs <nr> --gpu --port 4182`. Nennt der Bericht SwiftShader statt der echten Grafikkarte, ist der Lauf ungültig. Die PC-Sitzung meldet `report.json` und Bilder zurück; Kommentar, Artefakt und Labels erledigt die Cloud-Seite.
 - **Urteil** (steht in `report.json` › `verdict`, auf der Konsole und im Kopf von `report.md`):
-  - `bestanden` = **eindeutig**: jeder Schritt `ok` (optionale `skip` erlaubt), kein `fail`, kein „am Bild beurteilen“, nichts nur am echten Gerät (iPhone) prüfbar, keine Konsolenfehler, und `pc`-Szenarien liefen mit echter Grafikkarte. Dann wird der Test als bestätigt markiert: Kommentar mit `report.md` („Automatisch BESTANDEN“) und Link zum Bildbericht, Label `auto-user-test` → `done`, Issue schließen (Grund „completed“). Bei einem alten `[USERTEST]`-Issue: Label `user-test` → `done`, schließen, danach das zugehörige Feature-Issue wie bei deinem `BESTANDEN` abschließen. Den Vermerk in `docs/PROJECT_STATUS.md` („automatisch bestätigt (Datum)“) schreibt der Haupt-Thread.
-  - `pruefen` = **nicht eindeutig**: jeder andere Fall, also jede Abweichung, jeder „am Bild beurteilen“-Schritt und jede Prüfung, die nur auf dem iPhone bzw. einem echten Gerät geht. Dann Kommentar mit `report.md` („Automatische Vorprüfung – bitte selbst anschauen: …“ mit der Liste) und Link zum Bildbericht; Label `auto-user-test` → `user-test` (alte `[USERTEST]`-Issues behalten `user-test`), Issue bleibt offen, du antwortest im selben Issue mit `BESTANDEN` oder `FEHLGESCHLAGEN: …`.
+  - `bestanden` = **eindeutig**: jeder Schritt `ok` (optionale `skip` erlaubt), kein `fail`, kein „am Bild beurteilen“, nichts nur am echten Gerät (iPhone) prüfbar, keine Konsolenfehler, und `pc`-Szenarien liefen mit echter Grafikkarte. Dann wird der Test als bestätigt markiert: Kommentar mit `report.md` („Automatisch BESTANDEN“) und Link zum Bildbericht, Label `auto-user-test` → `done`, Issue schließen (Grund „completed“). Den Vermerk in `docs/PROJECT_STATUS.md` („automatisch bestätigt (Datum)“) schreibt der Haupt-Thread.
+  - `pruefen` = **nicht eindeutig**: jeder andere Fall, also jede Abweichung, jeder „am Bild beurteilen“-Schritt und jede Prüfung, die nur auf dem iPhone bzw. einem echten Gerät geht. Dann Kommentar mit `report.md` („Automatische Vorprüfung – bitte selbst anschauen: …“ mit der Liste) und Link zum Bildbericht; Label `auto-user-test` → `user-test`, Issue bleibt offen, du antwortest im selben Issue mit `BESTANDEN` oder `FEHLGESCHLAGEN: …`.
   - Ein fehlgeschlagener Schritt wird nie als bestanden markiert; `FEHLGESCHLAGEN` schreibst nur du.
 - **Bildbericht:** `report.html` als privates Artefakt veröffentlichen und den Link mit `--report-only --report-url <link>` in `report.md` übernehmen. Keine persönlichen Dateien oder Daten in Issue oder Bericht (das Repo ist öffentlich).
 
