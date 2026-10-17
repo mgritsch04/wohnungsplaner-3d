@@ -487,7 +487,7 @@ export function Editor2D() {
           }
           let snapped: string[] = [];
           updateTx((d) => {
-            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls, collide: !e.altKey });
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls, collide: !e.altKey, stack: !e.altKey });
           });
           setPreview({ snapWalls: snapped, clearanceIds: [dr.id] });
           return;
