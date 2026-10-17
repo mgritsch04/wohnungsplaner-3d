@@ -91,7 +91,7 @@ export async function fetchTest(nr) {
 
 /** What the session does on GitHub after a run, by issue kind and verdict. */
 export function actions(kind, verdict) {
-  const comment = 'Kommentar mit report.md (Link zum Bildbericht per --report-url)';
+  const comment = 'Kommentar mit report.md (nur Text; bei offenen Schritten deren Screenshots anhängen oder per --image-base verlinken, kein Artefakt)';
   if (verdict === 'pc') return ['Nichts ins Issue schreiben: auf dem PC mit --gpu wiederholen.'];
   if (kind === 'feature')
     return verdict === 'bestanden'

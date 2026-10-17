@@ -3,13 +3,15 @@
  * Automatische Vorprüfung eines [USERTEST]-Issues (wiederverwendbar für künftige User-Tests).
  *
  *   node scripts/usertest/run.mjs <issue-nr> [--port 4180] [--out usertest-reports] [--no-build] [--report-only] [--gpu]
- *                                 [--report-url <url>] [--plan]
+ *                                 [--image-base <url>] [--plan]
  *
  * Baut die App (npm run build), startet `vite preview` auf einem eigenen Port, führt das Szenario
  * scripts/usertest/scenarios/<issue-nr>.mjs Schritt für Schritt in Chromium (Playwright) aus,
  * macht nach jedem Schritt einen Screenshot und vergleicht Erwartung und Ergebnis.
  * Ergebnis: <out>/<issue-nr>/report.json, report.md (Text für den Issue-Kommentar) und
- * report.html (eigenständig, Bilder eingebettet – wird als Artefakt veröffentlicht).
+ * report.html (Bilder eingebettet, nur zum lokalen Ansehen – wird nicht veröffentlicht).
+ * Der Issue-Kommentar ist reiner Text; nur bei offenen Schritten nennt er deren Screenshots
+ * (mit --image-base <url> als Bildlinks <url>/<datei>, sonst als Dateinamen zum Anhängen).
  *
  * Ein Szenario exportiert `default` = { issue, title, name, device: 'desktop' | 'phone', pc: boolean, realDevice: [..],
  * steps: [{ nr, action, expected, run: async (t) => ({ status, observed }) }] }.
@@ -39,7 +41,7 @@ const opt = (name, def) => {
 };
 const issue = args.find((a) => /^\d+$/.test(a));
 if (!issue) {
-  console.error('Aufruf: node scripts/usertest/run.mjs <issue-nr> [--port 4180] [--out usertest-reports] [--no-build] [--report-only] [--gpu] [--report-url <url>] [--plan]');
+  console.error('Aufruf: node scripts/usertest/run.mjs <issue-nr> [--port 4180] [--out usertest-reports] [--no-build] [--report-only] [--gpu] [--image-base <url>] [--plan]');
   process.exit(2);
 }
 const port = Number(opt('port', process.env.PW_PORT ?? 4180));
@@ -50,7 +52,7 @@ if (args.includes('--plan')) {
   console.log(scenario.pc ? 'pc' : 'cloud');
   process.exit(0);
 }
-const reportUrl = opt('report-url');
+const imageBase = opt('image-base')?.replace(/\/$/, '');
 const LABEL = { ok: '✅ erfüllt', fail: '❌ nicht erfüllt', look: '👁 bitte am Bild beurteilen', device: '📱 nur am echten Gerät prüfbar', skip: '⏭ nicht geprüft (optional)' };
 
 // --report-only: rebuild report.md/report.html from an existing report.json (no browser run)
@@ -304,7 +306,6 @@ function markdown(r) {
   }[v.result];
   const lines = [
     ...head,
-    ...(reportUrl ? ['', `Bildbericht mit allen Screenshots: ${reportUrl}`] : []),
     '',
     `Stand: \`${r.commit}\` (${r.branch}) · Browser: Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'}${r.renderer ? ` (${r.renderer})` : ''} · ${r.date.slice(0, 16).replace('T', ' ')} UTC`,
     '',
@@ -314,6 +315,13 @@ function markdown(r) {
     '|---|---|---|',
     ...r.results.map((s) => `| ${s.nr} | ${LABEL[s.status]} | ${s.observed.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`),
   ];
+  // pictures only where something is open (not fulfilled, judge from the picture, real device)
+  const open = v.result === 'bestanden' ? [] : r.results.filter((s) => ['fail', 'look', 'device'].includes(s.status) && s.shots.length);
+  if (open.length) {
+    lines.push('', imageBase ? '**Bilder zu den offenen Schritten:**' : '**Screenshots zu den offenen Schritten (zum Anhängen):**');
+    for (const s of open)
+      for (const sh of s.shots) lines.push(imageBase ? `- Schritt ${s.nr}, ${sh.caption}:\n\n  ![Schritt ${s.nr}: ${sh.caption}](${imageBase}/${sh.file})` : `- Schritt ${s.nr}, ${sh.caption}: \`${sh.file}\``);
+  }
   if (r.consoleErrors.length) lines.push('', `**Fehler in der Browser-Konsole:** ${r.consoleErrors.slice(0, 5).map((e) => `\`${e.slice(0, 160)}\``).join(', ')}`);
   return lines.join('\n') + '\n';
 }

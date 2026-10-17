@@ -10,7 +10,7 @@ node scripts/usertest/run.mjs 178 --no-build    # vorhandenes dist/ verwenden
 node scripts/usertest/run.mjs 178 --report-only # nur Bericht aus report.json neu erzeugen
 node scripts/usertest/run.mjs 166 --gpu         # auf einem PC: echte Grafikkarte statt Software-Grafik
 node scripts/usertest/run.mjs 166 --plan        # nur ausgeben, wo der Test laufen muss: cloud | pc
-node scripts/usertest/run.mjs 166 --report-only --report-url <link>  # Link zum Bildbericht in report.md
+node scripts/usertest/run.mjs 166 --report-only --image-base <url>  # Bildlinks zu offenen Schritten in report.md
 ```
 
 Urteil (`report.json` › `verdict`, Konsole, Kopf von `report.md`):
@@ -25,8 +25,11 @@ Lokal ohne `/opt/pw-browsers/chromium` wird Playwrights eigenes Chromium genomme
 Optik-Tests (Realismus, Materialien, Licht) sind mit `--gpu` auf einem PC aussagekräftiger; ein iPhone ersetzt das nicht.
 
 Ergebnis in `usertest-reports/<nr>/` (nicht im Git):
-- `report.md` – Text für den Issue-Kommentar („Automatische Vorprüfung“)
-- `report.html` – Bildbericht mit eingebetteten Screenshots, als Artefakt veröffentlichen und im Kommentar verlinken
+- `report.md` – Text für den Issue-Kommentar. Bei „bestanden“ reicht der Text. Bei offenen Schritten
+  (Fehlschlag, „am Bild beurteilen“, echtes Gerät) nennt er deren Screenshots: zum Anhängen an den Kommentar
+  oder mit `--image-base <url>` als Bildlinks.
+- `report.html` – alle Screenshots eingebettet, nur zum lokalen Ansehen. **Nicht** als Artefakt veröffentlichen
+  (Regel von G, 2026-10-17).
 - `report.json`, `step-*.jpg`
 
 ## Welche Tests anstehen
