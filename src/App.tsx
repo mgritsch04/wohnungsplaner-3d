@@ -16,6 +16,7 @@ import { CatalogPanel } from './ui/panels/CatalogPanel';
 import { ImportPanel } from './ui/panels/ImportPanel';
 import { KitchenPanel } from './ui/panels/KitchenPanel';
 import { FurnishPanel } from './ui/panels/FurnishPanel';
+import { SmartHomePanel } from './smarthome/SmartHomePanel';
 import { PropertiesPanel } from './ui/panels/PropertiesPanel';
 import { BudgetPanel } from './ui/panels/BudgetPanel';
 import { ProjectPanel } from './ui/panels/ProjectPanel';
@@ -108,6 +109,7 @@ export default function App() {
                 ['catalog', 'Katalog'],
                 ['kitchen', 'Küche'],
                 ['furnish', 'Einrichten'],
+                ['smarthome', 'Smart Home'],
                 ['import', hasDraft ? 'Import •' : 'Import'],
               ] as const
             ).map(([id, label]) => (
@@ -120,6 +122,7 @@ export default function App() {
           {leftTab === 'catalog' && <CatalogPanel />}
           {leftTab === 'kitchen' && <KitchenPanel />}
           {leftTab === 'furnish' && <FurnishPanel />}
+          {leftTab === 'smarthome' && <SmartHomePanel />}
           {leftTab === 'import' && <ImportPanel />}
         </aside>
         <main className={`workspace view-${viewMode}`}>

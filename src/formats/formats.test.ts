@@ -44,7 +44,7 @@ describe('project file', () => {
     expect(() => parseProject(p)).toThrow(/inkonsistente/);
   });
 
-  it('has a migration table (empty for v1)', () => {
+  it('has one migration per schema step', () => {
     expect(Object.keys(PROJECT_MIGRATIONS)).toHaveLength(PROJECT_SCHEMA_VERSION - 1);
   });
 });

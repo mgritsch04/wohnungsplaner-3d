@@ -8,6 +8,7 @@ import { add, pointInPolygon, scale } from '../model/vec';
 import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState } from './lighting';
 import { flushLampShadowUpdates, registerShadowLamp, setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
+import { useSimLightOverrides } from '../smarthome/simStore';
 
 /**
  * Smoothing time constant (s) of the displayed time behind the slider: short enough to
@@ -87,6 +88,9 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   }, [derived]);
 
   // rooms without any own light source get an automatic ceiling light (used at dusk/night)
+  const sim = useSimLightOverrides(project);
+  const simKey = sim ? [...sim.keys()].sort().join(',') : '';
+  const simControlled = useMemo(() => new Set(simKey ? simKey.split(',') : []), [simKey]);
   const roomLights = useMemo(() => {
     const out: { pos: [number, number, number]; reach: number }[] = [];
     const lampShapes = new Set(['floor-lamp', 'table-lamp', 'pendant']);
@@ -94,7 +98,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       const g = derived.rooms.get(room.id);
       if (!g) continue;
       const hasLight =
-        project.lights.some((l) => l.on && pointInPolygon(l, g.interior)) ||
+        project.lights.some((l) => (l.on || simControlled.has(l.id)) && pointInPolygon(l, g.interior)) ||
         project.furniture.some((f) => f.model.type === 'procedural' && lampShapes.has(f.model.shape) && pointInPolygon(f, g.interior));
       if (hasLight) continue;
       // reach ≈ distance to the farthest room corner; shadows (within the lamp budget) stop the rest at walls (#130)
@@ -102,10 +106,17 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       out.push({ pos: [g.centroid.x, project.settings.defaultWallHeight - 0.35, g.centroid.y], reach });
     }
     return out.slice(0, MAX_ROOM_LIGHTS);
-  }, [project.rooms, project.lights, project.furniture, project.settings.defaultWallHeight, derived]);
+  }, [project.rooms, project.lights, project.furniture, project.settings.defaultWallHeight, derived, simControlled]);
 
-  const configured = project.lights.filter((l) => l.on).slice(0, realism ? 8 : 4);
-  const configuredKey = configured.map((l) => `${l.id}:${l.intensity}`).join(',');
+  // smart-home simulation (#170): simulated lamps follow their automation, also by day
+  const configured = project.lights
+    .map((l) => {
+      const o = sim?.get(l.id);
+      return o ? { ...l, on: o.on, intensity: (l.intensity * o.brightness) / 100, sim: true } : { ...l, sim: false };
+    })
+    .filter((l) => l.on)
+    .slice(0, realism ? 8 : 4);
+  const configuredKey = configured.map((l) => `${l.id}:${l.intensity}:${l.sim}`).join(',');
 
   const apply = (st: LightingState) => {
     const sun = sunRef.current;
@@ -128,7 +139,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     setLampLevel(lamps);
     configured.forEach((l, i) => {
       const pl = configuredRefs.current[i];
-      if (pl) pl.intensity = interiorIntensity(l) * lamps;
+      if (pl) pl.intensity = interiorIntensity(l) * (l.sim ? 1 : lamps);
     });
     if (realism) {
       windowLights.forEach((w, i) => {
