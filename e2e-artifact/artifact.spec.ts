@@ -236,3 +236,29 @@ test('Handy-Ansicht im Artefakt: 3D füllt den Bildschirm, Panels über die unte
   await expect(page.locator('.panel.left')).toBeVisible();
   await context.close();
 });
+
+test('Handy im iframe (wie im claude.ai-Artefakt): keine Textauswahl, Auswahl-Leiste und Blatt funktionieren (#164)', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  const errors = collectErrors(page);
+  const sandbox = encodeURIComponent('allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads');
+  await page.goto(`${HOST}/__host?sandbox=${sandbox}`);
+  const frame = page.frameLocator('#artifact');
+  await expect(frame.locator('.app.phone[data-ready="true"]')).toHaveCount(1, { timeout: 20000 });
+  await expect(frame.locator('[data-testid="scene3d"] canvas')).toBeVisible({ timeout: 20000 });
+  // no text selection (what makes iOS show its copy/look-up bubble) on UI text inside the frame
+  const blocked = await frame.locator('.mobile-bar').evaluate((el) => {
+    const ev = new Event('selectstart', { bubbles: true, cancelable: true });
+    el.querySelector('button')!.firstChild!.dispatchEvent(ev);
+    return { prevented: ev.defaultPrevented, select: getComputedStyle(el).userSelect };
+  });
+  expect(blocked).toEqual({ prevented: true, select: 'none' });
+  await frame.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Details' }).tap();
+  await frame.locator('.panel.right').getByRole('button', { name: /Wohnzimmer – 20,00 m²/ }).tap();
+  await expect(frame.getByRole('toolbar', { name: 'Auswahl' })).toBeHidden(); // sheet open: bar waits
+  await frame.getByRole('button', { name: 'Panel schließen' }).tap();
+  await expect(frame.getByRole('toolbar', { name: 'Auswahl' })).toContainText('Wohnzimmer');
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+  await context.close();
+});
