@@ -38,7 +38,7 @@ WORKFLOW: Follow docs/DEVELOPMENT_WORKFLOW.md, section "Ideen, Aufgaben und Abna
 - Merge conflicts in e2e/app.spec.ts: usually new tests at the end, keep both sides; remove duplicate imports. CSS conflicts: keep both sides. Parallel E2E: use your own PW_PORT if running several.
 - Never commit G's personal files (floor plan PDF, scan) or upload them to issues; use synthetic replicas. The repo is PUBLIC: nothing personal in code, issues, PRs or comments. No secrets, no scraping, no invented product data. Report success only after verifying it.
 
-PROJECT SETUP: The thread "Weiterarbeit am Wohnungsplaner" is the Haupt-Thread: only it edits docs/IDEAS.md and docs/PROJECT_STATUS.md and does issue triage. Other threads are feature threads: they open and merge their own PRs and handle labels and test comments for their own issues, but never touch docs/IDEAS.md or docs/PROJECT_STATUS.md; they report what needs to go there to the Haupt-Thread.
+PROJECT SETUP: The thread "Weiterarbeit am Wohnungsplaner" is the Haupt-Thread: only it edits docs/IDEAS.md and docs/PROJECT_STATUS.md and does issue triage. Other threads are feature threads: they open and merge their own PRs and handle labels and test comments for their own issues, but never touch docs/IDEAS.md or docs/PROJECT_STATUS.md; they report what needs to go there to the Haupt-Thread. At most 3 feature threads run at the same time (#195).
 
 COMMUNICATION: No progress or PR-status replies to G in threads. Reply only when you truly need something from G. The handoff for testing is the GitHub issue.
 
