@@ -471,9 +471,11 @@ export function Editor2D() {
           const fs = furnitureSnapOptions(settings.furnitureSnap, e.altKey);
           if (fs.grid) c = snapToGrid(c, fs.grid);
           // wall snapping + collision (Alt = free placement)
-          if (dr.rigid) {
-            // a furniture group moves rigidly; the collision check applies to the group as a whole
-            const rigid = dr.rigid;
+          if (dr.rigid || dr.group.length) {
+            // a furniture group or a multi-selection moves rigidly; the collision check applies to
+            // the selection as a whole, so its members never block each other – otherwise a fast
+            // mouse jump left the selection short of the wall (#210)
+            const rigid = dr.rigid ?? [dr.id, ...dr.group.map((g) => g.id)];
             updateTx((d) => {
               const cur = d.furniture.find((x) => x.id === dr.id);
               if (cur) moveGroupBy(d, obstacles, rigid, { x: roundMm(c.x) - cur.x, y: roundMm(c.y) - cur.y }, { collide: !e.altKey });
@@ -483,14 +485,9 @@ export function Editor2D() {
           }
           let snapped: string[] = [];
           updateTx((d) => {
-            // a group moves rigidly (no wall snapping), each item still stops at walls/furniture
-            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls && !dr.group.length, collide: !e.altKey });
-            const moved = d.furniture.find((x) => x.id === dr.id);
-            if (!moved || !dr.group.length) return;
-            const delta = { x: moved.x - dr.origin.x, y: moved.y - dr.origin.y };
-            for (const g of dr.group) moveFurnitureTo(d, derived, obstacles, g.id, { x: roundMm(g.x + delta.x), y: roundMm(g.y + delta.y) }, { snap: false, collide: !e.altKey });
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls, collide: !e.altKey });
           });
-          setPreview({ snapWalls: snapped, clearanceIds: [dr.id, ...dr.group.map((g) => g.id)] });
+          setPreview({ snapWalls: snapped, clearanceIds: [dr.id] });
           return;
         }
         case 'box': {

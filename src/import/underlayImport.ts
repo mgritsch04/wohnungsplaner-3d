@@ -5,6 +5,7 @@ import { db } from '../persistence/db';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { reportError } from '../ui/actions';
+import { pickFile } from '../ui/fileUtils';
 import { confirmDialog, useDialogStore } from '../ui/dialogStore';
 import { matchDimensions } from './dimensions';
 import { MAX_IMAGE_PIXELS, PlanFileError, validatePlanFile, type PlanFileKind } from './fileValidation';
@@ -12,6 +13,19 @@ import { useImportStore, useSourceAnalysis } from './importStore';
 
 /** Provisional display size (long side) for uncalibrated plans. NOT a real scale. */
 const PROVISIONAL_LONG_SIDE_M = 15;
+
+/** File types accepted for a plan underlay (PDF or image). */
+export const PLAN_FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg';
+
+/**
+ * "Grundriss importieren" from outside the import panel (start card, project menu, #214):
+ * shows the import panel and opens the file picker right away, so the click visibly does something.
+ */
+export async function importPlanFile() {
+  useUiStore.getState().setLeftTab('import');
+  const file = await pickFile(PLAN_FILE_ACCEPT);
+  if (file) await startPlanImport(file);
+}
 
 /** Entry point: validate the file, ask for a PDF page if needed, create the underlay. */
 export async function startPlanImport(file: File) {
