@@ -15,7 +15,7 @@ Stand: 2026-10-17. Diese Datei beschreibt, wie das Projekt in ein Claude-Code-Pr
 
 `CLAUDE.md`, `docs/` und `.claude/` kommen automatisch aus dem Repository mit; lokale Einstellungen deines PCs nicht.
 
-## 2. Aktuelle Projektanweisungen (Kopie, Stand 2026-10-17 10:55 UTC; DASHBOARD-Absatz und R4 Stand 11:25 UTC)
+## 2. Aktuelle Projektanweisungen (Kopie, Stand 2026-10-17 10:55 UTC; DASHBOARD-Absatz, R4 und R5 Stand 11:26 UTC)
 
 Maßgeblich ist der Text in den Projekteinstellungen; diese Kopie zieht der Haupt-Thread nach, wenn sich die Anweisungen ändern (#195). Sie ist auch die Grundlage für die Projektvorlage (#196).
 
@@ -42,7 +42,7 @@ PROJECT SETUP: The thread "Weiterarbeit am Wohnungsplaner" is the Haupt-Thread: 
 
 COMMUNICATION: No progress or PR-status replies to G in threads. Reply only when you truly need something from G. The handoff for testing is the GitHub issue.
 
-DASHBOARD (since 2026-10-17 11:25): G views the master dashboard https://claude.ai/artifact/DLsyumhy4w8L66F1VNA9pk. Every thread writes its own document there with ArtifactData in collection "threads", doc_id = the cmsg_… id of its thread root, content {project:"wp", title, status:"working"|"blocked"|"done"|"failed", task: one plain sentence, issue: number or null, env:"cloud"|"pc", updated: ISO UTC}; write at start, at every step change and at the end (status done/failed at the end; entries older than 2 h count as stale). New doc: get, then set; existing doc: set with if_version (on mismatch re-read and redo). Until the Leiter says otherwise, ALSO keep writing your row into the old feeder https://claude.ai/artifact/8a3jqSF73Stryn2zuhA5FJ (collection "board", doc "live", rows [{id,title,bucket,env,updated,task,cost}], with if_version). Features/usertests/forecast are derived from GitHub labels (auto-user-test and user-test), so keep labels accurate. Never invent numbers.
+DASHBOARD (since 2026-10-17 11:25): G views the master dashboard https://claude.ai/artifact/DLsyumhy4w8L66F1VNA9pk. Every thread writes its own document there with ArtifactData in collection "threads", doc_id = the cmsg_… id of its thread root, content {project:"wp", title, status:"working"|"paused"|"blocked"|"done"|"failed", task: one plain sentence, issue: number or null, env:"cloud"|"pc", updated: ISO UTC}; write at start, at every step change and at the end (status done/failed at the end; entries older than 2 h count as stale). "paused" = stopped because of the usage budget; "blocked" only when really waiting on G or something external (R5). New doc: get, then set; existing doc: set with if_version (on mismatch re-read and redo). Until the Leiter says otherwise, ALSO keep writing your row into the old feeder https://claude.ai/artifact/8a3jqSF73Stryn2zuhA5FJ (collection "board", doc "live", rows [{id,title,bucket,env,updated,task,cost}], with if_version). Features/usertests/forecast are derived from GitHub labels (auto-user-test and user-test), so keep labels accurate. Never invent numbers.
 Test runs never publish their own artifacts: the report goes only into the issue comment (text; on failure an image link or attachment if needed) (R4, G 2026-10-17).
 ```
 
