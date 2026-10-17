@@ -3983,6 +3983,48 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   expect(errors).toEqual([]);
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('catalog: drag and drop also works while walking – onto the floor under the pointer, the sky is rejected (#227)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByLabel('Katalog durchsuchen').fill('Zimmerpflanze');
+  const entry = page.locator('.catalog-item', { hasText: 'Zimmerpflanze groß' });
+  const count = async () => (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').length;
+  const before = await count();
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const canvas = page.locator('[data-testid="scene3d"] canvas');
+  // look down at the living-room floor near (2.5, 2)
+  await page.evaluate(
+    ([tx, ty]) => {
+      const wp = (window as any).__wp;
+      const c = wp.three.camera.position;
+      wp.walk.look(Math.atan2(-(tx - c.x), -(ty - c.z)), -Math.atan2(c.y, Math.hypot(tx - c.x, ty - c.z)));
+    },
+    [2.5, 2],
+  );
+  await page.waitForTimeout(300);
+  const cbox = (await canvas.boundingBox())!;
+  const s = await worldToScreen3d(page, 2.5, 0, 2);
+  await entry.dragTo(canvas, { targetPosition: { x: s.x - cbox.x, y: s.y - cbox.y } });
+  await expect.poll(count).toBe(before + 1);
+  const placed = (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
+  expect(Math.abs(placed.x - 2.5)).toBeLessThan(0.1);
+  expect(Math.abs(placed.y - 2)).toBeLessThan(0.1);
+  // still walking afterwards
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+
+  // looking up: no floor under the pointer → the same hint as outside a room, nothing added
+  await page.evaluate(() => (window as any).__wp.walk.look(0, 1.2));
+  await page.waitForTimeout(300);
+  await entry.dragTo(canvas, { targetPosition: { x: cbox.width / 2, y: 10 } });
+  await expect(page.getByText('nicht abgelegt – bitte in einen Raum ziehen')).toBeVisible();
+  expect(await count()).toBe(before + 1);
+  expect(errors).toEqual([]);
+});
+
 test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving restores it (#228)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
