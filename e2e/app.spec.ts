@@ -1551,6 +1551,22 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Realismus' }).click();
+  const blankRetries: string[] = [];
+  /** True when the screenshot is one flat colour, i.e. the canvas showed no rendered frame at all. */
+  const blankShot = (png: Buffer) =>
+    page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d')!;
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      for (let i = 4; i < d.length; i += 4) if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2]) return false;
+      return true;
+    }, png.toString('base64'));
   let last: { png: Buffer; clip: { x: number; y: number; width: number; height: number } } = { png: Buffer.alloc(0), clip: { x: 0, y: 0, width: 0, height: 0 } };
   const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
     // the lamp switch is in the toolbar's "Mehr" menu (#100)
@@ -1600,7 +1616,16 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     // a lost WebGL context shows the page background instead of the scene – say so instead of measuring it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(await page.evaluate(() => (window as any).__wp.three.gl.getContext().isContextLost())).toBe(false);
-    const png = await page.screenshot({ clip });
+    // the adaptive quality (PerformanceMonitor) may lower the resolution right now; that resizes the canvas,
+    // which shows nothing until the next frame is drawn (#157) – measure a frame that was actually drawn
+    let png = await page.screenshot({ clip });
+    for (let retry = 0; retry < 5 && (await blankShot(png)); retry++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      blankRetries.push(`${hour}/${lamps} dprCap ${await page.evaluate(() => (window as any).__wp.usePerformanceStore.getState().dprCap)}`);
+      const f1 = (await frames()).frame;
+      await expect.poll(async () => (await frames()).frame - f1, { timeout: 90000 }).toBeGreaterThanOrEqual(3);
+      png = await page.screenshot({ clip });
+    }
     last = { png, clip };
     // kept in test-results (uploaded by CI when a test fails) to see what a wrong value looked like (#157)
     await writeFile(test.info().outputPath(`brightness-${hour}-${lamps}.png`), png);
@@ -1689,7 +1714,8 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     { b64: last.png.toString('base64'), clip: last.clip },
   );
   const nightOff = await brightness(23.5, 'off');
-  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  renderer: ${glState}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  renderer: ${glState}\n  blank retries: ${blankRetries.join(', ') || 'none'} · dprCap now ${await page.evaluate(() => (window as any).__wp.usePerformanceStore.getState().dprCap)}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
   expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
   expect((await getProject(page)).settings.lamps).toBe('off');
   expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
