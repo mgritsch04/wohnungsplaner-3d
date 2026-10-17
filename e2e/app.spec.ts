@@ -3749,8 +3749,7 @@ test('walkthrough: a click selects the furniture in the crosshair, not the wall 
     [0.5, 0.95],
   ]) {
     await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
-    await page.waitForTimeout(150);
-    expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+    await expect.poll(() => getSelection(page)).toEqual({ type: 'furniture', id: table.id });
   }
   // nothing was dragged along
   const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
