@@ -78,7 +78,10 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
 3. Offene `user-task`-Issues auf Antworten prüfen und umsetzen (z. B. Freigabe → Aufgabe von `Blocked` nach `Ready`); erledigte schließen.
 4. Neue `idea-inbox`-Issues übernehmen: Duplikate/Umsetzungsstand prüfen → Eintrag in `docs/IDEAS.md` (mit `#Nummer`, Priorität, Nutzen, Abhängigkeiten, Abnahme) → Label `planned` statt `idea-inbox`. Bereits umgesetzt/ungeeignet → im Issue begründen und schließen.
 5. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
-6. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue.
+6. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue. Dabei gilt:
+   - Das Implementierungs-Issue wird erst geschlossen, wenn das `[USERTEST]`-Issue existiert; der Abschluss-Kommentar nennt es („Test: #…“). Ist kein User-Test nötig (z. B. reine Test- oder Doku-Änderung), steht das ausdrücklich im Abschluss-Kommentar.
+   - PRs schließen per „Closes #…“ nur das Implementierungs-Issue, **nie** ein `[USERTEST]`-Issue; ein `[USERTEST]`-Issue schließt nur ein `BESTANDEN` von dir (oder du selbst).
+   - Beim Schließen das Status-Label auf `done` setzen (kein `planned`/`in-progress` an geschlossenen Issues).
 7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
 8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
 
