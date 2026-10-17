@@ -15,6 +15,7 @@ import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
+import { useGamepadState } from './input/gamepad';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
 import { usePerformanceStore } from './performanceStore';
@@ -63,6 +64,7 @@ export function Scene3D() {
   const cameraMode = session ? 'orbit' : uiCameraMode;
   const quality = storeProject.settings.quality;
   const [locked, setLocked] = useState(false);
+  const gamepad = useGamepadState((s) => s.connected);
   const ducking = useUiStore((s) => s.walkDuck);
   const carried = useUiStore((s) => (s.walkCarry ? storeProject.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
@@ -131,6 +133,11 @@ export function Scene3D() {
             <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, E öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
+          )}
+          {gamepad && !carried && (
+            <span data-testid="walk-gamepad">
+              🎮 Controller: linker Stick gehen · rechter Stick umsehen · RT/Stick drücken: schneller · A: auswählen · X: Tür/Fenster · Y: tragen · B: ducken · LB: sitzen
+            </span>
           )}
         </div>
       )}

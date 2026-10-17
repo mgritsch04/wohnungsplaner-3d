@@ -949,6 +949,10 @@ dl.stats dd {
   max-width: calc(100% - 20px);
   text-align: center;
 }
+.walk-overlay [data-testid='walk-gamepad'] {
+  display: block;
+  margin-top: var(--space-1);
+}
 .empty-state {
   position: absolute;
   inset: 0;

@@ -14,6 +14,7 @@ import { toggleOpening } from '../ui/actions';
 import { registerWalkRig } from './cameraBookmarks';
 import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
 import { createLookFilter } from './lookFilter';
+import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 
 interface Props {
   derived: DerivedPlan;
@@ -32,6 +33,7 @@ interface Props {
  * Shift to walk faster, Escape releases the mouse. Collides with walls (open door
  * openings stay passable, closed doors not) and solid furniture; height is fixed at
  * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
+ * A gamepad works alongside keyboard and mouse (#29, see input/gamepad.ts).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -316,10 +318,26 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     [camera],
   );
 
+  // gamepad (#29): polled per frame, the browser does not push stick changes
+  const gamepad = useMemo(() => createGamepadSource(), []);
+  useEffect(() => () => gamepad.reset(), [gamepad]);
+
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
+    const pad = gamepad.poll();
+    if (pad) {
+      yaw.current -= pad.look.x * LOOK_RATE * dt;
+      pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - pad.look.y * LOOK_RATE * dt));
+      const api = walkApi.current;
+      const ui = useUiStore.getState();
+      if (pad.pressed.has(BUTTON.A)) api?.pickOrDrop();
+      if (pad.pressed.has(BUTTON.X)) api?.toggleOpening();
+      if (pad.pressed.has(BUTTON.Y)) api?.toggleCarry();
+      if (pad.pressed.has(BUTTON.B)) ui.toggleWalkDuck();
+      if (pad.pressed.has(BUTTON.LB)) ui.setWalkSit(!ui.walkSit);
+    }
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
     // crouch toggled with C (#47), sit with X (#78): move the eyes smoothly (frame-rate independent); seated, C is ignored
     const seated = useUiStore.getState().walkSit;
@@ -350,11 +368,26 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     if (k.has('KeyS') || k.has('ArrowDown')) fz -= 1;
     if (k.has('KeyD') || k.has('ArrowRight')) fx += 1;
     if (k.has('KeyA') || k.has('ArrowLeft')) fx -= 1;
-    if (fx === 0 && fz === 0) return;
+    // keys give full speed in their direction; the left stick adds an analog share (total ≤ 1)
+    const keyLen = Math.hypot(fx, fz);
+    if (keyLen > 0) {
+      fx /= keyLen;
+      fz /= keyLen;
+    }
+    if (pad) {
+      fx += pad.move.x;
+      fz += pad.move.z;
+    }
+    const len = Math.hypot(fx, fz);
+    if (len === 0) return;
+    if (len > 1) {
+      fx /= len;
+      fz /= len;
+    }
     forward.set(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     right.set(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
-    const len = Math.hypot(fx, fz);
-    const v = (speed * (k.has('ShiftLeft') || k.has('ShiftRight') ? 2 : 1) * walkSpeedFactor({ sitting: seated, ducking }) * dt) / len;
+    const run = k.has('ShiftLeft') || k.has('ShiftRight') || !!pad?.run;
+    const v = speed * (run ? 2 : 1) * walkSpeedFactor({ sitting: seated, ducking }) * dt;
     // sub-steps prevent tunnelling through thin walls at high speed
     const steps = Math.max(1, Math.ceil(v / 0.05));
     let p = { x: camera.position.x, y: camera.position.z };
