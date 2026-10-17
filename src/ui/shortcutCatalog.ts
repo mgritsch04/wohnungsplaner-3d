@@ -126,6 +126,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Umschalt', action: 'Schneller gehen', match: ['ShiftLeft', 'ShiftRight'] },
       { keys: 'C', action: 'Ducken / wieder aufstehen umschalten (Sitzen mit X beendet das Ducken)', match: ['KeyC'] },
       { keys: 'X', action: 'Sitzen / Stehen umschalten (auch Knöpfe Stehen/Sitzen oben neben „Begehen“; Sitzhöhe im Projekt-Panel)', match: ['KeyX'] },
+      { keys: 'Mausrad', action: 'Heranzoomen (Sichtfeld enger) bzw. zurück bis zur normalen Sicht', match: [] },
+      { keys: 'Z / mittlere Maustaste', action: 'Zoom zurücksetzen (normale Sicht)', match: ['KeyZ'] },
       { keys: 'Klick', action: 'Möbel im Fadenkreuz auswählen bzw. Tür/Fenster öffnen oder schließen', match: [] },
       { keys: 'G', action: 'Möbel tragen / absetzen', match: ['KeyG'] },
       { keys: 'E / O', action: 'Tür oder Fenster im Fadenkreuz öffnen / schließen', match: ['KeyE', 'KeyO'] },

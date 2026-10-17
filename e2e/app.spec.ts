@@ -3982,3 +3982,36 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   await expect.poll(async () => (await getProject(page)).rooms.map((r: { name: string }) => r.name)).toEqual(expect.arrayContaining(['Balkon', 'Schlafen', 'Wohnen']));
   expect(errors).toEqual([]);
 });
+
+test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving restores it (#228)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const fovOf = () => page.evaluate(() => (window as any).__wp.three.camera.fov as number);
+  const overviewFov = await fovOf();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  await expect.poll(fovOf).toBe(70);
+  const box = (await page.locator('canvas').first().boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -100);
+  await expect.poll(fovOf).toBe(20);
+  await page.mouse.wheel(0, 100);
+  await expect.poll(fovOf).toBeGreaterThan(20);
+  for (let i = 0; i < 20; i++) await page.mouse.wheel(0, 100);
+  await expect.poll(fovOf).toBe(70);
+  // Z resets after zooming in
+  await page.mouse.wheel(0, -300);
+  await expect.poll(fovOf).toBeLessThan(70);
+  await page.keyboard.press('KeyZ');
+  await expect.poll(fovOf).toBe(70);
+  // leaving and re-entering: back to the normal view, the overview keeps its own field of view
+  await page.mouse.wheel(0, -300);
+  await expect.poll(fovOf).toBeLessThan(70);
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByTestId('crosshair')).toHaveCount(0);
+  await expect.poll(fovOf).toBe(overviewFov);
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect.poll(fovOf).toBe(70);
+  expect(errors).toEqual([]);
+});
