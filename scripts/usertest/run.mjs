@@ -49,10 +49,13 @@ if (args.includes('--report-only')) {
 }
 
 if (!args.includes('--no-build')) execSync('npm run build', { cwd: root, stdio: 'inherit' });
-const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'ignore', detached: true });
+const win = process.platform === 'win32';
+// Windows: npx is a .cmd (needs a shell) and process groups do not exist (taskkill /T instead)
+const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'ignore', detached: !win, shell: win });
 const stopServer = () => {
   try {
-    process.kill(-server.pid);
+    if (win) execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: 'ignore' });
+    else process.kill(-server.pid);
   } catch {
     /* already gone */
   }
@@ -74,7 +77,10 @@ const localChromium = process.env.PW_CHROMIUM_PATH ?? '/opt/pw-browsers/chromium
 const gpu = args.includes('--gpu');
 const browser = await chromium.launch({
   executablePath: existsSync(localChromium) ? localChromium : undefined,
-  args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  // headless Chromium falls back to SwiftShader unless the ANGLE backend is named (Windows: D3D11)
+  args: gpu
+    ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', ...(win ? ['--use-angle=d3d11'] : process.platform === 'darwin' ? ['--use-angle=metal'] : [])]
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const IPHONE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -176,6 +182,17 @@ const t = {
   },
 };
 
+/** WebGL renderer actually used (proves real GPU vs. software rendering). */
+const renderer = await page
+  .evaluate(() => {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+    return gl ? String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : 'kein WebGL';
+  })
+  .catch(() => 'unbekannt');
+const software = /swiftshader|llvmpipe|software/i.test(renderer);
+if (gpu && software) console.warn(`Achtung: --gpu gesetzt, aber der Browser rechnet mit Software-Grafik (${renderer}).`);
+
 const results = [];
 for (const step of scenario.steps) {
   t._step = step.nr;
@@ -215,7 +232,8 @@ const report = {
   commit,
   branch,
   date: new Date().toISOString(),
-  gpu,
+  gpu: gpu && !software,
+  renderer,
   realDevice: scenario.realDevice ?? [],
   results,
   consoleErrors: errors,
@@ -238,7 +256,7 @@ function markdown(r) {
   const lines = [
     `**Automatische Vorprüfung** (kein Ersatz für deinen Test – \`BESTANDEN\` schreibst nur du)`,
     '',
-    `Stand: \`${r.commit}\` (${r.branch}) · Browser: Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'} · ${r.date.slice(0, 16).replace('T', ' ')} UTC`,
+    `Stand: \`${r.commit}\` (${r.branch}) · Browser: Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'}${r.renderer ? ` (${r.renderer})` : ''} · ${r.date.slice(0, 16).replace('T', ' ')} UTC`,
     '',
     `Ergebnis: ${c.ok} erfüllt · ${c.fail} nicht erfüllt · ${c.look} nur am Bild beurteilbar · ${c.device} nur am echten Gerät prüfbar${c.skip ? ` · ${c.skip} optional übersprungen` : ''}`,
     '',
@@ -286,7 +304,7 @@ figcaption{color:var(--muted);font-size:12px;margin-top:4px}ul{margin:6px 0 0;pa
 @media (max-width:560px){dl{grid-template-columns:1fr}}
 </style></head><body><main>
 <h1>Automatische Vorprüfung · #${r.issue} ${esc(r.name ?? '')}</h1>
-<p class="meta">${esc(r.title)}<br>Stand ${esc(r.commit)} (${esc(r.branch)}) · Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'} · ${esc(r.date.slice(0, 16).replace('T', ' '))} UTC</p>
+<p class="meta">${esc(r.title)}<br>Stand ${esc(r.commit)} (${esc(r.branch)}) · Chromium ${r.gpu ? 'lokal' : 'in der Cloud'}, ${r.device === 'phone' ? `iPhone-Emulation ${r.viewport.width}×${r.viewport.height}` : `Desktop ${r.viewport.width}×${r.viewport.height}`}, ${r.gpu ? 'echte Grafikkarte' : 'Software-Grafik'}${r.renderer ? ` (${esc(r.renderer)})` : ''} · ${esc(r.date.slice(0, 16).replace('T', ' '))} UTC</p>
 <div class="note">Diese Vorprüfung klickt die Schritte aus dem Issue automatisch durch und vergleicht Erwartung und Ergebnis. Sie ersetzt deinen Test nicht: <strong>BESTANDEN</strong> schreibst nur du.${r.realDevice.length ? `<br><strong>Nur auf einem echten Gerät prüfbar:</strong><ul>${r.realDevice.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}</div>
 <div class="sum"><span>${c.ok} erfüllt</span><span>${c.fail} nicht erfüllt</span><span>${c.look} am Bild beurteilen</span><span>${c.device} nur am Gerät</span>${r.consoleErrors.length ? `<span>${r.consoleErrors.length} Konsolenfehler</span>` : ''}</div>
 ${steps}
