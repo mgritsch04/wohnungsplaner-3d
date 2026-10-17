@@ -64,14 +64,22 @@ export function pairRule(a: Item, b: Item): PairRule {
   return { allowed: false };
 }
 
+/** Categories that never stand on other furniture, however small (stools stay under tables). */
+const NOT_STACKABLE = new Set(['textile', 'chair', 'table', 'desk', 'sofa', 'bed', 'bathroom', 'kitchen']);
+/** Shapes that hang, stand on the floor or on the wall even when small. */
+const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'k-wall', 'k-hood', 'k-cooktop']);
+
 /**
- * Small items that are put ON furniture (table lamps, small decor/plants): while
- * dragging they stand on the surface below them instead of colliding with it.
+ * Small items that are put ON furniture (table lamps, decor, boxes, small appliances,
+ * own or imported objects – #219): while dragging they stand on the surface below them
+ * instead of colliding with it. Large furniture, seats, tables and built-in kitchen parts
+ * stay on the floor.
  */
-export function isStackable(f: Pick<Furniture, 'category' | 'width' | 'depth' | 'height' | 'model'>): boolean {
+export function isStackable(f: Pick<Furniture, 'category' | 'width' | 'depth' | 'height' | 'model'> & { kitchen?: Furniture['kitchen'] }): boolean {
   const shape = shapeOf(f);
   if (shape === 'table-lamp') return true;
-  return (f.category === 'decor' || f.category === 'lighting') && shape !== 'floor-lamp' && shape !== 'pendant' && shape !== 'panel' && shape !== 'tv' && Math.max(f.width, f.depth) <= 0.6 && f.height <= 0.8;
+  if (f.kitchen || NOT_STACKABLE.has(f.category) || NOT_STACKABLE_SHAPES.has(shape)) return false;
+  return Math.max(f.width, f.depth) <= 0.6 && f.height <= 0.8;
 }
 
 /** Furniture that offers a top surface for stackable items. */

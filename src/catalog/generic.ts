@@ -32,6 +32,7 @@ const DEFS: Def[] = [
   ['generic-shelf-cube', 'Würfelregal 4×4', 'storage', 1.47, 0.39, 1.47, 'shelf', '#f0eee9', 150, { tags: ['regal'] }],
   ['generic-sideboard', 'Sideboard', 'storage', 1.6, 0.45, 0.8, 'cabinet', '#c8b59a', 300, { tags: ['kommode'] }],
   ['generic-tv-sideboard', 'TV-Lowboard', 'storage', 1.8, 0.42, 0.45, 'cabinet', '#3e3a36', 200, { tags: ['tv', 'lowboard'] }],
+  ['generic-storage-box', 'Aufbewahrungsbox', 'storage', 0.38, 0.3, 0.25, 'box', '#d6cfc2', 10, { tags: ['box', 'kiste', 'aufbewahrung'] }],
   ['generic-dresser', 'Kommode', 'storage', 0.8, 0.48, 0.9, 'dresser', '#ece8e1', 160, { tags: ['kommode'] }],
   ['generic-desk', 'Schreibtisch 140×70', 'desk', 1.4, 0.7, 0.74, 'desk', '#e2dbd0', 180, { tags: ['büro', 'homeoffice'] }],
   ['generic-desk-small', 'Schreibtisch 100×60', 'desk', 1.0, 0.6, 0.74, 'desk', '#e2dbd0', 110, { tags: ['büro'] }],
