@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { flushLampShadowUpdates, MAX_SHADOW_LAMPS, registerShadowLamp, requestLampShadowUpdate, setLampLevel } from './lampRegistry';
+import { flushLampShadowUpdates, LAMP_SHADOW_MIN_INTERVAL_MS, MAX_SHADOW_LAMPS, registerShadowLamp, requestLampShadowUpdate, setLampLevel } from './lampRegistry';
 
 const light = () => new THREE.PointLight('#fff', 1, 5);
 
@@ -40,5 +40,24 @@ describe('lamp shadows (#130)', () => {
     expect(l.shadow.needsUpdate).toBe(true);
     off();
     setLampLevel(1);
+  });
+
+  it('re-renders the maps at most every 250 ms while things keep changing, and always the last change (#231)', () => {
+    setLampLevel(1);
+    const l = light();
+    const off = registerShadowLamp(l);
+    const t0 = 1e7;
+    requestLampShadowUpdate();
+    flushLampShadowUpdates(t0);
+    l.shadow.needsUpdate = false;
+    // a carried item moves every frame
+    for (let f = 1; f <= 10; f++) {
+      requestLampShadowUpdate();
+      flushLampShadowUpdates(t0 + f * 16);
+    }
+    expect(l.shadow.needsUpdate).toBe(false);
+    flushLampShadowUpdates(t0 + LAMP_SHADOW_MIN_INTERVAL_MS);
+    expect(l.shadow.needsUpdate).toBe(true);
+    off();
   });
 });
