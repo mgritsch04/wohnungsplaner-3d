@@ -2144,3 +2144,11 @@ code {
   font-size: var(--font-size-sm);
   padding-inline: 0;
 }
+.color-auto {
+  padding: 2px var(--space-2);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+.color-auto[aria-pressed='true'] {
+  border-color: var(--color-accent);
+}

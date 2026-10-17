@@ -48,7 +48,7 @@ describe('furniture material (#63)', () => {
 
   it('metal makes the body metallic but leaves glowing lamp shades alone', () => {
     const lamp = buildParts('table-lamp', 0.3, 0.3, 0.5, '#b7bbbf', undefined, 'metal');
-    expect(lamp.some((p) => p.metal === 0.85)).toBe(true);
+    expect(lamp.some((p) => p.metal === 1 && (p.rough ?? 1) < 0.2)).toBe(true);
     expect(lamp.filter((p) => p.emissive).every((p) => p.metal === undefined)).toBe(true);
   });
 

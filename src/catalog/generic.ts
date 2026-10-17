@@ -86,3 +86,9 @@ export const GENERIC_CATALOG: CatalogItem[] = DEFS.map(([id, name, category, wid
 export function findCatalogItem(id: string, extra: CatalogItem[] = []): CatalogItem | undefined {
   return GENERIC_CATALOG.find((c) => c.id === id) ?? extra.find((c) => c.id === id);
 }
+
+/** Original colours of a placed item's catalog entry (#187), or undefined when the entry is unknown. */
+export function catalogColors(catalogId: string | undefined, extra: CatalogItem[] = []): { color: string; frontColor?: string } | undefined {
+  const item = catalogId ? findCatalogItem(catalogId, extra) : undefined;
+  return item && { color: item.color, frontColor: item.kitchen?.frontColor };
+}

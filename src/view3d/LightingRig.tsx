@@ -9,6 +9,7 @@ import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState 
 import { flushLampShadowUpdates, registerShadowLamp, setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
 import { useSimLightOverrides } from '../smarthome/simStore';
+import { setMetalEnvLevel } from './metalRegistry';
 
 /**
  * Smoothing time constant (s) of the displayed time behind the slider: short enough to
@@ -134,6 +135,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     }
     if (ambientRef.current) ambientRef.current.intensity = realism ? 0.02 * st.ambientStrength : 0.15;
     scene.environmentIntensity = realism ? 0.6 * st.ambientStrength : 0;
+    setMetalEnvLevel(scene.environmentIntensity);
     // lamps (lamp furniture, placed lights, automatic room lights) share one switch
     const lamps = realism ? lampLevel(lampMode, st) : 1;
     setLampLevel(lamps);

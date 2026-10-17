@@ -3714,6 +3714,14 @@ test('Möbel-Material: Standardmaterial wählen, in 3D anzeigen und speichern (#
   await page.mouse.click(s2.x, s2.y);
   await page.locator('.panel.right').getByRole('combobox', { name: /^Material/ }).selectOption('auto');
   await expect.poll(async () => 'finish' in (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)).toBe(false);
+
+  // the colour can be set back to the model's original colour as well (#187)
+  const colorAuto = page.locator('.panel.right').getByRole('button', { name: 'Automatisch', exact: true });
+  await expect(colorAuto).toBeEnabled();
+  await colorAuto.click();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id).color).toBe(sofa.color);
+  await expect(colorAuto).toHaveAttribute('aria-pressed', 'true');
+  await expect(colorAuto).toBeDisabled();
   expect(errors).toEqual([]);
 });
 

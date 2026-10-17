@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCatalogCsv, parseCatalogJson, parseCatalogJsonWithModels, parseCsv } from './catalogFormat';
 import { attachModelFiles, classifyImportFiles } from './catalogImport';
-import { GENERIC_CATALOG } from './generic';
+import { catalogColors, GENERIC_CATALOG } from './generic';
 import { FileFormatError } from '../formats/zodErrors';
 
 describe('generic catalog', () => {
@@ -111,5 +111,19 @@ describe('product list with model files', () => {
     expect(res.ignored).toEqual(['bericht.json', 'notizen.txt']);
     expect((await classifyImportFiles([files[2]])).list).toBeUndefined();
     await expect(classifyImportFiles([files[0], new File(['name;breite_cm'], 'b.csv')])).rejects.toThrow(/nur eine Produktliste/);
+  });
+});
+
+describe('original colour (#187)', () => {
+  it('finds the catalog colour of a placed item', () => {
+    const item = GENERIC_CATALOG[0];
+    expect(catalogColors(item.id)).toEqual({ color: item.color, frontColor: item.kitchen?.frontColor });
+    expect(catalogColors('unknown-id')).toBeUndefined();
+    expect(catalogColors(undefined)).toBeUndefined();
+  });
+
+  it('also looks in imported entries', () => {
+    const own = { ...GENERIC_CATALOG[0], id: 'own-1', color: '#123456' };
+    expect(catalogColors('own-1', [own])?.color).toBe('#123456');
   });
 });

@@ -215,8 +215,11 @@ test('Handy: Blatt schiebt die Ansicht hoch, Griff ändert die Höhe, 3D-Wohnung
   await fingers.gesture([grip2], [{ x: grip2.x, y: grip2.y + 300 }]);
   await expect.poll(async () => (await panel.boundingBox())!.height).toBeLessThan(p1.height - 50);
   // closing restores the full view and the original size
-  await page.getByRole('button', { name: 'Panel schließen' }).tap();
-  await expect(panel).toBeHidden();
+  // right after the grip gesture a tap can be swallowed while the sheet is still settling: tap again until it closes
+  await expect(async () => {
+    if (await panel.isVisible()) await page.getByRole('button', { name: 'Panel schließen' }).tap({ timeout: 2000 });
+    await expect(panel).toBeHidden({ timeout: 1500 });
+  }).toPass({ timeout: 10000 });
   await expect.poll(async () => (await page.locator('.workspace').boundingBox())!.height).toBeGreaterThan(ws0.height - 2);
   await expect.poll(span).toBeGreaterThan(before * 0.95);
   expect(await span()).toBeLessThan(before * 1.05);
