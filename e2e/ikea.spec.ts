@@ -108,3 +108,56 @@ test('IKEA-Auswahl ohne laufenden Helfer: Anleitung statt Fehler, Holen gesperrt
   await left.getByLabel(/Links oder Artikelnummern/).fill('104.099.32');
   await expect(left.getByRole('button', { name: 'Holen' })).toBeDisabled();
 });
+
+test('Lesezeichen „An Planer senden“ (#221): Lesezeichen wird angeboten, gesendete Seite erscheint mit Hinweis', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const cors = { 'access-control-allow-origin': '*' };
+  let inbox = [
+    {
+      id: 'x1',
+      receivedAt: '2026-10-17T15:00:00Z',
+      product: {
+        article: '000.000.02',
+        // SYNTHETIC product as the helper would deliver it from a sent page
+        entry: { name: 'TESTBETT Synthetisch', category: 'bed', width: 140, depth: 200, height: 40, price: 199, priceDate: '2026-10-17', retailer: 'IKEA Österreich', articleNumber: '000.000.02' },
+        model: null,
+      },
+    },
+  ];
+  const acked: string[] = [];
+  await page.route(`${HELPER}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET, POST' } });
+    if (url.pathname === '/status') return route.fulfill({ headers: cors, json: { ok: true, name: 'wohnungsplaner-ikea-helper', version: 2 } });
+    if (url.pathname === '/bookmarklet') return route.fulfill({ headers: cors, json: { token: 'ab12cd34ef56ab12cd34ef56' } });
+    if (url.pathname === '/inbox') return route.fulfill({ headers: cors, json: { items: inbox } });
+    if (url.pathname === '/inbox/ack') {
+      const ids = (route.request().postDataJSON() as { ids: string[] }).ids;
+      acked.push(...ids);
+      inbox = inbox.filter((i) => !ids.includes(i.id));
+      return route.fulfill({ headers: cors, json: { ok: true } });
+    }
+    return route.fulfill({ status: 404, headers: cors, json: { error: 'Nicht gefunden.' } });
+  });
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Katalog' }).click();
+  await left.getByRole('button', { name: 'IKEA', exact: true }).click();
+
+  const card = left.getByTestId('ikea-card');
+  await expect(card).toContainText('TESTBETT Synthetisch');
+  await expect(card).toContainText('neu vom Lesezeichen');
+  await expect(page.getByText('„TESTBETT Synthetisch“ vom Lesezeichen übernommen.')).toBeVisible();
+  await expect.poll(() => acked).toEqual(['x1']);
+
+  await left.getByTestId('ikea-bookmarklet').locator('summary').click();
+  const href = await left.getByTestId('ikea-bookmarklet-link').getAttribute('href');
+  expect(href).toMatch(/^javascript:/);
+  expect(decodeURIComponent(href!)).toContain('ab12cd34ef56ab12cd34ef56');
+
+  await card.getByRole('button', { name: 'In den Raum' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f) => f.name === 'TESTBETT Synthetisch')).toBe(true);
+  await expect(card).toHaveCount(1); // taken over once, not again on the next poll
+  expect(errors).toEqual([]);
+});
