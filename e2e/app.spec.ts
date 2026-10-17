@@ -951,10 +951,32 @@ test('realism mode: time-of-day control with presets, one undo step per drag, no
   await page.getByRole('button', { name: 'Realismus' }).click();
   const slider = page.getByLabel('Tageszeit', { exact: true });
   await expect(slider).toBeVisible();
+  // #192: reflections follow the time of day (the environment is rebuilt), windows are reflecting glass
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const envBuilds = () => page.evaluate(() => ((window as any).__wp.envBuilds as number | undefined) ?? 0);
+  await expect.poll(envBuilds, { timeout: 30000 }).toBeGreaterThan(0);
+  const buildsAtNoon = await envBuilds();
+  const glass = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scene = (window as any).__wp.three.scene;
+    let n = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    scene.traverse((o: any) => void (o.material?.userData?.glass && n++));
+    return n;
+  });
+  expect(glass).toBeGreaterThan(0);
+  // software WebGL (no graphics card): the automatic graphics level stays "normal"
+  await expect(page.getByTestId('scene3d')).toHaveAttribute('data-graphics-tier', 'normal');
   // presets are in the toolbar's "Mehr" menu (#100)
   await page.getByRole('button', { name: 'Mehr', exact: true }).click();
+  await expect(page.getByLabel('Grafikqualität').locator('option:checked')).toHaveText(/automatisch \(normal\)/);
+  await page.getByLabel('Grafikqualität').selectOption('high');
+  await expect(page.getByTestId('scene3d')).toHaveAttribute('data-graphics-tier', 'high');
+  await page.getByLabel('Grafikqualität').selectOption('auto');
+  await expect(page.getByTestId('scene3d')).toHaveAttribute('data-graphics-tier', 'normal');
   await page.getByLabel('Tageszeit-Voreinstellung').selectOption({ label: 'Nacht (23:30)' });
   expect((await getProject(page)).settings.timeOfDay).toBe(23.5);
+  await expect.poll(envBuilds, { timeout: 30000 }).toBeGreaterThan(buildsAtNoon);
   await page.keyboard.press('Escape');
   await expect(page.getByLabel('Tageszeit-Voreinstellung')).toHaveCount(0);
   const pastBefore = await page.evaluate(() => (window as unknown as { __wp: { useProjectStore: { getState: () => { past: unknown[] } } } }).__wp.useProjectStore.getState().past.length);

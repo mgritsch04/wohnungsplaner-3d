@@ -9,7 +9,7 @@ import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPla
 import { exportShoppingCsv } from '../budget/budgetActions';
 import { openPrintView } from '../export/PrintView';
 import { exportGlbFile } from '../export/exportGlbFile';
-import { LampsSelect, TimeOfDayControl, TimePresetSelect } from './TimeOfDayControl';
+import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } from './TimeOfDayControl';
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
 import { usePhoneLayout } from './phoneLayout';
@@ -265,6 +265,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               <div className="menu-fields">
                 <TimePresetSelect />
                 <LampsSelect />
+                <GraphicsTierSelect />
               </div>
             </>
           )}

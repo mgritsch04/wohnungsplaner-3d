@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { TIME_PRESETS } from '../view3d/lighting';
+import { useGraphicsTier, useGraphicsTierStore, type GraphicsTierPref } from '../view3d/graphicsTier';
 
 const fmt = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
 
@@ -48,6 +49,24 @@ export function LampsSelect() {
       <option value="auto">💡 Lampen: automatisch</option>
       <option value="on">💡 Lampen: an</option>
       <option value="off">💡 Lampen: aus</option>
+    </select>
+  );
+}
+
+/** Graphics level of realism mode on this device (#192); "automatisch" shows what it picked. */
+export function GraphicsTierSelect() {
+  const pref = useGraphicsTierStore((s) => s.pref);
+  const tier = useGraphicsTier();
+  return (
+    <select
+      value={pref}
+      aria-label="Grafikqualität"
+      title="Grafikqualität auf diesem Gerät: „Hoch“ zeigt feinere Spiegelungen und Schatten, braucht aber eine starke Grafikkarte (PC). Automatisch wählt „Hoch“ nur am PC mit Grafikkarte."
+      onChange={(e) => useGraphicsTierStore.getState().setPref(e.target.value as GraphicsTierPref)}
+    >
+      <option value="auto">🖥️ Grafik: automatisch ({tier === 'high' ? 'hoch' : 'normal'})</option>
+      <option value="high">🖥️ Grafik: hoch</option>
+      <option value="normal">🖥️ Grafik: normal</option>
     </select>
   );
 }
