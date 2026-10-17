@@ -56,7 +56,7 @@ export const FurnitureObject = memo(
     const castShadow = quality === 'realism' && item.height > 0.05;
 
     const fallback = (
-      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} quality={quality} castShadow={castShadow} />
+      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} quality={quality} castShadow={castShadow} />
     );
 
     /** End the current gesture; `commit` keeps the moved position, otherwise it is reverted. */
