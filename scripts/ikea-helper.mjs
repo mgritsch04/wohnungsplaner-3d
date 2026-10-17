@@ -12,8 +12,22 @@
  * IKEA-Schnittstellen. Ergebnisse werden in `ikea-import/auswahl/` zwischengespeichert
  * (Produktdaten 24 h, Modelle dauerhaft), damit dieselbe Seite nicht erneut abgerufen wird.
  *
+ * Lesezeichen „An Planer senden“ (#221): Auf einer Produktseite von ikea.com oder moebelix.at,
+ * die du selbst im Browser geöffnet hast, blendet das Lesezeichen die kleine Empfangsseite
+ * des Helfers (/empfang) ein und reicht ihr per postMessage die strukturierten Daten DIESER
+ * Seite (schema.org/JSON-LD, Meta-Angaben, Seitentext) samt geheimem Token aus
+ * `ikea-import/auswahl/.lesezeichen-token` (beim ersten Start erzeugt, nie im Repository).
+ * (Direkte Abrufe von ikea.com zum Helfer verbietet die Content-Security-Policy der Seite,
+ * eingebettete Seiten erlaubt sie.) Der Planer holt die Einträge ab. Für IKEA lädt der Helfer
+ * das auf der Seite deklarierte 3D-Modell (nur von web-api.ikea.com/dimma/assets).
+ *
  * Schnittstelle (für die App):
  *   GET /status                         → { ok, name, version }
+ *   GET /bookmarklet                    → { token }   (nur für den lokalen Planer)
+ *   GET /empfang                        → Empfangsseite für das Lesezeichen (nur in ikea.com/moebelix.at eingebettet)
+ *   POST /inbox  { token, url, html }   → { name }    (von der Empfangsseite)
+ *   GET /inbox                          → { items: [{ id, receivedAt, product }] }
+ *   POST /inbox/ack { ids }             → { ok }
  *   GET /product?article=<nr|url>[&model=1][&refresh=1]
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
@@ -21,16 +35,20 @@
  * 3D-Modelle und Bilder sind urheberrechtlich geschützt: nur privat nutzen.
  */
 import { createServer } from 'node:http';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fetchArticle, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
+import { fetchArticle, fetchIkeaModel, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
 
 const args = process.argv.slice(2);
 const portArg = args.indexOf('--port');
 const PORT = Number(portArg >= 0 ? args[portArg + 1] : process.env.IKEA_HELPER_PORT) || 4791;
 const CACHE = resolve(process.env.IKEA_HELPER_CACHE || join('ikea-import', 'auswahl'));
 const ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
-const VERSION = 1;
+const VERSION = 2;
+const MAX_BODY = 3 * 1024 * 1024;
+/** Shops whose product pages the bookmarklet may send (the page the user has open, one per click). */
+const SHOP_ORIGINS = ['https://www.ikea.com', 'https://www.moebelix.at'];
 
 /** Only the planner opened on this computer may use the helper (no other website). */
 function allowedOrigin(origin) {
@@ -44,6 +62,13 @@ function allowedOrigin(origin) {
 }
 
 mkdirSync(CACHE, { recursive: true });
+const TOKEN_FILE = join(CACHE, '.lesezeichen-token');
+if (!existsSync(TOKEN_FILE)) writeFileSync(TOKEN_FILE, randomBytes(24).toString('hex'), { mode: 0o600 });
+const TOKEN = readFileSync(TOKEN_FILE, 'utf-8').trim();
+const INBOX_FILE = join(CACHE, 'lesezeichen-eingang.json');
+let inbox = existsSync(INBOX_FILE) ? JSON.parse(readFileSync(INBOX_FILE, 'utf-8')) : [];
+const saveInbox = () => writeFileSync(INBOX_FILE, JSON.stringify(inbox, null, 2));
+const tokenOk = (t) => typeof t === 'string' && t.length === TOKEN.length && timingSafeEqual(Buffer.from(t), Buffer.from(TOKEN));
 const mods = await loadIkeaModules();
 const get = politeFetcher();
 
@@ -84,8 +109,93 @@ async function product(query) {
   return [200, { ...out, cached: false }];
 }
 
+function readBody(req) {
+  return new Promise((ok, fail) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY) {
+        fail(new Error('Seite zu groß'));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => ok(Buffer.concat(chunks).toString('utf-8')));
+    req.on('error', fail);
+  });
+}
+
+/** A product page sent by the bookmarklet: parse it like a pasted page; IKEA models come from IKEA's asset host only. */
+async function receivePage(body) {
+  if (!tokenOk(body?.token)) return [403, { error: 'Lesezeichen ungültig – bitte im Planer (Katalog › IKEA) neu einrichten.' }];
+  let url;
+  try {
+    url = new URL(String(body.url));
+  } catch {
+    return [400, { error: 'Keine Seitenadresse.' }];
+  }
+  if (!SHOP_ORIGINS.includes(url.origin)) return [400, { error: 'Das geht nur auf Produktseiten von ikea.com oder moebelix.at.' }];
+  const page = mods.parseProductPage(String(body.html ?? ''), url.href);
+  const isIkea = page.provider === 'ikea-at';
+  const digits = isIkea && page.articleNumber ? page.articleNumber.replace(/[^\dSs]/g, '').toLowerCase() : null;
+  const key = digits && /^s?\d{8}$/.test(digits) ? digits : `mx${createHash('sha1').update(page.productUrl ?? url.href).digest('hex').slice(0, 10)}`;
+  let modelFile = isIkea && existsSync(join(CACHE, `${key}.glb`)) ? `${key}.glb` : undefined;
+  let note;
+  if (isIkea && !modelFile && page.modelUrl && digits) {
+    const m = await fetchIkeaModel(get, page.modelUrl);
+    if (m.bytes) {
+      modelFile = `${key}.glb`;
+      writeFileSync(join(CACHE, modelFile), m.bytes);
+    } else note = m.note;
+  }
+  const entry = mods.pageToCatalogEntry(page, modelFile);
+  if (!entry) return [422, { error: page.name ? `„${page.name}“: Maße fehlen auf der Seite – nicht übernommen.` : 'Keine Produktdaten auf dieser Seite gefunden (ist es eine Produktseite?).' }];
+  if (!isIkea) entry.id = key;
+  const product = { article: entry.articleNumber ?? key, entry, model: modelFile ?? null, ...(note ? { note } : {}) };
+  const item = { id: `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, receivedAt: new Date().toISOString(), product };
+  inbox = [...inbox.filter((i) => i.product.article !== product.article), item].slice(-50);
+  saveInbox();
+  console.log(`Lesezeichen: ${entry.name}${modelFile ? ' + Modell' : ''}`);
+  return [200, { name: entry.name, model: !!modelFile }];
+}
+
+/**
+ * Receiving page of the bookmarklet: embedded by the shop page, it takes the page data via
+ * postMessage (only from the shop origins) and posts it to /inbox on its own origin.
+ */
+const RECEIVER_PAGE = `<!doctype html><html lang="de"><meta charset="utf-8"><title>An Planer senden</title>
+<style>body{margin:0;padding:12px 14px;font:14px system-ui,sans-serif;color:#111;background:#fff}b{color:#0058a3}</style>
+<b>Wohnungsplaner</b><p id="s">Warte auf die Produktseite …</p>
+<script>
+const SHOPS = ${JSON.stringify(SHOP_ORIGINS)};
+const show = (t) => (document.getElementById('s').textContent = t);
+addEventListener('message', async (e) => {
+  if (!SHOPS.includes(e.origin) || !e.data || e.data.type !== 'wp-send') return;
+  show('Sende an den Planer …');
+  let ok = false, text;
+  try {
+    const r = await fetch('/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(e.data.payload) });
+    const b = await r.json();
+    ok = r.ok;
+    text = ok ? '„' + b.name + '“ ist im Planer (Katalog › IKEA)' + (b.model ? ' – mit 3D-Modell.' : '.') : b.error;
+  } catch (err) {
+    text = 'Fehler: ' + err;
+  }
+  show(text);
+  e.source.postMessage({ type: 'wp-result', ok, text }, e.origin);
+});
+parent.postMessage({ type: 'wp-ready' }, '*');
+</script></html>`;
+
 const server = createServer(async (req, res) => {
   const origin = req.headers.origin;
+  const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+  if (req.method === 'GET' && url.pathname === '/empfang') {
+    res
+      .writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': `frame-ancestors ${SHOP_ORIGINS.join(' ')}`, 'cache-control': 'no-store' })
+      .end(RECEIVER_PAGE);
+    return;
+  }
   if (!allowedOrigin(origin)) {
     res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end('Nur für den lokal geöffneten Wohnungsplaner.');
     return;
@@ -93,13 +203,29 @@ const server = createServer(async (req, res) => {
   res.setHeader('access-control-allow-origin', origin);
   res.setHeader('vary', 'Origin');
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'access-control-allow-methods': 'GET', 'access-control-allow-private-network': 'true', 'access-control-max-age': '600' }).end();
+    res.writeHead(204, {
+      'access-control-allow-methods': 'GET, POST',
+      'access-control-allow-headers': 'content-type',
+      'access-control-allow-private-network': 'true',
+      'access-control-max-age': '600',
+    }).end();
     return;
   }
-  const url = new URL(req.url ?? '/', 'http://127.0.0.1');
   const json = (status, body) => res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify(body));
   try {
+    if (req.method === 'POST' && url.pathname === '/inbox') {
+      const [status, body] = await receivePage(JSON.parse(await readBody(req)));
+      return json(status, body);
+    }
+    if (req.method === 'POST' && url.pathname === '/inbox/ack') {
+      const ids = new Set((JSON.parse(await readBody(req))?.ids ?? []).map(String));
+      inbox = inbox.filter((i) => !ids.has(i.id));
+      saveInbox();
+      return json(200, { ok: true });
+    }
     if (req.method !== 'GET') return json(405, { error: 'Nur GET.' });
+    if (url.pathname === '/bookmarklet') return json(200, { token: TOKEN });
+    if (url.pathname === '/inbox') return json(200, { items: inbox });
     if (url.pathname === '/status') return json(200, { ok: true, name: 'wohnungsplaner-ikea-helper', version: VERSION });
     if (url.pathname === '/product') {
       const [status, body] = await product(url.searchParams);
