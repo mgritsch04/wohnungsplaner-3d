@@ -346,7 +346,8 @@ function SceneContent({
       <WalkPathMarkers />
       <Devices3D project={project} />
       <TapeMeasure3D />
-      {!readOnly && cameraMode === 'orbit' && <CatalogDrop3D />}
+      {/* also while walking (#227): a drag can only start while the pointer is not locked */}
+      {!readOnly && <CatalogDrop3D />}
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects aoQuality={tier.aoQuality} />
