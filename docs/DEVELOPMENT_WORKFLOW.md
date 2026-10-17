@@ -35,7 +35,7 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 **Rollen**
 - **Neben-Session (mobil, Ideenerfassung):** legt ausschließlich GitHub-Issues mit Label `idea-inbox` an oder ergänzt offene `idea-inbox`-Issues per Kommentar. Ändert **keine** Projektdateien, keine Labels anderer Issues, keine PRs. Anleitung: [`IDEA_CAPTURE.md`](IDEA_CAPTURE.md).
 - **Hauptsession (Entwicklung):** einzige Stelle, die `docs/IDEAS.md` pflegt; übernimmt Ideen, setzt um, testet, legt User-Test-Issues an, integriert.
-- **Du (Nutzer):** Ideen erfassen, User-Tests durchführen und im Issue mit `BESTANDEN` bzw. `FEHLGESCHLAGEN: …` antworten, Entscheidungen treffen.
+- **Du (Nutzer):** Ideen erfassen, User-Tests durchführen und im Issue mit `BESTANDEN` bzw. `FEHLGESCHLAGEN: …` antworten (eindeutige Tests erledigt vorher die automatische Prüfung, siehe unten), Entscheidungen treffen.
 
 **Labels (Status; je Issue genau eines)**
 | Label | Bedeutung |
@@ -45,7 +45,7 @@ npx playwright test   # E2E (startet vite preview; laufenden alten preview auf :
 | `in-progress` | wird umgesetzt |
 | `user-test` | `[USERTEST]`-Issue: manuelle Prüfung durch dich offen |
 | `needs-fix` | dein User-Test ist fehlgeschlagen (Issue bleibt offen) |
-| `done` | vollständig abgeschlossen (bei User-Tests: von dir bestanden) |
+| `done` | vollständig abgeschlossen (bei User-Tests: von dir oder eindeutig automatisch bestanden) |
 | `user-task` | `[AUFGABE]`-Issue: die Hauptsession braucht etwas von dir (Freigabe, Entscheidung, Datei, Netzfreigabe) |
 
 Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte, vor neuen Ideen bearbeiten), `info` (erledigt, enthält aber eine wichtige Info für dich – du schließt es), `blocked` (von der Ideen-Session vergeben, wenn etwas offensichtlich blockiert ist).
@@ -80,7 +80,7 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
 5. Höchste unblockierte `Ready`-Aufgabe wählen (höchstens 1–2 gleichzeitig), Issue-Label `in-progress`, umsetzen, Checks, Commit, PR nach CI grün mergen.
 6. Wenn eine manuelle Abnahme sinnvoll ist: Issue `[USERTEST] …` mit Label `user-test` (Anleitung für Nicht-Entwickler, erwartete Ergebnisse, Verweis auf Issue/PR, Voraussetzungen). Implementierungs-Issue danach `done` und schließen – die Abnahme läuft über das Test-Issue. Dabei gilt:
    - Das Implementierungs-Issue wird erst geschlossen, wenn das `[USERTEST]`-Issue existiert; der Abschluss-Kommentar nennt es („Test: #…“). Ist kein User-Test nötig (z. B. reine Test- oder Doku-Änderung), steht das ausdrücklich im Abschluss-Kommentar.
-   - PRs schließen per „Closes #…“ nur das Implementierungs-Issue, **nie** ein `[USERTEST]`-Issue; ein `[USERTEST]`-Issue schließt nur ein `BESTANDEN` von dir (oder du selbst).
+   - PRs schließen per „Closes #…“ nur das Implementierungs-Issue, **nie** ein `[USERTEST]`-Issue; ein `[USERTEST]`-Issue schließt nur ein `BESTANDEN` von dir, du selbst oder ein eindeutiges „Automatisch BESTANDEN“ (siehe „Automatische User-Tests“).
    - Beim Schließen das Status-Label auf `done` setzen (kein `planned`/`in-progress` an geschlossenen Issues).
 7. Braucht die Hauptsession etwas von dir: Issue `[AUFGABE] …` mit Label `user-task` (Blocker zusätzlich `priority: high`), in `docs/IDEAS.md` verlinken.
 8. `docs/IDEAS.md` und `docs/PROJECT_STATUS.md` aktualisieren.
@@ -88,6 +88,20 @@ Zusatzlabels (neben dem Status): `priority: high` (Blocker und dringende Punkte,
 **Statusbegriffe (Projektstatus):** implementiert · automatisiert getestet · User-Test offen (#Issue) · vom Nutzer bestätigt (Datum) · fehlgeschlagen/Nachbesserung (#Issue) · blockiert. „Done“ im Backlog bedeutet **nicht** automatisch „von dir bestätigt“.
 
 Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nächsten Durchlauf gelesen.
+
+## Automatische User-Tests
+
+Offene `[USERTEST]`-Issues werden automatisch abgearbeitet, bevor du sie selbst testest. Werkzeug und Szenario-Format: [`scripts/usertest/README.md`](../scripts/usertest/README.md).
+
+- **Einplanen:** Die Koordination plant die Testläufe wie normale Aufgaben ein (Kontingent, keine Datei-Überschneidung). Es entstehen **keine neuen Issues**; abgearbeitet wird das vorhandene `[USERTEST]`-Issue. Ein Testlauf baut nichts ein: Wünsche oder Auffälligkeiten kommen als Kommentar ins Issue, die Koordination entscheidet, wann sie drankommen.
+- **Szenario:** Fehlt `scripts/usertest/scenarios/<nr>.mjs`, schreibt der Testlauf es zuerst (Wortlaut von Schritt und Erwartung aus dem Issue) und bringt es per PR in `main`.
+- **Cloud oder PC (automatisch):** `node scripts/usertest/run.mjs <nr> --plan` gibt `cloud` oder `pc` aus. `pc` gilt, wenn das Szenario `pc: true` setzt, also ein Schritt die 3D-Optik beurteilt (Material, Licht, Realismus). Ein Cloud-Lauf eines `pc`-Szenarios endet mit dem Urteil `pc` und wird nicht ins Issue geschrieben, sondern auf deinem PC wiederholt.
+- **PC-Lauf:** Remote-Control-Sitzung im Ordner `C:\Users\maxim\wohnungsplaner-3d-tests` (Klon in `wp-vorpruefung`): `git fetch origin main && git checkout --detach origin/main`, bei geändertem `package-lock.json` `npm ci`, dann `node scripts/usertest/run.mjs <nr> --gpu --port 4182`. Nennt der Bericht SwiftShader statt der echten Grafikkarte, ist der Lauf ungültig. Die PC-Sitzung meldet `report.json` und Bilder zurück; Kommentar, Artefakt und Labels erledigt die Cloud-Seite.
+- **Urteil** (steht in `report.json` › `verdict`, auf der Konsole und im Kopf von `report.md`):
+  - `bestanden` = **eindeutig**: jeder Schritt `ok` (optionale `skip` erlaubt), kein `fail`, kein „am Bild beurteilen“, nichts nur am echten Gerät (iPhone) prüfbar, keine Konsolenfehler, und `pc`-Szenarien liefen mit echter Grafikkarte. Dann wird der Test als bestätigt markiert: Kommentar mit `report.md` („Automatisch BESTANDEN“) und Link zum Bildbericht, Label `user-test` → `done`, Issue schließen (Grund „completed“), danach das zugehörige Feature-Issue wie bei deinem `BESTANDEN` abschließen. Den Vermerk in `docs/PROJECT_STATUS.md` („automatisch bestätigt (Datum)“) schreibt der Haupt-Thread.
+  - `pruefen` = **nicht eindeutig**: jeder andere Fall, also jede Abweichung, jeder „am Bild beurteilen“-Schritt und jede Prüfung, die nur auf dem iPhone bzw. einem echten Gerät geht. Dann Kommentar mit `report.md` („bitte selbst anschauen: …“ mit der Liste) und Link zum Bildbericht; Label bleibt `user-test`, Issue bleibt offen, du antwortest wie gewohnt mit `BESTANDEN` oder `FEHLGESCHLAGEN: …`.
+  - Ein fehlgeschlagener Schritt wird nie als bestanden markiert; `FEHLGESCHLAGEN` schreibst nur du.
+- **Bildbericht:** `report.html` als privates Artefakt veröffentlichen und den Link mit `--report-only --report-url <link>` in `report.md` übernehmen. Keine persönlichen Dateien oder Daten in Issue oder Bericht (das Repo ist öffentlich).
 
 ## Modellwahl (#18)
 Ziel: das kleinste Modell verwenden, das die Aufgabe sicher schafft, um dein Kontingent zu schonen.
