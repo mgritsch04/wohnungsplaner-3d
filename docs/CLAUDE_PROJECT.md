@@ -15,7 +15,7 @@ Stand: 2026-10-17. Diese Datei beschreibt, wie das Projekt in ein Claude-Code-Pr
 
 `CLAUDE.md`, `docs/` und `.claude/` kommen automatisch aus dem Repository mit; lokale Einstellungen deines PCs nicht.
 
-## 2. Aktuelle Projektanweisungen (Kopie, Stand 2026-10-17 10:55 UTC)
+## 2. Aktuelle Projektanweisungen (Kopie, Stand 2026-10-17 10:55 UTC; DASHBOARD-Absatz und R4 Stand 11:25 UTC)
 
 Maßgeblich ist der Text in den Projekteinstellungen; diese Kopie zieht der Haupt-Thread nach, wenn sich die Anweisungen ändern (#195). Sie ist auch die Grundlage für die Projektvorlage (#196).
 
