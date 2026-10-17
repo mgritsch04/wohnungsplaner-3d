@@ -3709,3 +3709,55 @@ test('Möbel-Material: Standardmaterial wählen, in 3D anzeigen und speichern (#
   await expect.poll(async () => 'finish' in (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)).toBe(false);
   expect(errors).toEqual([]);
 });
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: a click selects the furniture in the crosshair, not the wall behind it (#185)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const table = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-coffee-table');
+  await page.evaluate(
+    ([tx, ty]) => {
+      const wp = (window as any).__wp;
+      const c = wp.three.camera.position;
+      wp.walk.look(Math.atan2(-(tx - c.x), -(ty - c.z)), -Math.atan2(c.y - 0.3, Math.hypot(tx - c.x, ty - c.z)));
+    },
+    [table.x, table.y],
+  );
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.target())).toBe(table.id);
+  await page.evaluate(() => (window as any).__wp.useUiStore.getState().setSelection(null));
+  const box = (await page.locator('[data-testid="scene3d"] canvas').boundingBox())!;
+
+  // captured mouse: the browser keeps reporting the position from before the capture – here near
+  // the left edge, on a wall or the floor. The click must act at the crosshair only.
+  await page.evaluate(() => {
+    const canvas = document.querySelector('[data-testid="scene3d"] canvas');
+    Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
+  });
+  for (const [fx, fy] of [
+    [0.04, 0.5],
+    [0.96, 0.3],
+    [0.5, 0.95],
+  ]) {
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    await page.waitForTimeout(150);
+    expect(await getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  }
+  // nothing was dragged along
+  const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
+  expect([after.x, after.y]).toEqual([table.x, table.y]);
+  await page.evaluate(() => delete (document as unknown as Record<string, unknown>).pointerLockElement);
+
+  // pointer lock refused (e.g. in an embedded page): a short click picks what is under the mouse
+  await page.evaluate(() => {
+    (window as any).__wp.useUiStore.getState().setSelection(null);
+    HTMLCanvasElement.prototype.requestPointerLock = function () {
+      return Promise.reject(new Error('refused')) as any;
+    };
+  });
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+  expect(errors).toEqual([]);
+});

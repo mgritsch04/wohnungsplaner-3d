@@ -289,10 +289,10 @@ function SceneContent({
   const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
   const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 4);
-  // walking by touch (#164): a finger on the view looks around and a tap acts at the crosshair –
-  // furniture under the finger must not be dragged along, walls/floors not selected
-  const touchUi = useTouchUi();
-  const walkTouch = cameraMode === 'walk' && touchUi;
+  // walking (#164, #185): selecting happens at the crosshair (WalkControls) – the scene's click
+  // handlers stay off: under pointer lock they would pick at the stale mouse position (the wall
+  // behind the furniture), by touch a finger drag would move furniture or select walls/floors
+  const walkPick = cameraMode === 'walk';
 
   return (
     <>
@@ -307,7 +307,7 @@ function SceneContent({
         derived={derived}
         quality={quality}
         selectedId={selection?.id ?? null}
-        onSelect={readOnly || walkTouch ? noop : onSelectArch}
+        onSelect={readOnly || walkPick ? noop : onSelectArch}
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
@@ -325,7 +325,7 @@ function SceneContent({
           onDrag={onDrag}
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}
-          readOnly={readOnly || walkTouch}
+          readOnly={readOnly || walkPick}
         />
       ))}
       {compare && <CompareMarkers diff={compare.diff} side={compare.side} />}
