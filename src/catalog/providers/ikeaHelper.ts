@@ -63,3 +63,45 @@ export async function fetchHelperModel(file: string, base = IKEA_HELPER_URL, f: 
   if (!res.ok) throw new Error(`3D-Modell ${file}: HTTP ${res.status}`);
   return new File([await res.blob()], file, { type: 'model/gltf-binary' });
 }
+
+/** Secret of the bookmarklet (#221), created by the helper on this computer; only the local planer may read it. */
+export async function fetchBookmarkletToken(base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<string | null> {
+  try {
+    const res = await f(`${base}/bookmarklet`);
+    const body = (await res.json()) as { token?: unknown };
+    return res.ok && typeof body.token === 'string' && /^[0-9a-f]{16,128}$/.test(body.token) ? body.token : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface InboxItem {
+  id: string;
+  receivedAt: string;
+  product: HelperProduct;
+}
+
+/** Products the bookmarklet sent to the helper and the planner has not taken over yet. */
+export async function fetchInbox(base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<InboxItem[]> {
+  const res = await f(`${base}/inbox`);
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => ({}))) as { items?: unknown };
+  if (!Array.isArray(body.items)) return [];
+  return body.items
+    .filter((i): i is { id: string; receivedAt?: unknown; product: Record<string, unknown> } => !!i && typeof i.id === 'string' && !!i.product && typeof i.product === 'object')
+    .map((i) => ({
+      id: i.id,
+      receivedAt: typeof i.receivedAt === 'string' ? i.receivedAt : '',
+      product: {
+        article: typeof i.product.article === 'string' ? i.product.article : i.id,
+        entry: i.product.entry ?? null,
+        model: typeof i.product.model === 'string' && /^s?\d{8}\.glb$/.test(i.product.model) ? i.product.model : null,
+        note: typeof i.product.note === 'string' ? i.product.note : undefined,
+      },
+    }));
+}
+
+export async function ackInbox(ids: string[], base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<void> {
+  if (!ids.length) return;
+  await f(`${base}/inbox/ack`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids }) });
+}

@@ -6,6 +6,7 @@
 import type { CatalogEntry } from '../catalogFormat';
 import type { ParsedProductPage } from './structuredData';
 import { classifyProduct } from './classify';
+import { MOEBELIX_AT } from './registry';
 
 export interface ArticleRef {
   /** 8 digits, without dots */
@@ -52,6 +53,12 @@ export function guessCategory(name: string): string {
   return classifyProduct(name).category ?? 'decor';
 }
 
+/** Retailer and brand of a parsed page; IKEA unless the page belongs to Möbelix (bookmarklet, #221). */
+function retailerFields(p: ParsedProductPage): { brand?: string; retailer: string } {
+  if (p.provider === MOEBELIX_AT.id) return { brand: p.brand ?? undefined, retailer: MOEBELIX_AT.label };
+  return { brand: p.brand ?? 'IKEA', retailer: 'IKEA Österreich' };
+}
+
 /**
  * Product list entry (units: cm) from a parsed product page. Returns null when the
  * page lacks complete dimensions or a name – nothing is guessed.
@@ -67,8 +74,7 @@ export function pageToCatalogEntry(p: ParsedProductPage, modelFile?: string): Ca
     height,
     price: p.price?.currency === 'EUR' ? p.price.amount : undefined,
     priceDate: p.retrievedAt.slice(0, 10),
-    brand: p.brand ?? 'IKEA',
-    retailer: 'IKEA Österreich',
+    ...retailerFields(p),
     productUrl: p.productUrl ?? undefined,
     imageUrl: p.imageUrl ?? undefined,
     articleNumber: p.articleNumber ?? undefined,
