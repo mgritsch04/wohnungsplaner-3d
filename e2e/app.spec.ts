@@ -3637,6 +3637,45 @@ test.describe('Handy-Ansicht (#129)', () => {
   });
 });
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('walkthrough: a gamepad walks (left stick), looks (right stick) and crouches (B) (#29)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  // simulated standard-mapping pad; the test changes its axes/buttons through window.__pad
+  await page.evaluate(() => {
+    const pad = { connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+    (window as any).__pad = pad;
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] });
+  });
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('walk-gamepad')).toBeVisible();
+  const cam = () => page.evaluate(() => {
+    const c = (window as any).__wp.three.camera;
+    return { x: c.position.x as number, y: c.position.y as number, z: c.position.z as number, yaw: c.rotation.y as number };
+  });
+  const c0 = await cam();
+  // right stick: the view turns
+  await page.evaluate(() => ((window as any).__pad.axes = [0, 0, 1, 0]));
+  await expect.poll(async () => Math.abs((await cam()).yaw - c0.yaw), { timeout: 15000 }).toBeGreaterThan(0.2);
+  await page.evaluate(() => ((window as any).__pad.axes = [0, 0, 0, 0]));
+  // left stick forward: the camera moves
+  const c1 = await cam();
+  await page.evaluate(() => ((window as any).__pad.axes = [0, -1, 0, 0]));
+  await expect.poll(async () => { const c = await cam(); return Math.hypot(c.x - c1.x, c.z - c1.z); }, { timeout: 15000 }).toBeGreaterThan(0.3);
+  await page.evaluate(() => ((window as any).__pad.axes = [0, 0, 0, 0]));
+  // B toggles crouching (one press = one toggle)
+  await page.evaluate(() => ((window as any).__pad.buttons[1] = { pressed: true, value: 1 }));
+  await expect.poll(async () => (await cam()).y).toBeLessThan(1.0);
+  await page.evaluate(() => ((window as any).__pad.buttons[1] = { pressed: false, value: 0 }));
+  await expect(page.getByTestId('walk-duck')).toBeVisible();
+  // unplugged: hint disappears, nothing moves
+  await page.evaluate(() => ((window as any).__pad.connected = false));
+  await expect(page.getByTestId('walk-gamepad')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 test('Möbel-Material: Standardmaterial wählen, in 3D anzeigen und speichern (#63)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
