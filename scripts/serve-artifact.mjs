@@ -50,7 +50,7 @@ createServer(async (req, res) => {
     const sandbox = url.searchParams.get('sandbox');
     const sb = sandbox === null ? '' : ` sandbox="${escapeAttr(sandbox)}"`;
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(`<!doctype html><meta charset="utf-8"><title>Host</title><style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe id="artifact" src="${escapeAttr(src)}"${sb}></iframe>`);
+    res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Host</title><style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe id="artifact" src="${escapeAttr(src)}"${sb}></iframe>`);
     return;
   }
   if (!url.pathname.startsWith(prefix)) {

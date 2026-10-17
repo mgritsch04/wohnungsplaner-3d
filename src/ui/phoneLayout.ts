@@ -26,3 +26,38 @@ function subscribe(onChange: () => void): () => void {
 export function usePhoneLayout(): boolean {
   return useSyncExternalStore(subscribe, isPhoneLayout, () => false);
 }
+
+/**
+ * Touch screen without a fine pointer (phone, tablet) – #164. Decides about touch-only helpers
+ * (stick for walking, no text selection); a PC with mouse is never affected.
+ */
+export const TOUCH_QUERY = '(pointer: coarse) and (hover: none)';
+
+function touchQuery(): MediaQueryList | null {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(TOUCH_QUERY) : null;
+}
+
+export function isTouchUi(): boolean {
+  return isPhoneLayout() || (touchQuery()?.matches ?? false);
+}
+
+function subscribeTouch(onChange: () => void): () => void {
+  const a = mediaQuery();
+  const b = touchQuery();
+  a?.addEventListener('change', onChange);
+  b?.addEventListener('change', onChange);
+  return () => {
+    a?.removeEventListener('change', onChange);
+    b?.removeEventListener('change', onChange);
+  };
+}
+
+export function useTouchUi(): boolean {
+  return useSyncExternalStore(subscribeTouch, isTouchUi, () => false);
+}
+
+/** Fields where text may still be selected and edited on a touch screen. */
+export function isEditableTarget(t: EventTarget | null): boolean {
+  const el = t instanceof Element ? t : t instanceof Node ? t.parentElement : null;
+  return !!el?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+}

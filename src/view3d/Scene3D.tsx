@@ -43,6 +43,8 @@ import { CompareMarkers } from './CompareMarkers';
 import { FurnishPreview3D } from './FurnishPreview3D';
 import { orbitKeyInput, orbitKeyMoves, orbitKeySpeed, orbitPlaneStep, setPointerOver3d } from './orbitKeys';
 import { useDialogStore } from '../ui/dialogStore';
+import { usePhoneLayout, useTouchUi } from '../ui/phoneLayout';
+import { TouchWalkPad } from './TouchWalkPad';
 
 /** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
 interface ComparePreview {
@@ -73,6 +75,8 @@ export function Scene3D() {
   const downAt = useRef<{ x: number; y: number } | null>(null);
   const cutaway = usePerformanceStore((s) => s.cutaway);
   const dprCap = usePerformanceStore((s) => s.dprCap);
+  // phones/tablets (#164): stick + finger look instead of WASD and mouse
+  const touchUi = useTouchUi();
 
   if (webglError) {
     return (
@@ -93,6 +97,8 @@ export function Scene3D() {
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
       onPointerEnter={() => setPointerOver3d(true)}
       onPointerLeave={() => setPointerOver3d(false)}
+      // a long press must not open the browser's image/context menu over the 3D view (#164)
+      onContextMenu={(e) => e.preventDefault()}
     >
       <WebGLBoundary onError={setWebglError}>
         <Canvas
@@ -126,7 +132,17 @@ export function Scene3D() {
           ⤓ Geduckt
         </div>
       )}
-      {cameraMode === 'walk' && (
+      {cameraMode === 'walk' && touchUi && <TouchWalkPad />}
+      {cameraMode === 'walk' && touchUi && (
+        <div className="walk-overlay">
+          {carried ? (
+            <span>Du trägst „{carried}“ – umsehen zum Verschieben · „Absetzen“ stellt es ab</span>
+          ) : (
+            <span>Finger ziehen: umsehen · Stick: gehen · Tippen: Möbel auswählen, Tür/Fenster öffnen</span>
+          )}
+        </div>
+      )}
+      {cameraMode === 'walk' && !touchUi && (
         <div className="walk-overlay">
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
@@ -272,6 +288,10 @@ function SceneContent({
   const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
   const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 4);
+  // walking by touch (#164): a finger on the view looks around and a tap acts at the crosshair –
+  // furniture under the finger must not be dragged along, walls/floors not selected
+  const touchUi = useTouchUi();
+  const walkTouch = cameraMode === 'walk' && touchUi;
 
   return (
     <>
@@ -286,7 +306,7 @@ function SceneContent({
         derived={derived}
         quality={quality}
         selectedId={selection?.id ?? null}
-        onSelect={readOnly ? noop : onSelectArch}
+        onSelect={readOnly || walkTouch ? noop : onSelectArch}
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
@@ -304,12 +324,13 @@ function SceneContent({
           onDrag={onDrag}
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}
-          readOnly={readOnly}
+          readOnly={readOnly || walkTouch}
         />
       ))}
       {compare && <CompareMarkers diff={compare.diff} side={compare.side} />}
       {!readOnly && <FurnishPreview3D />}
       <FitOnCompareLayout comparing={readOnly} />
+      <PhoneSheetFov enabled={cameraMode === 'orbit'} />
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
@@ -361,6 +382,37 @@ function FitOnCompareLayout({ comparing }: { comparing: boolean }) {
     pendingUntil.current = 0;
     usePerformanceStore.getState().resetCamera();
   }, [width, height]);
+  return null;
+}
+
+/** Vertical field of view of the overview camera (degrees) – same as the Canvas default. */
+const ORBIT_FOV = 50;
+
+/**
+ * Phone (#164): opening the Werkzeuge/Details sheet makes the 3D view shorter. Keeping the
+ * vertical field of view would shrink the whole apartment; instead the view is only cut at the
+ * top and bottom – the camera stays where the user turned it and things keep their size.
+ */
+function PhoneSheetFov({ enabled }: { enabled: boolean }) {
+  const phone = usePhoneLayout();
+  const camera = useThree((s) => s.camera);
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  const full = useRef({ width: 0, height: 0 });
+  useEffect(() => {
+    if (!phone || !enabled || height < 1) return;
+    const cam = camera as THREE.PerspectiveCamera;
+    const f = full.current;
+    // the tallest view seen at this width is the one without a sheet (rotating the phone starts over)
+    if (width !== f.width || height > f.height) full.current = { width, height };
+    const k = height / full.current.height;
+    cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(ORBIT_FOV / 2)) * k));
+    cam.updateProjectionMatrix();
+    return () => {
+      cam.fov = ORBIT_FOV;
+      cam.updateProjectionMatrix();
+    };
+  }, [phone, enabled, camera, width, height]);
   return null;
 }
 

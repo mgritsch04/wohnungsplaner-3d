@@ -6,12 +6,12 @@ import { newId } from '../model/ids';
 import { add, boundsOf, dist, dot, normalize, perp, rotate, scale, sub, type Vec2 } from '../model/vec';
 import { formatLength, radToDeg, roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
-import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
+import { selectedFurnitureIds, useUiStore, type Selection, type View2D } from '../store/uiStore';
 import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
-import { fitView, niceGridStep, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
 import { ZoomSlider } from '../ui/ZoomSlider';
 import { useWalkPose } from '../store/walkPoseStore';
 import { UnderlayImage } from './UnderlayImage';
@@ -113,6 +113,11 @@ export function Editor2D() {
   const drag = useRef<Drag | null>(null);
   const downScreen = useRef<{ x: number; y: number } | null>(null);
   const dragStarted = useRef(false);
+  /** Fingers on the plan (#164): two of them zoom and pan instead of editing. */
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ startView: View2D; startMid: Vec2; startDist: number } | null>(null);
+  /** Selection before the first finger landed – a pinch must not change it. */
+  const selBeforeTouch = useRef<{ selection: Selection | null; multi: string[] } | null>(null);
   const [preview, setPreview] = useState<Preview>({});
   /** Points of the wall chain currently being drawn. */
   const [chain, setChain] = useState<Vec2[]>([]);
@@ -242,8 +247,30 @@ export function Editor2D() {
   };
 
   // ---------- pointer handlers ----------
+  /** Midpoint (relative to the plan) and distance of the first two fingers. */
+  const twoFingers = (): { mid: Vec2; dist: number } | null => {
+    const [a, b] = [...touches.current.values()];
+    if (!a || !b) return null;
+    const r = svgRef.current!.getBoundingClientRect();
+    return { mid: { x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top }, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (lengthInput !== null && (e.target as HTMLElement).tagName === 'INPUT') return;
+    if (e.pointerType === 'touch') {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      svgRef.current?.setPointerCapture(e.pointerId);
+      if (touches.current.size === 1) selBeforeTouch.current = { selection: ui().selection, multi: ui().multi };
+      if (touches.current.size >= 2) {
+        // second finger: undo whatever the first one started and zoom/pan with both instead
+        abortDrag(false);
+        if (selBeforeTouch.current && !pinch.current) useUiStore.setState(selBeforeTouch.current);
+        const f = twoFingers();
+        if (f) pinch.current = { startView: view, startMid: f.mid, startDist: f.dist };
+        return;
+      }
+      if (pinch.current) return;
+    }
     const w = toWorld(e);
     downScreen.current = { x: e.clientX, y: e.clientY };
     dragStarted.current = false;
@@ -409,6 +436,15 @@ export function Editor2D() {
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const pc = pinch.current;
+      if (pc) {
+        const f = twoFingers();
+        if (f) ui().setView2d(pinchView(pc.startView, vp, pc.startMid, pc.startDist, f.mid, f.dist));
+        return;
+      }
+    }
     const w = toWorld(e);
     ui().setCursor(w);
     const dr = drag.current;
@@ -603,7 +639,18 @@ export function Editor2D() {
     return () => window.removeEventListener('blur', onBlur);
   }, [abortDrag]);
 
+  /** A finger left the plan: after a pinch the remaining one does nothing until all are lifted. */
+  const releaseTouch = (e: React.PointerEvent): boolean => {
+    if (e.pointerType !== 'touch') return false;
+    touches.current.delete(e.pointerId);
+    if (!pinch.current) return false;
+    if (touches.current.size === 0) pinch.current = null;
+    svgRef.current?.releasePointerCapture?.(e.pointerId);
+    return true;
+  };
+
   const onPointerUp = (e: React.PointerEvent) => {
+    if (releaseTouch(e)) return;
     const dr = drag.current;
     drag.current = null;
     svgRef.current?.releasePointerCapture?.(e.pointerId);
@@ -803,7 +850,10 @@ export function Editor2D() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => abortDrag(false)}
+        onPointerCancel={(e) => {
+          releaseTouch(e);
+          abortDrag(false);
+        }}
         onPointerLeave={() => {
           ui().setCursor(null);
           ui().setHover(null);
