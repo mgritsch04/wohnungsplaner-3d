@@ -27,6 +27,7 @@ export default {
   name: 'Smart Home',
   title: '[USERTEST] (#170) Smart Home simulieren: Melder schaltet Licht',
   device: 'desktop',
+  pc: true, // beurteilt Melder und Lichtschein in 3D
   realDevice: [],
   steps: [
     {

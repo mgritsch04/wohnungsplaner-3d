@@ -27,9 +27,8 @@ export default {
   name: 'Möbel-Material',
   title: '[USERTEST] Material für Möbel wählen (#63)',
   device: 'desktop',
-  realDevice: [
-    'Wie hochwertig Leder-, Holz- und Lackoberflächen aussehen: in der Cloud rechnet eine Software-Grafik ohne echte Grafikkarte, Glanz und Struktur wirken auf deinem PC schärfer.',
-  ],
+  pc: true, // beurteilt Glanz und Struktur der Materialien in 3D
+  realDevice: [],
   steps: [
     {
       nr: 1,
