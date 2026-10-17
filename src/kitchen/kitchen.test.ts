@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from '../model/factory';
-import { addRectRoom, closestWall, insertWall } from '../model/operations';
+import { addOpening, addRectRoom, closestWall, insertWall } from '../model/operations';
 import { derivePlan } from '../model/derived';
 import { buildPlacementObstacles, collidingObstacles, furnitureConflicts } from '../model/placement';
-import { generateCountertops, kitchenChecksForItem, kitchenComponents, placeKitchenRun, wallFaceLength } from './kitchen';
+import { generateCountertops, kitchenChecksForItem, kitchenComponents, layoutKitchenRun, placeKitchenRun, placeKitchenRunReport, wallFaceLength } from './kitchen';
 
 function kitchenProject() {
   const p = createEmptyProject();
@@ -43,9 +43,10 @@ describe('kitchen planner', () => {
   it('reports overlaps and wall collisions', () => {
     const p = kitchenProject();
     const [a] = placeKitchenRun(p, { wallId: p.walls[0].id, side: 1, start: 0, modules: [{ catalogId: 'generic-k-base-60' }] });
-    const [b] = placeKitchenRun(p, { wallId: p.walls[0].id, side: 1, start: 0.3, modules: [{ catalogId: 'generic-k-base-60' }] });
-    expect(kitchenChecksForItem(p, a).join()).toMatch(/Überschneidet/);
+    const [b] = placeKitchenRun(p, { wallId: p.walls[0].id, side: 1, start: 0.6, modules: [{ catalogId: 'generic-k-base-60' }] });
     const f = p.furniture.find((x) => x.id === b)!;
+    f.x -= 0.3;
+    expect(kitchenChecksForItem(p, a).join()).toMatch(/Überschneidet/);
     f.y = 0;
     expect(kitchenChecksForItem(p, b).join()).toMatch(/Wand/);
   });
@@ -79,4 +80,64 @@ describe('kitchen planner', () => {
       expect([...furnitureConflicts(p, d, buildPlacementObstacles(d)).values()].flatMap((c) => c.issues.map((i) => i.message))).toEqual([]);
     }
   });
+
+  /** North wall with two cross walls that only overlap it, as after a floor-plan import (#220). */
+  function importedRoom() {
+    const p = createEmptyProject();
+    const props = { thickness: 0.2, height: 2.6 };
+    insertWall(p, { x: 0, y: 0 }, { x: 4, y: 0 }, props); // face on side 1 at y = 0.1
+    insertWall(p, { x: 0.1, y: 0.06 }, { x: 0.1, y: 3 }, props); // inner face x = 0.2
+    insertWall(p, { x: 3.1, y: 0.06 }, { x: 3.1, y: 3 }, props); // inner face x = 3.0
+    const north = p.walls.find((w) => w.a === p.nodes[0].id || w.b === p.nodes[0].id)!;
+    return { p, north };
+  }
+
+  const RUN = ['generic-k-tall-60', 'generic-k-drawer-60', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-oven', 'generic-k-base-40'].map((catalogId) => ({ catalogId }));
+
+  it('starts at the inner face of an unconnected cross wall and skips what does not fit (#220)', () => {
+    const { p, north } = importedRoom();
+    expect(p.walls).toHaveLength(3);
+    expect(wallFaceLength(p, north.id, 1)).toBeCloseTo(2.8, 3);
+    const layout = layoutKitchenRun(p, { wallId: north.id, side: 1, start: 0, modules: RUN });
+    expect(layout.slots.map((s) => s.problem === null)).toEqual([true, true, true, true, false, false]);
+    expect(layout.slots[4].problem).toMatch(/zu lang/);
+    const { ids, skipped } = placeKitchenRunReport(p, { wallId: north.id, side: 1, start: 0, modules: RUN });
+    expect(ids).toHaveLength(4);
+    expect(skipped.map((s) => s.name)).toEqual(['Backofen-Umbau 60 cm', 'Unterschrank 40 cm']);
+    const items = ids.map((id) => p.furniture.find((f) => f.id === id)!);
+    const first = items[0];
+    expect(first.x - first.width / 2).toBeGreaterThanOrEqual(0.2 - 1e-6);
+    expect(first.x - first.width / 2).toBeLessThan(0.205);
+    const d = derivePlan(p);
+    const walls = buildPlacementObstacles(d).filter((o) => o.kind === 'wall');
+    for (const f of items) expect(collidingObstacles(f, walls), `${f.name} in der Wand`).toEqual([]);
+    for (const f of items) expect(kitchenChecksForItem(p, f.id)).toEqual([]);
+  });
+
+  it('does not place modules in front of a door, into existing furniture or past the wall end (#220)', () => {
+    const p = kitchenProject();
+    const wallId = p.walls[0].id;
+    addOpening(p, wallId, 'door', 2.05, { open: false }); // door 1.6 … 2.5
+    const [existing] = placeKitchenRun(p, { wallId, side: 1, start: 0, modules: [{ catalogId: 'generic-k-base-60' }] });
+    expect(existing).toBeTruthy();
+    const layout = layoutKitchenRun(p, {
+      wallId,
+      side: 1,
+      start: 0.3,
+      modules: [{ catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-wall-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-base-60' }, { catalogId: 'generic-k-base-60' }],
+    });
+    // 0.3–0.9 hits the first cabinet, 0.9–1.5 free, 1.5–2.1 + 2.1–2.7 door (wall cabinet at 2.7 is free),
+    // 2.7–3.3 free, 3.3–3.9 free, 3.9–4.5 past the end of the 4 m wall face
+    expect(layout.slots.map((s) => s.problem)).toEqual([
+      expect.stringMatching(/Unterschrank 60 cm/),
+      null,
+      expect.stringMatching(/Tür/),
+      expect.stringMatching(/Tür/),
+      null,
+      null,
+      null,
+      expect.stringMatching(/zu lang/),
+    ]);
+  });
 });
+
