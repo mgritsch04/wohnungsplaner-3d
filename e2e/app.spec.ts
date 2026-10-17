@@ -3797,3 +3797,45 @@ test('walkthrough: a click selects the furniture in the crosshair, not the wall 
   await expect.poll(() => getSelection(page)).toEqual({ type: 'furniture', id: table.id });
   expect(errors).toEqual([]);
 });
+
+test('multi-selection reaches the wall with a fast mouse jump, members keep their spacing (#210)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const p0 = await getProject(page);
+  const bed = p0.furniture.find((f: any) => f.catalogId === 'generic-bed-160');
+  const ns = p0.furniture.filter((f: any) => f.catalogId === 'generic-nightstand');
+  const ids = [bed.id, ...ns.map((n: any) => n.id)];
+  for (const [i, f] of [bed, ...ns].entries()) {
+    const s = await planToScreen(page, f.x, f.y);
+    if (i) await page.keyboard.down('Shift');
+    await page.mouse.click(s.x, s.y);
+    if (i) await page.keyboard.up('Shift');
+  }
+  // a few large jumps far beyond the wall to the left (a quick flick of the mouse)
+  const a = await planToScreen(page, bed.x, bed.y);
+  const b = await planToScreen(page, bed.x - 3, bed.y);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 2 });
+  await page.mouse.up();
+  const p1 = await getProject(page);
+  const after = ids.map((id) => p1.furniture.find((f: any) => f.id === id));
+  const dx = after.map((f: any, i: number) => f.x - [bed, ...ns][i].x);
+  for (const v of dx) expect(v).toBeCloseTo(dx[0], 3);
+  // the left edge of the selection is flush with the nearest wall face to its left
+  const half = (f: any) => (Math.abs(Math.sin(f.rotation)) > 0.5 ? f.depth : f.width) / 2;
+  const leftEdge = Math.min(...after.map((f: any) => f.x - half(f)));
+  const node = (id: string) => p1.nodes.find((n: any) => n.id === id);
+  const startEdge = Math.min(...[bed, ...ns].map((f: any) => f.x - half(f)));
+  const inner = Math.max(
+    ...p1.walls
+      .map((w: any) => ({ w, a: node(w.a), b: node(w.b) }))
+      .filter(({ a, b }: any) => Math.abs(a.x - b.x) < 1e-6 && a.x < startEdge && Math.min(a.y, b.y) < bed.y && Math.max(a.y, b.y) > bed.y)
+      .map(({ w, a }: any) => a.x + w.thickness / 2),
+  );
+  expect(leftEdge).toBeGreaterThanOrEqual(inner - 0.005);
+  expect(leftEdge - inner).toBeLessThan(0.02);
+  expect(errors).toEqual([]);
+});
