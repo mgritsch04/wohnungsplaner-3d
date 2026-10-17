@@ -29,6 +29,29 @@ Ergebnis in `usertest-reports/<nr>/` (nicht im Git):
 - `report.html` – Bildbericht mit eingebetteten Screenshots, als Artefakt veröffentlichen und im Kommentar verlinken
 - `report.json`, `step-*.jpg`
 
+## Welche Tests anstehen
+
+```bash
+node scripts/usertest/issues.mjs       # Warteschlange: Label auto-user-test, dazu alte [USERTEST]-Issues
+node scripts/usertest/issues.mjs 178   # Testschritte eines Issues als JSON (Vorlage fürs Szenario)
+```
+
+- **Neues Modell:** Das Feature-Issue trägt das Label `auto-user-test`; die Testschritte stehen im neuesten Kommentar,
+  der mit `## Testschritte` oder `**Testschritte**` beginnt (nummerierte Schritte, je eine Zeile `→ Erwartet: …`,
+  optionale Schritte mit `Optional:`).
+- **Altes Modell:** eigenes `[USERTEST]`-Issue, Schritte im Issue-Text. Funktioniert weiter.
+- Die Liste zeigt pro Issue: Cloud oder PC, ob ein Szenario fehlt, ob der Test schon automatisch geprüft wurde
+  und ob sich die Schritte seitdem geändert haben. Das Skript liest nur; Kommentar, Labels und Schließen
+  erledigt die Session mit ihren GitHub-Werkzeugen. Was zu tun ist, steht nach jedem Lauf in
+  `report.json` › `actions` und auf der Konsole:
+
+| | `bestanden` | `pruefen` |
+|---|---|---|
+| Feature-Issue (`auto-user-test`) | Kommentar, `auto-user-test` → `done`, schließen | Kommentar, `auto-user-test` → `user-test` |
+| altes `[USERTEST]`-Issue | Kommentar, `user-test` → `done`, schließen, Feature-Issue abschließen | Kommentar, `user-test` bleibt |
+
+Bei `pc` wird nichts ins Issue geschrieben, der Lauf wird auf dem PC mit `--gpu` wiederholt.
+
 ## Neues Szenario
 
 `scenarios/<issue-nr>.mjs` mit den Schritten aus dem Issue (Wortlaut von Schritt und Erwartung übernehmen).
