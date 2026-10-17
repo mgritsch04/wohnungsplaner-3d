@@ -6,7 +6,7 @@ import type { DerivedPlan } from '../model/derived';
 import type { Light, Project, QualityMode } from '../model/schema';
 import { add, pointInPolygon, scale } from '../model/vec';
 import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState } from './lighting';
-import { flushLampShadowUpdates, registerShadowLamp, setLampLevel } from './lampRegistry';
+import { flushLampShadowUpdates, lampCount, registerShadowLamp, setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
 import { useSimLightOverrides } from '../smarthome/simStore';
 import { setMetalEnvLevel } from './metalRegistry';
@@ -112,11 +112,13 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     }
     if (ambientRef.current) ambientRef.current.intensity = realism ? 0.02 * st.ambientStrength : 0.15;
     scene.environmentIntensity = realism ? 0.6 * st.ambientStrength : 0;
-    setMetalEnvLevel(scene.environmentIntensity);
     // lamps (lamp furniture, placed lights) share one switch; rooms without lamps stay dark at night (#216)
     const lamps = realism ? lampLevel(lampMode, st) : 1;
     setLampLevel(lamps);
-    if (realism) setEnvironmentLighting(st.hour, lamps);
+    // without any lamp, nothing lights reflections at night either: no glowing handles or window panes
+    const lampShine = !realism || configured.length > 0 || lampCount() > 0 ? lamps : 0;
+    setMetalEnvLevel(scene.environmentIntensity, lampShine);
+    if (realism) setEnvironmentLighting(st.hour, lampShine);
     configured.forEach((l, i) => {
       const pl = configuredRefs.current[i];
       if (pl) pl.intensity = interiorIntensity(l) * (l.sim ? 1 : lamps);
@@ -143,7 +145,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
     current.current = approachHour(current.current, goal, dt, BLEND_TAU);
-    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${configuredKey}`;
+    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${configuredKey}|${lampCount()}`;
     if (key === applied.current) return;
     applied.current = key;
     apply(lightingAt(current.current));

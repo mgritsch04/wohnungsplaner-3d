@@ -3903,6 +3903,16 @@ test('night without lamps: at 0:00 no light source shines in a room without lamp
       return n;
     });
   await expect.poll(shining, { timeout: 30000 }).toBe(0);
+  // reflections are not lit either: handles and window panes do not glow in the dark
+  const brightestReflection = () =>
+    page.evaluate(() => {
+      let max = 0;
+      (window as any).__wp.three.scene.traverse((o: any) => {
+        for (const m of [o.material].flat()) if (m?.envMap) max = Math.max(max, m.envMapIntensity);
+      });
+      return max;
+    });
+  await expect.poll(brightestReflection, { timeout: 30000 }).toBeLessThan(0.05);
   expect(errors).toEqual([]);
 });
 

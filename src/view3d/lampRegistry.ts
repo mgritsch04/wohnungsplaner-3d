@@ -33,6 +33,9 @@ export function setLampLevel(value: number): void {
 
 export const lampLevelNow = () => level;
 
+/** Number of lamp furniture lights in the scene. */
+export const lampCount = () => lights.size;
+
 /**
  * Shadows of lamp lights (#130), so their light stops at walls and closed doors.
  * Point-light shadows render the scene six times, so they are kept cheap:
