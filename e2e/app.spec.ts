@@ -3956,7 +3956,7 @@ test('empty project: "Grundriss importieren" on the start card opens the file pi
   expect(errors).toEqual([]);
 });
 
-test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it is kept, the balcony becomes a room with railings (#37, #214)', async ({ page }) => {
+test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it is kept, the balcony becomes a room with railings and a balcony door, door symbols and light partitions are read (#37, #214)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
@@ -3981,7 +3981,8 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   const draft: { walls: W[]; rooms: R[] } = await page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
   // the neighbouring flat behind the viewport is not proposed
   const names = draft.rooms.map((r) => r.name).sort();
-  expect(names).toEqual(['Balkon', 'Schlafen', 'Wohnen']);
+  // the storeroom behind light partitions (drawn only as a light grey fill) is a room of its own (#37)
+  expect(names).toEqual(['AR', 'Balkon', 'Schlafen', 'Wohnen']);
   // the east wall, half of it outside the viewport, is still a full wall – the flat is 8 m wide
   const xs = draft.walls.filter((w) => w.height > 2).flatMap((w) => [w.a.x, w.b.x]);
   expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(9);
@@ -3994,6 +3995,19 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   expect(balcony.statedArea).toBe(5.8);
   expect(balcony.area).toBeGreaterThan(4.5);
   expect(balcony.area).toBeLessThan(7);
+  const storeroom = draft.rooms.find((r) => r.name === 'AR')!;
+  expect(storeroom.area).toBeGreaterThan(1);
+  expect(storeroom.area).toBeLessThan(2);
+  // the opening onto the balcony is a balcony door down to the floor, not a window (#37)
+  type O = { kind: string; width: number; sillHeight: number; hingeSide?: { x: number; y: number }; swingSide?: { x: number; y: number } };
+  const openings = (draft as unknown as { openings: O[] }).openings;
+  const balconyDoor = openings.find((o) => Math.abs(o.width - 1.5) < 0.1)!;
+  expect(balconyDoor).toMatchObject({ kind: 'door', sillHeight: 0 });
+  // the partition door: leaf and swing arc give the hinge and the swing side (into the bedroom, east)
+  const inner = openings.find((o) => Math.abs(o.width - 0.9) < 0.1)!;
+  expect(inner.kind).toBe('door');
+  expect(inner.hingeSide).toBeDefined();
+  expect(inner.swingSide!.x).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
   const confirm = page.getByRole('alertdialog');
   if (await confirm.isVisible().catch(() => false)) await confirm.getByRole('button').last().click();

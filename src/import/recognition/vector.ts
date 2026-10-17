@@ -7,6 +7,8 @@ export interface VectorSegment {
   y1: number;
   x2: number;
   y2: number;
+  /** Piece of a curve (door swing) – only ever a symbol line. */
+  curve?: boolean;
 }
 
 interface VectorParams {
@@ -86,7 +88,7 @@ function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i:
     const dy = s.y2 - s.y1;
     const len = Math.hypot(dx, dy);
     if (len < 1e-6) return;
-    if (isWallLine && !isWallLine(i)) others.push(s);
+    if (s.curve || (isWallLine && !isWallLine(i))) others.push(s);
     else if (Math.abs(dy) / len <= p.angTol && len >= p.minLen) hs.push({ a0: Math.min(s.x1, s.x2), a1: Math.max(s.x1, s.x2), c: (s.y1 + s.y2) / 2 });
     else if (Math.abs(dx) / len <= p.angTol && len >= p.minLen) vs.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
     else others.push(s);
@@ -108,43 +110,78 @@ function makeVectorClassifier(hs: L[], vs: L[], others: VectorSegment[]): GapCla
     else if (Math.abs(dx) / len <= tol) ov.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
   }
   return (b, g0, g1) => {
-    const inGap = (x: number, y: number, pad: number) => {
-      const a = b.o === 'h' ? x : y;
-      const c = b.o === 'h' ? y : x;
-      return a > g0 + pad && a < g1 - pad && Math.abs(c - b.c) <= b.t / 2 + pad;
-    };
     // window: lines parallel to the wall inside the gap (wall pens or thinner symbol lines)
     const inGapParallel = (l: L) => l.a0 >= g0 - 2 && l.a1 <= g1 + 2 && Math.abs(l.c - b.c) <= b.t / 2 + 1;
     const symbolParallel = (b.o === 'h' ? oh : ov).filter((l) => inGapParallel(l) && l.a1 - l.a0 > (g1 - g0) * 0.5);
     // one thin line across a gap is usually a door threshold; a window frame has two or more
     const parallel = (b.o === 'h' ? hs : vs).filter(inGapParallel).length + (symbolParallel.length >= 2 ? symbolParallel.length : 0);
+    const door = doorSymbol(b, g0, g1, others);
+    // a door symbol wins over frame lines: glazed balcony/patio doors are drawn like windows plus a leaf (#37)
+    if (door) return door;
     if (parallel >= 1) return { kind: 'window', confidence: 0.6, note: 'Parallele Linien in der Öffnung' };
-    const width = g1 - g0;
-    let plus = 0;
-    let minus = 0;
-    for (const s of others) {
-      const mx = (s.x1 + s.x2) / 2;
-      const my = (s.y1 + s.y2) / 2;
-      if (inGap(mx, my, 0)) continue;
-      const a = b.o === 'h' ? mx : my;
-      const c = b.o === 'h' ? my : mx;
-      if (a < g0 - 2 || a > g1 + 2) continue;
-      const d = c - b.c;
-      if (d > b.t / 2 && d < b.t / 2 + width * 1.1) plus++;
-      if (-d > b.t / 2 && -d < b.t / 2 + width * 1.1) minus++;
-    }
-    if (plus + minus >= 3) {
-      const s = plus >= minus ? 1 : -1;
-      return { kind: 'door', confidence: 0.55, swingSide: b.o === 'h' ? { x: 0, y: s } : { x: s, y: 0 }, note: 'Bogen-/Schräglinien neben der Öffnung' };
-    }
     return { kind: 'passage', confidence: 0.4, note: 'Öffnung ohne erkennbares Symbol' };
+  };
+}
+
+/**
+ * Door symbol at the gap g0–g1 of band b: a leaf (straight line about as long as the gap, starting
+ * at one gap end and standing about square to the wall) or a swing arc around one gap end. Only these
+ * make a door – hatching, labels or furniture lines next to a gap do not (#37). The hinge is the
+ * gap end the symbol starts from, the swing side the side it lies on.
+ */
+function doorSymbol(b: Band, g0: number, g1: number, others: VectorSegment[]): GapInfo | null {
+  const width = g1 - g0;
+  const half = b.t / 2;
+  // positions in the band frame: along the wall (a) and across it, relative to the centre line (c)
+  const A = (x: number, y: number) => (b.o === 'h' ? x : y);
+  const C = (x: number, y: number) => (b.o === 'h' ? y : x) - b.c;
+  let best: { hinge: number; side: number; score: number } | null = null;
+  for (const hinge of [g0, g1]) {
+    for (const side of [1, -1]) {
+      let leaf = 0;
+      const arc: number[] = [];
+      for (const s of others) {
+        const p = { a: A(s.x1, s.y1), c: C(s.x1, s.y1) * side };
+        const q = { a: A(s.x2, s.y2), c: C(s.x2, s.y2) * side };
+        const len = Math.hypot(q.a - p.a, q.c - p.c);
+        if (len < width * 0.08) continue;
+        if (!s.curve) {
+          // leaf: one end at the hinge, the other end out in the room, about one gap width away
+          const [near, far] = Math.abs(p.a - hinge) + Math.abs(p.c) <= Math.abs(q.a - hinge) + Math.abs(q.c) ? [p, q] : [q, p];
+          const atHinge = Math.abs(near.a - hinge) <= Math.max(0.15 * width, half) && Math.abs(near.c) <= half + 0.15 * width;
+          const out = far.c >= half + 0.45 * width && far.a >= g0 - 0.3 * width && far.a <= g1 + 0.3 * width;
+          // drawn open: about perpendicular to the wall (hatching at 45° is not a leaf)
+          const square = Math.abs(far.a - near.a) <= 0.35 * len;
+          if (atHinge && out && square && len >= 0.6 * width && len <= 1.3 * width) leaf++;
+        }
+        // arc: pieces at about one gap width from the hinge, running around it (not towards it)
+        const r1 = Math.hypot(p.a - hinge, p.c);
+        const r2 = Math.hypot(q.a - hinge, q.c);
+        if (Math.min(p.c, q.c) < half * 0.5) continue;
+        if (Math.min(r1, r2) < 0.7 * width || Math.max(r1, r2) > 1.3 * width) continue;
+        if (Math.abs(r2 - r1) > 0.35 * len || len > 0.6 * width) continue;
+        arc.push(Math.atan2(p.c, p.a - hinge), Math.atan2(q.c, q.a - hinge));
+      }
+      const span = arc.length >= 4 ? Math.max(...arc) - Math.min(...arc) : 0;
+      const score = leaf * 2 + (span >= 0.5 ? 2 : 0);
+      if (score > 0 && (!best || score > best.score)) best = { hinge, side, score };
+    }
+  }
+  if (!best) return null;
+  const along = best.hinge === g0 ? -1 : 1;
+  return {
+    kind: 'door',
+    confidence: best.score >= 4 ? 0.7 : 0.6,
+    swingSide: b.o === 'h' ? { x: 0, y: best.side } : { x: best.side, y: 0 },
+    hingeSide: b.o === 'h' ? { x: along, y: 0 } : { x: 0, y: along },
+    note: 'Türblatt/Türbogen an der Öffnung',
   };
 }
 
 const rotateSegment = (f: ReturnType<typeof makeFrame>, s: VectorSegment): VectorSegment => {
   const a = toFrame(f, { x: s.x1, y: s.y1 });
   const b = toFrame(f, { x: s.x2, y: s.y2 });
-  return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+  return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...(s.curve ? { curve: true } : {}) };
 };
 
 /** Classify the gap g0→g1 along an arbitrary wall direction (gaps at oblique wall ends). */
@@ -157,7 +194,11 @@ function classifyAlongWall(segments: VectorSegment[], p: VectorParams, w: Recogn
   const a1 = Math.max(q0.x, q1.x);
   const band: Band = { o: 'h', a0, a1, c: toFrame(f, w.a).y, t: w.thickness, conf: w.confidence };
   const info = makeVectorClassifier(hs, vs, others)(band, a0, a1);
-  return info.swingSide ? { ...info, swingSide: dirFromFrame(f, info.swingSide) } : info;
+  return {
+    ...info,
+    ...(info.swingSide ? { swingSide: dirFromFrame(f, info.swingSide) } : {}),
+    ...(info.hingeSide ? { hingeSide: dirFromFrame(f, info.hingeSide) } : {}),
+  };
 }
 
 const MAX_FRAMES = 4;
@@ -177,7 +218,7 @@ function detectOblique(
 ): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
   const cands: { i: number; ang: number; len: number; mid: Pt }[] = [];
   segments.forEach((s, i) => {
-    if (isWallLine && !isWallLine(i)) return;
+    if (s.curve || (isWallLine && !isWallLine(i))) return;
     const len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
     if (len < p.minLen) return;
     const ang = foldQuarter(Math.atan2(s.y2 - s.y1, s.x2 - s.x1));

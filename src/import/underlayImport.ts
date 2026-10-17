@@ -82,7 +82,7 @@ export async function importPdfPage(file: File, pdf: PDFDocumentProxy, pageNumbe
       pixelHeight: rendered.height,
     });
     if (analysis) {
-      const dimensions = matchDimensions(analysis.texts, analysis.segments);
+      const dimensions = matchDimensions(analysis.texts, analysis.segments.filter((s) => !s.curve));
       useSourceAnalysis.getState().set({ imageAssetId, kind: analysis.kind, segments: analysis.segments, texts: analysis.texts, dimensions });
     }
     const kindLabel = analysis?.kind === 'vector' ? 'Vektor-PDF' : analysis?.kind === 'raster' ? 'gescanntes PDF (Rasterbild)' : analysis?.kind === 'mixed' ? 'gemischtes PDF' : 'PDF';

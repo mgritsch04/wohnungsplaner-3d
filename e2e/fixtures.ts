@@ -337,7 +337,8 @@ export function clippedCadPlanPdf(): Buffer {
   // walls: both faces with the heavy pen; the model continues into the neighbouring flat (x > 8.25)
   ops.push('0 G 0.7 w');
   const walls: [number, number, number, number][] = [
-    [-0.25, -0.25, 13, 0], // south, running on behind the viewport
+    [-0.25, -0.25, 1.5, 0], // south, with a 1.5 m opening onto the balcony (#37)
+    [3.0, -0.25, 13, 0], // … running on behind the viewport
     [-0.25, 6, 13, 6.25], // north
     [-0.25, 0, 0, 6], // west
     [8, 0, 8.25, 6], // east – the viewport ends in its middle
@@ -347,7 +348,14 @@ export function clippedCadPlanPdf(): Buffer {
     [12.75, 0, 13, 6],
   ];
   for (const [x0, y0, x1, y1] of walls) ops.push(`${rect(x0, y0, x1, y1)} S`);
-  ops.push('0 g', label('Wohnen 26,00 m2', 1.5, 3), label('Schlafen 18,00 m2', 5.8, 2.5), label('Balkon 5,80 m2', 1.5, -1.1));
+  // the opening onto the balcony is drawn like a window: two thin frame lines (#37)
+  ops.push('0 G 0.18 w', line(1.5, -0.17, 3.0, -0.17), line(1.5, -0.08, 3.0, -0.08));
+  // partition door: leaf drawn open into the bedroom, swing arc as a Bézier curve, hinge at y = 1.0
+  const k = 0.5523 * 0.9;
+  ops.push(line(4.56, 1.0, 5.46, 1.0), `${P(5.46, 1.0)} m ${P(5.46, 1.0 + k)} ${P(4.56 + k, 1.9)} ${P(4.56, 1.9)} c S`);
+  // storeroom in the bedroom's corner: light partitions drawn only as a light grey fill
+  ops.push('0.85 g', `${rect(6.92, 4.5, 7.0, 6.0)} f`, `${rect(7.0, 4.5, 8.0, 4.58)} f`);
+  ops.push('0 g', label('Wohnen 26,00 m2', 1.5, 3), label('Schlafen 18,00 m2', 5.8, 2.5), label('Balkon 5,80 m2', 1.5, -1.1), label('AR 1,40 m2', 7.15, 5.1));
   ops.push(label('Nachbar Wohnen 20,00 m2', 11, 3));
   ops.push('Q');
   // sheet: frame and title (outside the viewport, not clipped)

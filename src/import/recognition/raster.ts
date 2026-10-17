@@ -22,7 +22,7 @@ export interface RasterInput {
 
 export interface RasterOutput {
   walls: { a: { x: number; y: number }; b: { x: number; y: number }; thickness: number; confidence: number }[];
-  openings: { center: { x: number; y: number }; width: number; kind: 'door' | 'window' | 'passage'; swingSide?: { x: number; y: number }; confidence: number; note?: string }[];
+  openings: { center: { x: number; y: number }; width: number; kind: 'door' | 'window' | 'passage'; swingSide?: { x: number; y: number }; hingeSide?: { x: number; y: number }; confidence: number; note?: string }[];
   threshold: number;
 }
 

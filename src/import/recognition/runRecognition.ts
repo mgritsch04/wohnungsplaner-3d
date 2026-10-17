@@ -9,7 +9,7 @@ import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
 import { checkScale, scaleCheckMessage } from '../dimensions';
-import { outdoorRailings, type AreaOutline } from '../outdoor';
+import { balconyDoors, outdoorRailings, type AreaOutline } from '../outdoor';
 import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } from '../rooms';
 import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
@@ -60,6 +60,12 @@ export async function runRecognition() {
       }
     }
     draft.rooms = proposeRooms(draft.walls, { texts });
+    // windows onto a balcony are balcony doors (#37)
+    if (texts) {
+      const before = draft.openings.filter((o) => o.kind === 'door').length;
+      draft.openings = balconyDoors(draft.openings, texts, roomInteriors(draft.walls));
+      if (draft.openings.filter((o) => o.kind === 'door').length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als Türen übernommen – bitte prüfen.');
+    }
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
     if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
@@ -150,6 +156,7 @@ export function outputToDraft(out: RasterOutput, u: Underlay, source: Reconstruc
         height: o.kind === 'window' ? 1.4 : 2.1,
         sillHeight: o.kind === 'window' ? 0.9 : 0,
         swingSide: o.swingSide ? rotate(o.swingSide, u.rotation) : undefined,
+        hingeSide: o.hingeSide ? rotate(o.hingeSide, u.rotation) : undefined,
         status: 'uncertain',
         confidence: o.confidence,
         note: `${o.note ?? ''} – Höhe/Brüstung sind Standardwerte`,

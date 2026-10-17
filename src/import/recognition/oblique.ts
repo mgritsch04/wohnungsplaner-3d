@@ -44,7 +44,7 @@ export function dirFromFrame(f: Frame, d: Pt): Pt {
 export function mapFromFrame(f: Frame, res: { walls: RecognizedWall[]; openings: RecognizedOpening[] }): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
   return {
     walls: res.walls.map((w) => ({ ...w, a: fromFrame(f, w.a), b: fromFrame(f, w.b) })),
-    openings: res.openings.map((o) => ({ ...o, center: fromFrame(f, o.center), swingSide: o.swingSide ? dirFromFrame(f, o.swingSide) : undefined })),
+    openings: res.openings.map((o) => ({ ...o, center: fromFrame(f, o.center), swingSide: o.swingSide ? dirFromFrame(f, o.swingSide) : undefined, hingeSide: o.hingeSide ? dirFromFrame(f, o.hingeSide) : undefined })),
   };
 }
 
