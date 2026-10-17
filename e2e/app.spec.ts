@@ -3747,22 +3747,31 @@ test('walkthrough: a click selects the furniture in the crosshair, not the wall 
 
   // captured mouse: the browser keeps reporting the position from before the capture – here near
   // the left edge, on a wall or the floor. The click must act at the crosshair only.
-  await page.evaluate(() => {
-    const canvas = document.querySelector('[data-testid="scene3d"] canvas');
-    Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
-  });
+  // The mouse is moved there before the capture is faked: under pointer lock a mouse move turns
+  // the view, which would take the table out of the crosshair (a real captured mouse does not
+  // move the reported position at all).
+  const lock = (on: boolean) =>
+    page.evaluate((locked) => {
+      if (!locked) return void delete (document as unknown as Record<string, unknown>).pointerLockElement;
+      const canvas = document.querySelector('[data-testid="scene3d"] canvas');
+      Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true });
+    }, on);
   for (const [fx, fy] of [
     [0.04, 0.5],
     [0.96, 0.3],
     [0.5, 0.95],
   ]) {
-    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    await page.evaluate(() => (window as any).__wp.useUiStore.getState().setSelection(null));
+    await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+    await lock(true);
+    await page.mouse.down();
+    await page.mouse.up();
     await expect.poll(() => getSelection(page)).toEqual({ type: 'furniture', id: table.id });
+    await lock(false);
   }
   // nothing was dragged along
   const after = (await getProject(page)).furniture.find((f: { id: string }) => f.id === table.id);
   expect([after.x, after.y]).toEqual([table.x, table.y]);
-  await page.evaluate(() => delete (document as unknown as Record<string, unknown>).pointerLockElement);
 
   // pointer lock refused (e.g. in an embedded page): a short click picks what is under the mouse
   await page.evaluate(() => {
