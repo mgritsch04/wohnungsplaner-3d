@@ -3129,9 +3129,13 @@ test('3D tape measure in the walkthrough: crosshair clicks measure, the capture 
   const centre = () => page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
   await centre(); // captures the mouse – no point yet
   await expect(page.getByRole('status')).toContainText('Ersten Punkt anklicken');
-  // measuring clicks only count while the mouse is captured; the pointer lock is granted
-  // asynchronously and can lag behind on a slow CI runner, so wait for it before clicking
-  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null), { timeout: 15000 }).toBe('CANVAS');
+  // measuring clicks only count while the mouse is captured. The headless browser on CI sometimes
+  // refuses the pointer lock; like a user, click again (a click without the lock places no point)
+  const locked = () => page.evaluate(() => document.pointerLockElement?.tagName === 'CANVAS');
+  await expect(async () => {
+    if (!(await locked())) await centre();
+    await expect.poll(locked, { timeout: 1500 }).toBe(true);
+  }).toPass({ timeout: 20000, intervals: [500, 1000] });
   const look = (yaw: number, pitch: number) => page.evaluate(([y, p]) => (window as unknown as { __wp: { walk: { look: (a: number, b: number) => void } } }).__wp.walk.look(y, p), [yaw, pitch] as const);
   // the new view is applied on the next rendered frame – on a slow CI runner a fixed wait may not cover one,
   // so wait until the camera really looks somewhere else before clicking
