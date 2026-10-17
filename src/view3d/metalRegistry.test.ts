@@ -22,4 +22,11 @@ describe('metal reflections (#188)', () => {
     expect(metalEnvIntensity(0)).toBeGreaterThan(0.3);
     expect(metalEnvIntensity(10)).toBeLessThanOrEqual(1.6);
   });
+
+  it('at night without shining lamps, metal and glass do not glow (#216)', () => {
+    const night = 0.006; // scene environment intensity at 0:00
+    expect(metalEnvIntensity(night, 0)).toBeLessThan(0.02);
+    expect(metalEnvIntensity(night, 1)).toBeGreaterThan(0.3);
+    expect(metalEnvIntensity(0.6, 0)).toBe(metalEnvIntensity(0.6, 1)); // by day unchanged
+  });
 });
