@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addIkeaArticles, IKEA_SELECTION_MAX, isIkeaItem, type IkeaFetchDeps } from './ikeaSelection';
+import { addIkeaArticles, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchDeps } from './ikeaSelection';
 import { fetchHelperProduct, helperAvailable } from './providers/ikeaHelper';
 import type { CatalogItem } from './types';
 
@@ -122,5 +122,27 @@ describe('Helfer-Client', () => {
     await expect(fetchHelperProduct({ digits: '10409932', combination: false, quantity: 1 }, { model: false }, 'http://h', fake(400, { error: 'Keine IKEA-Artikelnummer erkannt' }))).rejects.toThrow(
       /Keine IKEA-Artikelnummer/,
     );
+  });
+});
+
+describe('Lesezeichen-Eingang (#221)', () => {
+  it('übernimmt gesendete Seiten, meldet ungültige und bestätigt alle beim Helfer', async () => {
+    const { d, added } = deps();
+    const acked: string[][] = [];
+    const outcomes = await takeInbox({
+      ...d,
+      fetchInbox: async () => [
+        { id: 'a', receivedAt: '', product: { article: '104.099.32', entry: entry('104.099.32', '10409932.glb'), model: '10409932.glb' } },
+        { id: 'b', receivedAt: '', product: { article: 'mx1', entry: null, model: null } },
+      ],
+      ackInbox: async (ids) => void acked.push(ids),
+    });
+    expect(outcomes.map((o) => [o.ok, o.withModel])).toEqual([
+      [true, true],
+      [false, undefined],
+    ]);
+    expect(outcomes[0].id).toBe('import-ikea-auswahl-104.099.32');
+    expect(added).toHaveLength(1);
+    expect(acked).toEqual([['a', 'b']]);
   });
 });

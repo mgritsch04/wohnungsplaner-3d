@@ -13,6 +13,14 @@ Katalog › Unterreiter **„IKEA“**: Links von ikea.com/at oder Artikelnummer
 * Im Claude-App-Artefakt ist „Holen“ nicht verfügbar (kein Helfer erreichbar); dort bleiben Auswahl und Ordner-Import.
 * Getestet 2026-10-17 mit echter Seite (KALLAX 104.099.32: Name, 111,5 × 39 × 146,5 cm, Preis, GLB 1,9 MB) bis zur Platzierung in 3D.
 
+## Lesezeichen „An Planer senden“ (#221, 2026-10-17)
+Katalog › IKEA › „Lesezeichen „An Planer senden““: den Knopf in die Lesezeichenleiste ziehen. Auf einer selbst geöffneten Produktseite von **ikea.com** oder **moebelix.at** schickt ein Klick die Daten **dieser einen Seite** (Meta-Angaben, schema.org/JSON-LD, sichtbarer Text) an den lokalen Helfer; der Planer übernimmt sie in „Meine IKEA-Auswahl“ (Hinweis „neu vom Lesezeichen“).
+
+* **Weg:** Die Content-Security-Policy von ikea.com verbietet Anfragen an fremde Hosts (geprüft 2026-10-17: `connect-src` über `default-src`), erlaubt aber eingebettete Seiten (`frame-src *`). Das Lesezeichen bettet deshalb die Empfangsseite des Helfers (`http://127.0.0.1:4791/empfang`, nur in ikea.com/moebelix.at einbettbar) ein und reicht ihr die Daten per `postMessage` (nur an die Helfer-Herkunft); diese sendet sie an `/inbox`.
+* **Absicherung:** geheimes Token in `ikea-import/auswahl/.lesezeichen-token` (vom Helfer beim ersten Start erzeugt, nie im Repository), nur im eigenen Lesezeichen; ohne gültiges Token wird nichts übernommen. Token und Eingang kann nur der lokal geöffnete Planer lesen.
+* **Kein Scraping:** eine Seite pro Klick, nur die Seite, die man selbst offen hat; der Helfer ruft dabei für IKEA höchstens das auf der Seite deklarierte 3D-Modell ab (nur `web-api.ikea.com/dimma/assets/`). Möbelix: nur Seitendaten, kein Modell. Was die Seite nicht liefert (z. B. Maße), bleibt leer bzw. das Produkt wird nicht übernommen.
+* Getestet 2026-10-17 mit echter Seite (KALLAX 104.099.32): Lesezeichen auf ikea.com → Planer zeigt Name, Maße, Preis, 3D-Modell. Möbelix-Seiten sind aus der Entwicklungsumgebung gesperrt (Cloudflare) → `NEEDS USER TEST`.
+
 ## Kurzfazit
 - Für **keinen** der beiden Händler gibt es eine offiziell dokumentierte, öffentliche Produkt-API. (`UNVERIFIED` – Recherche, keine Herstellerbestätigung)
 - **Live-Tests waren in der Entwicklungsumgebung nicht möglich:** Die Cloud-Umgebung blockiert `www.ikea.com` und `www.moebelix.at` (`UNAVAILABLE`).

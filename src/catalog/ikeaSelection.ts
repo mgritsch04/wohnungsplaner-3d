@@ -1,7 +1,7 @@
 import { CATALOG_FORMAT, parseCatalogJsonWithModels } from './catalogFormat';
 import { attachModelFiles, storeAsset } from './catalogImport';
 import { useCatalogStore } from './catalogStore';
-import { fetchHelperModel, fetchHelperProduct } from './providers/ikeaHelper';
+import { ackInbox, fetchHelperModel, fetchHelperProduct, fetchInbox, type HelperProduct } from './providers/ikeaHelper';
 import { formatArticle, parseArticleList } from './providers/ikeaList';
 import type { CatalogItem } from './types';
 
@@ -16,6 +16,8 @@ export const isIkeaItem = (i: CatalogItem) => i.sourceName === IKEA_SELECTION_SO
 export interface IkeaFetchOutcome {
   article: string;
   ok: boolean;
+  /** catalog id of the added product */
+  id?: string;
   name?: string;
   withModel?: boolean;
   message?: string;
@@ -53,32 +55,55 @@ export async function addIkeaArticles(
     const article = formatArticle(a);
     opts.onProgress?.(n, articles.length, article);
     try {
-      const hp = await deps.fetchProduct(a, { model: opts.model });
-      if (!hp.entry) {
-        outcomes.push({ article, ok: false, message: hp.reason ?? 'keine Produktdaten' });
-        continue;
-      }
-      const list = JSON.stringify({ format: CATALOG_FORMAT, version: 1, name: IKEA_SELECTION_SOURCE, units: 'cm', items: [hp.entry] });
-      const { items, modelFiles } = parseCatalogJsonWithModels(list, IKEA_SELECTION_SOURCE);
-      let result = items;
-      let warning: string | undefined;
-      const wanted = items[0] && modelFiles.get(items[0].id);
-      if (opts.model && wanted) {
-        try {
-          const file = await deps.fetchModel(wanted);
-          const res = await attachModelFiles(items, modelFiles, [file], deps.store, deps.check);
-          result = res.items;
-          warning = res.warnings[0];
-        } catch (e) {
-          warning = `3D-Modell nicht geladen (${e instanceof Error ? e.message : String(e)}) – Näherungsmodell verwendet.`;
-        }
-      }
-      await deps.addItems(result);
-      outcomes.push({ article, ok: true, name: result[0].name, withModel: result[0].model.type === 'gltf', message: warning ?? hp.note });
+      outcomes.push(await addHelperProduct(await deps.fetchProduct(a, { model: opts.model }), opts.model, deps));
     } catch (e) {
       outcomes.push({ article, ok: false, message: e instanceof Error ? e.message : String(e) });
     }
   }
   opts.onProgress?.(articles.length, articles.length, '');
   return { outcomes, skipped: all.length - articles.length };
+}
+
+/**
+ * Take one product the helper delivered (fetched by article number, or sent by the bookmarklet)
+ * into the catalog: validated with the catalog schema, with its 3D model when wanted and available.
+ */
+export async function addHelperProduct(hp: HelperProduct, withModel: boolean, deps: IkeaFetchDeps = defaultDeps): Promise<IkeaFetchOutcome> {
+  const article = hp.article;
+  if (!hp.entry) return { article, ok: false, message: hp.reason ?? 'keine Produktdaten' };
+  try {
+    const list = JSON.stringify({ format: CATALOG_FORMAT, version: 1, name: IKEA_SELECTION_SOURCE, units: 'cm', items: [hp.entry] });
+    const { items, modelFiles } = parseCatalogJsonWithModels(list, IKEA_SELECTION_SOURCE);
+    let result = items;
+    let warning: string | undefined;
+    const wanted = items[0] && modelFiles.get(items[0].id);
+    if (withModel && wanted) {
+      try {
+        const file = await deps.fetchModel(wanted);
+        const res = await attachModelFiles(items, modelFiles, [file], deps.store, deps.check);
+        result = res.items;
+        warning = res.warnings[0];
+      } catch (e) {
+        warning = `3D-Modell nicht geladen (${e instanceof Error ? e.message : String(e)}) – Näherungsmodell verwendet.`;
+      }
+    }
+    await deps.addItems(result);
+    return { article, ok: true, id: result[0].id, name: result[0].name, withModel: result[0].model.type === 'gltf', message: warning ?? hp.note };
+  } catch (e) {
+    return { article, ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Take over what the bookmarklet sent (#221). Items are acknowledged at the helper once handled,
+ * also when they were invalid, so nothing is offered twice.
+ */
+export async function takeInbox(
+  deps: IkeaFetchDeps & { fetchInbox: typeof fetchInbox; ackInbox: typeof ackInbox } = { ...defaultDeps, fetchInbox, ackInbox },
+): Promise<IkeaFetchOutcome[]> {
+  const items = await deps.fetchInbox();
+  const outcomes: IkeaFetchOutcome[] = [];
+  for (const i of items) outcomes.push(await addHelperProduct(i.product, true, deps));
+  await deps.ackInbox(items.map((i) => i.id));
+  return outcomes;
 }

@@ -45,6 +45,24 @@ export function politeFetcher(delay = DELAY_MS) {
   };
 }
 
+/** IKEA 3D models may only come from IKEA's asset host (allowed by robots.txt) – never from a URL a page claims elsewhere. */
+export function isIkeaModelUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname === 'web-api.ikea.com' && u.pathname.startsWith('/dimma/assets/');
+  } catch {
+    return false;
+  }
+}
+
+/** Download a declared IKEA 3D model; returns the bytes or a note why not. */
+export async function fetchIkeaModel(get, url) {
+  if (!isIkeaModelUrl(url)) return { bytes: null, note: 'Modell-Adresse ist keine IKEA-Modelldatei' };
+  const m = await get(url, { headers: { 'user-agent': UA } });
+  if (m.ok && /gltf-binary|octet-stream/.test(m.headers.get('content-type') ?? '')) return { bytes: Buffer.from(await m.arrayBuffer()) };
+  return { bytes: null, note: `Modell nicht geladen (HTTP ${m.status})` };
+}
+
 /**
  * Fetch one article. Returns { article, entry | null, model: { file, bytes } | null, page, reason?, note? }.
  * `entry` is a product list entry (cm) or null when the page lacks a name or complete dimensions.
@@ -57,10 +75,9 @@ export async function fetchArticle(mods, get, a, { withModel }) {
   let model = null;
   let note;
   if (withModel && page.modelUrl) {
-    const m = await get(page.modelUrl, { headers: { 'user-agent': UA } });
-    if (m.ok && /gltf-binary|octet-stream/.test(m.headers.get('content-type') ?? '')) {
-      model = { file: `${a.combination ? 's' : ''}${a.digits}.glb`, bytes: Buffer.from(await m.arrayBuffer()) };
-    } else note = `Modell nicht geladen (HTTP ${m.status})`;
+    const m = await fetchIkeaModel(get, page.modelUrl);
+    if (m.bytes) model = { file: `${a.combination ? 's' : ''}${a.digits}.glb`, bytes: m.bytes };
+    else note = m.note;
   }
   const entry = mods.pageToCatalogEntry(page, model?.file);
   if (!entry) return { article, entry: null, model, page, reason: 'Maße oder Name fehlen auf der Seite' };
