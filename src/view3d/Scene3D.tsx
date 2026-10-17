@@ -40,6 +40,7 @@ import { useCompareStore, type CompareSide } from '../versions/compareStore';
 import type { FurnitureDiff } from '../versions/diff';
 import { CompareBar } from '../versions/CompareBar';
 import { CompareMarkers } from './CompareMarkers';
+import { FurnishPreview3D } from './FurnishPreview3D';
 import { orbitKeyInput, orbitKeyMoves, orbitKeySpeed, orbitPlaneStep, setPointerOver3d } from './orbitKeys';
 import { useDialogStore } from '../ui/dialogStore';
 
@@ -307,6 +308,7 @@ function SceneContent({
         />
       ))}
       {compare && <CompareMarkers diff={compare.diff} side={compare.side} />}
+      {!readOnly && <FurnishPreview3D />}
       <FitOnCompareLayout comparing={readOnly} />
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
