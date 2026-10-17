@@ -9,7 +9,7 @@ import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore, type Selection, type View2D } from '../store/uiStore';
 import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
-import { PlanDrawing } from './PlanDrawing';
+import { FurnitureSymbol, PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
 import { fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
 import { ZoomSlider } from '../ui/ZoomSlider';
@@ -19,9 +19,8 @@ import { imageToWorld, worldToImage } from '../import/underlayTransform';
 import { OPENING_DEFAULTS } from '../model/operations';
 import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
-import { buildPlacementObstacles, canDropAt, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo, placeDroppedFurniture } from '../model/placement';
-import { draggedCatalogItem, droppedCatalogItem, isCatalogDrag } from '../catalog/catalogDrag';
-import { createFurnitureFromCatalog } from '../catalog/instantiate';
+import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
+import { catalogDropPreview, draggedCatalogItem, droppedCatalogItem, isCatalogDrag, useCatalogDragStore, type DropPreview } from '../catalog/catalogDrag';
 import { dropCatalogItemAt } from '../ui/actions';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
@@ -126,8 +125,11 @@ export function Editor2D() {
   const [calib, setCalib] = useState<{ p1: Vec2 | null; p2: Vec2 | null }>({ p1: null, p2: null });
   const [lengthInput, setLengthInput] = useState<string | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
-  /** Footprint of a catalog entry being dragged over the plan (#131); ok = may be dropped here. */
-  const [dropGhost, setDropGhost] = useState<{ corners: Vec2[]; ok: boolean } | null>(null);
+  /** Catalog entry being dragged over the plan (#131, #217): the item itself at the drop spot. */
+  const [dropGhostState, setDropGhost] = useState<DropPreview | null>(null);
+  // the drag ended elsewhere (Esc, released outside the plan): no ghost left behind
+  const dragActive = useCatalogDragStore((s) => s.item !== null);
+  const dropGhost = dragActive ? dropGhostState : null;
   // another project (new, opened, imported – #133): drop half-drawn walls, a started
   // measurement and calibration points of the previous one (reset during render, not in an effect)
   const [stateFor, setStateFor] = useState(project.id);
@@ -808,16 +810,11 @@ export function Editor2D() {
   const onDragOver = (e: React.DragEvent) => {
     if (!isCatalogDrag(e.dataTransfer)) return;
     e.preventDefault();
-    const w = toWorld(e);
-    const ok = canDropAt(derived, w);
     // a drop outside a room still fires, so the release can explain why nothing was placed
     e.dataTransfer.dropEffect = 'copy';
     const item = draggedCatalogItem();
     if (!item) return setDropGhost(null);
-    // the same placement as on drop, on a shallow copy (only the new item is changed)
-    const f = createFurnitureFromCatalog(item, w);
-    if (ok) placeDroppedFurniture({ ...project, furniture: [...project.furniture] }, derived, f, w, e.altKey);
-    setDropGhost({ corners: furnitureCorners(f), ok });
+    setDropGhost(catalogDropPreview(project, derived, obstacles, item, toWorld(e), e.altKey));
   };
   const onDrop = (e: React.DragEvent) => {
     setDropGhost(null);
@@ -991,16 +988,23 @@ export function Editor2D() {
 
           {openingPreview}
           {dropGhost && (
-            <polygon
-              data-testid="drop-ghost"
-              points={dropGhost.corners.map((q) => `${q.x},${q.y}`).join(' ')}
-              fill={dropGhost.ok ? 'rgba(37,99,235,0.18)' : 'rgba(220,38,38,0.12)'}
-              stroke={dropGhost.ok ? '#2563eb' : '#dc2626'}
-              strokeWidth={1.5}
-              strokeDasharray="6 4"
-              vectorEffect="non-scaling-stroke"
-              pointerEvents="none"
-            />
+            <g data-testid="drop-ghost" data-level={dropGhost.level} pointerEvents="none">
+              {dropGhost.level !== 'outside' && (
+                <g opacity={0.8}>
+                  <FurnitureSymbol f={dropGhost.item} selected={false} handle={false} hovered={false} px={px} conflict={dropGhost.level === 'ok' ? undefined : dropGhost.level} />
+                </g>
+              )}
+              <polygon
+                points={furnitureCorners(dropGhost.item)
+                  .map((q) => `${q.x},${q.y}`)
+                  .join(' ')}
+                fill={dropGhost.level === 'outside' ? 'rgba(220,38,38,0.12)' : 'none'}
+                stroke={dropGhost.level === 'ok' ? '#2563eb' : dropGhost.level === 'warn' ? '#d97706' : '#dc2626'}
+                strokeWidth={1.5}
+                strokeDasharray="6 4"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
           )}
           {(preview.snapWalls ?? []).map((id) => {
             const fp = derived.footprints.get(id);

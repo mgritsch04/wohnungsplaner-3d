@@ -649,6 +649,17 @@ test('plans a kitchen run along a selected wall', async ({ page }) => {
   await page.mouse.click(s.x, s.y);
   expect((await getSelection(page))?.type).toBe('wall');
   await page.locator('.panel.left').getByRole('button', { name: 'Küche' }).click();
+  // the TV lowboard stands in front of the wall: the planner says beforehand which modules do not fit (#220)
+  const blocked = page.getByTestId('kitchen-run-blocked');
+  await expect(blocked).toContainText('überschneidet sich mit „TV-Lowboard“');
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { name: string }[] }) => {
+      d.furniture = d.furniture.filter((f) => f.name !== 'TV-Lowboard');
+    });
+  });
+  await expect(blocked).toHaveCount(0);
   await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
   const q = await getProject(page);
   const kitchen = q.furniture.filter((f: { kitchen?: unknown }) => f.kitchen);
@@ -2421,6 +2432,14 @@ test('shows the kitchen work triangle with lengths, follows moved appliances and
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Küche' }).click();
   await left.getByRole('combobox', { name: 'Modul' }).first().selectOption({ label: 'Kühlschrank freistehend' });
+  // the TV lowboard would block the run (#220)
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = (window as any).__wp.useProjectStore.getState();
+    st.apply((d: { furniture: { name: string }[] }) => {
+      d.furniture = d.furniture.filter((f) => f.name !== 'TV-Lowboard');
+    });
+  });
   await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
 
   const plan = page.locator('[data-testid="editor2d"]');
@@ -4055,5 +4074,59 @@ test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving res
   await expect.poll(fovOf).toBe(overviewFov);
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect.poll(fovOf).toBe(70);
+  expect(errors).toEqual([]);
+});
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+test('catalog: while dragging, the item itself is previewed in 2D and 3D instead of the product photo (#217)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Katalog' }).click();
+  await page.getByLabel('Katalog durchsuchen').fill('Zimmerpflanze');
+  const entry = page.locator('.catalog-item', { hasText: 'Zimmerpflanze groß' });
+  const count = async () => (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').length;
+  const before = await count();
+  const ghost = page.getByTestId('drop-ghost');
+  const ebox = (await entry.boundingBox())!;
+  const svg = page.locator('[data-testid="editor2d"] svg');
+  const box = (await svg.boundingBox())!;
+
+  // 2D: over the living room the plan symbol appears in real size, free spot = level ok
+  await page.mouse.move(ebox.x + 20, ebox.y + ebox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ebox.x + 40, ebox.y + ebox.height / 2, { steps: 3 });
+  const target = await planToScreen(page, 2.5, 2.05);
+  await page.mouse.move(target.x, target.y, { steps: 8 });
+  await expect(ghost).toBeVisible();
+  await expect(ghost).toHaveAttribute('data-level', 'ok');
+  // outside every room: marked as outside (would be rejected)
+  await page.mouse.move(box.x + 12, box.y + box.height / 2, { steps: 8 });
+  await expect(ghost).toHaveAttribute('data-level', 'outside');
+  // back over the catalog and released there: preview gone, nothing added
+  await page.mouse.move(ebox.x + 20, ebox.y + ebox.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(ghost).toHaveCount(0);
+  expect(await count()).toBe(before);
+
+  // 3D: a translucent model follows the pointer on the floor and lands exactly there
+  const canvas = page.locator('[data-testid="scene3d"] canvas');
+  await expect(canvas).toBeVisible({ timeout: 20000 });
+  const ghost3d = () => page.evaluate(() => {
+    const o = (window as any).__wp.three.scene.getObjectByName('catalog-drop-ghost');
+    return o ? { x: o.position.x as number, z: o.position.z as number } : null;
+  });
+  const s = await worldToScreen3d(page, 2.5, 0, 2);
+  await page.mouse.move(ebox.x + 20, ebox.y + ebox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ebox.x + 40, ebox.y + ebox.height / 2, { steps: 3 });
+  await page.mouse.move(s.x, s.y, { steps: 8 });
+  await expect.poll(ghost3d).not.toBeNull();
+  const g = (await ghost3d())!;
+  await page.mouse.up();
+  await expect.poll(count).toBe(before + 1);
+  await expect.poll(ghost3d).toBeNull();
+  const placed = (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
+  expect(placed.x).toBeCloseTo(g.x, 2);
+  expect(placed.y).toBeCloseTo(g.z, 2);
   expect(errors).toEqual([]);
 });

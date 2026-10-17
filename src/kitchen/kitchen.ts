@@ -1,13 +1,14 @@
 import { findCatalogItem } from '../catalog/generic';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { furnitureCorners, footprintsOverlap } from '../editor2d/furnitureGeometry';
-import { derivePlan } from '../model/derived';
+import { derivePlan, type DerivedPlan } from '../model/derived';
 import { newId } from '../model/ids';
 import type { Furniture, Project } from '../model/schema';
 import { roundMm } from '../model/units';
-import { add, dot, scale, sub } from '../model/vec';
+import { add, dot, scale, sub, type Vec2 } from '../model/vec';
 import { pruneGroups } from '../model/groups';
-import type { WallFootprint } from '../model/geometry/walls';
+import type { ResolvedOpening, WallFootprint } from '../model/geometry/walls';
+import { buildPlacementObstacles, collidingObstacles, furnitureObstacles, type Obstacle } from '../model/placement';
 
 /**
  * Modular kitchen planning on top of the shared furniture model.
@@ -49,19 +50,88 @@ export function wallFaceRange(fp: Pick<WallFootprint, 'a' | 'dir' | 'polygon'>, 
   return { s0: dot(sub(p0, fp.a), fp.dir), s1: dot(sub(p1, fp.a), fp.dir) };
 }
 
+/** Modules that hang above the run (or sit in the countertop) and do not advance it. */
+const ABOVE_TYPES = new Set(['wall', 'hood', 'cooktop']);
+/** Allowed penetration (m) before a module counts as blocked – covers mm rounding at flush corners. */
+const TOUCH_TOL = 0.002;
+
+export interface RunSlot {
+  catalogId: string;
+  name: string;
+  /** The module at its place along the wall (not yet in the project). */
+  furniture: Furniture;
+  /** Why the module cannot be placed there, or null when it stands free. */
+  problem: string | null;
+}
+
+export interface RunLayout {
+  slots: RunSlot[];
+  /** Usable face range along the wall (from the centreline start, metres), unconnected cross walls excluded. */
+  range: { s0: number; s1: number };
+}
+
+/** Wall obstacles that do not belong to the wall the run stands on. */
+function otherWallObstacles(derived: DerivedPlan, wallId: string): Obstacle[] {
+  return buildPlacementObstacles(derived).filter((o) => o.kind === 'wall' && o.refId !== wallId);
+}
+
+/** Projection interval of a polygon onto a direction. */
+function projRange(poly: Vec2[], origin: Vec2, dir: Vec2): [number, number] {
+  const ps = poly.map((q) => dot(sub(q, origin), dir));
+  return [Math.min(...ps), Math.max(...ps)];
+}
+
 /**
- * Place a row of kitchen modules flush against a wall face (back side on the face, wall
- * thickness taken into account) and starting at the face's corner, so no module stands in
- * the wall or in a connected wall (#16). Returns created item ids.
+ * Usable range of the wall face on `side` (#220): the face range from the wall polygon, further
+ * shortened by cross walls that stand in front of it without being connected in the plan
+ * (typical after a floor-plan import, where walls only touch or overlap).
  */
-export function placeKitchenRun(d: Project, input: PlaceRunInput): string[] {
-  const derived = derivePlan(d);
+export function usableFaceRange(derived: DerivedPlan, wallId: string, side: 1 | -1, depth = 0.6, height = 2.1): { s0: number; s1: number } | null {
+  const fp = derived.footprints.get(wallId);
+  if (!fp) return null;
+  const face = wallFaceRange(fp, side);
+  let s0 = Math.min(face.s0, face.s1);
+  let s1 = Math.max(face.s0, face.s1);
+  const walls = otherWallObstacles(derived, wallId);
+  const normal = scale(fp.normal, side);
+  const rotation = Math.atan2(fp.dir.y, fp.dir.x) + (side === 1 ? 0 : Math.PI);
+  // a probe strip in front of the face between stations a and b (shrunk by the touch tolerance)
+  const probe = (a: number, b: number) => {
+    const c = add(add(fp.a, scale(fp.dir, (a + b) / 2)), scale(normal, fp.thickness / 2 + depth / 2 + TOUCH_TOL));
+    return { x: c.x, y: c.y, rotation, width: Math.max(0.001, b - a - 2 * TOUCH_TOL), depth: depth - 2 * TOUCH_TOL, elevation: 0, height };
+  };
+  // cross walls covering the start push it past them; the first one further along ends the face
+  for (let i = 0; i < 8 && s1 > s0; i++) {
+    const hits = collidingObstacles(probe(s0, s1), walls).map((o) => projRange(o.polygon, fp.a, fp.dir));
+    const covering = hits.filter(([lo]) => lo <= s0 + TOUCH_TOL);
+    if (covering.length) {
+      s0 = Math.max(...covering.map(([, hi]) => hi));
+      continue;
+    }
+    if (hits.length) s1 = Math.min(s1, ...hits.map(([lo]) => lo));
+    break;
+  }
+  return { s0, s1: Math.max(s0, s1) };
+}
+
+/**
+ * Lay out a row of kitchen modules flush against a wall face (back side on the face, wall
+ * thickness taken into account), starting at the face's inner corner – also when the cross wall
+ * is not connected (#16, #220). Nothing is changed: every module gets its place and, if it does
+ * not stand free there, the reason (wall, door/window opening, door leaf, other furniture, or
+ * past the end of the wall). Blocked modules keep their slot, so the rest of the run stays put.
+ */
+export function layoutKitchenRun(d: Project, input: PlaceRunInput, derived: DerivedPlan = derivePlan(d)): RunLayout {
   const fp = derived.footprints.get(input.wallId);
   if (!fp) throw new Error('Wand nicht gefunden');
   const rotation = Math.atan2(fp.dir.y, fp.dir.x) + (input.side === 1 ? 0 : Math.PI);
   const normal = scale(fp.normal, input.side);
-  const ids: string[] = [];
-  let along = wallFaceRange(fp, input.side).s0 + input.start;
+  const range = usableFaceRange(derived, input.wallId, input.side) ?? wallFaceRange(fp, input.side);
+  const walls = buildPlacementObstacles(derived).filter((o) => o.kind !== 'furniture');
+  const openings = derived.openings.get(input.wallId) ?? [];
+  const accepted: Furniture[] = [];
+  const slots: RunSlot[] = [];
+  let along = range.s0 + input.start;
   for (const m of input.modules) {
     const item = findCatalogItem(m.catalogId);
     if (!item) continue;
@@ -69,12 +139,71 @@ export function placeKitchenRun(d: Project, input: PlaceRunInput): string[] {
     const center = add(add(fp.a, scale(fp.dir, along + width / 2)), scale(normal, fp.thickness / 2 + item.depth / 2 + 0.002));
     const f = createFurnitureFromCatalog({ ...item, width }, { x: roundMm(center.x), y: roundMm(center.y), rotation });
     if (f.kitchen && input.frontColor) f.kitchen.frontColor = input.frontColor;
-    d.furniture.push(f);
-    ids.push(f.id);
+    slots.push({ catalogId: m.catalogId, name: f.name, furniture: f, problem: runProblem(d, f, along, width, range, walls, openings, accepted) });
+    if (!slots[slots.length - 1].problem) accepted.push(f);
     // wall cabinets and hoods hang above base cabinets and do not advance the run
-    if (!(item.kitchen?.type === 'wall' || item.kitchen?.type === 'hood' || item.kitchen?.type === 'cooktop')) along += width;
+    if (!(item.kitchen && ABOVE_TYPES.has(item.kitchen.type))) along += width;
   }
-  return ids;
+  return { slots, range };
+}
+
+function runProblem(
+  d: Project,
+  f: Furniture,
+  along: number,
+  width: number,
+  range: { s0: number; s1: number },
+  walls: Obstacle[],
+  openings: ResolvedOpening[],
+  accepted: Furniture[],
+): string | null {
+  if (along + width > range.s1 + TOUCH_TOL) return 'passt nicht mehr auf die Wand (Zeile zu lang)';
+  const z0 = f.elevation;
+  const z1 = f.elevation + f.height;
+  // a door or window in the wall the run stands on: the module would stand in front of the opening
+  for (const r of openings) {
+    const lo = Math.min(r.s0, r.s1);
+    const hi = Math.max(r.s0, r.s1);
+    if (Math.min(along + width, hi) - Math.max(along, lo) > TOUCH_TOL && Math.min(z1, r.top) - Math.max(z0, r.bottom) > 0.005) {
+      return r.opening.kind === 'window' ? 'steht vor einem Fenster' : 'steht vor einer Tür';
+    }
+  }
+  // shrink by the touch tolerance so flush neighbours and corners (mm rounding) do not count
+  const probe = { ...f, width: f.width - 2 * TOUCH_TOL, depth: f.depth - 2 * TOUCH_TOL };
+  const hit = collidingObstacles(probe, walls)[0];
+  if (hit) return hit.kind === 'wall' ? 'würde in eine Wand ragen' : 'steht im geöffneten Türblatt';
+  if (f.solid !== false) {
+    const others = furnitureObstacles({ ...d, furniture: [...d.furniture, ...accepted] }, f);
+    const o = collidingObstacles(probe, others)[0];
+    if (o) {
+      const other = [...d.furniture, ...accepted].find((x) => x.id === o.refId);
+      return `überschneidet sich mit „${other?.name ?? 'einem Möbel'}“`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Place a row of kitchen modules (see `layoutKitchenRun`). Only modules that stand free are
+ * added; the others are returned in `skipped` with the reason (#220). Returns created item ids.
+ */
+export function placeKitchenRun(d: Project, input: PlaceRunInput): string[] {
+  return placeKitchenRunReport(d, input).ids;
+}
+
+export function placeKitchenRunReport(d: Project, input: PlaceRunInput): { ids: string[]; skipped: { name: string; problem: string }[] } {
+  const layout = layoutKitchenRun(d, input);
+  const ids: string[] = [];
+  const skipped: { name: string; problem: string }[] = [];
+  for (const s of layout.slots) {
+    if (s.problem) {
+      skipped.push({ name: s.name, problem: s.problem });
+      continue;
+    }
+    d.furniture.push(s.furniture);
+    ids.push(s.furniture.id);
+  }
+  return { ids, skipped };
 }
 
 const FLOOR_TYPES = new Set(['base', 'sink', 'dishwasher', 'oven']);
@@ -213,12 +342,12 @@ export function kitchenComponents(p: Project): { components: KitchenComponent[];
 
 /** Kitchen modules placed along a wall face: length used vs. available. */
 export function wallFaceLength(p: Project, wallId: string, side?: 1 | -1): number {
-  const fp = derivePlan(p).footprints.get(wallId);
-  if (!fp) return 0;
-  // usable face length = centerline length minus the thickness of connected walls
+  const derived = derivePlan(p);
+  if (!derived.footprints.get(wallId)) return 0;
+  // usable face length = centerline length minus connected walls and unconnected cross walls (#220)
   const len = (sd: 1 | -1) => {
-    const r = wallFaceRange(fp, sd);
-    return Math.abs(r.s1 - r.s0);
+    const r = usableFaceRange(derived, wallId, sd);
+    return r ? r.s1 - r.s0 : 0;
   };
   return side ? len(side) : Math.min(len(1), len(-1));
 }

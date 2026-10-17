@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { GENERIC_CATALOG } from '../../catalog/generic';
-import { generateCountertops, kitchenChecksForItem, kitchenComponents, placeKitchenRun, wallFaceLength, type RunModule } from '../../kitchen/kitchen';
+import { generateCountertops, kitchenChecksForItem, kitchenComponents, layoutKitchenRun, placeKitchenRunReport, wallFaceLength, type RunModule } from '../../kitchen/kitchen';
 import { formatEuro, formatLength } from '../../model/units';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
@@ -33,6 +33,15 @@ export function KitchenPanel() {
     if (!it || ['wall', 'hood', 'cooktop'].includes(it.kitchen!.type)) return s;
     return s + (m.width ?? it.width);
   }, 0);
+  // which modules would not stand free – shown before placing (#220)
+  // after placing, the run itself occupies its slots: show what was skipped until the input changes
+  const runKey = JSON.stringify([wallId, side, start, run]);
+  const [placed, setPlaced] = useState<{ key: string; skipped: { name: string; problem: string }[] } | null>(null);
+  const blocked = useMemo(() => {
+    if (placed?.key === runKey) return placed.skipped;
+    if (!wallId || !project.walls.some((w) => w.id === wallId)) return [];
+    return layoutKitchenRun(project, { wallId, side, start, modules: run }).slots.flatMap((s) => (s.problem ? [{ name: s.name, problem: s.problem }] : []));
+  }, [project, wallId, side, start, run, placed, runKey]);
   const comps = useMemo(() => kitchenComponents(project), [project]);
   const problems = useMemo(
     () =>
@@ -97,6 +106,18 @@ export function KitchenPanel() {
           <button onClick={() => setRun([...run, { catalogId: 'generic-k-base-60' }])}>+ Unterschrank</button>
           <button onClick={() => setRun([...run, { catalogId: 'generic-k-wall-60' }])}>+ Oberschrank</button>
         </div>
+        {blocked.length > 0 && (
+          <div className="warning small" data-testid="kitchen-run-blocked">
+            <p>{placed?.key === runKey ? 'Nicht gesetzt, weil sie hier nicht passen:' : 'Diese Module passen hier nicht und werden nicht gesetzt:'}</p>
+            <ul className="plain">
+              {blocked.map((s, i) => (
+                <li key={i}>
+                  {s.name}: {s.problem}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <label className="field">
           <span className="field-label">Frontfarbe</span>
           <span className="field-input">
@@ -109,11 +130,17 @@ export function KitchenPanel() {
           onClick={() => {
             if (!wallId) return;
             let n = 0;
+            let skipped: { name: string; problem: string }[] = [];
             apply((d) => {
-              n = placeKitchenRun(d, { wallId, side, start, modules: run, frontColor }).length;
-              generateCountertops(d);
+              const r = placeKitchenRunReport(d, { wallId, side, start, modules: run, frontColor });
+              n = r.ids.length;
+              skipped = r.skipped;
+              if (n) generateCountertops(d);
             });
-            useUiStore.getState().toast(`${n} Küchenmodule platziert, Arbeitsplatten erzeugt.`, 'success');
+            setPlaced({ key: runKey, skipped });
+            const ui = useUiStore.getState();
+            if (!skipped.length) ui.toast(`${n} Küchenmodule platziert, Arbeitsplatten erzeugt.`, 'success');
+            else ui.toast(`${n} Küchenmodule platziert, ${skipped.length} passten nicht (siehe Liste).`, n ? 'info' : 'error');
           }}
         >
           Küchenzeile platzieren
