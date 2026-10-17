@@ -1,0 +1,41 @@
+/* Claude-Anbindung (#151) */
+.assistant-question {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+.assistant-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.assistant-card {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+.assistant-card h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+.assistant-card p {
+  margin: 0;
+}
+.assistant-card .btn-row {
+  margin-top: var(--space-1);
+}
+.assistant-preview {
+  border-top: 1px dashed var(--color-border);
+  padding-top: var(--space-1);
+}
