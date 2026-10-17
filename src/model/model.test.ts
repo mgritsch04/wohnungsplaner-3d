@@ -213,3 +213,15 @@ describe('settings', () => {
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, lamps: 'dim' } })).toThrow();
   });
 });
+
+describe('furniture material (#63)', () => {
+  it('is saved with the project and optional for older projects', () => {
+    const p = createSampleProject();
+    expect(p.furniture.length).toBeGreaterThan(0);
+    const withFinish = { ...p, furniture: p.furniture.map((f, i) => (i === 0 ? { ...f, finish: 'leather' as const } : f)) };
+    const back = ProjectSchema.parse(JSON.parse(JSON.stringify(withFinish)));
+    expect(back.furniture[0].finish).toBe('leather');
+    expect(back.furniture[1]?.finish).toBeUndefined();
+    expect(() => ProjectSchema.parse({ ...p, furniture: [{ ...p.furniture[0], finish: 'gold' }] })).toThrow();
+  });
+});

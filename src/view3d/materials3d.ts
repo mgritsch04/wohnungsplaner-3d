@@ -9,7 +9,7 @@ import type { Material, QualityMode } from '../model/schema';
 const cache = new Map<string, THREE.Material>();
 const textureCache = new Map<string, { map: THREE.Texture; bump: THREE.Texture }>();
 
-export type DetailKind = 'planks' | 'tile' | 'stone' | 'concrete' | 'carpet' | 'plaster' | 'fabric' | 'woodgrain';
+export type DetailKind = 'planks' | 'tile' | 'stone' | 'concrete' | 'carpet' | 'plaster' | 'fabric' | 'woodgrain' | 'leather';
 
 const SURFACE_DETAIL: Partial<Record<Material['kind'], DetailKind>> = {
   wood: 'planks',
@@ -22,7 +22,7 @@ const SURFACE_DETAIL: Partial<Record<Material['kind'], DetailKind>> = {
 };
 
 /** Relief strength per detail kind (bump scale). */
-const BUMP: Record<DetailKind, number> = { planks: 0.6, tile: 1.2, stone: 0.8, concrete: 0.5, carpet: 1.0, plaster: 0.25, fabric: 0.8, woodgrain: 0.3 };
+const BUMP: Record<DetailKind, number> = { planks: 0.6, tile: 1.2, stone: 0.8, concrete: 0.5, carpet: 1.0, plaster: 0.25, fabric: 0.8, woodgrain: 0.3, leather: 0.5 };
 
 /**
  * Colour-neutral detail textures (light grey values, multiplied with the
@@ -118,6 +118,10 @@ export function detailTexture(kind: DetailKind): { map: THREE.Texture; bump: THR
         ctx.fillRect(x, y, 4, 4);
       }
     noise(0.18, 0.6);
+  } else if (kind === 'leather') {
+    // fine pebbled grain
+    noise(0.22, 1.2);
+    noise(0.06);
   } else if (kind === 'carpet') {
     noise(0.35, 0.8);
   } else if (kind === 'plaster') {

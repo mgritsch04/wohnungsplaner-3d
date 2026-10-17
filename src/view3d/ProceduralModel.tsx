@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type { QualityMode } from '../model/schema';
+import type { FurnitureFinish, QualityMode } from '../model/schema';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
 import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
@@ -80,10 +80,25 @@ export interface Part {
   detailRepeat?: number;
 }
 
+/** Colours of the item's main parts (its colour and shades of it), collected while `buildParts` runs. */
+let tones: Set<string> | null = null;
+
 function shade(hex: string, f: number): string {
   const c = new THREE.Color(hex).multiplyScalar(f);
-  return `#${c.getHexString()}`;
+  const out = `#${c.getHexString()}`;
+  if (tones?.has(hex.toLowerCase())) tones.add(out);
+  return out;
 }
+
+/** Surface look per chosen furniture material (#63). */
+const FINISH_LOOK: Record<FurnitureFinish, Pick<Part, 'rough' | 'metal' | 'detail' | 'detailRepeat'>> = {
+  fabric: { rough: 0.95, metal: 0, detail: 'fabric', detailRepeat: 3 },
+  leather: { rough: 0.45, metal: 0, detail: 'leather', detailRepeat: 2 },
+  wood: { rough: 0.55, metal: 0, detail: 'woodgrain', detailRepeat: 1 },
+  lacquer: { rough: 0.2, metal: 0, detail: undefined, detailRepeat: undefined },
+  metal: { rough: 0.3, metal: 0.85, detail: undefined, detailRepeat: undefined },
+  stone: { rough: 0.25, metal: 0, detail: 'stone', detailRepeat: 1 },
+};
 
 /** Box from min corner (x0,y0,z0) to max corner. */
 const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, color: string, extra: Partial<Part> = {}): Part => ({
@@ -113,7 +128,25 @@ const WOOD = '#8a6748';
 const METAL = '#a7abb0';
 const BLACK = '#26272a';
 
-export function buildParts(shape: string, w: number, d: number, h: number, color: string, accent?: string): Part[] {
+/**
+ * Parts of a procedural model. With a `finish` (#63) the main parts, i.e. those in the item colour
+ * or a shade of it, get that material's surface; fixed parts (metal feet, glass, glowing shades) keep theirs.
+ */
+export function buildParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, finish?: FurnitureFinish): Part[] {
+  if (!finish) return shapeParts(shape, w, d, h, color, accent);
+  const own = new Set([color.toLowerCase()]);
+  tones = own;
+  let parts: Part[];
+  try {
+    parts = shapeParts(shape, w, d, h, color, accent);
+  } finally {
+    tones = null;
+  }
+  const look = FINISH_LOOK[finish];
+  return parts.map((p) => (own.has(p.color.toLowerCase()) && !p.emissive && (p.opacity ?? 1) === 1 ? { ...p, ...look } : p));
+}
+
+function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string): Part[] {
   const W = w / 2;
   const D = d / 2;
   const front = accent ?? color;
@@ -411,6 +444,7 @@ export const ProceduralModel = memo(function ProceduralModel({
   height,
   color,
   accent,
+  finish,
   quality,
   castShadow,
 }: {
@@ -420,10 +454,11 @@ export const ProceduralModel = memo(function ProceduralModel({
   height: number;
   color: string;
   accent?: string;
+  finish?: FurnitureFinish;
   quality: QualityMode;
   castShadow: boolean;
 }) {
-  const parts = useMemo(() => buildParts(shape, width, depth, height, color, accent), [shape, width, depth, height, color, accent]);
+  const parts = useMemo(() => buildParts(shape, width, depth, height, color, accent, finish), [shape, width, depth, height, color, accent, finish]);
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
   const materials = useMemo(
     () =>
