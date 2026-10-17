@@ -16,6 +16,7 @@ import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
 import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
+import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 
 interface Props {
   derived: DerivedPlan;
@@ -121,21 +122,24 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useEffect(() => {
     const el = gl.domElement;
     const pressed = keys.current;
-    /** First visible object under the crosshair (walls and floor in front of it block the view). */
-    const aimed = (): THREE.Object3D | null => {
-      raycaster.setFromCamera(CENTER, camera);
+    /**
+     * First visible object under the crosshair – or under `at` (normalized device coordinates,
+     * the mouse without pointer lock); walls and floor in front of it block the view.
+     */
+    const aimed = (at: THREE.Vector2 = CENTER): THREE.Object3D | null => {
+      raycaster.setFromCamera(at, camera);
       raycaster.far = PICK_RANGE;
       for (const h of raycaster.intersectObjects(scene.children, true)) {
-        if (!(h.object as THREE.Mesh).isMesh || !h.object.visible) continue;
+        if (!(h.object as THREE.Mesh).isMesh || !h.object.visible || isClippedHit(h)) continue;
         return h.object;
       }
       return null;
     };
     /** Furniture under the crosshair. */
-    const target = (): string | null => furnitureIdOf(aimed());
+    const target = (at?: THREE.Vector2): string | null => furnitureIdOf(aimed(at));
     /** Door/window under the crosshair (#21). */
-    const targetOpening = (): string | null => {
-      const o = aimed();
+    const targetOpening = (at?: THREE.Vector2): string | null => {
+      const o = aimed(at);
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
     /** E/O: open/close the door/window in sight, else the selected one. */
@@ -166,15 +170,18 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       const id = target() ?? (sel?.type === 'furniture' ? sel.id : null);
       if (id) startCarry(id);
     };
-    const pickOrDrop = () => {
+    // the walkthrough selects only here, at the crosshair (#185): the scene's own click handlers
+    // are off while walking – under pointer lock they would pick at the stale mouse position
+    // (usually the wall or floor behind the furniture) and overwrite this selection
+    const pickOrDrop = (at?: THREE.Vector2) => {
       if (carry.current) return dropCarry(true);
-      const id = target();
+      const id = target(at);
       if (id) return useUiStore.getState().setSelection({ type: 'furniture', id });
       // a door or window in sight is opened or closed (#21)
-      const opening = targetOpening();
+      const opening = targetOpening(at);
       if (opening) toggleOpening(opening);
     };
-    walkApi.current = { toggleCarry, pickOrDrop, target, targetOpening, toggleOpening: toggleAimedOpening };
+    walkApi.current = { toggleCarry, pickOrDrop: () => pickOrDrop(), target: () => target(), targetOpening: () => targetOpening(), toggleOpening: toggleAimedOpening };
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -232,8 +239,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     // (lastTouch) must not ask for pointer lock
     let touchLook: { id: number; x: number; y: number; sx: number; sy: number; t: number } | null = null;
     let lastTouch = 0;
+    // without pointer lock (refused, e.g. in an embedded page): a short click picks under the mouse
+    let downAt: { x: number; y: number } | null = null;
     const onDown = (e: MouseEvent) => {
       if (performance.now() - lastTouch < 1000) return;
+      downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
       if (document.pointerLockElement === el) {
         // locked: a click selects the furniture under the crosshair (or opens/closes the door or
         // window there), or drops the carried one
@@ -249,7 +259,16 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         }
       } else dragLook.current = { x: e.clientX, y: e.clientY };
     };
-    const onUp = () => (dragLook.current = null);
+    const onUp = (e: MouseEvent) => {
+      const d = downAt;
+      downAt = null;
+      const fallback = dragLook.current !== null && document.pointerLockElement !== el;
+      dragLook.current = null;
+      if (!fallback || !d || e.button !== 0 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_THRESHOLD_PX) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return;
+      pickOrDrop(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1));
+    };
     // a finger drag turns the view, a short tap selects / opens like a click
     const onTouchDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
