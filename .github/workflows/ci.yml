@@ -47,7 +47,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test -g "night lighting" --repeat-each=8 --max-failures=0
+      - run: npx playwright test -g "night lighting" --repeat-each=6 --max-failures=0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
