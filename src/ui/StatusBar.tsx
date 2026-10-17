@@ -19,7 +19,7 @@ export function StatusBar() {
       <span>Werkzeug: {toolLabel}</span>
       <span>{cursor ? `x ${(cursor.x * 100).toFixed(0)} cm · y ${(cursor.y * 100).toFixed(0)} cm` : '—'}</span>
       <span title="Bildschirm-Pixel pro Meter">1 m = {zoom.toFixed(0)} px</span>
-      {selection && <span>Auswahl: {{ wall: 'Wand', node: 'Ecke', room: 'Raum', opening: 'Öffnung', furniture: 'Objekt', light: 'Leuchte' }[selection.type]}</span>}
+      {selection && <span>Auswahl: {{ wall: 'Wand', node: 'Ecke', room: 'Raum', opening: 'Öffnung', furniture: 'Objekt', light: 'Leuchte', device: 'Smart-Home-Gerät' }[selection.type]}</span>}
       {underlay && <span className={underlay.calibrated ? '' : 'warn-text'}>Plan: {underlay.calibrated ? 'kalibriert' : underlay.scaleSource === 'notation' ? 'Maßstab angenommen' : 'NICHT kalibriert'}</span>}
       <span className="spacer" />
       {suggest && quality === 'realism' && (

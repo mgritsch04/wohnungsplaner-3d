@@ -1,129 +1,226 @@
 import { useMemo, useState } from 'react';
-import { derivePlan } from '../model/derived';
+import { derivePlan, type DerivedPlan } from '../model/derived';
 import type { Automation, Project, SmartDevice, SmartDeviceKind } from '../model/schema';
 import { polygonCentroid } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
+import { useUiStore } from '../store/uiStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../ui/fields';
 import { downloadBlob, safeFileName } from '../ui/fileUtils';
-import { addAutomationFor, addDevice, deleteAutomation, deleteDevice, roomAt, updateAutomation, updateDevice } from './actions';
-import { DEVICE_PRODUCTS, KIND_LABEL, productById } from './catalog';
+import { addAutomationFor, deleteAutomation, placeDevice, roomAt, updateAutomation } from './actions';
+import { DEVICE_PRODUCTS, KIND_LABEL } from './catalog';
+import { deviceOn, statusLabel } from './DeviceInfo';
+import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
-import { formatSimHour, occludersOf, roomCoverage, sensorParams } from './simulation';
-import { SPEEDS, useSimStore } from './simStore';
+import { ruleSentence } from './rules';
+import { formatSimHour, occludersOf, roomCoverage } from './simulation';
+import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
 
 const GENERIC = '__generic';
 const KINDS = Object.keys(KIND_LABEL) as SmartDeviceKind[];
 const isSensor = (d: SmartDevice) => d.kind === 'motion' || d.kind === 'presence';
-const deg = (rad: number) => Math.round(((((rad * 180) / Math.PI) % 360) + 360) % 360);
+const OUTSIDE = '__outside';
+
+/** Room the panel works in: chosen in the panel, else the room or device selected in the plan, else the first room. */
+function useActiveRoom(project: Project, derived: DerivedPlan) {
+  const [chosen, setChosen] = useState('');
+  const selection = useUiStore((s) => s.selection);
+  const fromSelection =
+    selection?.type === 'room'
+      ? selection.id
+      : selection?.type === 'device'
+        ? (() => {
+            const d = project.devices.find((x) => x.id === selection.id);
+            return d ? roomAt(project, derived, d) : null;
+          })()
+        : null;
+  const room = project.rooms.find((r) => r.id === chosen) ?? project.rooms.find((r) => r.id === fromSelection) ?? project.rooms[0];
+  return [room, setChosen] as const;
+}
 
 /**
- * Smart-home simulation (#170): place devices from the catalog (datasheet values with
- * sources), link them with automations, run the simulation with a person in the plan or
- * the walkthrough, check the coverage per room and export the automations for
- * Home Assistant. Nothing connects to real devices.
+ * Smart-home simulation (#170, #233) in three steps: place devices (datasheet values with
+ * sources) by room or by a click into the plan, link them with rules, and test them with a
+ * person in the plan or in the walkthrough. Clicking a device in 2D/3D shows its info and
+ * actions under „Eigenschaften“. Nothing connects to real devices.
  */
 export function SmartHomePanel() {
   const project = useProjectStore((s) => s.project);
   const derived = useMemo(() => derivePlan(project), [project]);
-  const { running, speed, state, selectedDeviceId, start, stop, setSpeed, setPerson, select } = useSimStore();
-  const [roomId, setRoomId] = useState<string>('');
-  const [kind, setKind] = useState<SmartDeviceKind>('motion');
-  const [productId, setProductId] = useState<string>(DEVICE_PRODUCTS.find((p) => p.kind === 'motion')?.id ?? GENERIC);
-  const room = project.rooms.find((r) => r.id === roomId) ?? project.rooms[0];
-  const coverage = useMemo(() => roomCoverage(project, derived, occludersOf(project, derived)), [project, derived]);
-  const selected = project.devices.find((d) => d.id === selectedDeviceId) ?? null;
-
-  const products = DEVICE_PRODUCTS.filter((p) => p.kind === kind);
-  const onKind = (k: SmartDeviceKind) => {
-    setKind(k);
-    setProductId(DEVICE_PRODUCTS.find((p) => p.kind === k)?.id ?? GENERIC);
-  };
-  const add = () => select(addDevice(kind, productId === GENERIC ? undefined : productId, room?.id ?? null));
-  const placePerson = () => {
-    const g = room && derived.rooms.get(room.id);
-    if (g) setPerson(polygonCentroid(g.interior));
-  };
-  const exportYaml = () => downloadBlob(automationsYaml(project), `${safeFileName(project.name)}-automations.yaml`, 'text/yaml');
+  const step = useSimStore((s) => s.step);
+  const setStep = useSimStore((s) => s.setStep);
+  const [room, setRoomId] = useActiveRoom(project, derived);
+  const steps: { id: PanelStep; label: string }[] = [
+    { id: 'devices', label: `Geräte (${project.devices.length})` },
+    { id: 'rules', label: `Regeln (${project.automations.length})` },
+    { id: 'test', label: 'Testen' },
+  ];
 
   return (
     <div className={`panel-scroll ${css.panel}`} data-testid="smarthome-panel">
-      <Section title="Smart Home simulieren">
-        <p className="muted small">
-          Geräte mit Werten aus dem Datenblatt platzieren, mit Automationen verknüpfen und testen: Die Person im Plan (ziehbar) oder du selbst im Rundgang löst die
-          Melder aus. Keine Verbindung zu echten Geräten.
-        </p>
-        {project.rooms.length === 0 && <p className="warning small">Bitte zuerst Räume anlegen (Werkzeuge › Raum).</p>}
-        <SelectField label="Raum" value={room?.id ?? ''} options={project.rooms.map((r) => ({ value: r.id, label: r.name }))} onChange={setRoomId} />
-        <div className="btn-row">
-          {running ? (
-            <button className="primary" onClick={stop} data-testid="sim-stop">
-              Simulation stoppen
-            </button>
-          ) : (
-            <button className="primary" onClick={start} disabled={!project.devices.length} data-testid="sim-start">
-              Simulation starten
-            </button>
-          )}
-          <button onClick={placePerson} disabled={!room} data-testid="sim-person">
-            Person in den Raum stellen
+      <nav className={css.steps} aria-label="Smart-Home-Schritte">
+        {steps.map((s, i) => (
+          <button key={s.id} className={step === s.id ? css.stepActive : undefined} aria-pressed={step === s.id} onClick={() => setStep(s.id)} data-testid={`sh-step-${s.id}`}>
+            <span className={css.stepNo}>{i + 1}</span> {s.label}
           </button>
-        </div>
-        <SelectField label="Tempo" value={String(speed)} options={SPEEDS.map((s) => ({ value: String(s), label: s === 1 ? 'Echtzeit' : `${s}× schneller` }))} onChange={(v) => setSpeed(Number(v))} />
-        {state && (
-          <p className="small" data-testid="sim-clock">
-            Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
-          </p>
-        )}
-      </Section>
+        ))}
+      </nav>
+      {project.rooms.length === 0 && <p className="warning small panel-section">Bitte zuerst Räume anlegen (Werkzeuge › Raum).</p>}
+      {step === 'devices' && <DevicesStep project={project} derived={derived} room={room} setRoomId={setRoomId} />}
+      {step === 'rules' && <RulesStep project={project} />}
+      {step === 'test' && <TestStep project={project} derived={derived} room={room} setRoomId={setRoomId} />}
+    </div>
+  );
+}
 
+type RoomProps = { project: Project; derived: DerivedPlan; room: Project['rooms'][number] | undefined; setRoomId: (id: string) => void };
+
+function RoomSelect({ project, room, setRoomId }: Omit<RoomProps, 'derived'>) {
+  return <SelectField label="Raum" value={room?.id ?? ''} options={project.rooms.map((r) => ({ value: r.id, label: r.name }))} onChange={setRoomId} />;
+}
+
+function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
+  const [kind, setKind] = useState<SmartDeviceKind>('motion');
+  const [productId, setProductId] = useState<string>(DEVICE_PRODUCTS.find((p) => p.kind === 'motion')?.id ?? GENERIC);
+  const placing = useSimStore((s) => s.placing);
+  const setPlacing = useSimStore((s) => s.setPlacing);
+  const products = DEVICE_PRODUCTS.filter((p) => p.kind === kind);
+  const product = productId === GENERIC ? undefined : productId;
+  const onKind = (k: SmartDeviceKind) => {
+    setKind(k);
+    setProductId(DEVICE_PRODUCTS.find((p) => p.kind === k)?.id ?? GENERIC);
+    if (placing) setPlacing({ kind: k, productId: DEVICE_PRODUCTS.find((p) => p.kind === k)?.id });
+  };
+  const clickToPlace = () => {
+    if (placing) return setPlacing(null);
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    setPlacing({ kind, productId: product });
+  };
+
+  return (
+    <>
       <Section title="Gerät hinzufügen">
-        <SelectField label="Art" value={kind} options={KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] }))} onChange={onKind} />
+        <div className={css.kinds} role="group" aria-label="Geräteart">
+          {KINDS.map((k) => (
+            <button key={k} className={k === kind ? `${css.kind} ${css.kindActive}` : css.kind} aria-pressed={k === kind} onClick={() => onKind(k)} data-testid="device-kind" data-kind={k}>
+              <span style={{ color: KIND_COLOR[k] }}>
+                <DeviceGlyph kind={k} size={22} />
+              </span>
+              {KIND_LABEL[k]}
+            </button>
+          ))}
+        </div>
         <SelectField
           label="Produkt"
           value={productId}
           options={[...products.map((p) => ({ value: p.id, label: `${p.brand} ${p.model}` })), { value: GENERIC, label: 'Allgemein (Annahmewerte)' }]}
-          onChange={setProductId}
+          onChange={(v) => {
+            setProductId(v);
+            if (placing) setPlacing({ kind, productId: v === GENERIC ? undefined : v });
+          }}
         />
-        <button className="primary block" onClick={add} disabled={!room} data-testid="device-add">
-          In „{room?.name ?? '–'}“ platzieren
-        </button>
+        <RoomSelect project={project} room={room} setRoomId={setRoomId} />
+        <div className="btn-row">
+          <button className="primary" onClick={() => placeDevice(kind, product, room?.id ?? null)} disabled={!room} data-testid="device-add">
+            In „{room?.name ?? '–'}“ platzieren
+          </button>
+          <button onClick={clickToPlace} aria-pressed={!!placing} data-testid="device-place-click">
+            {placing ? 'Abbrechen' : 'Im Plan klicken'}
+          </button>
+        </div>
+        {placing && (
+          <p className={`small ${css.hint}`} data-testid="device-placing-hint">
+            Klicke im 2D-Plan dorthin, wo {KIND_LABEL[placing.kind]} hin soll. Esc bricht ab.
+          </p>
+        )}
       </Section>
+      <DeviceList project={project} derived={derived} />
+    </>
+  );
+}
 
-      <Section title={`Geräte (${project.devices.length})`}>
-        {project.devices.length === 0 && <p className="muted small">Noch keine Geräte.</p>}
-        <ul className={css.list}>
-          {project.devices.map((d) => {
-            const e = state?.entities[d.id];
-            return (
-              <li key={d.id}>
-                <button className={d.id === selectedDeviceId ? `${css.row} ${css.active}` : css.row} onClick={() => select(d.id === selectedDeviceId ? null : d.id)} data-testid="device-row" data-device={d.name}>
-                  <span>{d.name}</span>
-                  {e && <Badge kind={e.on ? 'ok' : 'muted'}>{stateLabel(d, e.on, e.brightness)}</Badge>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        {selected && <DeviceDetails project={project} device={selected} />}
+/** Devices grouped by room with live status and the sensor coverage of the room. */
+function DeviceList({ project, derived }: { project: Project; derived: DerivedPlan }) {
+  const entities = useSimStore((s) => s.state?.entities);
+  const selectedId = useSelectedDeviceId();
+  const coverage = useMemo(() => (project.devices.some(isSensor) ? roomCoverage(project, derived, occludersOf(project, derived)) : null), [project, derived]);
+  if (!project.devices.length) return <p className="muted small panel-section">Noch keine Geräte. Art wählen und platzieren, dann erscheint das Gerät im Plan und hier.</p>;
+  const groups = new Map<string, SmartDevice[]>();
+  for (const d of project.devices) {
+    const r = roomAt(project, derived, d) ?? OUTSIDE;
+    groups.set(r, [...(groups.get(r) ?? []), d]);
+  }
+  const rows = [...project.rooms.map((r) => ({ id: r.id, name: r.name })), { id: OUTSIDE, name: 'Außerhalb der Räume' }];
+  const select = (id: string) => useUiStore.getState().setSelection(id === selectedId ? null : { type: 'device', id });
+  return (
+    <Section title={`Geräte im Plan (${project.devices.length})`}>
+      {rows.map((r) => {
+        const list = groups.get(r.id) ?? [];
+        const share = coverage?.get(r.id);
+        if (!list.length && share === undefined) return null;
+        return (
+          <div key={r.id} className={css.group}>
+            <div className={css.groupHead} data-testid={share !== undefined ? 'coverage' : undefined} data-room={r.name} data-share={share?.toFixed(3)}>
+              <strong>{r.name}</strong>
+              {share !== undefined && (
+                <span className="small" title="Anteil der Bodenfläche im Erfassungsbereich der Melder (Reichweite, Winkel, Sichtlinie; Wände und geschlossene Türen blockieren)">
+                  <span className={css.bar}>
+                    <span style={{ width: `${Math.round(share * 100)}%` }} />
+                  </span>
+                  {Math.round(share * 100)} % erfasst
+                </span>
+              )}
+            </div>
+            {list.length === 0 && <p className="muted small">Keine Geräte.</p>}
+            <ul className={css.list}>
+              {list.map((d) => {
+                const st = deviceOn(project, d, entities);
+                return (
+                  <li key={d.id}>
+                    <button className={d.id === selectedId ? `${css.row} ${css.active}` : css.row} onClick={() => select(d.id)} data-testid="device-row" data-device={d.name}>
+                      <span className={css.inline}>
+                        <span style={{ color: KIND_COLOR[d.kind] }}>
+                          <DeviceGlyph kind={d.kind} size={18} />
+                        </span>
+                        <span>{d.name}</span>
+                      </span>
+                      <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness)}</Badge>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+      <p className="muted small">Gerät anklicken (hier, im Plan oder in 3D) für Infos und Aktionen unter „Eigenschaften“.</p>
+    </Section>
+  );
+}
+
+function RulesStep({ project }: { project: Project }) {
+  const triggers = project.devices.filter((d) => isSensor(d) || d.kind === 'contact');
+  const [sensorId, setSensorId] = useState('');
+  const sensor = triggers.find((d) => d.id === sensorId) ?? triggers[0];
+  const exportYaml = () => downloadBlob(automationsYaml(project), `${safeFileName(project.name)}-automations.yaml`, 'text/yaml');
+  return (
+    <>
+      <Section title="Neue Regel">
+        {triggers.length === 0 ? (
+          <p className="muted small">Für eine Regel zuerst einen Bewegungs-/Präsenzmelder oder Tür-/Fensterkontakt platzieren (Schritt 1).</p>
+        ) : (
+          <>
+            <SelectField label="Auslöser" value={sensor?.id ?? ''} options={triggers.map((d) => ({ value: d.id, label: d.name }))} onChange={setSensorId} />
+            <button className="primary block" onClick={() => sensor && addAutomationFor(sensor.id)} data-testid="automation-add">
+              Regel anlegen
+            </button>
+            <p className="muted small">Vorschlag: Lampen im selben Raum gehen an, wenn es dunkel ist; danach alles anpassbar.</p>
+          </>
+        )}
       </Section>
-
-      {project.devices.some(isSensor) && (
-        <Section title="Abdeckung durch Melder">
-          <ul className={css.list}>
-            {project.rooms.map((r) => (
-              <li key={r.id} className={css.cover} data-testid="coverage" data-room={r.name} data-share={(coverage.get(r.id) ?? 0).toFixed(3)}>
-                <span>{r.name}</span>
-                <span>{Math.round((coverage.get(r.id) ?? 0) * 100)} %</span>
-              </li>
-            ))}
-          </ul>
-          <p className="muted small">Anteil der Bodenfläche im Erfassungsbereich (Reichweite, Winkel, Sichtlinie; Wände und geschlossene Türen blockieren).</p>
-        </Section>
-      )}
-
-      <Section title={`Automationen (${project.automations.length})`}>
-        {project.automations.length === 0 && <p className="muted small">Gerät auswählen › „Automation anlegen“.</p>}
+      <Section title={`Regeln (${project.automations.length})`}>
+        {project.automations.length === 0 && <p className="muted small">Noch keine Regel.</p>}
         {project.automations.map((a) => (
           <AutomationEditor key={a.id} project={project} a={a} />
         ))}
@@ -131,123 +228,23 @@ export function SmartHomePanel() {
           Als Home-Assistant-YAML herunterladen
         </button>
       </Section>
-
-      {state && state.events.length > 0 && (
-        <Section title="Protokoll">
-          <ol className={css.log} data-testid="sim-log">
-            {state.events
-              .slice(-8)
-              .reverse()
-              .map((ev, i) => (
-                <li key={`${ev.t}-${i}`}>
-                  <span className="muted">{formatSimHour(ev.hour)}</span> {ev.text}
-                </li>
-              ))}
-          </ol>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function stateLabel(d: SmartDevice, on: boolean, brightness?: number) {
-  if (d.kind === 'contact') return on ? 'offen' : 'zu';
-  if (d.kind === 'light') return on ? `an ${brightness ?? 100} %` : 'aus';
-  if (d.kind === 'plug') return on ? 'an' : 'aus';
-  return on ? 'Bewegung' : 'ruhig';
-}
-
-function DeviceDetails({ project, device: d }: { project: Project; device: SmartDevice }) {
-  const product = productById(d.productId);
-  const params = isSensor(d) ? sensorParams(d) : null;
-  const assumed = <Badge kind="warn" title="Kein Datenblattwert – Annahme, bitte prüfen">Annahme</Badge>;
-  return (
-    <div className={css.details} data-testid="device-details">
-      <TextField label="Name" value={d.name} onChange={(name) => updateDevice(d.id, { name })} />
-      {product ? (
-        <div className="small">
-          <strong>
-            {product.brand} {product.model}
-          </strong>
-          <br />
-          {product.protocol} · {product.power}
-          {product.batteryLife ? ` · Batterie ${product.batteryLife}` : ''}
-          <br />
-          Mesh-Router: {product.router === 'stated' ? 'ja' : product.router === 'inferred' ? 'vermutlich (Netzbetrieb)' : product.router === 'no' ? 'nein (Batterie)' : 'unbekannt'}
-          {product.note && <p className="muted">{product.note}</p>}
-          <p className="muted">
-            {product.sourceKind === 'manufacturer' ? 'Quelle Hersteller' : 'Quelle Händler/Presse'}:{' '}
-            {product.sources.map((s, i) => (
-              <a key={s} href={s} target="_blank" rel="noreferrer">
-                [{i + 1}]
-              </a>
-            ))}{' '}
-            · Stand 17.10.2026, vor dem Kauf prüfen
-          </p>
-        </div>
-      ) : (
-        <p className="muted small">Allgemeines Gerät ohne Produktdaten.</p>
-      )}
-      {params && (
-        <>
-          <div className={css.inline}>
-            <NumberField label="Reichweite" unit="m" value={params.rangeM} min={0.5} max={20} onChange={(rangeM) => updateDevice(d.id, { rangeM })} />
-            {params.assumed.range && assumed}
-          </div>
-          <div className={css.inline}>
-            <NumberField label="Winkel" unit="°" digits={0} value={params.angleDeg} min={10} max={360} onChange={(angleDeg) => updateDevice(d.id, { angleDeg })} />
-            {params.assumed.angle && assumed}
-          </div>
-          <div className={css.inline}>
-            <NumberField
-              label="Haltezeit"
-              unit="s"
-              digits={0}
-              value={params.holdS}
-              min={1}
-              max={3600}
-              onChange={(holdS) => updateDevice(d.id, { holdS })}
-              title="So lange meldet der Sensor nach der letzten Bewegung noch „Bewegung“"
-            />
-            {params.assumed.hold && assumed}
-          </div>
-          <NumberField label="Blickrichtung" unit="°" digits={0} value={deg(d.rotation)} min={0} max={360} onChange={(v) => updateDevice(d.id, { rotation: (v * Math.PI) / 180 })} />
-        </>
-      )}
-      {d.kind === 'contact' && (
-        <SelectField
-          label="Fenster/Tür"
-          value={d.openingId ?? ''}
-          options={[{ value: '', label: '–' }, ...project.openings.filter((o) => o.kind !== 'passage').map((o, i) => ({ value: o.id, label: `${o.kind === 'door' ? 'Tür' : 'Fenster'} ${i + 1}` }))]}
-          onChange={(openingId) => updateDevice(d.id, { openingId: openingId || undefined })}
-        />
-      )}
-      <NumberField label="Höhe" unit="m" digits={2} value={d.elevation} min={0} max={10} onChange={(elevation) => updateDevice(d.id, { elevation })} />
-      <div className="btn-row">
-        {(isSensor(d) || d.kind === 'contact') && (
-          <button onClick={() => addAutomationFor(d.id)} data-testid="automation-add">
-            Automation anlegen
-          </button>
-        )}
-        <button className="danger" onClick={() => deleteDevice(d.id)}>
-          Entfernen
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
 
 function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
   const derived = useMemo(() => derivePlan(project), [project]);
-  const trigger = project.devices.find((d) => 'deviceId' in a.trigger && d.id === a.trigger.deviceId);
   const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug');
   const roomName = (d: SmartDevice) => project.rooms.find((r) => r.id === roomAt(project, derived, d))?.name;
+  const s = ruleSentence(project, a);
   return (
-    <div className={css.automation} data-testid="automation" data-name={a.name}>
+    <details className={css.automation} data-testid="automation" data-name={a.name}>
+      <summary>
+        <span className={a.enabled ? undefined : 'muted'}>
+          {s.when}, {s.then}.
+        </span>
+      </summary>
       <TextField label="Name" value={a.name} onChange={(name) => updateAutomation(a.id, (x) => void (x.name = name))} />
-      <p className="small">
-        Wenn: {a.trigger.type === 'time' ? `es ${formatSimHour(a.trigger.hour)} ist` : a.trigger.type === 'contact' ? `${trigger?.name ?? '?'} ${a.trigger.to === 'open' ? 'geöffnet' : 'geschlossen'} wird` : `${trigger?.name ?? '?'} Bewegung meldet`}
-      </p>
       <CheckField label="Aktiv" checked={a.enabled} onChange={(v) => updateAutomation(a.id, (x) => void (x.enabled = v))} />
       <CheckField label="Nur wenn es dunkel ist" checked={a.onlyWhenDark} onChange={(v) => updateAutomation(a.id, (x) => void (x.onlyWhenDark = v))} />
       <p className="small">Dann einschalten:</p>
@@ -265,8 +262,58 @@ function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
         <NumberField label="Aus nach" unit="s" digits={0} value={a.offAfterS ?? 0} min={0} max={7200} onChange={(v) => updateAutomation(a.id, (x) => void (x.offAfterS = v))} title="Sekunden ohne Bewegung, bis das Licht wieder ausgeht" />
       )}
       <button className="small danger" onClick={() => deleteAutomation(a.id)}>
-        Automation löschen
+        Regel löschen
       </button>
-    </div>
+    </details>
+  );
+}
+
+function TestStep({ project, derived, room, setRoomId }: RoomProps) {
+  const { running, speed, state, start, stop, setSpeed, setPerson } = useSimStore();
+  const placePerson = () => {
+    const g = room && derived.rooms.get(room.id);
+    if (g) setPerson(polygonCentroid(g.interior));
+  };
+  return (
+    <>
+      <Section title="Simulation">
+        <p className="muted small">Die Person im Plan (ziehbar) oder du selbst im Rundgang löst die Melder aus. Einzelne Geräte lassen sich auch über „Eigenschaften“ schalten oder auslösen.</p>
+        <div className="btn-row">
+          {running ? (
+            <button className="primary" onClick={stop} data-testid="sim-stop">
+              Simulation stoppen
+            </button>
+          ) : (
+            <button className="primary" onClick={start} disabled={!project.devices.length} data-testid="sim-start">
+              Simulation starten
+            </button>
+          )}
+        </div>
+        <RoomSelect project={project} room={room} setRoomId={setRoomId} />
+        <button className="block" onClick={placePerson} disabled={!room} data-testid="sim-person">
+          Person in „{room?.name ?? '–'}“ stellen
+        </button>
+        <SelectField label="Tempo" value={String(speed)} options={SPEEDS.map((s) => ({ value: String(s), label: s === 1 ? 'Echtzeit' : `${s}× schneller` }))} onChange={(v) => setSpeed(Number(v))} />
+        {state && (
+          <p className="small" data-testid="sim-clock">
+            Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
+          </p>
+        )}
+      </Section>
+      {state && state.events.length > 0 && (
+        <Section title="Protokoll">
+          <ol className={css.log} data-testid="sim-log">
+            {state.events
+              .slice(-8)
+              .reverse()
+              .map((ev, i) => (
+                <li key={`${ev.t}-${i}`}>
+                  <span className="muted">{formatSimHour(ev.hour)}</span> {ev.text}
+                </li>
+              ))}
+          </ol>
+        </Section>
+      )}
+    </>
   );
 }

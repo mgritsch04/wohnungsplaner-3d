@@ -3,6 +3,8 @@ import { newId } from '../model/ids';
 import type { Automation, Project, SmartDevice, SmartDeviceKind } from '../model/schema';
 import { dist, pointInPolygon, polygonCentroid, type Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
+import { useUiStore } from '../store/uiStore';
+import { useSimStore } from './simStore';
 import { DEFAULT_ELEVATION, KIND_LABEL, productById } from './catalog';
 
 /** Editing operations for smart-home devices and automations (#170); each is one undo step. */
@@ -32,10 +34,21 @@ export function openingPoint(project: Project, openingId: string): Vec2 | null {
  * Where a new device goes in a room: sensors in the room corner looking at the centre
  * (typical mounting), lights at the centre, contacts on the room's first window/door.
  */
-export function placementFor(project: Project, derived: DerivedPlan, kind: SmartDeviceKind, roomId: string | null): Pick<SmartDevice, 'x' | 'y' | 'rotation' | 'openingId'> {
+export function placementFor(
+  project: Project,
+  derived: DerivedPlan,
+  kind: SmartDeviceKind,
+  roomId: string | null,
+  at?: Vec2,
+): Pick<SmartDevice, 'x' | 'y' | 'rotation' | 'openingId'> {
   const g = roomId ? derived.rooms.get(roomId) : undefined;
-  if (!g) return { x: 0, y: 0, rotation: 0 };
+  if (!g) return at ? { x: r3(at.x), y: r3(at.y), rotation: 0 } : { x: 0, y: 0, rotation: 0 };
   const c = polygonCentroid(g.interior);
+  // clicked point (#233): sensors look towards the room centre, contacts snap to the nearest window/door
+  if (at && kind !== 'contact') {
+    const look = dist(at, c) > 0.2 ? Math.atan2(c.y - at.y, c.x - at.x) : 0;
+    return { x: r3(at.x), y: r3(at.y), rotation: kind === 'motion' || kind === 'presence' ? look : 0 };
+  }
   if (kind === 'motion' || kind === 'presence') {
     const corner = g.interior.reduce((best, p) => (dist(p, c) > dist(best, c) ? p : best), g.interior[0]);
     const k = 0.08 / (dist(corner, c) || 1);
@@ -46,7 +59,7 @@ export function placementFor(project: Project, derived: DerivedPlan, kind: Smart
       .filter((o) => o.kind !== 'passage')
       .map((o) => ({ o, p: openingPoint(project, o.id) }))
       .filter((x): x is { o: (typeof x)['o']; p: Vec2 } => !!x.p)
-      .sort((a, b) => dist(a.p, c) - dist(b.p, c));
+      .sort((a, b) => dist(a.p, at ?? c) - dist(b.p, at ?? c));
     const hit = candidates[0];
     if (hit) return { x: r3(hit.p.x), y: r3(hit.p.y), rotation: 0, openingId: hit.o.id };
   }
@@ -59,13 +72,16 @@ const nameFor = (project: Project, kind: SmartDeviceKind, roomName: string | und
   return n ? `${base} ${n + 1}` : base;
 };
 
-/** Add a device (optionally of a catalog product) to a room. A smart lamp also gets a placed light. */
-export function addDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null): string {
+/**
+ * Add a device (optionally of a catalog product) to a room – at `at` if given (click into
+ * the plan), else at a typical spot. A smart lamp also gets a placed light.
+ */
+export function addDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2): string {
   const id = newId('dev');
   const st = useProjectStore.getState();
   const derived = derivePlan(st.project);
   st.apply((d) => {
-    const pos = placementFor(d, derived, kind, roomId);
+    const pos = placementFor(d, derived, kind, roomId, at);
     const room = d.rooms.find((r) => r.id === roomId);
     const product = productById(productId);
     const dev: SmartDevice = { id, name: nameFor(d, kind, room?.name), kind, productId: product?.id, ...pos, elevation: DEFAULT_ELEVATION[kind] };
@@ -78,6 +94,19 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
     }
     d.devices.push(dev);
   });
+  return id;
+}
+
+/** Add a device and give visible feedback (#233): select it, flash it, short message. */
+export function placeDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2): string {
+  const id = addDevice(kind, productId, roomId, at);
+  const p = useProjectStore.getState().project;
+  const dev = p.devices.find((x) => x.id === id);
+  const room = dev && p.rooms.find((r) => r.id === roomAt(p, derivePlan(p), dev));
+  const ui = useUiStore.getState();
+  ui.setSelection({ type: 'device', id });
+  useSimStore.getState().setFlash(id);
+  ui.toast(`${KIND_LABEL[kind]} ${room ? `in „${room.name}“ ` : ''}platziert – Strg+Z macht es rückgängig.`, 'success');
   return id;
 }
 

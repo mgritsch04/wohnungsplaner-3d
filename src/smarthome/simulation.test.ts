@@ -7,6 +7,7 @@ import { migrateProjectObject, parseProject } from '../formats/project/projectFi
 import { automationsYaml, entityIds, slug } from './haYaml';
 import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
 import { placementFor } from './actions';
+import { formatDuration, rulesOf, ruleSentence } from './rules';
 
 /** Two separate rooms: A with interior 0..4 × 0..3, B with interior 6..10 × 0..3. */
 function twoRooms(): Project {
@@ -146,5 +147,33 @@ describe('detection outline (#170)', () => {
     const poly = detectionPolygon(m, sensorParams(m), occludersOf(p, d));
     expect(Math.max(...poly.map((q) => q.x))).toBeLessThan(4.1);
     expect(Math.max(...poly.map((q) => q.x))).toBeGreaterThan(3.9);
+  });
+
+  it('reports a hand trigger as detection without a person (#233)', () => {
+    const p = twoRooms();
+    const s = run(p, initialState(p, 22), 1, { person: null, moving: false, triggered: new Set(['m']) });
+    expect(s.entities.m.on).toBe(true);
+    expect(s.entities.b.on).toBe(true);
+  });
+
+  it('places a clicked device at the click, sensors looking at the room centre (#232/#233)', () => {
+    const p = twoRooms();
+    const d = derivePlan(p);
+    const bad = p.rooms.find((r) => r.name === 'Bad')!.id;
+    const pos = placementFor(p, d, 'motion', bad, { x: 6.2, y: 1.5 });
+    expect(pos).toMatchObject({ x: 6.2, y: 1.5 });
+    expect(Math.abs(pos.rotation)).toBeLessThan(0.05); // centre of B is at x ≈ 8
+    expect(placementFor(p, d, 'light', bad, { x: 9, y: 2 })).toMatchObject({ x: 9, y: 2, rotation: 0 });
+  });
+
+  it('describes rules as sentences (#233)', () => {
+    const p = twoRooms();
+    expect(ruleSentence(p, p.automations[0])).toEqual({
+      when: 'Wenn Melder Flur Bewegung meldet und es dunkel ist',
+      then: 'dann Lampe Flur an (80 %), aus nach 2 min ohne Bewegung',
+    });
+    expect(rulesOf(p, 'b').map((a) => a.id)).toEqual(['a1']);
+    expect(rulesOf(p, 'x')).toEqual([]);
+    expect(formatDuration(90)).toBe('1,5 min');
   });
 });

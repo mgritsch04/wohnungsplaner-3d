@@ -1,4 +1,5 @@
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
+import { deleteDevice } from '../smarthome/actions';
 import type { CatalogItem } from '../catalog/types';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
@@ -60,6 +61,8 @@ export async function deleteSelection() {
     store().apply((d) => {
       d.lights = d.lights.filter((l) => l.id !== sel.id);
     });
+  } else if (sel.type === 'device') {
+    deleteDevice(sel.id);
   }
   ui().setSelection(null);
 }

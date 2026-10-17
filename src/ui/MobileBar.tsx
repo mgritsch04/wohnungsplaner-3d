@@ -44,6 +44,7 @@ export function selectionLabel(p: Project, sel: Selection, count: number): strin
     return kind === 'window' ? 'Fenster' : kind === 'passage' ? 'Durchgang' : 'Tür';
   }
   if (sel.type === 'light') return p.lights.find((l) => l.id === sel.id)?.name || 'Licht';
+  if (sel.type === 'device') return p.devices.find((d) => d.id === sel.id)?.name || 'Gerät';
   return sel.type === 'wall' ? 'Wand' : 'Ecke';
 }
 
