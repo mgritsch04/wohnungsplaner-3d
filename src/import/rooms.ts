@@ -120,6 +120,11 @@ function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: D
   });
 }
 
+/** Clear interior outlines of all closed areas of the accepted draft walls. */
+export function roomInteriors(walls: DraftWall[]): Vec2[][] {
+  return roomProposals(walls, {}).map((p) => p.interior);
+}
+
 /** Propose rooms for all closed areas of the accepted draft walls. */
 export function proposeRooms(walls: DraftWall[], opts: RoomProposalOptions = {}): DraftRoom[] {
   return roomProposals(walls, opts).map((p) => p.room);
