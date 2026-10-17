@@ -117,8 +117,8 @@ Mögliche Auswirkungen auf deine Testpunkte der Runde 4: keine geänderten Datei
 
 ## Wartet auf deinen Test
 Seit 2026-10-17 läuft jeder Test im Feature-Issue selbst (neues Issue-Modell, siehe [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md) Schritt 6). Die 32 offenen alten `[USERTEST]`-Issues sind am 2026-10-17 umgezogen: Testschritte und Verlauf stehen jetzt im Original-Issue, das alte Issue ist mit „Verschoben nach #…“ geschlossen.
-- **Für dich (Label `user-test`, Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …` im Issue):** #63 Möbel-Material (Bild beurteilen; Farbwunsch ist #187) · #164 Handy-Ansicht (nur am echten Gerät) · #170 Smart Home Stufe 1 (Bild beurteilen) · #129 (Idee-Issue mit Test).
-- **Automatische Vorprüfung zuerst (Label `auto-user-test`):** #185 (neu), #4, #8, #10 (aus #12 und #61), #11, #20, #21, #29, #37, #39, #57, #66, #68, #71, #73, #75, #82, #89, #94, #96, #99, #100, #130, #131, #132, #133, #137, #142, #183. Warteschlange: `node scripts/usertest/issues.mjs`.
+- **Für dich (Label `user-test`, Antwort `BESTANDEN` oder `FEHLGESCHLAGEN: …` im Issue):** #63 Möbel-Material (Bild beurteilen; Farbwunsch ist #187) · #164 Handy-Ansicht (nur am echten Gerät) · #170 Smart Home Stufe 1 (Bild beurteilen) · #29 Gamepad (braucht echten Controller) · #129 (Idee-Issue mit Test).
+- **Automatische Vorprüfung zuerst (Label `auto-user-test`):** #185 (neu), #4, #8, #10 (aus #12 und #61), #11, #20, #21, #37, #39, #57, #66, #68, #71, #73, #75, #82, #89, #94, #96, #99, #100, #130, #131, #132, #133, #137, #142, #183. Warteschlange: `node scripts/usertest/issues.mjs`.
 - Umzug alt → neu: #16→#4, #26→#8, #12/#61→#10, #47→#20, #107→#21, #175→#29, #114→#37, #42→#39, #106→#57, #166→#63, #115→#66, #118→#68, #112→#71, #123→#73, #116→#75, #127→#82, #140→#89, #122→#96, #126→#99, #139→#100, #148→#130, #160→#131, #152→#132, #180→#133, #162→#137, #149→#142, #173→#164, #178→#170, #190→#183; #11 und #94 hatten kein Feature-Issue und laufen selbst weiter.
 
 ## Automatisierung (geplante Läufe)
