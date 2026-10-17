@@ -3872,3 +3872,24 @@ test('Budget: Gruppierung bleibt nach Auswahl eines Möbels, Panelwechsel und Ne
   await expect(grouping).toHaveValue('room');
   expect(errors).toEqual([]);
 });
+
+test('empty project: "Grundriss importieren" on the start card opens the file picker and imports the plan (#214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+
+  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+  await card.getByRole('button', { name: 'Grundriss importieren' }).click();
+  await (await chooser).setFiles({ name: 'grundriss.png', mimeType: 'image/png', buffer: syntheticPlanPng() });
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
+  await expect(page.locator('.panel.left .tabs').getByRole('button', { name: /^Import/ })).toHaveClass(/active/);
+  await expect.poll(async () => !!(await getProject(page)).underlay).toBe(true);
+  // the plan is the next step – the card no longer covers it
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
