@@ -1,0 +1,44 @@
+.panel {
+  display: block;
+}
+.list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  margin-bottom: 4px;
+}
+.active {
+  outline: 2px solid var(--color-accent, #2563eb);
+}
+.cover {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+.details,
+.automation {
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inline > :first-child {
+  flex: 1;
+}
+.log {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}

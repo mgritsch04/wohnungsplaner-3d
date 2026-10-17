@@ -8,7 +8,7 @@ import { z } from 'zod';
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 1;
+export const PROJECT_SCHEMA_VERSION = 2;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -217,6 +217,49 @@ export const LightSchema = z.object({
   on: z.boolean().default(true),
 });
 
+/**
+ * Smart-home device (#170, simulated; no connection to real hardware). `kind` decides the
+ * behaviour in the simulation, `productId` points into the device catalog
+ * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
+ */
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug']);
+export const SmartDeviceSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(100),
+  kind: SmartDeviceKindSchema,
+  productId: z.string().max(100).optional(),
+  x: finite(),
+  y: finite(),
+  elevation: len(0, 10),
+  /** Plan rotation in radians: the direction a sensor looks at (0 = +x). */
+  rotation: finite().default(0),
+  /** Detection range (m) / opening angle (degrees) / hold time (s); overrides the catalog value. */
+  rangeM: len(0.5, 20).optional(),
+  angleDeg: z.number().min(10).max(360).optional(),
+  holdS: z.number().min(1).max(3600).optional(),
+  /** kind `light`: the placed light (project.lights) this bulb switches. */
+  lightId: z.string().optional(),
+  /** kind `contact`: the door/window it watches. */
+  openingId: z.string().optional(),
+});
+
+/** Home-Assistant-like automation: trigger → optional condition → light action (#170). */
+export const AutomationSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(100),
+  enabled: z.boolean().default(true),
+  trigger: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('motion'), deviceId: z.string().min(1) }),
+    z.object({ type: z.literal('contact'), deviceId: z.string().min(1), to: z.enum(['open', 'closed']) }),
+    z.object({ type: z.literal('time'), hour: z.number().min(0).max(24) }),
+  ]),
+  /** only when it is dark (sun below the horizon at the simulated hour) */
+  onlyWhenDark: z.boolean().default(false),
+  action: z.object({ deviceIds: z.array(z.string()), on: z.boolean(), brightness: z.number().min(1).max(100).optional() }),
+  /** Motion trigger: switch the lights off again once the sensor reports "no motion" for this long (s). */
+  offAfterS: z.number().min(0).max(7200).optional(),
+});
+
 export const CalibrationSchema = z.object({
   /** Two reference points in IMAGE pixel coordinates. */
   p1: Vec2Schema,
@@ -341,6 +384,9 @@ export const ProjectSchema = z.object({
   cameraBookmarks: z.array(CameraBookmarkSchema).default([]),
   /** Furniture groups (#65); projects saved before lack the field. */
   groups: z.array(FurnitureGroupSchema).default([]),
+  /** Simulated smart-home devices and automations (#170, schema 2). */
+  devices: z.array(SmartDeviceSchema).default([]),
+  automations: z.array(AutomationSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -358,6 +404,9 @@ export type KitchenModule = z.infer<typeof KitchenModuleSchema>;
 export type Furniture = z.infer<typeof FurnitureSchema>;
 export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
+export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
+export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
+export type Automation = z.infer<typeof AutomationSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;
