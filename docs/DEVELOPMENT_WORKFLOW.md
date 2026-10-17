@@ -107,7 +107,7 @@ Hinweis: GitHub-Kommentare starten keine Session; Rückmeldungen werden beim nä
 
 ## Rückmeldungen an dich und Dashboard
 - **Rückmeldungen (#195):** Ergebnisse stehen im Thread, der die Arbeit gemacht hat; sonst meldet sich ein Thread nur, wenn er etwas von dir braucht (Entscheidung, Test, Freigabe). Keine Fortschrittsmeldungen.
-- **Dashboard:** Gesamtansicht und Updater sind im Fitness-Projekt beschrieben: [`fitness-coach/docs/DASHBOARD.md`](https://github.com/mgritsch04/fitness-coach/blob/main/docs/DASHBOARD.md). Bis das Leiter-Projekt die Dashboard-Zeilen übernimmt (#195 Punkt 6), trägt jeder Thread seine Zeile selbst in die Zulieferung ein (siehe [`CLAUDE_PROJECT.md`](CLAUDE_PROJECT.md)).
+- **Dashboard:** Gesamtansicht und Updater sind im Fitness-Projekt beschrieben: [`fitness-coach/docs/DASHBOARD.md`](https://github.com/mgritsch04/fitness-coach/blob/main/docs/DASHBOARD.md). Jeder Thread trägt seine Zeile selbst in die Zulieferung ein (siehe [`CLAUDE_PROJECT.md`](CLAUDE_PROJECT.md)), ereignisbasiert bei Start, Schrittwechsel und Ende; am Ende setzt er sie auf erledigt oder idle, denn Zeilen älter als 2 Stunden gelten als still (Regel für beide Projekte, 2026-10-17; #195 Punkt 6 entfallen).
 
 ## Automatische User-Tests
 
