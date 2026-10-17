@@ -6,7 +6,7 @@ import { buildPlacementObstacles, conflictSummary, clipConvex, moveFurnitureTo, 
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
-import { seatBackDepth } from './placementRules';
+import { isStackable, seatBackDepth } from './placementRules';
 import { pointInPolygon, polygonArea, rotate } from './vec';
 
 const T = 0.12;
@@ -368,6 +368,41 @@ describe('unified furniture rules', () => {
     expect(furnitureConflicts(p, d, obs).size).toBe(0);
     moveFurnitureTo(p, d, obs, lamp.id, { x: 3.4, y: 2.5 }, { snap: true, collide: true });
     expect(p.furniture.find((f) => f.id === lamp.id)!.elevation).toBe(0);
+  });
+
+  it('a storage box dragged onto a dining table stands on the table top, off it back on the floor (#219)', () => {
+    const { p, d, obs } = room();
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    const box = createFurnitureFromCatalog(cat('generic-storage-box'), { x: 0.6, y: 0.6 });
+    p.furniture.push(table, box);
+    moveFurnitureTo(p, d, obs, box.id, { x: 2.2, y: 1.5 }, { snap: true, collide: true });
+    const b = p.furniture.find((f) => f.id === box.id)!;
+    expect(b.x).toBeCloseTo(2.2, 3);
+    expect(b.elevation).toBeCloseTo(table.height, 6);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+    moveFurnitureTo(p, d, obs, box.id, { x: 3.4, y: 2.5 }, { snap: true, collide: true });
+    expect(p.furniture.find((f) => f.id === box.id)!.elevation).toBe(0);
+  });
+
+  it('small items of any category stack, large furniture, seats and kitchen units do not (#219)', () => {
+    const custom = { ...createFurnitureFromCatalog(cat('generic-storage-box'), { x: 0, y: 0 }), category: 'other', width: 0.45, depth: 0.35, height: 0.3 };
+    expect(isStackable(custom)).toBe(true);
+    expect(isStackable(createFurnitureFromCatalog(cat('generic-storage-box'), { x: 0, y: 0 }))).toBe(true);
+    expect(isStackable(createFurnitureFromCatalog(cat('generic-plant-small'), { x: 0, y: 0 }))).toBe(true);
+    for (const id of ['generic-sofa-3', 'generic-wardrobe-100', 'generic-dresser', 'generic-bar-stool', 'generic-nightstand', 'generic-k-base-40', 'generic-k-hood-60', 'generic-floor-lamp', 'generic-washer', 'generic-toilet']) {
+      expect(isStackable(createFurnitureFromCatalog(cat(id), { x: 0, y: 0 })), id).toBe(false);
+    }
+  });
+
+  it('a sofa dragged onto a table stays on the floor and is blocked by it (#219)', () => {
+    const { p, d, obs } = room();
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    const sofa = createFurnitureFromCatalog(cat('generic-sofa-2'), { x: 2, y: 2.5 });
+    p.furniture.push(table, sofa);
+    moveFurnitureTo(p, d, obs, sofa.id, { x: 2, y: 1.5 }, { snap: true, collide: true });
+    const s = p.furniture.find((f) => f.id === sofa.id)!;
+    expect(s.elevation).toBe(0);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
   });
 
   it('dragging a floor lamp into a sofa stops at the sofa (same blocking as walls)', () => {
