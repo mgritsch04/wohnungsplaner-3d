@@ -17,6 +17,7 @@ import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
+import { nextWalkFov, WALK_FOV, wheelPixels, zoomLookFactor } from './walkZoom';
 
 interface Props {
   derived: DerivedPlan;
@@ -35,7 +36,8 @@ interface Props {
  * Shift to walk faster, Escape releases the mouse. Collides with walls (open door
  * openings stay passable, closed doors not) and solid furniture; height is fixed at
  * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
- * A gamepad works alongside keyboard and mouse (#29, see input/gamepad.ts).
+ * A gamepad works alongside keyboard and mouse (#29, see input/gamepad.ts). The mouse wheel
+ * zooms by narrowing the field of view; Z or the middle mouse button resets it (#228).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -74,6 +76,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const yaw = useRef(0);
   const pitch = useRef(0);
   const dragLook = useRef<{ x: number; y: number } | null>(null);
+  // field of view of the wheel zoom (#228); every walkthrough starts at the normal view
+  const fov = useRef(WALK_FOV);
   // read through a ref: changing the sensitivity must not re-register listeners (or drop pointer lock)
   const sensitivityRef = useRef(sensitivity);
   useEffect(() => {
@@ -115,7 +119,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     camera.rotation.set(0, 0, 0, 'YXZ');
     const cam = camera as THREE.PerspectiveCamera;
     const oldFov = cam.fov;
-    cam.fov = 70;
+    fov.current = WALK_FOV;
+    cam.fov = WALK_FOV;
     cam.near = 0.05;
     cam.updateProjectionMatrix();
     return () => {
@@ -207,6 +212,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         ui.setWalkSit(!ui.walkSit);
         return;
       }
+      if (e.code === 'KeyZ' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // back to the normal view after zooming with the wheel (#228)
+        setFov(WALK_FOV);
+        return;
+      }
       if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // E (#107) or O: open/close the door or window in sight
         toggleAimedOpening();
@@ -216,12 +226,24 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     };
     const onKeyUp = (e: KeyboardEvent) => keys.current.delete(e.code);
+    const setFov = (f: number) => {
+      fov.current = f;
+      const cam = camera as THREE.PerspectiveCamera;
+      if (cam.fov === f) return;
+      cam.fov = f;
+      cam.updateProjectionMatrix();
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setFov(nextWalkFov(fov.current, wheelPixels(e.deltaY, e.deltaMode)));
+    };
     const clear = () => {
       keys.current.clear();
       dragLook.current = null;
     };
     const look = (dx: number, dy: number) => {
-      const k = sensitivityRef.current;
+      // zoomed in, the view turns slower so aiming stays calm (#228)
+      const k = sensitivityRef.current * zoomLookFactor(fov.current);
       yaw.current -= dx * k;
       pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - dy * k));
     };
@@ -249,6 +271,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     let downAt: { x: number; y: number } | null = null;
     const onDown = (e: MouseEvent) => {
       if (performance.now() - lastTouch < 1000) return;
+      if (e.button === 1) {
+        // middle button: reset the wheel zoom (#228); no autoscroll
+        e.preventDefault();
+        setFov(WALK_FOV);
+        return;
+      }
       downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
       if (document.pointerLockElement === el) {
         // locked: a click selects the furniture under the crosshair (or opens/closes the door or
@@ -311,6 +339,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onLock);
     el.addEventListener('mousedown', onDown);
+    el.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('mouseup', onUp);
     el.addEventListener('pointerdown', onTouchDown);
     el.addEventListener('pointermove', onTouchMove);
@@ -328,6 +357,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('pointerlockchange', onLock);
       el.removeEventListener('mousedown', onDown);
+      el.removeEventListener('wheel', onWheel);
       window.removeEventListener('mouseup', onUp);
       if (document.pointerLockElement === el) document.exitPointerLock();
       pressed.clear();
@@ -361,6 +391,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       target: () => walkApi.current?.target() ?? null,
       targetOpening: () => walkApi.current?.targetOpening() ?? null,
       toggleOpening: () => walkApi.current?.toggleOpening(),
+      fov: () => fov.current,
     };
     return () => void delete wp.walk;
   }, []);
@@ -391,8 +422,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const dt = Math.min(dtRaw, 0.05);
     const pad = gamepad.poll();
     if (pad) {
-      yaw.current -= pad.look.x * LOOK_RATE * dt;
-      pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - pad.look.y * LOOK_RATE * dt));
+      const rate = LOOK_RATE * zoomLookFactor(fov.current) * dt;
+      yaw.current -= pad.look.x * rate;
+      pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - pad.look.y * rate));
       const api = walkApi.current;
       const ui = useUiStore.getState();
       if (pad.pressed.has(BUTTON.A)) api?.pickOrDrop();
