@@ -3846,5 +3846,8 @@ test('empty project: "Grundriss importieren" on the start card opens the file pi
   await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
   await expect(page.locator('.panel.left .tabs').getByRole('button', { name: /^Import/ })).toHaveClass(/active/);
   await expect.poll(async () => !!(await getProject(page)).underlay).toBe(true);
+  // the plan is the next step – the card no longer covers it
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
