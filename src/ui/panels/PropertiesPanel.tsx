@@ -5,7 +5,8 @@ import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
 import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
-import { defaultLeafOpen, type Furniture, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
+import { defaultLeafOpen, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
+import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
@@ -472,6 +473,38 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </div>
       </PanelGroup>
       <PanelGroup groupKey="furniture.appearance" title="Aussehen">
+        <SelectField<FurnitureFinish | 'auto'>
+          label="Material"
+          value={f.finish ?? 'auto'}
+          options={[{ value: 'auto', label: 'Automatisch (Modell)' }, ...FURNITURE_FINISHES.map((m) => ({ value: m.id, label: m.label }))]}
+          onChange={(v) =>
+            upd((x) => {
+              if (v === 'auto') delete x.finish;
+              else x.finish = v;
+            })
+          }
+        />
+        <div className="finish-presets" role="group" aria-label="Standardmaterialien">
+          {FURNITURE_FINISH_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className="finish-preset"
+              title={p.label}
+              aria-label={p.label}
+              aria-pressed={f.finish === p.finish && f.color.toLowerCase() === p.color}
+              onClick={() =>
+                upd((x) => {
+                  x.finish = p.finish;
+                  x.color = p.color;
+                })
+              }
+            >
+              <span className={`swatch finish-${p.finish}`} style={{ background: p.color }} />
+            </button>
+          ))}
+        </div>
+        {f.model.type === 'gltf' && <p className="small muted">Das Material wirkt auf das Ersatzmodell; eigene 3D-Modelle behalten ihre Oberfläche.</p>}
         <div className="field-row">
           <label className="field">
             <span className="field-label">Farbe</span>

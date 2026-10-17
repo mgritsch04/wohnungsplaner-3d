@@ -60,7 +60,7 @@ export function fitModelToItem(model: THREE.Object3D, item: Pick<Furniture, 'wid
 function proceduralBody(f: Furniture): THREE.Group {
   const g = new THREE.Group();
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
-  for (const p of buildParts(shape, f.width, f.depth, f.height, f.color, f.kitchen?.frontColor)) {
+  for (const p of buildParts(shape, f.width, f.depth, f.height, f.color, f.kitchen?.frontColor, f.finish)) {
     const mesh = new THREE.Mesh(p.geo, colorMat(p.color, { roughness: p.rough, metalness: p.metal, opacity: p.opacity }));
     mesh.position.set(...p.p);
     mesh.scale.set(...p.s);

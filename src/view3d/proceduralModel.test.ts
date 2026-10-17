@@ -31,3 +31,28 @@ describe('procedural furniture models', () => {
     });
   }
 });
+
+describe('furniture material (#63)', () => {
+  it('gives the main parts the chosen surface and keeps fixed parts', () => {
+    const plain = buildParts('sofa', 2, 0.9, 0.85, '#8E9096');
+    const leather = buildParts('sofa', 2, 0.9, 0.85, '#8E9096', undefined, 'leather');
+    expect(leather).toHaveLength(plain.length);
+    const main = leather.filter((p) => p.detail === 'leather');
+    expect(main.length).toBeGreaterThan(plain.length / 2);
+    expect(main.every((p) => p.rough === 0.45)).toBe(true);
+    // the wooden feet are not in the item colour and keep their look
+    const feet = leather.filter((_, i) => plain[i].detail === 'woodgrain');
+    expect(feet.length).toBeGreaterThan(0);
+    expect(feet.every((p) => p.detail === 'woodgrain')).toBe(true);
+  });
+
+  it('metal makes the body metallic but leaves glowing lamp shades alone', () => {
+    const lamp = buildParts('table-lamp', 0.3, 0.3, 0.5, '#b7bbbf', undefined, 'metal');
+    expect(lamp.some((p) => p.metal === 0.85)).toBe(true);
+    expect(lamp.filter((p) => p.emissive).every((p) => p.metal === undefined)).toBe(true);
+  });
+
+  it('without a material the model keeps its built-in look', () => {
+    expect(buildParts('table', 1.6, 0.9, 0.75, '#c9a477', undefined, undefined)).toEqual(buildParts('table', 1.6, 0.9, 0.75, '#c9a477'));
+  });
+});

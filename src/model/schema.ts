@@ -154,6 +154,9 @@ export const KitchenModuleSchema = z.object({
   generated: z.boolean().default(false),
 });
 
+/** Surface type of a furniture body (#63): replaces the model's built-in structure/gloss on its main parts. */
+export const FurnitureFinishSchema = z.enum(['fabric', 'leather', 'wood', 'lacquer', 'metal', 'stone']);
+
 export const FurnitureSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().optional(),
@@ -171,6 +174,8 @@ export const FurnitureSchema = z.object({
   depth: len(0.01, 20),
   height: len(0.001, 10),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#b0a898'),
+  /** Chosen material of the main parts (#63); absent = the model's built-in look. */
+  finish: FurnitureFinishSchema.optional(),
   model: ModelRefSchema,
   quantity: z.number().int().min(1).max(999).default(1),
   price: PriceSchema.optional(),
@@ -346,6 +351,7 @@ export type Opening = z.infer<typeof OpeningSchema>;
 export type Room = z.infer<typeof RoomSchema>;
 export type MaterialKind = z.infer<typeof MaterialKindSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
+export type FurnitureFinish = z.infer<typeof FurnitureFinishSchema>;
 export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 export type KitchenModule = z.infer<typeof KitchenModuleSchema>;

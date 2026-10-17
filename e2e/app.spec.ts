@@ -3675,3 +3675,37 @@ test('walkthrough: a gamepad walks (left stick), looks (right stick) and crouche
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+test('Möbel-Material: Standardmaterial wählen, in 3D anzeigen und speichern (#63)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const sofa = (await getProject(page)).furniture.find((f: { catalogId?: string }) => f.catalogId === 'generic-sofa-3');
+  const s = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.click(s.x, s.y);
+  expect(await getSelection(page)).toEqual({ type: 'furniture', id: sofa.id });
+  const right = page.locator('.panel.right');
+  await expect(right.getByRole('combobox', { name: /^Material/ })).toHaveValue('auto');
+
+  // one click on a standard material sets material and colour
+  await right.getByRole('button', { name: 'Leder Cognac' }).click();
+  await expect(right.getByRole('button', { name: 'Leder Cognac' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(right.getByRole('combobox', { name: /^Material/ })).toHaveValue('leather');
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)).toMatchObject({ finish: 'leather', color: '#8a4f2a' });
+
+  // the material alone can be changed, the colour stays
+  await right.getByRole('combobox', { name: /^Material/ }).selectOption('wood');
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)).toMatchObject({ finish: 'wood', color: '#8a4f2a' });
+
+  // saved with the project
+  await expect(page.locator('.save-state')).toHaveText('Gespeichert', { timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)?.finish).toBe('wood');
+
+  // „Automatisch“ removes the material again
+  const s2 = await planToScreen(page, sofa.x, sofa.y);
+  await page.mouse.click(s2.x, s2.y);
+  await page.locator('.panel.right').getByRole('combobox', { name: /^Material/ }).selectOption('auto');
+  await expect.poll(async () => 'finish' in (await getProject(page)).furniture.find((f: { id: string }) => f.id === sofa.id)).toBe(false);
+  expect(errors).toEqual([]);
+});
