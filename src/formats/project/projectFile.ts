@@ -13,7 +13,8 @@ import { FileFormatError, formatZodError } from '../zodErrors';
  */
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 export const PROJECT_MIGRATIONS: Record<number, Migration> = {
-  // 1: (raw) => ({ ...raw, schemaVersion: 2, newField: defaultValue }),
+  // 1 → 2 (#170): simulated smart-home devices and automations
+  1: (raw) => ({ ...raw, schemaVersion: 2, devices: raw.devices ?? [], automations: raw.automations ?? [] }),
 };
 
 export function migrateProjectObject(raw: unknown): Record<string, unknown> {

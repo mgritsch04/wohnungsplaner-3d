@@ -14,6 +14,7 @@ import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
+import { Devices3D } from '../smarthome/Devices3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { useGamepadState } from './input/gamepad';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
@@ -334,6 +335,7 @@ function SceneContent({
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
+      <Devices3D project={project} />
       <TapeMeasure3D />
       {!readOnly && cameraMode === 'orbit' && <CatalogDrop3D />}
       {quality === 'realism' && (
