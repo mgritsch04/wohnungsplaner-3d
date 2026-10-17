@@ -237,6 +237,22 @@ describe('furniture groups: moving and turning as a whole (#65)', () => {
     }
   });
 
+  it('one large jump still reaches the wall: adjacent members do not block each other (#210)', () => {
+    // bed with a night stand directly on each side, like the sample flat; one 4 m jump to the left
+    const p = roomProject();
+    const bed = add(p, 3, 2, { width: 1.6, depth: 2, rotation: 0 });
+    const left = add(p, 1.95, 1.2, { width: 0.5, depth: 0.4, rotation: 0 });
+    const right = add(p, 4.05, 1.2, { width: 0.5, depth: 0.4, rotation: 0 });
+    const ids = [bed.id, left.id, right.id];
+    const obstacles = buildPlacementObstacles(derivePlan(p));
+    const d = moveGroupBy(p, obstacles, ids, { x: -4, y: 0 }, { collide: true });
+    // left night stand starts at x 1.7; the wall face is at 0 → 1.7 m
+    expect(d.x).toBeLessThan(-1.69);
+    expect(d.x).toBeGreaterThanOrEqual(-1.7 - 1e-6);
+    expect(get(p, left.id).x - 0.25).toBeCloseTo(0, 2);
+    expect(get(p, bed.id).x - get(p, left.id).x).toBeCloseTo(1.05, 6);
+  });
+
   it('stops at furniture outside the group; Alt (collide off) moves freely', () => {
     const { p, ids } = rowProject();
     const sofa = add(p, 3, 3.3, { width: 2, depth: 0.6, rotation: 0 }, 'generic-sideboard'); // y 3.0..3.6
