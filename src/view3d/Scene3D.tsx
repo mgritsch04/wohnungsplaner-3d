@@ -5,6 +5,7 @@ import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postproces
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { setMetalEnvironment } from './metalRegistry';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { architectureKey, derivePlan } from '../model/derived';
 import type { Project, QualityMode } from '../model/schema';
@@ -641,8 +642,10 @@ function EnvironmentLight() {
     const envScene = new RoomEnvironment();
     const tex = pmrem.fromScene(envScene, 0.04).texture;
     scene.environment = tex;
+    setMetalEnvironment(tex);
     return () => {
       scene.environment = null;
+      setMetalEnvironment(null);
       tex.dispose();
       pmrem.dispose();
     };

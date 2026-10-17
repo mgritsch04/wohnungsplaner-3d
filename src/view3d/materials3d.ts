@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Material, QualityMode } from '../model/schema';
+import { forgetMetals, METAL_THRESHOLD, registerMetal } from './metalRegistry';
 
 /**
  * Shared Three.js materials. Materials are cached by their definition and quality
@@ -210,6 +211,7 @@ export function getColorMaterial(
           depthWrite: !transparent,
           side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
         });
+  if (mat instanceof THREE.MeshStandardMaterial && mat.metalness >= METAL_THRESHOLD) registerMetal(mat);
   cache.set(key, mat);
   return mat;
 }
@@ -223,4 +225,5 @@ export function disposeMaterialCache() {
   }
   cache.clear();
   textureCache.clear();
+  forgetMetals();
 }

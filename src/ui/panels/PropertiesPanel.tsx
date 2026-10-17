@@ -5,6 +5,8 @@ import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
 import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
+import { catalogColors } from '../../catalog/generic';
+import { useCatalogStore } from '../../catalog/catalogStore';
 import { defaultLeafOpen, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
@@ -401,6 +403,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
   const apply = useApply();
   const more = useUiStore((s) => s.multi.length);
   const multi = useUiStore((s) => s.multi);
+  const extraCatalog = useCatalogStore((s) => s.items);
   const f = project.furniture.find((x) => x.id === id);
   if (!f) return <Gone />;
   const group = more > 0 ? selectedGroup(project, selectedFurnitureIds({ selection: { type: 'furniture', id }, multi })) : null;
@@ -411,6 +414,9 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
     });
   const issues = placementIssues(project, derivePlan(project), f);
   const summary = conflictSummary(issues);
+  const original = catalogColors(f.catalogId, extraCatalog);
+  const colorIsOriginal =
+    !!original && f.color.toLowerCase() === original.color.toLowerCase() && (f.kitchen?.frontColor ?? '').toLowerCase() === (original.frontColor ?? '').toLowerCase();
   return (
     <div className="panel-scroll">
       {more > 0 && (
@@ -510,6 +516,25 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             <span className="field-label">Farbe</span>
             <span className="field-input">
               <input type="color" value={f.color} onChange={(e) => upd((x) => (x.color = e.target.value))} />
+              <button
+                type="button"
+                className="color-auto"
+                disabled={!original || colorIsOriginal}
+                aria-pressed={colorIsOriginal}
+                title={original ? 'Farbe auf die Originalfarbe des Modells zurückstellen' : 'Originalfarbe unbekannt (Modell nicht im Katalog)'}
+                onClick={() =>
+                  original &&
+                  upd((x) => {
+                    x.color = original.color;
+                    if (x.kitchen) {
+                      if (original.frontColor) x.kitchen.frontColor = original.frontColor;
+                      else delete x.kitchen.frontColor;
+                    }
+                  })
+                }
+              >
+                Automatisch
+              </button>
             </span>
           </label>
           {f.kitchen && (

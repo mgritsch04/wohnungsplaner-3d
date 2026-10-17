@@ -96,7 +96,7 @@ const FINISH_LOOK: Record<FurnitureFinish, Pick<Part, 'rough' | 'metal' | 'detai
   leather: { rough: 0.45, metal: 0, detail: 'leather', detailRepeat: 2 },
   wood: { rough: 0.55, metal: 0, detail: 'woodgrain', detailRepeat: 1 },
   lacquer: { rough: 0.2, metal: 0, detail: undefined, detailRepeat: undefined },
-  metal: { rough: 0.3, metal: 0.85, detail: undefined, detailRepeat: undefined },
+  metal: { rough: 0.16, metal: 1, detail: undefined, detailRepeat: undefined },
   stone: { rough: 0.25, metal: 0, detail: 'stone', detailRepeat: 1 },
 };
 
