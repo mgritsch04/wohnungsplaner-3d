@@ -1543,11 +1543,6 @@ test('chair under table (#16): the seat goes under the table top, the backrest s
 test('night lighting: day > evening > night, lamps on/off clearly distinguishable (measured screen brightness)', async ({ page }) => {
   test.setTimeout(600000);
   const errors = collectErrors(page);
-  // TEMPORARY (#157): WebGL warnings (e.g. failed draw calls) are console warnings, not errors
-  const glWarnings: string[] = [];
-  page.on('console', (m) => {
-    if (m.type() === 'warning' && /GL|WebGL|THREE/i.test(m.text())) glWarnings.push(m.text().slice(0, 300));
-  });
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Realismus' }).click();
@@ -1567,7 +1562,6 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       for (let i = 4; i < d.length; i += 4) if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2]) return false;
       return true;
     }, png.toString('base64'));
-  let last: { png: Buffer; clip: { x: number; y: number; width: number; height: number } } = { png: Buffer.alloc(0), clip: { x: 0, y: 0, width: 0, height: 0 } };
   const brightness = async (hour: number, lamps: 'auto' | 'on' | 'off') => {
     // the lamp switch is in the toolbar's "Mehr" menu (#100)
     await page.getByRole('button', { name: 'Mehr', exact: true }).click();
@@ -1626,7 +1620,6 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
       await expect.poll(async () => (await frames()).frame - f1, { timeout: 90000 }).toBeGreaterThanOrEqual(3);
       png = await page.screenshot({ clip });
     }
-    last = { png, clip };
     // kept in test-results (uploaded by CI when a test fails) to see what a wrong value looked like (#157)
     await writeFile(test.info().outputPath(`brightness-${hour}-${lamps}.png`), png);
     return page.evaluate(async (b64) => {
@@ -1666,56 +1659,8 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   const evening = await brightness(21, 'auto');
   const night = await brightness(23.5, 'auto');
   const nightLights = await lightReport();
-  // TEMPORARY (#157): renderer state in that frame
-  const glState = await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const wp = (window as any).__wp;
-    const r = wp.three.gl;
-    const g = r.getContext();
-    const info = `calls ${r.info.render.calls} tris ${r.info.render.triangles} programs ${r.info.programs?.length} target ${r.getRenderTarget() ? 'set' : 'null'} glError ${g.getError()}`;
-    r.render(wp.three.scene, wp.three.camera);
-    const px = new Uint8Array(4);
-    g.readPixels(Math.floor(g.drawingBufferWidth / 2), Math.floor(g.drawingBufferHeight / 2), 1, 1, g.RGBA, g.UNSIGNED_BYTE, px);
-    const cam = wp.three.camera;
-    const progs = (r.info.programs ?? []).map((p: { diagnostics?: unknown }) => p.diagnostics ? 'diag' : '').filter(Boolean).length;
-    return `${info} | manual render: calls ${r.info.render.calls} glError ${g.getError()} centre px ${Array.from(px).join(',')} | proj finite ${cam.projectionMatrix.elements.every(Number.isFinite)} world finite ${cam.matrixWorld.elements.every(Number.isFinite)} | failed programs ${progs}`;
-  });
-  // TEMPORARY (#157): what does a wrong 23:30 frame consist of? coarse luminance grid of the screenshot
-  // and which elements lie on top of the measured area
-  const nightShot = await page.evaluate(
-    async ({ b64, clip }) => {
-      const img = new Image();
-      img.src = `data:image/png;base64,${b64}`;
-      await img.decode();
-      const c = document.createElement('canvas');
-      c.width = 8;
-      c.height = 6;
-      const g = c.getContext('2d')!;
-      g.drawImage(img, 0, 0, 8, 6);
-      const d = g.getImageData(0, 0, 8, 6).data;
-      const rows: string[] = [];
-      for (let y = 0; y < 6; y++) {
-        const r: string[] = [];
-        for (let x = 0; x < 8; x++) {
-          const i = (y * 8 + x) * 4;
-          r.push(`${d[i]},${d[i + 1]},${d[i + 2]}`);
-        }
-        rows.push(r.join(' '));
-      }
-      const hits = [0.25, 0.5, 0.75].map((f) => {
-        const el = document.elementFromPoint(clip.x + clip.width * f, clip.y + clip.height * f);
-        return el ? `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}` : 'none';
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const wp = (window as any).__wp;
-      const cam = wp.three.camera;
-      return `clip ${JSON.stringify(clip)} cam ${cam.position.toArray().map((v: number) => v.toFixed(2))} on top: ${hits.join(' | ')}\n    ${rows.join('\n    ')}`;
-    },
-    { b64: last.png.toString('base64'), clip: last.clip },
-  );
   const nightOff = await brightness(23.5, 'off');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  renderer: ${glState}\n  blank retries: ${blankRetries.join(', ') || 'none'} · dprCap now ${await page.evaluate(() => (window as any).__wp.usePerformanceStore.getState().dprCap)}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  blank frames re-measured: ${blankRetries.join(', ') || 'none'}\n  lamps off: ${await lightReport()}`);
   expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
   expect((await getProject(page)).settings.lamps).toBe('off');
   expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
