@@ -9,7 +9,9 @@ import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
 import { checkScale, scaleCheckMessage } from '../dimensions';
-import { proposeRooms, refreshRoomProposals, type PlacedText } from '../rooms';
+import { outdoorRailings, type AreaOutline } from '../outdoor';
+import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } from '../rooms';
+import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
@@ -47,7 +49,17 @@ export async function runRecognition() {
       return;
     }
     // rooms: closed areas of the proposed walls; names/areas only from the plan's own text layer
-    draft.rooms = proposeRooms(draft.walls, { texts: planTextsInWorld() });
+    const texts = planTextsInWorld();
+    // balconies/terraces have no walls – railings from their floor area close them (#214)
+    if (texts) {
+      const interiors = roomInteriors(draft.walls);
+      const railings = outdoorRailings(draft.walls, texts, planAreasInWorld(), (p) => interiors.some((poly) => pointInPolygon(p, poly)));
+      if (railings.length) {
+        draft.walls.push(...railings);
+        draft.warnings.push('Balkon/Terrasse: Geländer aus der Fläche im Plan ergänzt (1 m hoch) – bitte prüfen.');
+      }
+    }
+    draft.rooms = proposeRooms(draft.walls, { texts });
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
     if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
@@ -73,6 +85,21 @@ function planTextsInWorld(): PlacedText[] | undefined {
     const c = t.dir && t.width ? { x: t.x + (t.dir.x * t.width) / 2, y: t.y + (t.dir.y * t.width) / 2 } : t;
     return { str: t.str, ...imageToWorld(u, c) };
   });
+}
+
+/** Light filled areas of the current PDF underlay (floor areas such as a balcony), in plan metres. */
+function planAreasInWorld(): AreaOutline[] {
+  const u = useProjectStore.getState().project.underlay;
+  const analysis = useSourceAnalysis.getState().analysis;
+  if (!u || !analysis || analysis.imageAssetId !== u.imageAssetId) return [];
+  const byPath = new Map<number, AreaOutline>();
+  for (const s of analysis.segments) {
+    if (s.path === undefined) continue;
+    const poly = byPath.get(s.path) ?? [];
+    poly.push(imageToWorld(u, { x: s.x1, y: s.y1 }));
+    byPath.set(s.path, poly);
+  }
+  return [...byPath.values()];
 }
 
 /** Re-propose rooms in the review after walls were removed, deselected or moved. */

@@ -13,9 +13,13 @@ let intensity = 1;
 /** Metalness from which a material counts as metal. */
 export const METAL_THRESHOLD = 0.5;
 
-/** Reflection level of metals for a given scene environment intensity (bright by day, never black at night). */
-export function metalEnvIntensity(sceneIntensity: number): number {
-  return Math.min(1.6, Math.max(0.35, 2.4 * sceneIntensity));
+/**
+ * Reflection level of metals for a given scene environment intensity: bright by day; at night a
+ * minimum level as far as lamps actually shine (`lampShine` 0..1), so a room without lamps stays
+ * dark and its handles and window panes do not glow (#216).
+ */
+export function metalEnvIntensity(sceneIntensity: number, lampShine = 1): number {
+  return Math.min(1.6, Math.max(0.35 * lampShine, 2.4 * sceneIntensity));
 }
 
 /** Metal materials are cached and shared, so they stay registered. */
@@ -34,8 +38,8 @@ export function setMetalEnvironment(map: THREE.Texture | null): void {
   metals.forEach(apply);
 }
 
-export function setMetalEnvLevel(sceneIntensity: number): void {
-  intensity = metalEnvIntensity(sceneIntensity);
+export function setMetalEnvLevel(sceneIntensity: number, lampShine = 1): void {
+  intensity = metalEnvIntensity(sceneIntensity, lampShine);
   metals.forEach(apply);
 }
 

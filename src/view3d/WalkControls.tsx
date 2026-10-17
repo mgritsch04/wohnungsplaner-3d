@@ -91,8 +91,14 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   useEffect(() => {
     eyeRef.current = eyeHeight;
   }, [eyeHeight]);
-  // the carried item must not push the walker around
-  const colliders = useMemo(() => buildColliders(derived, carryId ? furniture.filter((f) => f.id !== carryId) : furniture), [derived, furniture, carryId]);
+  // the carried item must not push the walker around. While carrying, only the carried item moves,
+  // so the colliders of the rest are built once when it is picked up, not every frame (#231)
+  const collidersFurniture = carryId ? null : furniture;
+  const colliders = useMemo(
+    () => buildColliders(derived, carryId ? furniture.filter((f) => f.id !== carryId) : furniture),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [derived, collidersFurniture, carryId],
+  );
   const collidersRef = useRef(colliders);
   useEffect(() => {
     collidersRef.current = colliders;

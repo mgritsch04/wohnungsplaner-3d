@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import { useImportStore } from '../import/importStore';
+import { importPlanFile } from '../import/underlayImport';
 import { newProject } from './actions';
 
 /**
  * Start card for empty projects (#102): the first steps instead of an empty plan.
- * Shown while the project has no walls, rooms or furniture; it disappears as soon as
+ * Shown while the project has no walls, rooms, furniture or plan underlay; it disappears as soon as
  * something is placed. Closing it is remembered per project (in this browser);
  * a small "Erste Schritte" button (and "Projekt ▾ › Erste Schritte") brings it back while
  * the project is still empty.
@@ -58,7 +60,9 @@ export const reopenStartCard = (projectId: string) => useStartCardStore.getState
 export function StartCard() {
   const project = useProjectStore((s) => s.project);
   const closed = useStartCardStore((s) => s.closed);
-  if (!isProjectEmpty(project)) return null;
+  const importing = useImportStore((s) => !!s.draft || !!s.progress);
+  // a loaded plan underlay or a running import is a first step too – the card would only cover the plan (#214)
+  if (!isProjectEmpty(project) || project.underlay || importing) return null;
   const setFor = (v: boolean) => useStartCardStore.getState().setClosed(project.id, v);
 
   if (closed.includes(project.id)) {
@@ -79,13 +83,7 @@ export function StartCard() {
       <p className="muted small">Drei Wege zum ersten Grundriss:</p>
       <ol className="start-card-steps">
         <li>
-          <button
-            onClick={() => {
-              ui().setLeftTab('import');
-            }}
-          >
-            Grundriss importieren
-          </button>
+          <button onClick={() => void importPlanFile()}>Grundriss importieren</button>
           <span className="muted small">Plan als PDF oder Bild laden, Maßstab setzen, Wände übernehmen.</span>
         </li>
         <li>

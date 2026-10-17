@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Project } from '../model/schema';
 import { createSampleProject } from '../model/sample';
+import { shareUnchanged } from './structuralShare';
 
 const HISTORY_LIMIT = 100;
 
@@ -29,7 +30,8 @@ function produce(base: Project, fn: (draft: Project) => void): Project {
   const draft = structuredClone(base);
   fn(draft);
   draft.updatedAt = new Date().toISOString();
-  return draft;
+  // untouched walls, rooms, furniture … stay the same objects, so the views skip them (#231)
+  return shareUnchanged(base, draft);
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({

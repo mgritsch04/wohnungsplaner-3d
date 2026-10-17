@@ -308,3 +308,68 @@ export function cadFilledPlanPdf(): Buffer {
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(out, 'latin1');
 }
+
+/**
+ * Synthetic CAD layout (#214): the plan sits in a viewport (clipping path) that ends in the
+ * middle of the right outer wall; behind it the model continues with a neighbouring flat that
+ * is not visible on the sheet. Below the flat a balcony: a light floor area with thin railing
+ * lines and a label, but no walls. Walls are drawn with the heaviest pen, details with thin ones.
+ */
+export function clippedCadPlanPdf(): Buffer {
+  const m = 1000 / 75 / 25.4 * 72; // points per metre at 1:75
+  const ox = 200;
+  const oy = 380;
+  const P = (x: number, y: number) => `${(ox + x * m).toFixed(2)} ${(oy + y * m).toFixed(2)}`;
+  const rect = (x0: number, y0: number, x1: number, y1: number) => `${P(x0, y0)} m ${P(x1, y0)} l ${P(x1, y1)} l ${P(x0, y1)} l h`;
+  const line = (x0: number, y0: number, x1: number, y1: number) => `${P(x0, y0)} m ${P(x1, y1)} l S`;
+  const label = (s: string, x: number, y: number) => `BT /F1 9 Tf 1 0 0 1 ${P(x, y)} Tm (${s}) Tj ET`;
+  const ops: string[] = [];
+  // viewport: everything right of x = 8.12 m (inside the 25 cm right wall) is hidden
+  ops.push('q', `${P(-1.5, -2.5)} ${(9.62 * m).toFixed(2)} ${(10 * m).toFixed(2)} re W n`);
+  // balcony floor: light grey, filled and stroked in the same tone (as CAD exports it)
+  ops.push('0.85 g 0.85 G 0.1 w', `${rect(0.5, -1.75, 4.5, -0.3)} B`);
+  // thin details: railing lines, floor tiles, furniture
+  ops.push('0 G 0.18 w');
+  ops.push(line(0.5, -1.75, 4.5, -1.75), line(0.5, -1.65, 4.5, -1.65), line(0.5, -1.75, 0.5, -0.3), line(4.5, -1.75, 4.5, -0.3));
+  for (let x = 0.8; x < 4.5; x += 0.4) ops.push(line(x, -1.65, x, -0.3));
+  for (let y = -1.35; y < -0.3; y += 0.4) ops.push(line(0.5, y, 4.5, y));
+  ops.push(`${rect(1, 4, 3, 5.5)} S`, `${rect(5.5, 3.5, 7.5, 5.5)} S`, `${rect(1.2, 1, 2.4, 1.8)} S`);
+  // walls: both faces with the heavy pen; the model continues into the neighbouring flat (x > 8.25)
+  ops.push('0 G 0.7 w');
+  const walls: [number, number, number, number][] = [
+    [-0.25, -0.25, 13, 0], // south, running on behind the viewport
+    [-0.25, 6, 13, 6.25], // north
+    [-0.25, 0, 0, 6], // west
+    [8, 0, 8.25, 6], // east – the viewport ends in its middle
+    [4.44, 0, 4.56, 1.0], // partition with a door 1.0–1.9 m
+    [4.44, 1.9, 4.56, 6],
+    [10.5, 0, 10.62, 6], // neighbouring flat (hidden)
+    [12.75, 0, 13, 6],
+  ];
+  for (const [x0, y0, x1, y1] of walls) ops.push(`${rect(x0, y0, x1, y1)} S`);
+  ops.push('0 g', label('Wohnen 26,00 m2', 1.5, 3), label('Schlafen 18,00 m2', 5.8, 2.5), label('Balkon 5,80 m2', 1.5, -1.1));
+  ops.push(label('Nachbar Wohnen 20,00 m2', 11, 3));
+  ops.push('Q');
+  // sheet: frame and title (outside the viewport, not clipped)
+  ops.push('0 G 0.7 w', '20 20 m 1171 20 l 1171 822 l 20 822 l h S');
+  ops.push('BT /F1 10 Tf 1 0 0 1 885 60 Tm (Massstab M 1:75   Format A3) Tj ET');
+  const content = ops.join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1191 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}

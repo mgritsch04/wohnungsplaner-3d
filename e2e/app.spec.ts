@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cadFilledPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
+import { cadFilledPlanPdf, clippedCadPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 import { derivePlan } from '../src/model/derived';
 import { createFurnitureFromCatalog } from '../src/catalog/instantiate';
@@ -1566,6 +1566,14 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   test.setTimeout(600000);
   const errors = collectErrors(page);
   await freshStart(page);
+  // a ceiling light in each room: since #216 only placed lamps light a room at night (no automatic room light)
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      for (const [id, x, y] of [['light_e2e_living', 2.5, 2], ['light_e2e_bed', 6.9, 2]] as const)
+        d.lights.push({ id, name: 'Deckenlicht', x, y, elevation: 2.4, temperature: 3000, intensity: 5, on: true });
+    });
+  });
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Realismus' }).click();
   const blankRetries: string[] = [];
@@ -3870,5 +3878,107 @@ test('Budget: Gruppierung bleibt nach Auswahl eines Möbels, Panelwechsel und Ne
   await expect(page.getByText('Beispielwohnung').or(page.locator('input.project-name'))).toBeVisible();
   await right.getByRole('button', { name: 'Budget' }).click();
   await expect(grouping).toHaveValue('room');
+  expect(errors).toEqual([]);
+});
+
+test('night without lamps: at 0:00 no light source shines in a room without lamps (#216)', async ({ page }) => {
+  test.setTimeout(240_000); // realism rendering with software WebGL is slow
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.evaluate(() => {
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.settings.quality = 'realism';
+      d.settings.timeOfDay = 0;
+      d.settings.lamps = 'auto';
+      d.lights = [];
+      d.furniture = d.furniture.filter((f: any) => !(f.model.type === 'procedural' && ['floor-lamp', 'table-lamp', 'pendant'].includes(f.model.shape)));
+    });
+  });
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => Math.abs((window as any).__wp.lightingHour?.() ?? 99)), { timeout: 60000 }).toBeLessThan(0.01);
+  const shining = () =>
+    page.evaluate(() => {
+      let n = 0;
+      (window as any).__wp.three.scene.traverse((o: any) => void ((o.isPointLight || o.isSpotLight) && o.intensity > 0.01 && n++));
+      return n;
+    });
+  await expect.poll(shining, { timeout: 30000 }).toBe(0);
+  // reflections are not lit either: handles and window panes do not glow in the dark
+  const brightestReflection = () =>
+    page.evaluate(() => {
+      let max = 0;
+      (window as any).__wp.three.scene.traverse((o: any) => {
+        for (const m of [o.material].flat()) if (m?.envMap) max = Math.max(max, m.envMapIntensity);
+      });
+      return max;
+    });
+  await expect.poll(brightestReflection, { timeout: 30000 }).toBeLessThan(0.05);
+  expect(errors).toEqual([]);
+});
+
+test('empty project: "Grundriss importieren" on the start card opens the file picker and imports the plan (#214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  const card = page.getByTestId('start-card');
+  await expect(card).toBeVisible();
+
+  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+  await card.getByRole('button', { name: 'Grundriss importieren' }).click();
+  await (await chooser).setFiles({ name: 'grundriss.png', mimeType: 'image/png', buffer: syntheticPlanPng() });
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
+  await expect(page.locator('.panel.left .tabs').getByRole('button', { name: /^Import/ })).toHaveClass(/active/);
+  await expect.poll(async () => !!(await getProject(page)).underlay).toBe(true);
+  // the plan is the next step – the card no longer covers it
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('start-card-reopen')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it is kept, the balcony becomes a room with railings (#37, #214)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'grundriss-layout.pdf', mimeType: 'application/pdf', buffer: clippedCadPlanPdf() });
+  await expect(page.getByRole('button', { name: 'Aus Angabe übernehmen' })).toBeVisible({ timeout: 15000 });
+  await page.locator('.field-row.compact input').fill('75');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await page.evaluate(() => {
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  type W = { a: { x: number; y: number }; b: { x: number; y: number }; thickness: number; height: number };
+  type R = { name: string; area: number; statedArea?: number };
+  const draft: { walls: W[]; rooms: R[] } = await page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
+  // the neighbouring flat behind the viewport is not proposed
+  const names = draft.rooms.map((r) => r.name).sort();
+  expect(names).toEqual(['Balkon', 'Schlafen', 'Wohnen']);
+  // the east wall, half of it outside the viewport, is still a full wall – the flat is 8 m wide
+  const xs = draft.walls.filter((w) => w.height > 2).flatMap((w) => [w.a.x, w.b.x]);
+  expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(9);
+  const bedroom = draft.rooms.find((r) => r.name === 'Schlafen')!;
+  expect(bedroom.area).toBeGreaterThan(17);
+  expect(bedroom.area).toBeLessThan(21);
+  // balcony: three railings (1 m high), its floor area as a room
+  expect(draft.walls.filter((w) => w.height === 1)).toHaveLength(3);
+  const balcony = draft.rooms.find((r) => r.name === 'Balkon')!;
+  expect(balcony.statedArea).toBe(5.8);
+  expect(balcony.area).toBeGreaterThan(4.5);
+  expect(balcony.area).toBeLessThan(7);
+  await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
+  const confirm = page.getByRole('alertdialog');
+  if (await confirm.isVisible().catch(() => false)) await confirm.getByRole('button').last().click();
+  // (added to the sample flat, whose rooms stay)
+  await expect.poll(async () => (await getProject(page)).rooms.map((r: { name: string }) => r.name)).toEqual(expect.arrayContaining(['Balkon', 'Schlafen', 'Wohnen']));
   expect(errors).toEqual([]);
 });

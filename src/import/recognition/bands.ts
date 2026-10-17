@@ -167,6 +167,7 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
 
   // 2. join ends onto perpendicular bands (corners and T-junctions)
   const result = bands.map((b) => ({ ...b }));
+  const extend: { q: Band; at: number }[] = [];
   for (const b of result) {
     const perps = bands.filter((p) => p.o !== b.o && p.a0 - p.t / 2 - opts.joinTol <= b.c && p.a1 + p.t / 2 + opts.joinTol >= b.c);
     for (const end of ['a0', 'a1'] as const) {
@@ -183,9 +184,13 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
         b[end] = best.p.c;
         continue;
       }
-      // opening between the wall end and a perpendicular wall (e.g. a door next to a corner)
+      // opening between the wall end and a perpendicular wall (e.g. a door next to a corner);
+      // the wall may meet the perpendicular one near its end, where a thicker outer wall turns
+      // the corner (a partition offset from the outer wall's centre line, #214)
+      const reach = opts.joinTol + b.t;
+      const perpsOpen = bands.filter((p) => p.o !== b.o && p.a0 - p.t / 2 - reach <= b.c && p.a1 + p.t / 2 + reach >= b.c);
       let bestOpen: { p: Band; gap: number } | null = null;
-      for (const p of perps) {
+      for (const p of perpsOpen) {
         const gap = end === 'a1' ? lo(p) - pos : pos - hi(p);
         if (gap >= opts.minOpening && gap <= opts.maxOpening && (!bestOpen || gap < bestOpen.gap)) bestOpen = { p, gap };
       }
@@ -195,8 +200,16 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
         const info = classify(b, g0, g1);
         openings.push({ center: pointOf(b.o, (g0 + g1) / 2, b.c), width: g1 - g0, ...info, confidence: info.confidence * 0.8 });
         b[end] = bestOpen.p.c;
+        // reaching past the perpendicular wall's end: lengthen it (below, once all ends are
+        // joined), so both walls meet in one corner
+        extend.push({ q: result[bands.indexOf(bestOpen.p)], at: b.c });
       }
     }
+  }
+
+  for (const { q, at } of extend) {
+    q.a0 = Math.min(q.a0, at);
+    q.a1 = Math.max(q.a1, at);
   }
 
   const walls = result

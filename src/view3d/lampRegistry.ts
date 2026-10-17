@@ -33,13 +33,17 @@ export function setLampLevel(value: number): void {
 
 export const lampLevelNow = () => level;
 
+/** Number of lamp furniture lights in the scene. */
+export const lampCount = () => lights.size;
+
 /**
  * Shadows of lamp lights (#130), so their light stops at walls and closed doors.
  * Point-light shadows render the scene six times, so they are kept cheap:
  * - at most MAX_SHADOW_LAMPS lights cast shadows (lamps before automatic room lights),
  * - only while the lamps are on (shader variants are cached, so switching is cheap),
  * - the shadow maps are rendered only when something changed (requestLampShadowUpdate),
- *   not every frame: walls and furniture are static while the camera moves.
+ *   not every frame: walls and furniture are static while the camera moves; during a drag at
+ *   most every LAMP_SHADOW_MIN_INTERVAL_MS (#231).
  */
 export const MAX_SHADOW_LAMPS = 6;
 const LAMP_SHADOW_MAP = 512;
@@ -89,9 +93,19 @@ export function requestLampShadowUpdate(): void {
   shadowsDirty = true;
 }
 
+/**
+ * Shortest time between two re-renders of the lamp shadow maps (#231). While furniture is carried or
+ * dragged, the project changes every frame; re-rendering every lamp's six shadow faces each time
+ * made the scene ~8× as expensive. The maps now follow at most this often, and the last change is
+ * always rendered.
+ */
+export const LAMP_SHADOW_MIN_INTERVAL_MS = 250;
+let lastFlush = -Infinity;
+
 /** Called once per frame before rendering. */
-export function flushLampShadowUpdates(): void {
-  if (!shadowsDirty) return;
+export function flushLampShadowUpdates(now: number = performance.now()): void {
+  if (!shadowsDirty || now - lastFlush < LAMP_SHADOW_MIN_INTERVAL_MS) return;
   shadowsDirty = false;
+  lastFlush = now;
   for (const { light } of shadowLamps) if (light.castShadow) light.shadow.needsUpdate = true;
 }
