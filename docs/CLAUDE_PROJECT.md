@@ -35,7 +35,7 @@ Parallele Arbeit: Opus-Agents in eigenen Git-Worktrees (eigener Branch, eigener 
 
 Nutzungslimit steuern: Ziel ca. 90 % des 5-Stunden-Fensters bis zum Reset, nicht 100 %. Erlaubtes Tempo = (90 % − aktueller Stand) ÷ Stunden bis Reset. Liegt das gemessene Tempo darüber, keine neuen Agents starten (laufende fertig werden lassen); deutlich darunter (< 70 % des erlaubten) → einen weiteren Agent starten; in der letzten Stunde vor dem Reset darf der Rest genutzt werden. Wochenlimit mitprüfen (ab ~80 % Hochrechnung bremsen). Kurz vor dem Limit einen Weckruf auf den Reset stellen, damit es danach weitergeht. Nie zusätzliche kostenpflichtige Nutzung aktivieren.
 
-Dashboard: https://claude.ai/artifact/Smc3PMAsNzSgMnFG2WHqK2 (Daten in der Artefakt-Datenbank board/*: features, agents, usertests, forecast pflegt der Haupt-Thread; usage und live schreibt ein Updater). Test-Liste nach jeder Änderung an User-Tests mit GitHub abgleichen.
+Dashboard: Gesamtansicht https://claude.ai/artifact/DLsyumhy4w8L66F1VNA9pk (gemeinsam mit dem Fitness-Projekt). Jeder Thread trägt seine Zeile bei Start, Schrittwechsel und Ende in die Zulieferung https://claude.ai/artifact/8a3jqSF73Stryn2zuhA5FJ ein (Artefakt-Datenbank: collection `board`, Dokument `live`, nur die eigene Zeile in `rows` ersetzen, immer mit `if_version`). Das alte Dashboard (Smc3…) ist gelöscht.
 
 App als Artefakt: https://claude.ai/artifact/V1VLy26ytDs9YkHVUvv6MW – nach jedem Merge nach main mit npm run build:artifact bauen und mit dem Manifest (artifact-manifest.json) neu veröffentlichen. Der normale Build (npm run build / dist) darf sich dadurch nie ändern.
 
