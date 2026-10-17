@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
+import { actions } from './issues.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -56,6 +57,8 @@ const LABEL = { ok: '✅ erfüllt', fail: '❌ nicht erfüllt', look: '👁 bitt
 if (args.includes('--report-only')) {
   const r = { ...JSON.parse(readFileSync(join(outDir, 'report.json'), 'utf8')), name: scenario.name, pc: !!scenario.pc, realDevice: scenario.realDevice ?? [] };
   r.verdict = verdict(r);
+  r.kind = kindOf(scenario);
+  r.actions = actions(r.kind, r.verdict.result);
   writeFileSync(join(outDir, 'report.json'), JSON.stringify(r, null, 2));
   writeFileSync(join(outDir, 'report.md'), markdown(r));
   writeFileSync(join(outDir, 'report.html'), html(r));
@@ -254,12 +257,20 @@ const report = {
   consoleErrors: errors,
 };
 report.verdict = verdict(report);
+report.kind = kindOf(scenario);
+report.actions = actions(report.kind, report.verdict.result);
 writeFileSync(join(outDir, 'report.json'), JSON.stringify(report, null, 2));
 writeFileSync(join(outDir, 'report.md'), markdown(report));
 writeFileSync(join(outDir, 'report.html'), html(report));
 console.log(`Bericht: ${join(outDir, 'report.html')}`);
 console.log(`Urteil: ${report.verdict.result}${report.verdict.reasons.length ? `\n- ${report.verdict.reasons.join('\n- ')}` : ''}`);
+console.log(`Danach auf GitHub (#${issue}, ${report.kind === 'feature' ? 'Feature-Issue' : 'altes [USERTEST]-Issue'}):\n- ${report.actions.join('\n- ')}`);
 process.exit(0);
+
+/** Old model: a separate [USERTEST] issue; new model: the feature issue itself (label auto-user-test). */
+function kindOf(sc) {
+  return /^\[USERTEST\]/i.test(sc.title ?? '') ? 'usertest' : 'feature';
+}
 
 /** Automatic verdict: only an unambiguous pass may be marked as confirmed. */
 function verdict(r) {
