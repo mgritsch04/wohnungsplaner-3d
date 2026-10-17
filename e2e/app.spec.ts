@@ -1641,6 +1641,20 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
   const evening = await brightness(21, 'auto');
   const night = await brightness(23.5, 'auto');
   const nightLights = await lightReport();
+  // TEMPORARY (#157): renderer state in that frame
+  const glState = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wp = (window as any).__wp;
+    const r = wp.three.gl;
+    const g = r.getContext();
+    const info = `calls ${r.info.render.calls} tris ${r.info.render.triangles} programs ${r.info.programs?.length} target ${r.getRenderTarget() ? 'set' : 'null'} glError ${g.getError()}`;
+    r.render(wp.three.scene, wp.three.camera);
+    const px = new Uint8Array(4);
+    g.readPixels(Math.floor(g.drawingBufferWidth / 2), Math.floor(g.drawingBufferHeight / 2), 1, 1, g.RGBA, g.UNSIGNED_BYTE, px);
+    const cam = wp.three.camera;
+    const progs = (r.info.programs ?? []).map((p: { diagnostics?: unknown }) => p.diagnostics ? 'diag' : '').filter(Boolean).length;
+    return `${info} | manual render: calls ${r.info.render.calls} glError ${g.getError()} centre px ${Array.from(px).join(',')} | proj finite ${cam.projectionMatrix.elements.every(Number.isFinite)} world finite ${cam.matrixWorld.elements.every(Number.isFinite)} | failed programs ${progs}`;
+  });
   // TEMPORARY (#157): what does a wrong 23:30 frame consist of? coarse luminance grid of the screenshot
   // and which elements lie on top of the measured area
   const nightShot = await page.evaluate(
@@ -1675,7 +1689,7 @@ test('night lighting: day > evening > night, lamps on/off clearly distinguishabl
     { b64: last.png.toString('base64'), clip: last.clip },
   );
   const nightOff = await brightness(23.5, 'off');
-  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
+  console.log(`night lighting: noon ${noon.toFixed(1)} · 21:00 ${evening.toFixed(1)} · 23:30 ${night.toFixed(1)} · 23:30 off ${nightOff.toFixed(1)}\n  lamps on: ${nightLights}\n  23:30 frame: ${nightShot}\n  renderer: ${glState}\n  gl warnings (${glWarnings.length}): ${[...new Set(glWarnings)].slice(0, 8).join(' // ')}\n  errors (${errors.length}): ${[...new Set(errors)].slice(0, 4).map((e) => e.slice(0, 1500)).join(' // ')}\n  lamps off: ${await lightReport()}`);
   expect(errors).toEqual([]); // e.g. shader compile errors would explain missing light
   expect((await getProject(page)).settings.lamps).toBe('off');
   expect(evening).toBeLessThan(noon * 0.5); // 21:00 is clearly darker than noon (was ~0.53× before the fix)
