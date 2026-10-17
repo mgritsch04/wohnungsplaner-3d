@@ -10,6 +10,7 @@ import { flushLampShadowUpdates, registerShadowLamp, setLampLevel } from './lamp
 import { useUiStore } from '../store/uiStore';
 import { useSimLightOverrides } from '../smarthome/simStore';
 import { setMetalEnvLevel } from './metalRegistry';
+import { setEnvironmentLighting } from './daylightEnvironment';
 
 /**
  * Smoothing time constant (s) of the displayed time behind the slider: short enough to
@@ -139,6 +140,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     // lamps (lamp furniture, placed lights, automatic room lights) share one switch
     const lamps = realism ? lampLevel(lampMode, st) : 1;
     setLampLevel(lamps);
+    if (realism) setEnvironmentLighting(st.hour, lamps);
     configured.forEach((l, i) => {
       const pl = configuredRefs.current[i];
       if (pl) pl.intensity = interiorIntensity(l) * (l.sim ? 1 : lamps);

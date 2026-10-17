@@ -4,7 +4,8 @@ import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { createDaylightEnvironment, ENV_MIN_INTERVAL_MS, envHour, envKey, environmentLighting } from './daylightEnvironment';
+import { tierSettings, useGraphicsTier, useGraphicsTierStore, isSoftwareRenderer, type TierSettings } from './graphicsTier';
 import { setMetalEnvironment } from './metalRegistry';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { architectureKey, derivePlan } from '../model/derived';
@@ -79,6 +80,7 @@ export function Scene3D() {
   const dprCap = usePerformanceStore((s) => s.dprCap);
   // phones/tablets (#164): stick + finger look instead of WASD and mouse
   const touchUi = useTouchUi();
+  const graphicsTier = useGraphicsTier();
 
   if (webglError) {
     return (
@@ -94,6 +96,7 @@ export function Scene3D() {
     <div
       className="scene3d"
       data-testid="scene3d"
+      data-graphics-tier={quality === 'realism' ? graphicsTier : undefined}
       onPointerDownCapture={(e) => (downAt.current = { x: e.clientX, y: e.clientY })}
       // the middle button turns the view (#132) – no browser auto-scroll / paste
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
@@ -111,6 +114,10 @@ export function Scene3D() {
           onCreated={({ gl }) => {
             gl.toneMapping = THREE.ACESFilmicToneMapping;
             gl.outputColorSpace = THREE.SRGBColorSpace;
+            // no real graphics card: the automatic level stays on "normal" (#192)
+            const ctx = gl.getContext();
+            const info = ctx.getExtension('WEBGL_debug_renderer_info');
+            useGraphicsTierStore.getState().setSoftwareRenderer(isSoftwareRenderer(String(ctx.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : ctx.RENDERER))));
           }}
           frameloop="always"
           onPointerMissed={(e) => {
@@ -294,12 +301,13 @@ function SceneContent({
   // handlers stay off: under pointer lock they would pick at the stale mouse position (the wall
   // behind the furniture), by touch a finger drag would move furniture or select walls/floors
   const walkPick = cameraMode === 'walk';
+  const tier = tierSettings(useGraphicsTier());
 
   return (
     <>
       <color attach="background" args={[quality === 'realism' ? '#dfe7ee' : '#eef1f4']} />
       <LightingRig project={project} derived={derived} quality={quality} center={center} span={span} showSky={!(cutaway && cameraMode === 'orbit')} />
-      {quality === 'realism' && <EnvironmentLight />}
+      {quality === 'realism' && <EnvironmentLight stepHours={tier.envStepHours} size={tier.envSize} />}
       <FpsMeter />
       <AdaptiveQuality />
       <Ground quality={quality} />
@@ -341,7 +349,7 @@ function SceneContent({
       {!readOnly && cameraMode === 'orbit' && <CatalogDrop3D />}
       {quality === 'realism' && (
         <EffectsBoundary>
-          <RealismEffects />
+          <RealismEffects aoQuality={tier.aoQuality} />
         </EffectsBoundary>
       )}
       <CameraBookmarkDriver />
@@ -424,7 +432,7 @@ function PhoneSheetFov({ enabled }: { enabled: boolean }) {
  * shadows in corners and under furniture), SMAA anti-aliasing and filmic tone mapping.
  * Skipped automatically when the pixel ratio was reduced for performance.
  */
-function RealismEffects() {
+function RealismEffects({ aoQuality }: { aoQuality: TierSettings['aoQuality'] }) {
   const dprCap = usePerformanceStore((s) => s.dprCap);
   const { gl } = useThree();
   // tone mapping happens once, in the effect chain – not additionally in the renderer
@@ -438,7 +446,7 @@ function RealismEffects() {
   const lowPower = dprCap < 1;
   return (
     <EffectComposer multisampling={0}>
-      <N8AO aoRadius={0.6} distanceFalloff={0.6} intensity={2.2} quality={lowPower ? 'performance' : 'medium'} halfRes={lowPower} />
+      <N8AO aoRadius={0.6} distanceFalloff={0.6} intensity={2.2} quality={lowPower ? 'performance' : aoQuality} halfRes={lowPower} />
       <SMAA />
       <ToneMapping mode={ToneMappingMode.AGX} />
     </EffectComposer>
@@ -634,23 +642,52 @@ function OrbitZoomSlider() {
   return <ZoomSlider testId="zoom-3d" label="Zoom 3D" value={distance} min={1.5} max={80} invert onChange={apply} onFit={resetCamera} />;
 }
 
-/** Neutral image-based fill light; its strength is driven by the lighting rig (time of day). */
-function EnvironmentLight() {
+/**
+ * Image-based fill light and reflections (#192): a room environment tinted for the time of day,
+ * rebuilt when the lighting moves to another step (see daylightEnvironment.ts). Its strength is
+ * driven by the lighting rig.
+ */
+function EnvironmentLight({ stepHours, size }: { stepHours: number; size: number }) {
   const { gl, scene } = useThree();
+  const state = useRef<{ pmrem: THREE.PMREMGenerator; tex: THREE.Texture | null; key: string; at: number } | null>(null);
   useEffect(() => {
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const envScene = new RoomEnvironment();
-    const tex = pmrem.fromScene(envScene, 0.04).texture;
-    scene.environment = tex;
-    setMetalEnvironment(tex);
+    const s = { pmrem: new THREE.PMREMGenerator(gl), tex: null as THREE.Texture | null, key: '', at: -Infinity };
+    state.current = s;
     return () => {
       scene.environment = null;
       setMetalEnvironment(null);
-      tex.dispose();
-      pmrem.dispose();
+      s.tex?.dispose();
+      s.pmrem.dispose();
+      state.current = null;
     };
   }, [gl, scene]);
+  // a new step or resolution: rebuild on the next frame
+  useEffect(() => {
+    if (state.current) state.current.key = '';
+  }, [stepHours, size]);
+  useFrame(() => {
+    const s = state.current;
+    if (!s) return;
+    const { hour, lamps } = environmentLighting();
+    const key = `${envKey(hour, lamps, stepHours)}|${size}`;
+    const now = performance.now();
+    if (key === s.key || (s.tex && now - s.at < ENV_MIN_INTERVAL_MS)) return;
+    const env = createDaylightEnvironment(envHour(hour, stepHours), lamps);
+    const tex = s.pmrem.fromScene(env, 0.04, 0.1, 100, { size }).texture;
+    env.dispose();
+    s.tex?.dispose();
+    Object.assign(s, { tex, key, at: now });
+    scene.environment = tex;
+    setMetalEnvironment(tex);
+    countEnvBuild();
+  });
   return null;
+}
+
+/** e2e/debug hook: how often the environment was rebuilt. */
+function countEnvBuild() {
+  const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
+  if (wp) wp.envBuilds = ((wp.envBuilds as number | undefined) ?? 0) + 1;
 }
 
 /** Measures frame rate once per second (no React re-render inside the loop). */
