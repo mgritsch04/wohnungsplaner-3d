@@ -25,6 +25,7 @@ import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { dropCatalogItemAt } from '../ui/actions';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
+import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
 import { SightlineOverlay } from './SightlineOverlay';
@@ -842,6 +843,7 @@ export function Editor2D() {
           />
           {tool === 'select' && <GroupOverlay project={project} selectedIds={selectedIds} groupId={groupSel} px={px} />}
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
+          <FurnishPreviewOverlay px={px} />
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
