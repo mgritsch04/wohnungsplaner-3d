@@ -40,7 +40,7 @@ export function LampsSelect() {
     <select
       value={lamps}
       aria-label="Lampen"
-      title="Lampen (Stehlampen, Tischlampen, platzierte Lichtquellen, Raumlicht): automatisch ab der Dämmerung, immer an oder aus"
+      title="Lampen (Stehlampen, Tischlampen, platzierte Lichtquellen): automatisch ab der Dämmerung, immer an oder aus. Räume ohne Lampen bleiben nachts dunkel."
       onChange={(e) => {
         const v = e.target.value as typeof lamps;
         useProjectStore.getState().apply((d) => void (d.settings.lamps = v));

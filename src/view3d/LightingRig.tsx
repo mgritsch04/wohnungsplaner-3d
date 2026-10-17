@@ -18,9 +18,6 @@ import { setEnvironmentLighting } from './daylightEnvironment';
  */
 const BLEND_TAU = 0.05;
 const MAX_WINDOW_LIGHTS = 10;
-const MAX_ROOM_LIGHTS = 12;
-/** Automatic ceiling light of rooms without own lamps (when lamps are on). */
-const ROOM_LIGHT_INTENSITY = 5;
 
 interface Props {
   project: Project;
@@ -34,8 +31,8 @@ interface Props {
 
 /**
  * All lighting of the 3D scene. Realism mode follows the time of day: sun
- * position/colour/shadows, sky, diffuse environment, light through windows and
- * automatic room lights at night. Changes of the time blend smoothly; updates are
+ * position/colour/shadows, sky, diffuse environment and light through windows; at night
+ * only placed lamps light the rooms (#216). Changes of the time blend smoothly; updates are
  * applied imperatively in the render loop, so moving the slider does not rebuild the scene.
  * Planning mode uses fixed, bright daylight for readability.
  */
@@ -48,7 +45,6 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   const configuredRefs = useRef<(THREE.PointLight | null)[]>([]);
   const skyRef = useRef<THREE.Mesh>(null);
   const windowRefs = useRef<(THREE.PointLight | null)[]>([]);
-  const roomRefs = useRef<(THREE.PointLight | null)[]>([]);
   const current = useRef<number | null>(null);
   const applied = useRef<string>('');
   const dist = span * 1.5 + 10;
@@ -89,28 +85,8 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     return out.sort((a, b) => b.area - a.area).slice(0, MAX_WINDOW_LIGHTS);
   }, [derived]);
 
-  // rooms without any own light source get an automatic ceiling light (used at dusk/night)
-  const sim = useSimLightOverrides(project);
-  const simKey = sim ? [...sim.keys()].sort().join(',') : '';
-  const simControlled = useMemo(() => new Set(simKey ? simKey.split(',') : []), [simKey]);
-  const roomLights = useMemo(() => {
-    const out: { pos: [number, number, number]; reach: number }[] = [];
-    const lampShapes = new Set(['floor-lamp', 'table-lamp', 'pendant']);
-    for (const room of project.rooms) {
-      const g = derived.rooms.get(room.id);
-      if (!g) continue;
-      const hasLight =
-        project.lights.some((l) => (l.on || simControlled.has(l.id)) && pointInPolygon(l, g.interior)) ||
-        project.furniture.some((f) => f.model.type === 'procedural' && lampShapes.has(f.model.shape) && pointInPolygon(f, g.interior));
-      if (hasLight) continue;
-      // reach ≈ distance to the farthest room corner; shadows (within the lamp budget) stop the rest at walls (#130)
-      const reach = Math.max(...g.interior.map((p) => Math.hypot(p.x - g.centroid.x, p.y - g.centroid.y))) + 0.8;
-      out.push({ pos: [g.centroid.x, project.settings.defaultWallHeight - 0.35, g.centroid.y], reach });
-    }
-    return out.slice(0, MAX_ROOM_LIGHTS);
-  }, [project.rooms, project.lights, project.furniture, project.settings.defaultWallHeight, derived, simControlled]);
-
   // smart-home simulation (#170): simulated lamps follow their automation, also by day
+  const sim = useSimLightOverrides(project);
   const configured = project.lights
     .map((l) => {
       const o = sim?.get(l.id);
@@ -137,7 +113,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     if (ambientRef.current) ambientRef.current.intensity = realism ? 0.02 * st.ambientStrength : 0.15;
     scene.environmentIntensity = realism ? 0.6 * st.ambientStrength : 0;
     setMetalEnvLevel(scene.environmentIntensity);
-    // lamps (lamp furniture, placed lights, automatic room lights) share one switch
+    // lamps (lamp furniture, placed lights) share one switch; rooms without lamps stay dark at night (#216)
     const lamps = realism ? lampLevel(lampMode, st) : 1;
     setLampLevel(lamps);
     if (realism) setEnvironmentLighting(st.hour, lamps);
@@ -149,10 +125,6 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       windowLights.forEach((w, i) => {
         const l = windowRefs.current[i];
         if (l) l.intensity = st.daylight * Math.min(3, 0.9 * w.area);
-      });
-      roomLights.forEach((_, i) => {
-        const l = roomRefs.current[i];
-        if (l) l.intensity = ROOM_LIGHT_INTENSITY * lamps;
       });
       const sky = skyRef.current;
       const uniforms = (sky?.material as THREE.ShaderMaterial | undefined)?.uniforms;
@@ -171,7 +143,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
     current.current = approachHour(current.current, goal, dt, BLEND_TAU);
-    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${roomLights.length}|${configuredKey}`;
+    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${configuredKey}`;
     if (key === applied.current) return;
     applied.current = key;
     apply(lightingAt(current.current));
@@ -186,7 +158,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
   // re-apply after structural changes (new lights mounted, mode switch)
   useEffect(() => {
     applied.current = '';
-  }, [realism, windowLights, roomLights]);
+  }, [realism, windowLights]);
 
   return (
     <>
@@ -205,10 +177,6 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       {realism &&
         windowLights.map((w, i) => (
           <pointLight key={`w${i}`} ref={(el) => void (windowRefs.current[i] = el)} position={w.pos} color="#dfe9ff" intensity={0} distance={7} decay={2} />
-        ))}
-      {realism &&
-        roomLights.map((r, i) => (
-          <ShadowedLight key={`r${i}`} priority={1} lightRef={(el) => void (roomRefs.current[i] = el)} position={r.pos} color={kelvinToColor(3000)} distance={r.reach} decay={2} />
         ))}
       {configured.map((l, i) => (
         <InteriorLight key={l.id} light={l} shadow={realism} lightRef={(el) => void (configuredRefs.current[i] = el)} />
