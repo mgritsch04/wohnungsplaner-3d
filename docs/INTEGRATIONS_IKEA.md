@@ -4,6 +4,15 @@ _Stand: 2026-10-16 (2. Untersuchungsrunde ergänzt)._  Kennzeichnung: `VERIFIED`
 
 > **Runde 3 (2026-10-16):** `www.ikea.com` ist inzwischen erreichbar. Echte Produktseiten wurden geprüft – Ergebnisse, Planer-Analyse und Möbelix-Blocker stehen in [`PLANNER_IMPORT_RESEARCH.md`](PLANNER_IMPORT_RESEARCH.md). Wichtigste Korrekturen: Die 3D-Modelle sind als schema.org-`3DModel` deklariert; das unten erwähnte `pip-xr-viewer-model` kommt auf den geprüften Seiten nicht vor (veraltet).
 
+## IKEA-Auswahl im Planer mit lokalem Helfer (2026-10-17)
+Katalog › Unterreiter **„IKEA“**: Links von ikea.com/at oder Artikelnummern einfügen, **„Holen“** drücken; das Produkt landet mit Bild, Maßen, Preis (mit Abrufdatum) und – wenn gewünscht – dem echten 3D-Modell in **„Meine IKEA-Auswahl“** und lässt sich per Klick („In den Raum“) oder Ziehen platzieren. Die Auswahl bleibt lokal gespeichert.
+
+* Abgerufen wird über den **lokalen Helfer** `npm run ikea-helper` (`scripts/ikea-helper.mjs`, Port 4791, nur 127.0.0.1). Er nutzt denselben Weg wie `scripts/ikea-products.mjs` (gemeinsam in `scripts/lib/ikea-fetch.mjs`): genau eine öffentliche Produktseite pro eingefügter Nummer, höchstens eine Anfrage alle 1,5 s, max. 25 pro Durchgang, Zwischenspeicher `ikea-import/auswahl/` (Produktdaten 24 h, Modelle dauerhaft). Keine Suche, keine Konten, keine internen Schnittstellen.
+* Der Helfer beantwortet nur Anfragen von `localhost`/`127.0.0.1` (andere Websites bekommen HTTP 403).
+* Eine **Produktsuche im Planer gibt es bewusst nicht**: IKEA bietet keine öffentliche Such-API; die Such-Endpunkte sind intern. Gesucht wird auf ikea.com, der Link kommt in den Planer.
+* Im Claude-App-Artefakt ist „Holen“ nicht verfügbar (kein Helfer erreichbar); dort bleiben Auswahl und Ordner-Import.
+* Getestet 2026-10-17 mit echter Seite (KALLAX 104.099.32: Name, 111,5 × 39 × 146,5 cm, Preis, GLB 1,9 MB) bis zur Platzierung in 3D.
+
 ## Kurzfazit
 - Für **keinen** der beiden Händler gibt es eine offiziell dokumentierte, öffentliche Produkt-API. (`UNVERIFIED` – Recherche, keine Herstellerbestätigung)
 - **Live-Tests waren in der Entwicklungsumgebung nicht möglich:** Die Cloud-Umgebung blockiert `www.ikea.com` und `www.moebelix.at` (`UNAVAILABLE`).
