@@ -698,3 +698,69 @@ describe('catalog drag and drop (#131)', () => {
     expect(canDropAt(derivePlan(createEmptyProject()), { x: 50, y: -3 })).toBe(true);
   });
 });
+
+describe('carrying and dragging never pass through walls (#39)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+
+  it('an item at an angle pushed into a wall frame after frame stays in the room', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const box = createFurnitureFromCatalog(cat('generic-storage-box'), { x: 1, y: 1.5, rotation: 0.4 });
+    p.furniture.push(box);
+    for (let i = 0; i < 60; i++) {
+      // the gaze (or pointer) lies behind the wall and wanders up and down
+      moveFurnitureTo(p, d, obs, box.id, { x: 6, y: 1.5 + Math.sin(i / 7) * 1.6 }, { snap: false, collide: true });
+      const b = p.furniture[0];
+      expect(b.x, `frame ${i}`).toBeLessThan(4);
+      expect(collidingObstacles(b, obs), `frame ${i}`).toHaveLength(0);
+    }
+  });
+
+  it('stepping down from a dresser under a window is not pushed out through the wall', () => {
+    const p = createEmptyProject();
+    addRectRoom(p, { x: 0, y: 0, width: 4, depth: 3, name: 'A', thickness: T, height: 2.6 });
+    addRectRoom(p, { x: 4 + T, y: 0, width: 3, depth: 3, name: 'B', thickness: T, height: 2.6 });
+    const ww = closestWall(p, { x: 5.5, y: 3.06 })!;
+    addOpening(p, ww.wall.id, 'window', ww.s, {});
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const dresser = createFurnitureFromCatalog(cat('generic-dresser'), { x: 5.5, y: 2.7, rotation: Math.PI });
+    const box = createFurnitureFromCatalog(cat('generic-storage-box'), { x: 5.439, y: 2.772 });
+    box.elevation = dresser.height;
+    p.furniture.push(box, dresser);
+    moveFurnitureTo(p, d, obs, box.id, { x: 1.9, y: 1.42 }, { snap: true, collide: true });
+    const b = p.furniture[0];
+    expect(b.elevation).toBe(0);
+    expect(b.y).toBeLessThan(3);
+    expect(collidingObstacles(b, obs.filter((o) => o.kind === 'wall'))).toHaveLength(0);
+  });
+
+  it('closed doors block only where asked (walkthrough carrying), the plan keeps every doorway passable', () => {
+    const p = createEmptyProject();
+    addRectRoom(p, { x: 0, y: 0, width: 4, depth: 3, name: 'A', thickness: T, height: 2.6 });
+    addRectRoom(p, { x: 4 + T, y: 0, width: 3, depth: 3, name: 'B', thickness: T, height: 2.6 });
+    const w = closestWall(p, { x: 4.06, y: 1.5 })!;
+    addOpening(p, w.wall.id, 'door', w.s, { width: 0.9, open: false });
+    const d = derivePlan(p);
+    const through = (obs: ReturnType<typeof buildPlacementObstacles>) => {
+      const q = createEmptyProject();
+      q.furniture.push(createFurnitureFromCatalog(cat('generic-storage-box'), { x: 3, y: 1.5 }));
+      moveFurnitureTo(q, d, obs, q.furniture[0].id, { x: 5.5, y: 1.5 }, { snap: false, collide: true });
+      return q.furniture[0].x;
+    };
+    expect(through(buildPlacementObstacles(d))).toBeCloseTo(5.5, 3);
+    expect(through(buildPlacementObstacles(d, { closedOpenings: true }))).toBeLessThan(4);
+  });
+
+  it('small items stack on a table also with „Möbel einrasten: aus“ (#219)', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const obs = buildPlacementObstacles(d);
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    const box = createFurnitureFromCatalog(cat('generic-storage-box'), { x: 0.6, y: 0.6 });
+    p.furniture.push(table, box);
+    moveFurnitureTo(p, d, obs, box.id, { x: 2.2, y: 1.5 }, { snap: false, collide: true, stack: true });
+    expect(p.furniture[1].elevation).toBeCloseTo(table.height, 6);
+  });
+});

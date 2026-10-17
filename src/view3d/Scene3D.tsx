@@ -273,7 +273,7 @@ function SceneContent({
           moveGroupBy(d, obstacles, ids, { x: roundMm(p.x) - cur.x, y: roundMm(p.y) - cur.y }, { collide: !free });
           return;
         }
-        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: !free });
+        moveFurnitureTo(d, derived, obstacles, id, { x: roundMm(p.x), y: roundMm(p.y) }, { snap: fs.walls, collide: !free, stack: !free });
       }),
     [updateTx, derived, obstacles],
   );

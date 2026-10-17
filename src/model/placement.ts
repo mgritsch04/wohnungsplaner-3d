@@ -14,6 +14,7 @@ import { add, dot, normalize, perp, pointInPolygon, polygonArea, polygonCentroid
 import { normalizeAngle } from './units';
 import { frontClearance, isRug, isStackable, isSurface, pairRule, seatAndTable, seatBackDepth } from './placementRules';
 import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
+import { clipFootprint } from './geometry/walls';
 
 export interface Obstacle {
   polygon: Vec2[];
@@ -41,16 +42,29 @@ export function probeCorners(pose: Pick<Furniture, 'x' | 'y' | 'width' | 'depth'
   return o.seatBack ? backStripCorners(pose, o.seatBack) : fc;
 }
 
-export function buildPlacementObstacles(d: DerivedPlan): Obstacle[] {
+/**
+ * `closedOpenings`: closed doors and windows block as well, within the height of their leaves
+ * (#39) – used while carrying an item in the walkthrough, where the walker is stopped by them
+ * too. Plan editing leaves them open, so furniture can be moved through any doorway.
+ */
+export function buildPlacementObstacles(d: DerivedPlan, opts: { closedOpenings?: boolean } = {}): Obstacle[] {
   const out: Obstacle[] = [];
   for (const [wallId, pieces] of d.pieces) for (const pc of pieces) out.push({ polygon: pc.polygon, z0: pc.z0, z1: pc.z1, kind: 'wall', refId: wallId });
   for (const h of d.hubs) out.push({ polygon: h.polygon, z0: 0, z1: h.height, kind: 'wall', refId: h.nodeId });
-  for (const list of d.openings.values()) {
+  for (const [wallId, list] of d.openings) {
     for (const r of list) {
       // an opened leaf (door: 90° along the swing side, as in the plan; window sash: into the
       // room) is solid within its height; a closed one lies in the wall opening and blocks nothing
       for (const l of d.leaves.get(r.opening.id) ?? []) {
         if (l.open) out.push({ polygon: leafPolygon(l, LEAF_OPEN_ANGLE), z0: l.z0, z1: l.z1, kind: 'door-leaf', refId: r.opening.id });
+      }
+      const closed = (d.leaves.get(r.opening.id) ?? []).filter((l) => !l.open);
+      const fp = d.footprints.get(wallId);
+      if (opts.closedOpenings && closed.length && fp) {
+        const polygon = clipFootprint(fp, r.s0, r.s1);
+        const z0 = Math.min(...closed.map((l) => l.z0));
+        const z1 = Math.max(...closed.map((l) => l.z1));
+        if (polygon.length >= 3) out.push({ polygon, z0, z1, kind: 'wall', refId: r.opening.id });
       }
     }
   }
@@ -136,6 +150,15 @@ function obstacleInfo(o: Obstacle) {
 const obstacleBounds = obstacleInfo;
 const obstacleThickness = (o: Obstacle) => obstacleInfo(o).thickness;
 
+/** Overlaps up to this depth (m) are contact, not "already inside" (see `constrainMove`). */
+const STUCK_DEPTH = 0.002;
+
+/** How far (m) `pose` reaches into obstacle `o` (0 if separated). */
+function penetration(pose: Pose, o: Obstacle): number {
+  const m = mtv(probeCorners(pose, o, furnitureCorners(pose)), o.polygon);
+  return m ? Math.hypot(m.x, m.y) : 0;
+}
+
 /** Push a pose out of all overlapping obstacles (a few iterations handle corners). */
 function resolve(pose: Pose, obstacles: Obstacle[]): Pose {
   let p = { ...pose };
@@ -190,7 +213,10 @@ export function constrainMove(
   // resolve to the far side of a thin partition (tunnelling)
   const thinnest = relevant.reduce((m, o) => Math.min(m, obstacleThickness(o)), Infinity);
   maxStep = Math.max(0.004, Math.min(maxStep, thinnest / 3));
-  const stuck = new Set(collidingObstacles(current, relevant));
+  // only a real overlap counts as "already inside": an item resting flush against a wall
+  // (millimetre rounding can leave it a fraction of a millimetre in it) must keep being
+  // blocked by that wall, otherwise it glides straight through it (#39)
+  const stuck = new Set(collidingObstacles(current, relevant).filter((o) => penetration(current, o) > STUCK_DEPTH));
   const active = () => relevant.filter((o) => !stuck.has(o));
   const dx = target.x - start.x;
   const dy = target.y - start.y;
@@ -570,6 +596,11 @@ export interface MoveOptions {
   snap: boolean;
   /** Block movement through walls and door leaves. */
   collide: boolean;
+  /**
+   * Small items stand on the table/cabinet below them (#219). Default: as `snap`; the plan and
+   * 3D dragging pass it separately, so it also works with „Möbel einrasten: aus“ (only Alt is free).
+   */
+  stack?: boolean;
 }
 
 /**
@@ -597,14 +628,23 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
   }
   // small items (table lamps, decor) stand on the table/cabinet below them
   let elevation = f.elevation;
-  if (opts.snap && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
+  if ((opts.stack ?? opts.snap) && isStackable(f) && f.elevation <= 1.3) elevation = surfaceTopAt(d, f.id, goal);
+  let rounded = { x: Math.round(goal.x * 1000) / 1000, y: Math.round(goal.y * 1000) / 1000 };
   if (opts.collide) {
     const m = moveCollision(d, { ...f, rotation, elevation }, obstacles);
-    const r = constrainMove(m.pose, goal, m.obstacles, undefined, m.free ? { ...f, elevation: 0, height: 1 } : f);
+    // the item as it is, at its new height: stepping down from a cabinet (or up onto it) must not
+    // push it out of that cabinet sideways – possibly through the wall behind it (#39); the
+    // surface it stood on counts as "already inside" until the item has left it
+    const current = m.free ? { ...f, elevation: 0, height: 1 } : { ...f, elevation };
+    const r = constrainMove(m.pose, goal, m.obstacles, undefined, current);
     goal = { x: r.x, y: r.y };
+    rounded = { x: Math.round(goal.x * 1000) / 1000, y: Math.round(goal.y * 1000) / 1000 };
+    // millimetre rounding must not turn "touching" into a tiny overlap (#39)
+    const pose = { ...m.pose, ...goal };
+    if (collidingObstacles({ ...pose, ...rounded }, m.obstacles).length > collidingObstacles(pose, m.obstacles).length) rounded = goal;
   }
-  f.x = Math.round(goal.x * 1000) / 1000;
-  f.y = Math.round(goal.y * 1000) / 1000;
+  f.x = rounded.x;
+  f.y = rounded.y;
   f.rotation = rotation;
   f.elevation = Math.round(elevation * 1000) / 1000;
   return snapped;

@@ -5,7 +5,7 @@ import type { DerivedPlan } from '../model/derived';
 import type { Furniture } from '../model/schema';
 import { buildColliders, EYE_HEIGHT, resolveCollisions } from './collision';
 import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
-import { roundMm } from '../model/units';
+import { carryGoal } from './carryTarget';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
@@ -45,8 +45,6 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 /** Furniture under the crosshair can be picked up to this distance (m). */
 const PICK_RANGE = 6;
 /** A carried item stays this far in front of the eyes (m, horizontal). */
-const CARRY_MIN = 1.1;
-const CARRY_MAX = 4;
 const CENTER = new THREE.Vector2(0, 0);
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
@@ -66,7 +64,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
   const carry = useRef<{ id: string; last: Vec2 | null } | null>(null);
-  const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
+  const obstacles = useMemo(() => buildPlacementObstacles(derived, { closedOpenings: true }), [derived]);
   const placement = useRef({ derived, obstacles });
   useEffect(() => {
     placement.current = { derived, obstacles };
@@ -444,12 +442,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
-      // carried item: on the floor (or its surface height) where the gaze meets it, 1.1–4 m ahead
+      // carried item: where the gaze meets the floor (1.1–4 m ahead) or a table top
       const dir = camera.getWorldDirection(new THREE.Vector3());
-      const flat = Math.hypot(dir.x, dir.z) || 1;
-      let dist = CARRY_MAX;
-      if (dir.y < -0.01) dist = Math.min(CARRY_MAX, Math.max(CARRY_MIN, ((camera.position.y - 0.3) * flat) / -dir.y));
-      const goal = { x: roundMm(camera.position.x + (dir.x / flat) * dist), y: roundMm(camera.position.z + (dir.z / flat) * dist) };
+      const goal = carryGoal(camera.position, dir, useProjectStore.getState().project.furniture, c.id);
       if (!c.last || Math.hypot(goal.x - c.last.x, goal.y - c.last.y) > 0.01) {
         c.last = goal;
         const { derived: dv, obstacles: ob } = placement.current;
