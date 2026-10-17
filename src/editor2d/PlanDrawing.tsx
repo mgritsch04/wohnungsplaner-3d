@@ -265,7 +265,7 @@ function signedAreaSign(poly: Vec2[]): number {
 }
 
 /** Simple top-view symbol for a furniture item; detail depends on the procedural shape. */
-const FurnitureSymbol = memo(function FurnitureSymbol({
+export const FurnitureSymbol = memo(function FurnitureSymbol({
   f,
   selected,
   handle,
