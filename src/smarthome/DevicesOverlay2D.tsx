@@ -1,9 +1,10 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
+import { derivePlan } from '../model/derived';
 import type { Project, SmartDevice } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { syncLight } from './actions';
-import { sensorParams } from './simulation';
+import { detectionPolygon, occludersOf, sensorParams } from './simulation';
 import { useSimStore } from './simStore';
 
 const COLOR: Record<SmartDevice['kind'], string> = { motion: '#7c3aed', presence: '#9333ea', contact: '#0891b2', light: '#ca8a04', plug: '#475569' };
@@ -11,17 +12,6 @@ const LETTER: Record<SmartDevice['kind'], string> = { motion: 'B', presence: 'P'
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 type Drag = { kind: 'move'; id: string; dx: number; dy: number } | { kind: 'rotate'; id: string } | { kind: 'person' };
-
-/** Wedge path of a sensor's detection area (plan coordinates). */
-export function wedgePath(d: SmartDevice, range: number, angleDeg: number): string {
-  if (angleDeg >= 360) return `M ${d.x - range} ${d.y} a ${range} ${range} 0 1 0 ${2 * range} 0 a ${range} ${range} 0 1 0 ${-2 * range} 0 Z`;
-  const half = (angleDeg * Math.PI) / 360;
-  const a0 = d.rotation - half;
-  const a1 = d.rotation + half;
-  const p0 = { x: d.x + range * Math.cos(a0), y: d.y + range * Math.sin(a0) };
-  const p1 = { x: d.x + range * Math.cos(a1), y: d.y + range * Math.sin(a1) };
-  return `M ${d.x} ${d.y} L ${p0.x} ${p0.y} A ${range} ${range} 0 ${angleDeg > 180 ? 1 : 0} 1 ${p1.x} ${p1.y} Z`;
-}
 
 /**
  * Smart-home devices in the 2D plan (#170): symbol per device, detection wedge of the
@@ -32,6 +22,7 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
   const ref = useRef<SVGGElement>(null);
   const drag = useRef<Drag | null>(null);
   const { state, person, selectedDeviceId, select, setPerson } = useSimStore();
+  const occluders = useMemo(() => (project.devices.length ? occludersOf(project, derivePlan(project)) : []), [project]);
   if (!project.devices.length && !person) return null;
 
   const toWorld = (e: React.PointerEvent): Vec2 | null => {
@@ -89,7 +80,7 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
           <g key={d.id} data-testid="device-2d" data-device={d.name} data-on={on}>
             {params && (
               <path
-                d={wedgePath(d, params.rangeM, params.angleDeg)}
+                d={`M ${detectionPolygon(d, params, occluders).map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}
                 fill={COLOR[d.kind]}
                 fillOpacity={on ? 0.28 : sel ? 0.14 : 0.07}
                 stroke={COLOR[d.kind]}

@@ -232,3 +232,39 @@ export function roomCoverage(project: Project, derived: DerivedPlan, occluders: 
   }
   return out;
 }
+
+/** Distance from `o` along unit direction `d` to the nearest occluder (or `max`). */
+function castRay(o: Vec2, d: Vec2, occluders: Segment[], max: number): number {
+  let best = max;
+  for (const s of occluders) {
+    const ex = s.b.x - s.a.x, ey = s.b.y - s.a.y;
+    const den = d.x * ey - d.y * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const ax = s.a.x - o.x, ay = s.a.y - o.y;
+    const t = (ax * ey - ay * ex) / den;
+    const u = (ax * d.y - ay * d.x) / den;
+    if (t > 1e-9 && t < best && u >= 0 && u <= 1) best = t;
+  }
+  return best;
+}
+
+/**
+ * Outline of the area a sensor actually covers: its wedge, cut off where walls or closed
+ * doors block the line of sight (rays every ~2°). Used for the 2D display.
+ */
+export function detectionPolygon(d: SmartDevice, params: SensorParams, occluders: Segment[]): Vec2[] {
+  const full = params.angleDeg >= 360;
+  const span = (Math.min(params.angleDeg, 360) * Math.PI) / 180;
+  const n = Math.max(8, Math.ceil(Math.min(params.angleDeg, 360) / 2));
+  const pts: Vec2[] = full ? [] : [{ x: d.x, y: d.y }];
+  for (let i = 0; i <= n; i++) {
+    if (full && i === n) break;
+    const a = d.rotation - span / 2 + (span * i) / n;
+    const dir = { x: Math.cos(a), y: Math.sin(a) };
+    // start a few centimetres in front of the device (it sits on a wall face), like inDetectionArea
+    const o = { x: d.x + dir.x * 0.05, y: d.y + dir.y * 0.05 };
+    const r = castRay(o, dir, occluders, params.rangeM - 0.05) + 0.05;
+    pts.push({ x: d.x + dir.x * r, y: d.y + dir.y * r });
+  }
+  return pts;
+}

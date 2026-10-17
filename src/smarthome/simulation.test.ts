@@ -5,7 +5,7 @@ import { addRectRoom } from '../model/operations';
 import type { Automation, Project, SmartDevice } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
-import { initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
+import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
 import { placementFor } from './actions';
 
 /** Two separate rooms: A with interior 0..4 × 0..3, B with interior 6..10 × 0..3. */
@@ -135,5 +135,16 @@ describe('schema 2 migration (#170)', () => {
     const back = parseProject(JSON.parse(JSON.stringify(p))).project;
     expect(back.devices).toHaveLength(2);
     expect(back.automations[0].offAfterS).toBe(120);
+  });
+});
+
+describe('detection outline (#170)', () => {
+  it('stops at walls', () => {
+    const p = twoRooms();
+    const d = derivePlan(p);
+    const m = { ...p.devices[0], rangeM: 12 };
+    const poly = detectionPolygon(m, sensorParams(m), occludersOf(p, d));
+    expect(Math.max(...poly.map((q) => q.x))).toBeLessThan(4.1);
+    expect(Math.max(...poly.map((q) => q.x))).toBeGreaterThan(3.9);
   });
 });
