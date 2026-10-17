@@ -22,6 +22,8 @@ export interface GapInfo {
   confidence: number;
   /** Direction (pixel frame) towards which a door leaf swings. */
   swingSide?: { x: number; y: number };
+  /** Direction (pixel frame) along the wall from the opening centre towards the door hinge. */
+  hingeSide?: { x: number; y: number };
   note?: string;
 }
 
@@ -39,6 +41,7 @@ export interface RecognizedOpening {
   width: number;
   kind: 'door' | 'window' | 'passage';
   swingSide?: { x: number; y: number };
+  hingeSide?: { x: number; y: number };
   confidence: number;
   note?: string;
 }

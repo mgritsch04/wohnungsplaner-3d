@@ -8,7 +8,7 @@
  */
 import { newId } from '../model/ids';
 import { pointInPolygon, type Vec2 } from '../model/vec';
-import type { DraftWall } from './draft';
+import type { DraftOpening, DraftWall } from './draft';
 import type { PlacedText } from './rooms';
 
 const OUTDOOR = /(balkon|loggia|terrasse)/i;
@@ -139,4 +139,37 @@ function railingsForBox(box: { x0: number; x1: number; y0: number; y1: number },
   if (left.c === null) out.push(railing(P(x0, y0), P(x0, y1)));
   if (right.c === null) out.push(railing(P(x1, y0), P(x1, y1)));
   return out;
+}
+
+/** A window this close (m, centre line to the floor edge) to a balcony/terrace leads onto it. */
+const DOOR_REACH = 0.35;
+export const BALCONY_DOOR_HEIGHT = 2.1;
+
+function edgeDistance(p: Vec2, poly: Vec2[]): number {
+  let d = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const l2 = ex * ex + ey * ey;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / l2)) : 0;
+    d = Math.min(d, Math.hypot(p.x - a.x - t * ex, p.y - a.y - t * ey));
+  }
+  return d;
+}
+
+/**
+ * Openings onto a balcony, loggia or terrace are balcony doors, not windows (#37): plans draw them
+ * like windows, but they reach down to the floor. `interiors` are the floor outlines of the proposed
+ * rooms; those holding an outdoor label are the outdoor areas. Converted openings stay "uncertain".
+ */
+export function balconyDoors(openings: DraftOpening[], texts: PlacedText[], interiors: Vec2[][]): DraftOpening[] {
+  const outdoor = interiors.filter((poly) => texts.some((t) => OUTDOOR.test(t.str) && pointInPolygon(t, poly)));
+  if (!outdoor.length) return openings;
+  return openings.map((o) =>
+    o.kind === 'window' && outdoor.some((poly) => !pointInPolygon(o.center, poly) && edgeDistance(o.center, poly) <= DOOR_REACH)
+      ? { ...o, kind: 'door', sillHeight: 0, height: BALCONY_DOOR_HEIGHT, status: 'uncertain', note: 'Balkontür: Öffnung zum Balkon/zur Terrasse – Art und Höhe prüfen' }
+      : o,
+  );
 }

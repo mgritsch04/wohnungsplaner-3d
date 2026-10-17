@@ -1,6 +1,7 @@
 import type { FloorPlanRecognizer, RecognitionInput } from './types';
 import type { RasterOutput } from './raster';
 import { detectVectorWalls } from './vector';
+import { insideWall } from './oblique';
 
 /** Max long side for raster analysis (keeps the worker fast and memory bounded). */
 const RASTER_MAX_SIDE = 2400;
@@ -8,7 +9,7 @@ const RASTER_MAX_SIDE = 2400;
 /** Dark filled areas with at least this much outline (m) may be how the plan draws its walls. */
 const MIN_WALL_FILL_OUTLINE = 6;
 
-type CandidateSegment = { x1: number; y1: number; x2: number; y2: number; width?: number; areaFill?: boolean; darkFill?: boolean; faint?: boolean };
+type CandidateSegment = { x1: number; y1: number; x2: number; y2: number; width?: number; areaFill?: boolean; darkFill?: boolean; faint?: boolean; curve?: boolean; path?: number };
 
 type Pt = { x: number; y: number };
 const len = (x1: number, y1: number, x2: number, y2: number) => Math.hypot(x2 - x1, y2 - y1);
@@ -22,15 +23,64 @@ const len = (x1: number, y1: number, x2: number, y2: number) => Math.hypot(x2 - 
  * fills were symbols or small overview plans, and all lines are used.
  */
 export function detectVectorWallsFromPdf(segments: CandidateSegment[], metersPerPixel: number): RasterOutput {
-  const fills = segments.filter((s) => s.darkFill);
+  const fills = segments.filter((s) => s.darkFill && !s.curve);
   if (fills.reduce((sum, s) => sum + len(s.x1, s.y1, s.x2, s.y2), 0) * metersPerPixel >= MIN_WALL_FILL_OUTLINE) {
     const out = detectVectorWalls(fills, metersPerPixel);
     const wallLength = out.walls.reduce((sum, w) => sum + len(w.a.x, w.a.y, w.b.x, w.b.y), 0);
     if (out.walls.length >= 3 && wallLength * metersPerPixel >= 8) return out;
   }
   const lines = segments.filter((s) => !s.areaFill && !s.faint);
-  const heavy = new Set(heavyLines(lines));
-  return mainPlanOnly(detectVectorWalls(lines, metersPerPixel, { isWallLine: (i) => heavy.has(lines[i]) }), metersPerPixel);
+  const heavy = new Set(heavyLines(lines).filter((s) => !s.curve));
+  const out = detectVectorWalls(lines, metersPerPixel, { isWallLine: (i) => heavy.has(lines[i]) });
+  // light partitions (drywall, e.g. between WC and storeroom) drawn only as a thin light-grey fill (#37)
+  const extra = lightPartitions(segments, metersPerPixel).filter(
+    (r) => !out.walls.some((w) => insideWall(r.mid, w, 1)) && !out.openings.some((o) => Math.hypot(o.center.x - r.mid.x, o.center.y - r.mid.y) < o.width),
+  );
+  if (!extra.length) return mainPlanOnly(out, metersPerPixel);
+  const more = [...lines, ...extra.flatMap((r) => r.edges)];
+  for (const r of extra) for (const e of r.edges) heavy.add(e);
+  return mainPlanOnly(detectVectorWalls(more, metersPerPixel, { isWallLine: (i) => heavy.has(more[i]) }), metersPerPixel);
+}
+
+/** Thickness range (m) of a light filled strip that is a wall, not a floor area or a pane. */
+const PARTITION_T = [0.04, 0.25];
+const PARTITION_MIN_LEN = 0.6;
+
+/**
+ * Thin axis-aligned rectangles filled in a light tone: how some CAD layouts draw light partition
+ * walls. Their two long edges become wall candidates. Strips inside an already found wall or in
+ * one of its openings (window panes, sills) are dropped by the caller.
+ */
+export function lightPartitions(segments: CandidateSegment[], metersPerPixel: number): { mid: Pt; edges: CandidateSegment[] }[] {
+  const byPath = new Map<number, CandidateSegment[]>();
+  for (const s of segments) if (s.areaFill && s.path !== undefined && !s.curve) byPath.set(s.path, [...(byPath.get(s.path) ?? []), s]);
+  const out: { mid: Pt; edges: CandidateSegment[] }[] = [];
+  for (const edges of byPath.values()) {
+    if (edges.length < 4 || edges.length > 6) continue;
+    if (!edges.every((e) => Math.abs(e.x2 - e.x1) < 1 || Math.abs(e.y2 - e.y1) < 1)) continue;
+    const xs = edges.flatMap((e) => [e.x1, e.x2]);
+    const ys = edges.flatMap((e) => [e.y1, e.y2]);
+    const x0 = Math.min(...xs);
+    const x1 = Math.max(...xs);
+    const y0 = Math.min(...ys);
+    const y1 = Math.max(...ys);
+    const w = (x1 - x0) * metersPerPixel;
+    const h = (y1 - y0) * metersPerPixel;
+    const t = Math.min(w, h);
+    if (t < PARTITION_T[0] || t > PARTITION_T[1] || Math.max(w, h) < PARTITION_MIN_LEN) continue;
+    const long: CandidateSegment[] =
+      w >= h
+        ? [
+            { x1: x0, y1: y0, x2: x1, y2: y0, width: 0 },
+            { x1: x0, y1: y1, x2: x1, y2: y1, width: 0 },
+          ]
+        : [
+            { x1: x0, y1: y0, x2: x0, y2: y1, width: 0 },
+            { x1: x1, y1: y0, x2: x1, y2: y1, width: 0 },
+          ];
+    out.push({ mid: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }, edges: long });
+  }
+  return out;
 }
 
 function segmentDistance(p: Pt, q: Pt, a: Pt, b: Pt): number {

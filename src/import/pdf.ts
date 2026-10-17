@@ -81,7 +81,12 @@ export interface PdfSegment {
   faint?: boolean;
   /** Path number of a light-filled area (stroked or not): its edges together outline one area, e.g. a balcony floor (#214). */
   path?: number;
+  /** Piece of a curve (door swing, rounded corner) – a symbol line, never a wall face (#37). */
+  curve?: boolean;
 }
+
+/** Straight pieces per Bézier curve – enough to tell a door swing from other symbols. */
+const CURVE_PIECES = 4;
 
 
 
@@ -205,10 +210,13 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
       const push = (a: { x: number; y: number }, b: { x: number; y: number }) =>
         segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, filled, ...(areaFill ? { areaFill } : {}), ...(filled && light ? { path: pathCount } : {}), ...(darkFill ? { darkFill } : {}), ...(faint ? { faint } : {}) });
       // only what is visible on the sheet: lines outside the active clip are dropped or cut
-      const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const seg = (a: { x: number; y: number }, b: { x: number; y: number }, extra?: Partial<PdfSegment>) => {
+        const n = segments.length;
         if (clips.length === 0) push(a, b);
         else for (const [p, q] of clipSegment(a, b, clips, clipMargin)) push(p, q);
+        if (extra) for (let j = n; j < segments.length; j++) Object.assign(segments[j], extra);
       };
+      const curveSeg = (a: { x: number; y: number }, b: { x: number; y: number }) => seg(a, b, { curve: true });
       let cur: { x: number; y: number } | null = null;
       let start: { x: number; y: number } | null = null;
       for (let k = 0; k < data.length; ) {
@@ -220,12 +228,29 @@ export async function analyzePdfPage(page: PDFPageProxy, pixelsPerPoint: number,
           const p = apply(ctm, data[k++], data[k++]);
           if (cur) seg(cur, p);
           cur = p;
-        } else if (op === 2) {
-          k += 4;
-          cur = apply(ctm, data[k++], data[k++]);
-        } else if (op === 3) {
-          k += 2;
-          cur = apply(ctm, data[k++], data[k++]);
+        } else if (op === 2 || op === 3) {
+          // curves (door swings, rounded corners): a few straight pieces, marked so they never become walls
+          const c1 = apply(ctm, data[k++], data[k++]);
+          const c2 = op === 2 ? apply(ctm, data[k++], data[k++]) : c1;
+          const p = apply(ctm, data[k++], data[k++]);
+          if (cur) {
+            const p0 = cur;
+            const at = (t: number) => {
+              const u = 1 - t;
+              const w0 = u * u * u;
+              const w1 = 3 * u * u * t;
+              const w2 = 3 * u * t * t;
+              const w3 = t * t * t;
+              return { x: w0 * p0.x + w1 * c1.x + w2 * c2.x + w3 * p.x, y: w0 * p0.y + w1 * c1.y + w2 * c2.y + w3 * p.y };
+            };
+            let q = p0;
+            for (let n = 1; n <= CURVE_PIECES; n++) {
+              const r = at(n / CURVE_PIECES);
+              curveSeg(q, r);
+              q = r;
+            }
+          }
+          cur = p;
         } else if (op === 4) {
           if (cur && start) seg(cur, start);
           cur = start;

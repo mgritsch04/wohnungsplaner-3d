@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { DraftWall } from './draft';
-import { outdoorRailings, RAILING_HEIGHT } from './outdoor';
-import { proposeRooms } from './rooms';
+import type { DraftOpening, DraftWall } from './draft';
+import { balconyDoors, BALCONY_DOOR_HEIGHT, outdoorRailings, RAILING_HEIGHT } from './outdoor';
+import { proposeRooms, roomInteriors } from './rooms';
 
 const wall = (ax: number, ay: number, bx: number, by: number, thickness = 0.25): DraftWall => ({
   id: `w${ax}${ay}${bx}${by}`,
@@ -44,5 +44,31 @@ describe('balconies and terraces (#214)', () => {
     expect(outdoorRailings(flat, texts, [floor], () => true)).toEqual([]);
     const far = floor.map((p) => ({ x: p.x, y: p.y + 5 }));
     expect(outdoorRailings(flat, [{ str: 'Balkon', x: 2, y: 10 }], [far], () => false)).toEqual([]);
+  });
+});
+
+describe('balcony doors (#37)', () => {
+  const opening = (kind: DraftOpening['kind'], x: number, y: number): DraftOpening => ({
+    id: `o${x}${y}`,
+    kind,
+    center: { x, y },
+    width: 1,
+    height: 1.4,
+    sillHeight: 0.9,
+    status: 'uncertain',
+    accepted: true,
+  });
+  it('a window in the wall onto the balcony becomes a door to the floor, other windows stay', () => {
+    const railings = outdoorRailings(flat, texts, [floor], () => false);
+    const walls = [...flat, ...railings];
+    const out = balconyDoors([opening('window', 2.5, 4), opening('window', 5.2, 4), opening('window', 3, 0)], texts, roomInteriors(walls));
+    expect(out[0]).toMatchObject({ kind: 'door', sillHeight: 0, height: BALCONY_DOOR_HEIGHT });
+    // beside the balcony (x = 5.2 lies past its end at 4.5) and on the far side: still windows
+    expect(out[1].kind).toBe('window');
+    expect(out[2].kind).toBe('window');
+  });
+  it('without an outdoor area nothing changes', () => {
+    const o = [opening('window', 2.5, 4)];
+    expect(balconyDoors(o, [{ str: 'Wohnen', x: 3, y: 2 }], roomInteriors(flat))).toBe(o);
   });
 });
