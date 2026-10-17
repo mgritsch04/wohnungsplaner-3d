@@ -1,6 +1,12 @@
 # Gamepad-Steuerung für die Begehung – Machbarkeitsbewertung
 
-_Stand 2026-10-16 · nur Bewertung, **nicht umgesetzt** (wartet auf Freigabe)._
+_Bewertung vom 2026-10-16 · **Basis umgesetzt 2026-10-17** (#29)._
+
+## Umgesetzt (2026-10-17)
+- `src/view3d/input/gamepad.ts`: radiale Totzone 0,15 mit Neuskalierung, Ansprechkurve (Exponent 2) für den Blick, Abfrage per `navigator.getGamepads()` pro Frame, Tastendrücke als Flanke (gehaltene Tasten beim Verbinden zählen nicht), Trennen stoppt sofort.
+- `WalkControls` nutzt Tastatur/Maus und Gamepad gleichzeitig; Bewegung läuft über dieselben Kollisions-Teilschritte.
+- Belegung (Standard-Mapping): linker Stick gehen, rechter Stick umsehen, RT oder linken Stick drücken = schneller, A auswählen/absetzen, X Tür/Fenster, Y tragen, B ducken, LB sitzen/stehen. Hinweiszeile in der Begehung, solange ein Controller verbunden ist.
+- Noch offen (Ausbau): Einstellungen für Empfindlichkeit/Invertieren/Totzone, Vibration.
 
 ## Ist-Zustand
 - `src/view3d/WalkControls.tsx`: Tastatur (WASD/Pfeile, Shift) über ein `Set` gedrückter Tasten, Maus über Pointer-Lock (`movementX/Y`) bzw. Ziehen. Pro Frame (`useFrame`) wird aus Vorwärts-/Seitwärts-Anteil eine Bewegung berechnet und in Teilschritten über `resolveCollisions()` (`collision.ts`) gegen Wände/Möbel geprüft.
