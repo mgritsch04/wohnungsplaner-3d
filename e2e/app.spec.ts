@@ -4062,7 +4062,8 @@ test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving res
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
-  const fovOf = () => page.evaluate(() => (window as any).__wp.three.camera.fov as number);
+  // NaN until the 3D scene is mounted (after a reload, too), so expect.poll keeps waiting
+  const fovOf = () => page.evaluate(() => ((window as any).__wp.three?.camera.fov ?? NaN) as number);
   // the 3D scene mounts asynchronously
   await expect.poll(() => page.evaluate(() => !!(window as any).__wp.three)).toBe(true);
   const overviewFov = await fovOf();
@@ -4153,7 +4154,8 @@ test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size an
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.getByTestId('crosshair')).toBeVisible();
-  const fovOf = () => page.evaluate(() => (window as any).__wp.three.camera.fov as number);
+  // NaN until the 3D scene is mounted (after a reload, too), so expect.poll keeps waiting
+  const fovOf = () => page.evaluate(() => ((window as any).__wp.three?.camera.fov ?? NaN) as number);
   await expect.poll(fovOf).toBe(70);
   const toggle = page.getByRole('button', { name: 'Echt-Maßstab' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
