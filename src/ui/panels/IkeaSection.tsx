@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCatalogStore } from '../../catalog/catalogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
 import { useIkeaDrafts, type PendingDraft } from '../../catalog/ikeaDrafts';
-import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchOutcome } from '../../catalog/ikeaSelection';
+import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, isMoebelixDraft, isMoebelixItem, takeInbox, type IkeaFetchOutcome } from '../../catalog/ikeaSelection';
 import { buildBookmarklet } from '../../catalog/providers/bookmarklet';
 import { fetchBookmarkletToken, helperAvailable } from '../../catalog/providers/ikeaHelper';
 import { DIM_KEYS, parseArticleList, type DimKey } from '../../catalog/providers/ikeaList';
@@ -19,20 +19,14 @@ type HelperState = 'checking' | 'on' | 'off';
 const INBOX_POLL_MS = 3000;
 
 /**
- * Katalog › IKEA: paste ikea.com links or article numbers, fetch them through the local
- * helper (`npm run ikea-helper`) and place them in the room as 3D objects.
+ * The local helper and the bookmarklet inbox (#221), shared by Katalog › IKEA and › Möbelix:
+ * while one of them is open, pages sent with „An Planer senden“ are taken over.
  */
-export function IkeaSection() {
-  const items = useCatalogStore((st) => st.items);
-  const mine = useMemo(() => items.filter(isIkeaItem), [items]);
+function useShopHelper() {
   const [helper, setHelper] = useState<HelperState>(IN_ARTIFACT ? 'off' : 'checking');
-  const [text, setText] = useState('');
-  const [withModel, setWithModel] = useState(true);
-  const [progress, setProgress] = useState<string | null>(null);
-  const [outcomes, setOutcomes] = useState<IkeaFetchOutcome[]>([]);
-  const found = useMemo(() => parseArticleList(text).length, [text]);
   /** catalog ids that arrived from the bookmarklet while this section was open */
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
+  const addFresh = useCallback((id: string) => setFresh((prev) => new Set([...prev, id])), []);
 
   const check = useCallback(async () => {
     if (IN_ARTIFACT) return;
@@ -43,7 +37,6 @@ export function IkeaSection() {
     void check();
   }, [check]);
 
-  // pages sent with the bookmarklet „An Planer senden“ (#221)
   useEffect(() => {
     if (helper !== 'on') return;
     let busy = false;
@@ -54,12 +47,14 @@ export function IkeaSection() {
         const got = await takeInbox();
         const ok = got.filter((o) => o.ok);
         if (ok.length) setFresh((prev) => new Set([...prev, ...ok.map((o) => o.id!)]));
+        const items = useCatalogStore.getState().items;
+        const moebelix = (id?: string) => items.some((i) => i.id === id && isMoebelixItem(i));
         for (const o of got)
           useUiStore
             .getState()
             .toast(
               o.ok
-                ? `„${o.name}“ vom Lesezeichen übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}.`
+                ? `„${o.name}“ vom Lesezeichen übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}${moebelix(o.id) ? ' – zu finden unter Katalog › Möbelix' : ''}.`
                 : o.pending
                   ? `„${o.name}“: Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.`
                   : `Lesezeichen: ${o.message}`,
@@ -75,6 +70,23 @@ export function IkeaSection() {
     const t = window.setInterval(() => void poll(), INBOX_POLL_MS);
     return () => window.clearInterval(t);
   }, [helper]);
+
+  return { helper, check, fresh, addFresh };
+}
+
+/**
+ * Katalog › IKEA: paste ikea.com links or article numbers, fetch them through the local
+ * helper (`npm run ikea-helper`) and place them in the room as 3D objects.
+ */
+export function IkeaSection() {
+  const items = useCatalogStore((st) => st.items);
+  const mine = useMemo(() => items.filter(isIkeaItem), [items]);
+  const { helper, check, fresh, addFresh } = useShopHelper();
+  const [text, setText] = useState('');
+  const [withModel, setWithModel] = useState(true);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [outcomes, setOutcomes] = useState<IkeaFetchOutcome[]>([]);
+  const found = useMemo(() => parseArticleList(text).length, [text]);
 
   const run = async () => {
     setOutcomes([]);
@@ -140,20 +152,59 @@ export function IkeaSection() {
         )}
       </div>
       {helper === 'on' && <BookmarkletSetup />}
-      <MissingDims onAdded={(id) => setFresh((prev) => new Set([...prev, id]))} />
+      <MissingDims shop="ikea" onAdded={addFresh} />
       <h3 className={s.heading}>Meine IKEA-Auswahl ({mine.length})</h3>
       {mine.length === 0 ? (
         <p className={s.empty}>Noch keine IKEA-Produkte. Link einfügen und „Holen“ drücken – das Produkt erscheint hier und lässt sich in den Raum setzen.</p>
       ) : (
         <ul className={s.cards}>
           {mine.map((i) => (
-            <IkeaCard key={i.id} item={i} fresh={fresh.has(i.id)} />
+            <ShopCard key={i.id} item={i} fresh={fresh.has(i.id)} testId="ikea-card" />
           ))}
         </ul>
       )}
       <p className={s.note}>
         Daten und 3D-Modelle stammen von den öffentlichen Produktseiten von IKEA Österreich und sind urheberrechtlich geschützt – nur privat nutzen. Preise mit
         Abrufdatum, bitte vor dem Kauf auf ikea.com prüfen.
+      </p>
+    </div>
+  );
+}
+
+/** Katalog › Möbelix (#278): the same list as „Meine IKEA-Auswahl“ for products from moebelix.at. */
+export function MoebelixSection() {
+  const items = useCatalogStore((st) => st.items);
+  const mine = useMemo(() => items.filter(isMoebelixItem), [items]);
+  const { helper, check, fresh, addFresh } = useShopHelper();
+  return (
+    <div className={s.section} data-testid="moebelix-section">
+      <div className={s.fetch}>
+        <HelperStatus state={helper} onRetry={() => void check()} />
+        <p className={s.empty}>
+          Möbelix-Produkte kommen über das Lesezeichen „An Planer senden“ (auf der Produktseite anklicken) oder über „Alle Möbel“ › „Produkt von Händlerseite
+          übernehmen“. Möbelix hat keine 3D-Modelle: Der Planer baut eine Näherung aus Maßen, Seitentext und Produktfoto.
+        </p>
+        <div className={s.actions}>
+          <a href="https://www.moebelix.at/" target="_blank" rel="noopener noreferrer">
+            Auf moebelix.at suchen ↗
+          </a>
+        </div>
+      </div>
+      {helper === 'on' && <BookmarkletSetup />}
+      <MissingDims shop="moebelix" onAdded={addFresh} />
+      <h3 className={s.heading}>Meine Möbelix-Auswahl ({mine.length})</h3>
+      {mine.length === 0 ? (
+        <p className={s.empty}>Noch keine Möbelix-Produkte. Auf einer Produktseite von moebelix.at das Lesezeichen anklicken – das Produkt erscheint hier.</p>
+      ) : (
+        <ul className={s.cards}>
+          {mine.map((i) => (
+            <ShopCard key={i.id} item={i} fresh={fresh.has(i.id)} testId="moebelix-card" />
+          ))}
+        </ul>
+      )}
+      <p className={s.note}>
+        Daten und Fotos stammen von den öffentlichen Produktseiten von Möbelix Österreich und sind urheberrechtlich geschützt – nur privat nutzen. Preise mit
+        Abrufdatum, bitte vor dem Kauf auf moebelix.at prüfen.
       </p>
     </div>
   );
@@ -238,7 +289,8 @@ function BookmarkletSetup() {
   );
 }
 
-function IkeaCard({ item, fresh }: { item: CatalogItem; fresh: boolean }) {
+/** One product of „Meine IKEA-/Möbelix-Auswahl“. */
+function ShopCard({ item, fresh, testId }: { item: CatalogItem; fresh: boolean; testId: string }) {
   const [imageOk, setImageOk] = useState(true);
   const image = item.imageUrl && /^https:\/\//i.test(item.imageUrl) && imageOk ? item.imageUrl : null;
   const article = item.tags.find((t) => /^S?\d{3}\.\d{3}\.\d{2}$/i.test(t));
@@ -249,7 +301,7 @@ function IkeaCard({ item, fresh }: { item: CatalogItem; fresh: boolean }) {
       onDragStart={(e) => startCatalogDrag(e.dataTransfer, item)}
       onDragEnd={endCatalogDrag}
       title="In den Plan ziehen oder „In den Raum“ klicken"
-      data-testid="ikea-card"
+      data-testid={testId}
     >
       {image ? (
         <img className={s.image} src={image} alt="" referrerPolicy="no-referrer" loading="lazy" onError={() => setImageOk(false)} />
@@ -289,11 +341,12 @@ function IkeaCard({ item, fresh }: { item: CatalogItem; fresh: boolean }) {
 const DIM_LABEL: Record<DimKey, string> = { width: 'Breite', depth: 'Tiefe', height: 'Höhe' };
 
 /** Products whose page states no (complete) dimensions (#269): enter them here, then they join the selection. */
-function MissingDims({ onAdded }: { onAdded: (id: string) => void }) {
-  const drafts = useIkeaDrafts((st) => st.drafts);
+function MissingDims({ shop, onAdded }: { shop: 'ikea' | 'moebelix'; onAdded: (id: string) => void }) {
+  const all = useIkeaDrafts((st) => st.drafts);
+  const drafts = useMemo(() => all.filter((d) => isMoebelixDraft(d.draft) === (shop === 'moebelix')), [all, shop]);
   if (!drafts.length) return null;
   return (
-    <section data-testid="ikea-missing-dims">
+    <section data-testid={`${shop}-missing-dims`}>
       <h3 className={s.heading}>Maße fehlen ({drafts.length})</h3>
       <p className={s.empty}>
         Auf diesen Seiten stehen keine vollständigen Maße. Bitte selbst eintragen (bei Pflanzen z. B. den Topfdurchmesser als Breite und Tiefe), dann kommt das

@@ -181,7 +181,7 @@ async function receivePage(body) {
   inbox = [...inbox.filter((i) => i.product.article !== product.article), item].slice(-50);
   saveInbox();
   console.log(`Lesezeichen: ${found.name}${modelFile ? ' + Modell' : ''}${draft ? ' (Maße fehlen)' : ''}`);
-  return [200, { name: found.name, model: !!modelFile, missingDims: !!draft }];
+  return [200, { name: found.name, model: !!modelFile, missingDims: !!draft, list: isIkea ? 'IKEA' : 'Möbelix' }];
 }
 
 /**
@@ -204,7 +204,7 @@ addEventListener('message', async (e) => {
     const b = await r.json();
     ok = r.ok;
     text = ok
-      ? '„' + b.name + '“ ist im Planer (Katalog › IKEA)' + (b.model ? ' – mit 3D-Modell' : '') + (b.missingDims ? '. Die Maße fehlen auf der Seite – bitte dort eintragen.' : '.')
+      ? '„' + b.name + '“ ist im Planer (Katalog › ' + (b.list === 'Möbelix' ? 'Möbelix' : 'IKEA') + ')' + (b.model ? ' – mit 3D-Modell' : '') + (b.missingDims ? '. Die Maße fehlen auf der Seite – bitte dort eintragen.' : '.')
       : b.error;
   } catch (err) {
     text = 'Fehler: ' + err;

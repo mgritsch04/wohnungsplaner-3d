@@ -8,11 +8,11 @@ import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
 import { useDialogStore } from '../dialogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
-import { IkeaSection } from './IkeaSection';
+import { IkeaSection, MoebelixSection } from './IkeaSection';
 import s from './IkeaSection.module.css';
 
 export function CatalogPanel() {
-  const [view, setView] = useState<'catalog' | 'ikea'>('catalog');
+  const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix'>('catalog');
   return (
     <div className="panel-scroll catalog">
       <div className={`segmented ${s.views}`} role="group" aria-label="Katalog-Ansicht">
@@ -22,8 +22,11 @@ export function CatalogPanel() {
         <button className={view === 'ikea' ? 'active' : ''} aria-pressed={view === 'ikea'} onClick={() => setView('ikea')}>
           IKEA
         </button>
+        <button className={view === 'moebelix' ? 'active' : ''} aria-pressed={view === 'moebelix'} onClick={() => setView('moebelix')}>
+          Möbelix
+        </button>
       </div>
-      {view === 'ikea' ? <IkeaSection /> : <CatalogList />}
+      {view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : <CatalogList />}
     </div>
   );
 }

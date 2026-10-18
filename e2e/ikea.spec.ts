@@ -162,6 +162,61 @@ test('Lesezeichen „An Planer senden“ (#221): Lesezeichen wird angeboten, ges
   expect(errors).toEqual([]);
 });
 
+test('Möbelix-Auswahl (#278): gesendete Möbelix-Seite erscheint in eigener Liste, nicht bei IKEA; Entfernen', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const cors = { 'access-control-allow-origin': '*' };
+  const item = (id: string, entry: Record<string, unknown>) => ({ id, receivedAt: '2026-10-18T17:00:00Z', product: { article: id, entry, model: null } });
+  let inbox = [
+    // SYNTHETIC products as the helper would deliver them from sent pages
+    item('mx0000000a01', { id: 'mx0000000a01', name: 'TESTTISCH Möbelix', category: 'table', width: 160, depth: 90, height: 75, price: 299, priceDate: '2026-10-18', retailer: 'Möbelix Österreich', productUrl: 'https://www.moebelix.at/p/testtisch-synthetisch-001' }),
+    item('x2', { name: 'TESTBETT Synthetisch', category: 'bed', width: 140, depth: 200, height: 40, price: 199, priceDate: '2026-10-17', retailer: 'IKEA Österreich', articleNumber: '000.000.02' }),
+  ];
+  await page.route(`${HELPER}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET, POST' } });
+    if (url.pathname === '/status') return route.fulfill({ headers: cors, json: { ok: true, name: 'wohnungsplaner-ikea-helper', version: 2 } });
+    if (url.pathname === '/bookmarklet') return route.fulfill({ headers: cors, json: { token: 'ab12cd34ef56ab12cd34ef56' } });
+    if (url.pathname === '/inbox') return route.fulfill({ headers: cors, json: { items: inbox } });
+    if (url.pathname === '/inbox/ack') {
+      const ids = (route.request().postDataJSON() as { ids: string[] }).ids;
+      inbox = inbox.filter((i) => !ids.includes(i.id));
+      return route.fulfill({ headers: cors, json: { ok: true } });
+    }
+    return route.fulfill({ status: 404, headers: cors, json: { error: 'Nicht gefunden.' } });
+  });
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Katalog' }).click();
+  await left.getByRole('button', { name: 'Möbelix', exact: true }).click();
+
+  const section = left.getByTestId('moebelix-section');
+  const card = section.getByTestId('moebelix-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('TESTTISCH Möbelix');
+  await expect(card).toContainText('neu vom Lesezeichen');
+  await expect(card).toContainText('Näherung');
+  await expect(card.getByRole('link', { name: /moebelix\.at/ })).toHaveAttribute('href', 'https://www.moebelix.at/p/testtisch-synthetisch-001');
+  await expect(section.getByRole('heading', { name: 'Meine Möbelix-Auswahl (1)' })).toBeVisible();
+  await expect(page.getByText('„TESTTISCH Möbelix“ vom Lesezeichen übernommen – zu finden unter Katalog › Möbelix.')).toBeVisible();
+
+  await card.getByRole('button', { name: 'In den Raum' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.some((f) => f.name === 'TESTTISCH Möbelix')).toBe(true);
+
+  // the IKEA list holds only the IKEA product
+  await left.getByRole('button', { name: 'IKEA', exact: true }).click();
+  await expect(left.getByTestId('ikea-card')).toHaveCount(1);
+  await expect(left.getByTestId('ikea-card')).toContainText('TESTBETT Synthetisch');
+
+  await left.getByRole('button', { name: 'Möbelix', exact: true }).click();
+  await left.getByTestId('moebelix-card').getByRole('button', { name: /entfernen/ }).click();
+  await expect(left.getByTestId('moebelix-card')).toHaveCount(0);
+  await expect(left.getByText('Noch keine Möbelix-Produkte.', { exact: false })).toBeVisible();
+  // placed furniture stays in the plan
+  expect((await getProject(page)).furniture.some((f) => f.name === 'TESTTISCH Möbelix')).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('Maße fehlen (#269): gesendete Pflanze ohne Maße wartet, Maße eintragen, dann in der Auswahl', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

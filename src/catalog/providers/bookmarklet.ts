@@ -60,7 +60,7 @@ function pageScript() {
     panel.style.padding = '12px 14px';
     const line = (t: string) => panel.appendChild(Object.assign(document.createElement('p'), { textContent: t }));
     line('Wohnungsplaner: Der Planer-Helfer antwortet nicht.');
-    line('Er übernimmt diese Seite in den Planer (Katalog › IKEA) und lädt Foto bzw. 3D-Modell. Starten: im Projektordner „npm run ikea-helper“, dann das Lesezeichen noch einmal klicken.');
+    line('Er übernimmt diese Seite in den Planer (Katalog › IKEA bzw. Möbelix) und lädt Foto bzw. 3D-Modell. Starten: im Projektordner „npm run ikea-helper“, dann das Lesezeichen noch einmal klicken.');
     line('Ohne Helfer: „Seite kopieren“ und im Planer unter Katalog › Produkt importieren einfügen.');
     const button = (label: string, act: () => void) => {
       const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label });
