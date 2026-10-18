@@ -103,6 +103,23 @@ describe('wall details in vector plans (#37)', () => {
     expect(out.openings.filter((o) => o.center.y > 150 && o.center.y < 260)).toEqual([]);
   });
 
+  it('a shaft block in line with a wall (beside a bathtub) stays a block of its own', () => {
+    // left wall (20 cm) with a 50 cm deep, 1.2 m long shaft block at its top end
+    const segs = [
+      ...room().filter((s) => !(s.x1 === s.x2 && s.x1 <= 20)),
+      ...[S(0, 0, 0, 140), S(50, 20, 50, 140), S(0, 140, 50, 140)], // block outline
+      ...[S(-3, 145, -3, 400), S(17, 145, 17, 380)], // wall faces below it (slightly offset, as drawn in CAD plans)
+    ];
+    const out = detectVectorWalls(segs, mpp, { oblique: false });
+    const block = wallAt(out, 'v', 25);
+    expect(block).toHaveLength(1);
+    expect(block[0].thickness).toBeCloseTo(50, 0);
+    expect(Math.max(block[0].a.y, block[0].b.y)).toBeLessThan(150);
+    // the wall itself still runs from corner to corner
+    const wall = out.walls.find((w) => Math.abs(w.a.x - w.b.x) < 1 && Math.abs(w.a.y - w.b.y) > 350 && w.thickness < 40);
+    expect(wall).toBeDefined();
+  });
+
   it('a second line beside a wall (a neighbouring shaft face) is no wall and gets no doors', () => {
     // a 20 cm layer outside the left wall, from y = 100 to 300, sharing the wall's outer face line
     const out = detectVectorWalls([...room(), S(-20, 100, -20, 300)], mpp, { oblique: false });
