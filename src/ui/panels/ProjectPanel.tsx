@@ -5,6 +5,7 @@ import { useUiStore } from '../../store/uiStore';
 import { CheckField, NumberField, Section, Badge } from '../fields';
 import { WalkFovControl } from '../WalkFovControl';
 import { BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, eyeFromBody, seatedEyeFromBody } from '../../model/body';
+import { windowFov } from '../../view3d/walkZoom';
 import { usePerformanceStore } from '../../view3d/performanceStore';
 import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
@@ -83,10 +84,10 @@ export function ProjectPanel() {
         </p>
         <WalkFovControl />
         <CheckField
-          label="Echt-Maßstab beim Begehen"
+          label="Gefühlt echt beim Begehen"
           checked={s.walkTrueScale}
           onChange={(v) => apply((d) => void (d.settings.walkTrueScale = v))}
-          title="Sichtfeld aus Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt. Aus: Sichtfeld vom Regler"
+          title="Natürliches Sichtfeld (62°) mit Maßstabshinweisen: Entfernung und Höhe am Fadenkreuz, Durchgangshöhe an Türen. Aus: Sichtfeld vom Regler"
         />
         <NumberField
           label="Bildschirmdiagonale"
@@ -96,7 +97,7 @@ export function ProjectPanel() {
           min={10}
           max={100}
           step={0.5}
-          title="Diagonale deines Bildschirms für den Echt-Maßstab (Standard 24 Zoll)"
+          title="Diagonale deines Bildschirms (Standard 27 Zoll) – für den Hinweis, wie eng das Bild in Echtgröße wäre"
           onChange={(v) => apply((d) => void (d.settings.screenDiagonal = Math.max(10, Math.min(100, v))))}
         />
         <NumberField
@@ -108,9 +109,12 @@ export function ProjectPanel() {
           min={30}
           max={300}
           step={5}
-          title="Abstand deiner Augen zum Bildschirm für den Echt-Maßstab (Standard 60 cm)"
+          title="Abstand deiner Augen zum Bildschirm (Standard 60 cm) – für den Hinweis, wie eng das Bild in Echtgröße wäre"
           onChange={(v) => apply((d) => void (d.settings.viewingDistance = Math.max(0.3, Math.min(3, v))))}
         />
+        <p className="muted small" data-testid="window-fov">
+          In Echtgröße zeigt dein Bildschirm nur {Math.round(windowFov(s.screenDiagonal, s.viewingDistance, window.screen?.width || 16, window.screen?.height || 9))}° (bildschirmhoch) – wie durch ein Fenster. Deshalb nutzt „Gefühlt echt“ ein weiteres Sichtfeld und zeigt Maße an.
+        </p>
         <CheckField
           label="Kopfwippen beim Gehen"
           checked={s.walkHeadBob}

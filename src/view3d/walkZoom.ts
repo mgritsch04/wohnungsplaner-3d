@@ -1,11 +1,16 @@
 /**
  * Field of view in the walkthrough: mouse-wheel zoom (#228) narrows it like binoculars, starting
- * from a base value – the slider value (#263, 30–70°, 70° = wide angle) or, with "Echt-Maßstab"
- * (#256), the angle the picture actually covers for the viewer, so things look as large as in reality.
+ * from a base value – the slider value (#263, 30–70°, 70° = wide angle) or "Gefühlt echt" (62°).
+ * trueScaleFov gives the angle the picture actually covers for the viewer (#256), shown as a hint.
  */
 export const WALK_FOV = 70;
 /** Default field of view (#263): between the wide angle and the real-size angle, rooms look natural. */
 export const WALK_FOV_DEFAULT = 50;
+/**
+ * "Gefühlt echt" (#263): the real-size angle of a monitor (about 25–31°) shows only a narrow
+ * window of a room, so the mode uses a natural-feeling 62° and adds scale hints instead.
+ */
+export const FEEL_FOV = 62;
 /** Range of the field-of-view slider. */
 export const WALK_FOV_SLIDER_MIN = 30;
 export const WALK_FOV_MIN = 20;
@@ -51,4 +56,12 @@ export function trueScaleFov(p: TrueScaleInput): number {
   const share = p.screenHeightPx > 0 ? Math.min(1, Math.max(0.05, p.viewHeightPx / p.screenHeightPx)) : 1;
   const fov = (2 * Math.atan((screenHeightM * share) / 2 / Math.max(0.1, p.distance)) * 180) / Math.PI;
   return Math.max(WALK_FOV_MIN, Math.min(WALK_FOV, fov));
+}
+
+/**
+ * Real-size angle of the whole screen (#263 hint in the project panel): how narrow the picture
+ * would be if things were shown in their real size. Aspect from the screen, 16:9 if unknown.
+ */
+export function windowFov(diagonalInch: number, distance: number, screenWidthPx = 16, screenHeightPx = 9): number {
+  return trueScaleFov({ diagonalInch, distance, viewHeightPx: screenHeightPx, screenWidthPx, screenHeightPx });
 }

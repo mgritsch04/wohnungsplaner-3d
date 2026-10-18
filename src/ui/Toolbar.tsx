@@ -208,9 +208,9 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
           )}
           {cameraMode === 'walk' && (
             <IconButton
-              label="Echt-Maßstab"
-              text="Echt-Maßstab"
-              tip="Echt-Maßstab: Sichtfeld passend zu Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt (Werte im Projekt-Panel). Aus: gewohnter Weitwinkel"
+              label="Gefühlt echt"
+              text="Gefühlt echt"
+              tip="Gefühlt echt: natürliches Sichtfeld (62°) mit Maßstabshinweisen – Entfernung und Höhe am Fadenkreuz, Durchgangshöhe an Türen. Aus: Sichtfeld vom Regler im Projekt-Panel"
               pressed={trueScale}
               onClick={() => apply((d) => void (d.settings.walkTrueScale = !d.settings.walkTrueScale))}
             >

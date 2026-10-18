@@ -1399,6 +1399,32 @@ code {
   pointer-events: none;
   z-index: 2;
 }
+/* "Gefühlt echt" scale hints (issue 263): readout under the crosshair, door heights */
+.aim-readout {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 22px);
+  transform: translateX(-50%);
+  max-width: min(90%, 420px);
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: var(--space-0) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 2;
+}
+.door-height {
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
 .multi-note {
   margin: var(--space-3) var(--space-5) 0;
   padding: var(--space-3) var(--space-4);
