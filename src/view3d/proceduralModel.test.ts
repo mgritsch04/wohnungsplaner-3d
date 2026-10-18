@@ -56,3 +56,18 @@ describe('furniture material (#63)', () => {
     expect(buildParts('table', 1.6, 0.9, 0.75, '#c9a477', undefined, undefined)).toEqual(buildParts('table', 1.6, 0.9, 0.75, '#c9a477'));
   });
 });
+
+describe('Gestell und Teilmaße (#273)', () => {
+  it('jede Gestellart erzeugt Teile in der Gestellfarbe, die Platte bleibt in der Hauptfarbe', () => {
+    for (const base of ['legs4', 'sled', 'x', 'pedestal', 'panel'] as const) {
+      const parts = buildParts('table', 1.6, 0.9, 0.76, '#c49a6c', undefined, undefined, { base, secondary: '#1f1f1f' });
+      expect(parts.filter((p) => p.color === '#1f1f1f').length).toBeGreaterThan(0);
+      expect(parts.filter((p) => p.color === '#c49a6c')).toHaveLength(1);
+    }
+  });
+
+  it('Plattenstärke aus der Seite', () => {
+    const [top] = buildParts('table', 1.6, 0.9, 0.76, '#c49a6c', undefined, undefined, { topThickness: 0.05 });
+    expect(top.p[1]).toBeCloseTo(0.76 - 0.025);
+  });
+});

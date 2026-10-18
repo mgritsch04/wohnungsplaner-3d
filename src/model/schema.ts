@@ -133,8 +133,23 @@ export const PriceSchema = z.object({
   recordedAt: z.string().optional(),
 });
 
+/** Kinds of table base the procedural stand-in can draw (#273). */
+export const TableBaseSchema = z.enum(['legs4', 'sled', 'x', 'pedestal', 'panel']);
+export type TableBase = z.infer<typeof TableBaseSchema>;
+
 export const ModelRefSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('procedural'), shape: z.string().min(1) }),
+  z.object({
+    type: z.literal('procedural'),
+    shape: z.string().min(1),
+    /** colour of legs / frame / base, e.g. from the product photo (#273) */
+    secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    /** kind of table base stated on the product page (#273) */
+    base: TableBaseSchema.optional(),
+    /** part sizes stated on the product page, in meters (#273) */
+    topThickness: len(0.005, 0.15).optional(),
+    legSize: len(0.01, 0.25).optional(),
+    seatHeight: len(0.25, 0.9).optional(),
+  }),
   z.object({
     type: z.literal('gltf'),
     /** Either an asset id from the local asset store or an http(s)/relative URL. */

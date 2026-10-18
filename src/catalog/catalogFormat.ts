@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FileFormatError, formatZodError } from '../formats/zodErrors';
 import type { CatalogItem } from './types';
 import { CATEGORIES } from './types';
+import { TableBaseSchema } from '../model/schema';
 
 /**
  * Product list import format ("wohnungsplaner-catalog").
@@ -26,7 +27,15 @@ const CatalogEntrySchema = z.object({
   productUrl: z.string().max(2000).optional(),
   imageUrl: z.string().max(2000).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  /** legs / frame colour of the procedural stand-in (#273) */
+  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   shape: z.string().max(40).optional(),
+  /** kind of table base (#273) */
+  base: TableBaseSchema.optional(),
+  /** part sizes in the list's unit (#273): table top thickness, leg size, seat height */
+  topThickness: num.positive().optional(),
+  legSize: num.positive().optional(),
+  seatHeight: num.positive().optional(),
   modelUrl: z.string().max(2000).optional(),
   /** Name of a .glb file imported together with the list (no path). */
   modelFile: z.string().max(200).regex(/^[^/\\]+\.glb$/i, 'nur ein Dateiname mit Endung .glb').optional(),
@@ -59,6 +68,9 @@ const DEFAULT_SHAPE: Record<string, string> = {
   decor: 'box',
 };
 
+/** A part size in meters, only when it is plausible (the model schema would reject the item otherwise). */
+const part = (key: string, v: number | undefined, k: number, min: number, max: number) => (v !== undefined && v * k >= min && v * k <= max ? { [key]: v * k } : {});
+
 const isHttpUrl = (u?: string) => !!u && /^https?:\/\//i.test(u);
 
 export function entriesToCatalogItems(entries: CatalogEntry[], units: 'm' | 'cm' | 'mm', sourceName: string): CatalogItem[] {
@@ -76,7 +88,17 @@ export function entriesToCatalogItems(entries: CatalogEntry[], units: 'm' | 'cm'
       height: e.height * k,
       elevation: e.elevation !== undefined ? e.elevation * k : undefined,
       color: e.color ?? '#b8b0a4',
-      model: isHttpUrl(e.modelUrl) ? { type: 'gltf', url: e.modelUrl, fallbackShape: shape } : { type: 'procedural', shape },
+      model: isHttpUrl(e.modelUrl)
+        ? { type: 'gltf', url: e.modelUrl, fallbackShape: shape }
+        : {
+            type: 'procedural',
+            shape,
+            ...(e.secondaryColor ? { secondaryColor: e.secondaryColor } : {}),
+            ...(e.base ? { base: e.base } : {}),
+            ...part('topThickness', e.topThickness, k, 0.005, 0.15),
+            ...part('legSize', e.legSize, k, 0.01, 0.25),
+            ...part('seatHeight', e.seatHeight, k, 0.25, 0.9),
+          },
       price: e.price !== undefined ? { amount: e.price, currency: 'EUR', status: 'user', recordedAt: e.priceDate } : undefined,
       brand: e.brand,
       retailer: e.retailer,

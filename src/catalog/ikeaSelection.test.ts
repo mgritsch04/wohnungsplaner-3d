@@ -202,9 +202,9 @@ describe('Möbelix ohne 3D-Modell: Farbe vom Produktfoto (#273)', () => {
   // SYNTHETIC Möbelix page result (no real product data)
   const mx = { name: 'TESTTISCH Synthetisch', category: 'table', shape: 'table', width: 160, depth: 90, height: 76, price: 299, priceDate: '2026-10-18', retailer: 'Möbelix', productUrl: 'https://www.moebelix.at/p/testtisch-synthetisch-001' };
 
-  it('färbt das Näherungsmodell mit der Hauptfarbe des Fotos', async () => {
+  it('färbt Platte und Gestell des Näherungsmodells mit den Farben des Fotos', async () => {
     const asked: string[] = [];
-    const { d, added } = deps({ colorOf: async (img) => (asked.push(img), '#8a5a2b') });
+    const { d, added } = deps({ colorOf: async (img) => (asked.push(img), { main: '#8a5a2b', secondary: '#222222' }) });
     const outcomes = await takeInbox({
       ...d,
       fetchInbox: async () => [{ id: 'm', receivedAt: '', product: { article: 'mx0123456789', entry: mx, model: null, image: 'mx0123456789.jpg' } }],
@@ -213,6 +213,7 @@ describe('Möbelix ohne 3D-Modell: Farbe vom Produktfoto (#273)', () => {
     expect(outcomes[0]).toMatchObject({ ok: true, withModel: false });
     expect(asked).toEqual(['mx0123456789.jpg']);
     expect(added[0].color).toBe('#8a5a2b');
+    expect(added[0].model).toEqual({ type: 'procedural', shape: 'table', secondaryColor: '#222222' });
   });
 
   it('ohne Foto oder wenn die Farbe nicht erkennbar ist, bleibt die Standardfarbe', async () => {
