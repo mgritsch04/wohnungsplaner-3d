@@ -18,6 +18,8 @@ import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
+import { eyeFromBody } from '../model/body';
+import { RefFigure } from './RefFigure';
 import { useGamepadState } from './input/gamepad';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
@@ -157,7 +159,7 @@ export function Scene3D() {
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · F: Objekt-Menü · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · F: Objekt-Menü · P: Referenzfigur · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, Mausrad zoomt, E öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
           )}
@@ -345,6 +347,7 @@ function SceneContent({
       <CollisionMarkers conflicts={conflicts} furniture={project.furniture} />
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
+      <RefFigure derived={derived} start={walkStart} />
       <Devices3D project={project} />
       <TapeMeasure3D />
       {/* also while walking (#227): a drag can only start while the pointer is not locked */}
@@ -368,7 +371,7 @@ function SceneContent({
           furniture={project.furniture}
           start={walkStart}
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
-          eyeHeight={project.settings.eyeHeight}
+          eyeHeight={eyeFromBody(project.settings.bodyHeight)}
           onLockChange={onLockChange}
         />
       )}

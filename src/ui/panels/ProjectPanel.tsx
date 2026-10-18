@@ -3,6 +3,8 @@ import { validateModel } from '../../model/validation';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { CheckField, NumberField, Section, Badge } from '../fields';
+import { WalkFovControl } from '../WalkFovControl';
+import { BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, eyeFromBody, seatedEyeFromBody } from '../../model/body';
 import { usePerformanceStore } from '../../view3d/performanceStore';
 import type { Material } from '../../model/schema';
 import { newId } from '../../model/ids';
@@ -65,34 +67,26 @@ export function ProjectPanel() {
       <Section title="Steuerung (3D)">
         <MouseSensitivityControl />
         <NumberField
-          label="Augenhöhe beim Begehen"
-          value={s.eyeHeight}
+          label="Körpergröße"
+          value={s.bodyHeight}
           factor={100}
           digits={0}
           unit="cm"
-          min={100}
-          max={220}
+          min={110}
+          max={230}
           step={1}
-          title="Höhe der Kamera über dem Boden im Begehen-Modus (Standard 163 cm)"
-          onChange={(v) => apply((d) => void (d.settings.eyeHeight = Math.max(1, Math.min(2.2, v))))}
+          title="Deine Körpergröße: daraus ergibt sich die Augenhöhe beim Begehen (11 cm darunter) und im Sitzen (Standard 163 cm)"
+          onChange={(v) => apply((d) => void (d.settings.bodyHeight = Math.max(BODY_HEIGHT_MIN, Math.min(BODY_HEIGHT_MAX, v))))}
         />
-        <NumberField
-          label="Augenhöhe im Sitzen"
-          value={s.sitEyeHeight}
-          factor={100}
-          digits={0}
-          unit="cm"
-          min={60}
-          max={160}
-          step={1}
-          title="Kamerahöhe beim Sitzen im Begehen-Modus, z. B. auf dem Sofa (Standard 120 cm)"
-          onChange={(v) => apply((d) => void (d.settings.sitEyeHeight = Math.max(0.6, Math.min(1.6, v))))}
-        />
+        <p className="muted small" data-testid="eye-heights">
+          Augenhöhe beim Begehen {Math.round(eyeFromBody(s.bodyHeight) * 100)} cm, im Sitzen {Math.round(seatedEyeFromBody(s.bodyHeight) * 100)} cm
+        </p>
+        <WalkFovControl />
         <CheckField
           label="Echt-Maßstab beim Begehen"
           checked={s.walkTrueScale}
           onChange={(v) => apply((d) => void (d.settings.walkTrueScale = v))}
-          title="Sichtfeld aus Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt. Aus: gewohnter Weitwinkel (70°)"
+          title="Sichtfeld aus Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt. Aus: Sichtfeld vom Regler"
         />
         <NumberField
           label="Bildschirmdiagonale"
@@ -116,6 +110,18 @@ export function ProjectPanel() {
           step={5}
           title="Abstand deiner Augen zum Bildschirm für den Echt-Maßstab (Standard 60 cm)"
           onChange={(v) => apply((d) => void (d.settings.viewingDistance = Math.max(0.3, Math.min(3, v))))}
+        />
+        <CheckField
+          label="Kopfwippen beim Gehen"
+          checked={s.walkHeadBob}
+          onChange={(v) => apply((d) => void (d.settings.walkHeadBob = v))}
+          title="Die Augen senken sich bei jedem Schritt ein wenig – hilft dem Tiefengefühl"
+        />
+        <CheckField
+          label="Referenzfigur in deiner Größe (Taste P)"
+          checked={s.showRefFigure}
+          onChange={(v) => apply((d) => void (d.settings.showRefFigure = v))}
+          title="Eine Figur in deiner Körpergröße als Maßstab; beim Begehen stellt Taste P sie dorthin, wo das Fadenkreuz den Boden trifft"
         />
         <CheckField label="Beim Begehen sitzen (Taste X)" checked={walkSit} onChange={(v) => useUiStore.getState().setWalkSit(v)} title="Umschalten zwischen Stehen und Sitzen – wirkt sofort beim Begehen" />
       </Section>

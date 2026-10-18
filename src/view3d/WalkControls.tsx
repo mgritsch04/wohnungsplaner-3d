@@ -19,7 +19,9 @@ import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
-import { nextWalkFov, trueScaleFov, WALK_FOV, wheelPixels, zoomLookFactor } from './walkZoom';
+import { nextWalkFov, trueScaleFov, wheelPixels, zoomLookFactor } from './walkZoom';
+import { createBob, stepBob } from './headBob';
+import { seatedEyeFromBody } from '../model/body';
 
 interface Props {
   derived: DerivedPlan;
@@ -49,6 +51,8 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 const PICK_RANGE = 6;
 /** A carried item stays this far in front of the eyes (m, horizontal). */
 const CENTER = new THREE.Vector2(0, 0);
+/** Farthest floor point the reference figure is placed at with P (m) (#263). */
+const FIGURE_RANGE = 15;
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
 function furnitureIdOf(o: THREE.Object3D | null): string | null {
@@ -62,7 +66,7 @@ function openingIdOf(o: THREE.Object3D | null): string | null {
   return null;
 }
 
-export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
+export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
   const { camera, gl, scene, size } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
@@ -81,9 +85,10 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const trueScale = useProjectStore((s) => s.project.settings.walkTrueScale);
   const diagonal = useProjectStore((s) => s.project.settings.screenDiagonal);
   const distance = useProjectStore((s) => s.project.settings.viewingDistance);
+  const walkFov = useProjectStore((s) => s.project.settings.walkFov);
   const baseFov = trueScale
     ? trueScaleFov({ diagonalInch: diagonal, distance, viewHeightPx: size.height, screenWidthPx: window.screen?.width ?? 0, screenHeightPx: window.screen?.height ?? 0 })
-    : WALK_FOV;
+    : walkFov;
   const base = useRef(baseFov);
   // field of view of the wheel zoom (#228); every walkthrough starts at the base value
   const fov = useRef(baseFov);
@@ -103,8 +108,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     sensitivityRef.current = sensitivity;
   }, [sensitivity]);
   // eye height changes apply immediately, without restarting the walk (pointer lock stays)
-  // seated eye height (#78) comes straight from the project settings
-  const sitEye = useProjectStore((s) => s.project.settings.sitEyeHeight);
+  // seated eye height (#78) follows the body height in the project settings (#263)
+  const sitEye = useProjectStore((s) => seatedEyeFromBody(s.project.settings.bodyHeight));
   const sitEyeRef = useRef(sitEye);
   useEffect(() => {
     sitEyeRef.current = sitEye;
@@ -231,6 +236,18 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       const c = client ?? paneCenter('3d');
       openObjectMenu(t, c.x, c.y, client ? '3d' : 'walk');
     };
+    /** P (#263): reference figure to the floor point in sight, or 2 m ahead when looking up. */
+    const placeRefFigure = () => {
+      raycaster.setFromCamera(CENTER, camera);
+      const { origin, direction } = raycaster.ray;
+      const t = direction.y < -0.02 ? -origin.y / direction.y : Infinity;
+      const flat = Math.hypot(direction.x, direction.z) || 1;
+      const reach = Math.min(t * flat, FIGURE_RANGE);
+      const at = reach < FIGURE_RANGE ? origin.clone().addScaledVector(direction, t) : origin.clone().addScaledVector(new THREE.Vector3(direction.x / flat, 0, direction.z / flat), 2);
+      useUiStore.getState().setRefFigurePos({ x: Math.round(at.x * 1000) / 1000, y: Math.round(at.z * 1000) / 1000 });
+      const ps = useProjectStore.getState();
+      if (!ps.project.settings.showRefFigure) ps.apply((d) => void (d.settings.showRefFigure = true));
+    };
     walkApi.current = { toggleCarry, pickOrDrop: () => pickOrDrop(), target: () => target(), targetOpening: () => targetOpening(), toggleOpening: toggleAimedOpening };
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -259,6 +276,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // context menu at the crosshair (#235)
         openMenu();
+        return;
+      }
+      if (e.code === 'KeyP' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // place the reference figure where the crosshair meets the floor (#263) and show it
+        placeRefFigure();
         return;
       }
       if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -467,6 +489,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const gamepad = useMemo(() => createGamepadSource(), []);
   useEffect(() => () => gamepad.reset(), [gamepad]);
 
+  const bob = useMemo(() => createBob(), []);
+  const moved = useRef(0);
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
   useFrame((_, dtRaw) => {
@@ -491,7 +515,10 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const goalEye = goalEyeHeight({ eye: eyeRef.current, sitEye: sitEyeRef.current, sitting: seated, ducking });
     eyeNow.current = eyeNow.current === null ? goalEye : eyeNow.current + (goalEye - eyeNow.current) * (1 - Math.exp(-dt / 0.08));
     if (Math.abs(eyeNow.current - goalEye) < 0.001) eyeNow.current = goalEye;
-    camera.position.y = eyeNow.current;
+    // head bob (#263) from the distance walked in the previous frame
+    const bobY = useProjectStore.getState().project.settings.walkHeadBob ? stepBob(bob, moved.current, dt) : 0;
+    moved.current = 0;
+    camera.position.y = eyeNow.current + bobY;
     useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
@@ -544,7 +571,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       };
       p = resolveCollisions(p, collidersRef.current);
     }
-    camera.position.set(p.x, eyeNow.current, p.y);
+    moved.current = Math.hypot(p.x - camera.position.x, p.y - camera.position.z);
+    camera.position.set(p.x, eyeNow.current + bobY, p.y);
   });
 
   return null;

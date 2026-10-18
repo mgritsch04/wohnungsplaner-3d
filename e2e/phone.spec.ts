@@ -315,7 +315,7 @@ test('Handy: Begehen mit Stick und Finger – gehen, umsehen, Möbel per Tippen 
       return { x: c.position.x as number, z: c.position.z as number, yaw: c.rotation.y as number, fov: c.fov as number };
     });
   const p0 = await pose();
-  expect(p0.fov).toBeCloseTo(70, 0);
+  expect(p0.fov).toBeCloseTo(50, 0); // default field of view of the walkthrough (#263)
   // push the stick forward and hold: the walker moves
   const fingers = await Fingers.on(page);
   const c = await center(page, '[data-testid="touch-stick"]');

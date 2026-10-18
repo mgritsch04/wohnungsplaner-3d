@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyProject } from '../model/factory';
-import { ProjectSchema } from '../model/schema';
+import { eyeFromBody, seatedEyeFromBody } from '../model/body';
 import { useUiStore } from '../store/uiStore';
 import { DUCK_MIN_EYE, DUCK_SPEED, goalEyeHeight, walkSpeedFactor } from './walkPosture';
 
@@ -17,14 +16,10 @@ describe('walkthrough posture (#78)', () => {
     expect(goalEyeHeight({ eye: 1.63, sitEye: 1.2, sitting: true, ducking: true })).toBe(1.2);
   });
 
-  it('old projects load with the default seated eye height of 120 cm; the range is enforced', () => {
-    const raw = structuredClone(createEmptyProject()) as unknown as { settings: Record<string, unknown> };
-    delete raw.settings.sitEyeHeight;
-    expect(ProjectSchema.parse(raw).settings.sitEyeHeight).toBe(1.2);
-    expect(createEmptyProject().settings.sitEyeHeight).toBe(1.2);
-    expect(ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 1.05 } }).settings.sitEyeHeight).toBe(1.05);
-    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 0.5 } })).toThrow();
-    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, sitEyeHeight: 1.7 } })).toThrow();
+  it('the seated eye height follows the body height (#263)', () => {
+    expect(seatedEyeFromBody(1.63)).toBe(1.21);
+    expect(seatedEyeFromBody(1.8)).toBeLessThan(eyeFromBody(1.8));
+    expect(seatedEyeFromBody(1.9)).toBeGreaterThan(seatedEyeFromBody(1.63));
   });
 
   it('crouched or seated walks slower', () => {
