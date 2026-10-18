@@ -18,6 +18,7 @@ import { footprintsOverlap, furnitureCorners } from '../editor2d/furnitureGeomet
 import { derivePlan, type DerivedPlan } from '../model/derived';
 import { buildPlacementObstacles, placementIssues, type Obstacle } from '../model/placement';
 import { frontClearance, isSurface } from '../model/placementRules';
+import { newId } from '../model/ids';
 import type { Furniture, Project } from '../model/schema';
 import { add, boundsOf, dist, dot, normalize, perp, pointInPolygon, polygonCentroid, rotate, scale, sub, type Vec2 } from '../model/vec';
 
@@ -525,8 +526,17 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
 
 /** Adds the proposed items to the project (call inside one `apply` → one undo step). Returns their ids. */
 export function applyFurnishing(d: Project, s: FurnishingSuggestion): string[] {
-  for (const f of s.items) d.furniture.push(structuredClone(f));
-  return s.items.map((f) => f.id);
+  // taking the same suggestion twice must not create a second item with the same id (#268)
+  const taken = new Set(d.furniture.map((f) => f.id));
+  const ids: string[] = [];
+  for (const f of s.items) {
+    const item = structuredClone(f);
+    if (taken.has(item.id)) item.id = newId('item');
+    taken.add(item.id);
+    d.furniture.push(item);
+    ids.push(item.id);
+  }
+  return ids;
 }
 
 /** Sum of the proposed items' prices (guide values of the generic catalogue). */

@@ -30,6 +30,7 @@ import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
 import { MobileBar } from './ui/MobileBar';
 import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
+import { FileFormatError } from './formats/zodErrors';
 import './ui/phone.css';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
@@ -51,13 +52,18 @@ export default function App() {
         const id = await lastProjectId();
         if (id) {
           const res = await loadProject(id);
-          if (res) useProjectStore.getState().load(res.project);
+          if (res) {
+            useProjectStore.getState().load(res.project);
+            if (res.repaired) useUiStore.getState().toast(`Projekt beim Laden repariert: ${res.repaired.join(' ')}`, 'info');
+          }
         } else {
           await saveProject(useProjectStore.getState().project);
         }
       } catch (e) {
         console.error(e);
-        useUiStore.getState().toast('Das zuletzt geöffnete Projekt konnte nicht geladen werden – Beispielprojekt wird angezeigt.', 'error');
+        // the reason helps to find the cause; the saved project itself stays untouched
+        const why = e instanceof FileFormatError ? ` Grund: ${[e.message, ...e.details.slice(0, 2)].join(' ')}` : '';
+        useUiStore.getState().toast(`Das zuletzt geöffnete Projekt konnte nicht geladen werden – Beispielprojekt wird angezeigt.${why}`, 'error');
       } finally {
         void useCatalogStore.getState().load();
         useUiStore.getState().requestFit();
