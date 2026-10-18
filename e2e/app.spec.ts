@@ -241,7 +241,7 @@ test('walkthrough mode can be entered and left', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('walkthrough: eye height 163 cm by default, adjustable live and saved; crosshair only while walking (#23, #22)', async ({ page }) => {
+test('walkthrough: body height 163 cm by default (eyes 11 cm lower), adjustable live and saved; crosshair only while walking (#23, #22)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -253,13 +253,14 @@ test('walkthrough: eye height 163 cm by default, adjustable live and saved; cros
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (window as any).__wp.three.camera.position.y as number;
     });
-  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect.poll(camY).toBeCloseTo(1.52, 3);
   await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
-  const field = page.getByLabel('Augenhöhe beim Begehen');
+  const field = page.getByLabel('Körpergröße');
   await expect(field).toHaveValue('163');
   await field.fill('180');
   await field.press('Enter');
-  await expect.poll(camY).toBeCloseTo(1.8, 3); // immediately, still walking
+  await expect.poll(camY).toBeCloseTo(1.69, 3); // immediately, still walking
+  await expect(page.getByTestId('eye-heights')).toHaveText('Augenhöhe beim Begehen 169 cm, im Sitzen 133 cm');
   await expect(page.locator('.walk-overlay')).toBeVisible();
   await page.getByRole('button', { name: 'Übersicht' }).click();
   await expect(page.getByTestId('crosshair')).toHaveCount(0);
@@ -267,7 +268,7 @@ test('walkthrough: eye height 163 cm by default, adjustable live and saved; cros
   await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(1200);
   await page.reload();
-  await expect.poll(async () => (await getProject(page)).settings.eyeHeight).toBeCloseTo(1.8, 6);
+  await expect.poll(async () => (await getProject(page)).settings.bodyHeight).toBeCloseTo(1.8, 6);
   expect(errors).toEqual([]);
 });
 
@@ -409,7 +410,7 @@ test('walkthrough: C toggles crouching (lower camera, slower), C again stands up
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
-  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect.poll(camY).toBeCloseTo(1.52, 3);
   // one press crouches – and the camera stays down after releasing C (toggle, #47)
   await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeLessThan(1.0);
@@ -423,23 +424,23 @@ test('walkthrough: C toggles crouching (lower camera, slower), C again stands up
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().walkDuck)).toBe(true);
   // pressing C again stands up
   await page.keyboard.press('KeyC');
-  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect.poll(camY).toBeCloseTo(1.52, 3);
   await expect(page.getByTestId('walk-duck')).toHaveCount(0);
   // sitting down (X) ends crouching; standing up again (X) does not crouch
   await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeLessThan(1.0);
   await page.keyboard.press('KeyX');
   await expect(page.getByTestId('walk-duck')).toHaveCount(0);
-  await expect.poll(camY).toBeCloseTo(1.2, 3);
+  await expect.poll(camY).toBeCloseTo(1.21, 3);
   await page.keyboard.press('KeyX');
-  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect.poll(camY).toBeCloseTo(1.52, 3);
   // leaving the walkthrough resets crouching
   await page.keyboard.press('KeyC');
   await expect.poll(camY).toBeLessThan(1.0);
   await page.getByRole('button', { name: 'Übersicht' }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.getByTestId('walk-duck')).toHaveCount(0);
-  await expect.poll(camY).toBeCloseTo(1.63, 3);
+  await expect.poll(camY).toBeCloseTo(1.52, 3);
   expect(errors).toEqual([]);
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -3003,7 +3004,7 @@ test('exports the 3D model as a GLB file from the export menu (#87)', async ({ p
   expect(errors).toEqual([]);
 });
 
-test('walkthrough: X switches between standing and sitting, the seated eye height is saved (#78)', async ({ page }) => {
+test('walkthrough: X switches between standing and sitting, the seated eye height follows the body height (#78, #263)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -3011,39 +3012,38 @@ test('walkthrough: X switches between standing and sitting, the seated eye heigh
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.getByTestId('crosshair')).toBeVisible();
   const eyeY = () => page.evaluate(() => (window as unknown as { __wp: { three: { camera: { position: { y: number } } } } }).__wp.three.camera.position.y);
-  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
-  expect((await getProject(page)).settings.sitEyeHeight).toBe(1.2);
+  await expect.poll(eyeY).toBeCloseTo(1.52, 2);
 
   // X: sit down – immediately, still walking; the overlay says so
   await page.keyboard.press('x');
-  await expect.poll(eyeY).toBeCloseTo(1.2, 2);
+  await expect.poll(eyeY).toBeCloseTo(1.21, 2);
   await expect(page.getByTestId('walk-sit')).toHaveText(/Sitzen/);
   await expect(page.getByTestId('crosshair')).toBeVisible();
   // ducking (C) is ignored while seated
   await page.keyboard.down('c');
   await page.waitForTimeout(400);
-  expect(await eyeY()).toBeCloseTo(1.2, 2);
+  expect(await eyeY()).toBeCloseTo(1.21, 2);
   await page.keyboard.up('c');
 
-  // the seated eye height is adjustable and applies right away
+  // the seated eye height follows the body height and applies right away
   await page.locator('.panel.right').getByRole('button', { name: 'Projekt', exact: true }).click();
-  const field = page.locator('.panel.right').getByRole('textbox', { name: 'Augenhöhe im Sitzen cm' });
-  await field.fill('105');
+  const field = page.locator('.panel.right').getByRole('textbox', { name: 'Körpergröße cm' });
+  await field.fill('150');
   await field.press('Enter');
-  await expect.poll(eyeY).toBeCloseTo(1.05, 2);
+  await expect.poll(eyeY).toBeCloseTo(1.11, 2);
   await expect(page.locator('.panel.right').getByLabel('Beim Begehen sitzen (Taste X)')).toBeChecked();
 
   // X again: stand up
   await page.locator('[data-testid="scene3d"]').hover();
   await page.keyboard.press('x');
-  await expect.poll(eyeY).toBeCloseTo(1.63, 2);
+  await expect.poll(eyeY).toBeCloseTo(1.39, 2);
   await expect(page.getByTestId('walk-sit')).toHaveCount(0);
 
   // saved with the project and kept after reloading
   await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(1200);
   await page.reload();
-  await expect.poll(async () => (await getProject(page)).settings.sitEyeHeight).toBe(1.05);
+  await expect.poll(async () => (await getProject(page)).settings.bodyHeight).toBe(1.5);
   expect(errors).toEqual([]);
 });
 
@@ -4069,28 +4069,29 @@ test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving res
   const overviewFov = await fovOf();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.getByTestId('crosshair')).toBeVisible();
-  await expect.poll(fovOf).toBe(70);
+  await expect.poll(fovOf).toBe(50);
   const box = (await page.locator('canvas').first().boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -100);
-  await expect.poll(fovOf).toBe(20);
+  // down to 2/7 of the base angle (50° → about 14°)
+  await expect.poll(fovOf).toBeCloseTo(100 / 7, 3);
   await page.mouse.wheel(0, 100);
-  await expect.poll(fovOf).toBeGreaterThan(20);
+  await expect.poll(fovOf).toBeGreaterThan(100 / 7 + 0.01);
   for (let i = 0; i < 20; i++) await page.mouse.wheel(0, 100);
-  await expect.poll(fovOf).toBe(70);
+  await expect.poll(fovOf).toBe(50);
   // Z resets after zooming in
   await page.mouse.wheel(0, -300);
-  await expect.poll(fovOf).toBeLessThan(70);
+  await expect.poll(fovOf).toBeLessThan(50);
   await page.keyboard.press('KeyZ');
-  await expect.poll(fovOf).toBe(70);
+  await expect.poll(fovOf).toBe(50);
   // leaving and re-entering: back to the normal view, the overview keeps its own field of view
   await page.mouse.wheel(0, -300);
-  await expect.poll(fovOf).toBeLessThan(70);
+  await expect.poll(fovOf).toBeLessThan(50);
   await page.getByRole('button', { name: 'Übersicht' }).click();
   await expect(page.getByTestId('crosshair')).toHaveCount(0);
   await expect.poll(fovOf).toBe(overviewFov);
   await page.getByRole('button', { name: 'Begehen' }).click();
-  await expect.poll(fovOf).toBe(70);
+  await expect.poll(fovOf).toBe(50);
   expect(errors).toEqual([]);
 });
 
@@ -4156,7 +4157,7 @@ test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size an
   await expect(page.getByTestId('crosshair')).toBeVisible();
   // NaN until the 3D scene is mounted (after a reload, too), so expect.poll keeps waiting
   const fovOf = () => page.evaluate(() => ((window as any).__wp.three?.camera.fov ?? NaN) as number);
-  await expect.poll(fovOf).toBe(70);
+  await expect.poll(fovOf).toBe(50);
   const toggle = page.getByRole('button', { name: 'Echt-Maßstab' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await toggle.click();
@@ -4189,8 +4190,93 @@ test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size an
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect.poll(fovOf).toBeLessThan(60);
-  // switched off: the usual wide angle is back
+  // switched off: the slider angle (default 50°) is back
   await page.getByRole('button', { name: 'Echt-Maßstab' }).click();
+  await expect.poll(fovOf).toBe(50);
+  expect(errors).toEqual([]);
+});
+
+test('walkthrough: field-of-view slider with quick choices, head bob, reference figure in the body height placed with P (#263)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const fovOf = () => page.evaluate(() => ((window as any).__wp.three?.camera.fov ?? NaN) as number);
+  const settings = async () => (await getProject(page)).settings;
+  await expect.poll(fovOf).toBe(50);
+  const panel = page.locator('.panel.right');
+  await panel.getByRole('button', { name: 'Projekt', exact: true }).click();
+  // quick choices and slider
+  const quick = panel.getByRole('group', { name: 'Sichtfeld-Schnellwahl' });
+  await expect(quick.getByRole('button', { name: 'Normal (50°)' })).toHaveAttribute('aria-pressed', 'true');
+  await quick.getByRole('button', { name: 'Weit (70°)' }).click();
   await expect.poll(fovOf).toBe(70);
+  await quick.getByRole('button', { name: 'Echt', exact: true }).click();
+  await expect.poll(fovOf).toBeLessThan(50);
+  expect((await settings()).walkTrueScale).toBe(true);
+  const slider = panel.getByRole('slider', { name: 'Sichtfeld beim Begehen' });
+  await slider.fill('45');
+  await expect.poll(fovOf).toBe(45);
+  expect((await settings()).walkTrueScale).toBe(false);
+  expect((await settings()).walkFov).toBe(45);
+
+  // head bob: the eyes dip a little while walking; switched off they stay level
+  // keys typed into a form field do not walk: take the focus off the panel first
+  const focusScene = async () => {
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.locator('[data-testid="scene3d"]').hover();
+  };
+  const sampleY = async () => {
+    await focusScene();
+    await page.evaluate(() => (window as any).__wp.walk.look(0, 0));
+    await page.keyboard.down('KeyW');
+    const ys: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      ys.push(await page.evaluate(() => (window as any).__wp.three.camera.position.y as number));
+      await page.waitForTimeout(60);
+    }
+    await page.keyboard.up('KeyW');
+    return Math.min(...ys);
+  };
+  expect((await settings()).walkHeadBob).toBe(true);
+  expect(await sampleY()).toBeLessThan(1.52 - 0.002);
+  const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
+  await expect.poll(camY).toBeCloseTo(1.52, 3); // settles when standing still
+  await panel.getByLabel('Kopfwippen beim Gehen').uncheck();
+  expect(await sampleY()).toBeCloseTo(1.52, 3);
+
+  // reference figure: off by default; P places it where the crosshair meets the floor and shows it
+  const figure = () => page.evaluate(() => {
+    const o = (window as any).__wp.three.scene.getObjectByName('ref-figure');
+    return o ? { x: o.position.x as number, z: o.position.z as number, h: o.userData.height as number } : null;
+  });
+  expect(await figure()).toBeNull();
+  await panel.getByLabel('Referenzfigur in deiner Größe (Taste P)').check();
+  await expect.poll(figure).not.toBeNull();
+  expect((await figure())!.h).toBeCloseTo(1.63, 6);
+  await focusScene();
+  await page.evaluate(() => (window as any).__wp.walk.look(0.3, -0.5));
+  await page.waitForTimeout(200);
+  await page.keyboard.press('KeyP');
+  const cam = await page.evaluate(() => {
+    const p = (window as any).__wp.three.camera.position;
+    return { x: p.x as number, z: p.z as number };
+  });
+  // looking 0.5 rad down from 1.52 m: the floor is about 2.8 m ahead
+  await expect.poll(async () => { const f = await figure(); return f ? Math.hypot(f.x - cam.x, f.z - cam.z) : 0; }).toBeGreaterThan(2.5);
+  const f = (await figure())!;
+  expect(Math.hypot(f.x - cam.x, f.z - cam.z)).toBeLessThan(3.1);
+  // it follows the body height
+  await panel.getByRole('textbox', { name: 'Körpergröße cm' }).fill('190');
+  await panel.getByRole('textbox', { name: 'Körpergröße cm' }).press('Enter');
+  await expect.poll(async () => (await figure())?.h).toBeCloseTo(1.9, 6);
+  // P while the figure is hidden switches it on again
+  await panel.getByLabel('Referenzfigur in deiner Größe (Taste P)').uncheck();
+  await expect.poll(figure).toBeNull();
+  await focusScene();
+  await page.keyboard.press('KeyP');
+  await expect.poll(figure).not.toBeNull();
+  expect((await settings()).showRefFigure).toBe(true);
   expect(errors).toEqual([]);
 });
