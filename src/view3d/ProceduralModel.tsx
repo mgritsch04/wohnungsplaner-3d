@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { FurnitureFinish, ModelRef, QualityMode, TableBase } from '../model/schema';
@@ -78,6 +78,8 @@ export interface Part {
   /** Surface structure in realism mode. */
   detail?: DetailKind;
   detailRepeat?: number;
+  /** Takes the product photo texture when the item has one (#273: table tops). */
+  textured?: boolean;
 }
 
 /** Colours of the item's main parts (its colour and shades of it), collected while `buildParts` runs. */
@@ -156,13 +158,15 @@ export interface ProceduralLook {
   topThickness?: number;
   legSize?: number;
   seatHeight?: number;
+  /** product photo crop (data URL) for the main surface, e.g. a table top */
+  texture?: string;
 }
 
 /** The look fields a procedural model reference carries (#273). */
 export function lookOf(model: ModelRef): ProceduralLook {
   if (model.type !== 'procedural') return {};
-  const { secondaryColor: secondary, base, topThickness, legSize, seatHeight } = model;
-  return { secondary, base, topThickness, legSize, seatHeight };
+  const { secondaryColor: secondary, base, topThickness, legSize, seatHeight, texture } = model;
+  return { secondary, base, topThickness, legSize, seatHeight, texture };
 }
 
 /** Base under a rectangular table top whose underside is at height `top` (half sizes W, D). */
@@ -285,7 +289,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
     case 'table':
     case 'desk': {
       const top = look.topThickness ?? 0.035;
-      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, Math.min(0.008, top / 3), color, { rough: 0.45, ...grain })];
+      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, Math.min(0.008, top / 3), color, { rough: 0.45, ...grain, textured: true })];
       const base = look.base ?? (shape === 'desk' ? 'panel' : 'legs4');
       parts.push(...tableBase(base, W, D, h - top, frame ?? shade(color, shape === 'desk' ? 0.9 : 0.85), look.legSize));
       if (shape === 'desk') parts.push(box(-W + 0.06, h - top - 0.12, -D + 0.04, W - 0.06, h - top, -D + 0.06, shade(color, 0.9)));
@@ -295,7 +299,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       const r = Math.min(w, d) / 2;
       const c = frame ?? shade(color, 0.8);
       const top = look.topThickness ?? 0.035;
-      const parts: Part[] = [cyl(0, h - top, 0, r, h, color, { rough: 0.45, ...grain })];
+      const parts: Part[] = [cyl(0, h - top, 0, r, h, color, { rough: 0.45, ...grain, textured: true })];
       if (look.base === 'legs4' || look.base === 'x') {
         const k = r * 0.55;
         for (const [x, z] of [[-k, -k], [k, -k], [-k, k], [k, k]]) parts.push(leg(x, z, h - top, look.legSize ? look.legSize / 2 : 0.026, c));
@@ -526,7 +530,8 @@ export const ProceduralModel = memo(function ProceduralModel({
   quality: QualityMode;
   castShadow: boolean;
 }) {
-  const { secondary, base, topThickness, legSize, seatHeight } = look ?? {};
+  const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
+  const photo = usePhotoTexture(texture);
   const parts = useMemo(
     () => buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
     [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight],
@@ -535,12 +540,14 @@ export const ProceduralModel = memo(function ProceduralModel({
   const materials = useMemo(
     () =>
       parts.map((p) => {
+        // the product photo on the main surface (#273); without it the plain colour material
+        if (p.textured && photo) return new THREE.MeshStandardMaterial({ map: photo, roughness: p.rough ?? 0.6, metalness: 0 });
         const m = getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat });
         // in realism mode, glowing shades follow the lamp switch / time of day
         if (p.emissive && quality === 'realism') registerLampShade(m);
         return m;
       }),
-    [parts, quality],
+    [parts, quality, photo],
   );
   return (
     <group>
@@ -560,6 +567,28 @@ export const ProceduralModel = memo(function ProceduralModel({
     </group>
   );
 });
+
+/** A product photo crop as texture; null while loading or without one. */
+function usePhotoTexture(url: string | undefined): THREE.Texture | null {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let alive = true;
+    let loaded: THREE.Texture | null = null;
+    new THREE.TextureLoader().load(url, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      loaded = t;
+      if (alive) setTex(t);
+      else t.dispose();
+    });
+    return () => {
+      alive = false;
+      loaded?.dispose();
+      setTex(null);
+    };
+  }, [url]);
+  return url ? tex : null;
+}
 
 /** The light of a lamp; its brightness follows the lamp switch / time of day, its shadow keeps it out of neighbouring rooms. */
 function LampBulb({ y }: { y: number }) {

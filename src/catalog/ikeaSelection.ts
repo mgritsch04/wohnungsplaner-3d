@@ -41,6 +41,9 @@ export interface IkeaFetchDeps {
   colorOf?: (image: string) => Promise<ProductColors | null>;
 }
 
+/** Shapes whose main surface takes the product photo (#273, stage 2). */
+const TEXTURED_SHAPES = new Set(['table', 'table-round', 'desk']);
+
 const defaultDeps: IkeaFetchDeps = {
   fetchProduct: fetchHelperProduct,
   fetchModel: fetchHelperModel,
@@ -111,7 +114,15 @@ export async function addHelperProduct(hp: HelperProduct, withModel: boolean, de
         result = result.map((i) => ({
           ...i,
           color: c.main,
-          model: i.model.type === 'procedural' && c.secondary ? { ...i.model, secondaryColor: c.secondary } : i.model,
+          model:
+            i.model.type === 'procedural'
+              ? {
+                  ...i.model,
+                  ...(c.secondary ? { secondaryColor: c.secondary } : {}),
+                  // stage 2: the photo itself on table tops (wood grain, stone)
+                  ...(c.texture && TEXTURED_SHAPES.has(i.model.shape) ? { texture: c.texture } : {}),
+                }
+              : i.model,
         }));
     }
     await deps.addItems(result);

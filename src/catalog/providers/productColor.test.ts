@@ -41,7 +41,11 @@ describe('Platte und Gestell getrennt (#273)', () => {
   ]);
 
   it('Platte oben, Beine unten – auch wenn die Beine mehr Fläche haben', () => {
-    expect(productColors(table, 40, 40)).toEqual({ main: '#cdaa7d', secondary: '#1e1e1e' });
+    expect(productColors(table, 40, 40)).toMatchObject({ main: '#cdaa7d', secondary: '#1e1e1e' });
+  });
+
+  it('Stufe 2: findet die Tischplatte als Band für die Foto-Textur', () => {
+    expect(productColors(table, 40, 40)?.band).toEqual({ x0: 6 / 40, y0: 8 / 40, x1: 34 / 40, y1: 13 / 40 });
   });
 
   it('eine weiße Platte bleibt erhalten (Hintergrund nur vom Rand her)', () => {
@@ -55,6 +59,6 @@ describe('Platte und Gestell getrennt (#273)', () => {
   });
 
   it('einfarbiges Produkt: keine zweite Farbe', () => {
-    expect(productColors(image(20, 20, [250, 250, 250], [[3, 3, 17, 17, [90, 110, 140]]]), 20, 20)).toEqual({ main: '#5a6e8c' });
+    expect(productColors(image(20, 20, [250, 250, 250], [[3, 3, 17, 17, [90, 110, 140]]]), 20, 20)).not.toHaveProperty('secondary');
   });
 });

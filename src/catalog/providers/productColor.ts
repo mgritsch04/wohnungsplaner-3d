@@ -38,6 +38,10 @@ export interface ProductColors {
   main: string;
   /** set only when the lower part clearly differs from the main colour */
   secondary?: string;
+  /** stage 2: the widest solid band in the upper part (e.g. a table top), as fractions of the image */
+  band?: { x0: number; y0: number; x1: number; y1: number };
+  /** that band cut from the full photo, as small JPEG data URL (set by colorsOfImage) */
+  texture?: string;
 }
 
 /**
@@ -97,8 +101,50 @@ export function productColors(pixels: Uint8ClampedArray | number[], w: number, h
   // keepLight: inside the product, light pixels are real (a white top)
   const main = dominantColor(region(0, 0.4), true) ?? dominantColor(region(0, 1), true);
   if (!main) return null;
-  const secondary = dominantColor(region(0.55, 1), true);
-  return secondary && colorDistance(main, secondary) > 60 ? { main, secondary } : { main };
+  // legs/base: without light neutral greys – those are mostly the floor shadow on a studio photo
+  const lower = region(0.55, 1);
+  for (let i = 0; i < lower.length; i += 4) {
+    const v = [lower[i], lower[i + 1], lower[i + 2]];
+    if (Math.min(...v) > 185 && Math.max(...v) - Math.min(...v) < 20) lower[i + 3] = 0;
+  }
+  const secondary = dominantColor(lower, true);
+  const out: ProductColors = secondary && colorDistance(main, secondary) > 60 ? { main, secondary } : { main };
+  const band = solidBand(back, w, top, top + Math.ceil(span * 0.4));
+  if (band) out.band = { x0: band.x0 / w, y0: band.y0 / h, x1: (band.x1 + 1) / w, y1: (band.y1 + 1) / h };
+  return out;
+}
+
+/** Longest run of rows (≥ 2) whose product part is one wide solid stretch; its common columns, trimmed 8 %. */
+function solidBand(back: Uint8Array, w: number, from: number, to: number) {
+  const rows: { y: number; x0: number; x1: number }[] = [];
+  let widest = 0;
+  for (let y = from; y < to; y++) {
+    let x0 = -1;
+    let x1 = -1;
+    let n = 0;
+    for (let x = 0; x < w; x++)
+      if (!back[y * w + x]) {
+        if (x0 < 0) x0 = x;
+        x1 = x;
+        n++;
+      }
+    // solid: at least 90 % of the stretch between first and last product pixel is product
+    if (x0 >= 0 && n >= (x1 - x0 + 1) * 0.9) {
+      rows.push({ y, x0, x1 });
+      widest = Math.max(widest, x1 - x0 + 1);
+    }
+  }
+  let best: typeof rows = [];
+  let run: typeof rows = [];
+  for (const r of rows.filter((r) => r.x1 - r.x0 + 1 >= widest * 0.6)) {
+    run = run.length && r.y === run[run.length - 1].y + 1 ? [...run, r] : [r];
+    if (run.length > best.length) best = run;
+  }
+  if (best.length < 2) return null;
+  const x0 = Math.max(...best.map((r) => r.x0));
+  const x1 = Math.min(...best.map((r) => r.x1));
+  const trim = Math.floor((x1 - x0) * 0.08);
+  return x1 - x0 - 2 * trim >= 4 ? { x0: x0 + trim, x1: x1 - trim, y0: best[0].y, y1: best[best.length - 1].y } : null;
 }
 
 function colorDistance(a: string, b: string): number {
@@ -120,7 +166,20 @@ export async function colorsOfImage(blob: Blob): Promise<ProductColors | null> {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, w, h);
-    return productColors(ctx.getImageData(0, 0, w, h).data, w, h);
+    const colors = productColors(ctx.getImageData(0, 0, w, h).data, w, h);
+    const b = colors?.band;
+    if (colors && b) {
+      // stage 2: the band from the full-size photo as a small texture
+      const tex = document.createElement('canvas');
+      tex.width = 256;
+      tex.height = 64;
+      const tc = tex.getContext('2d');
+      const bw = bitmap.width;
+      const bh = bitmap.height;
+      tc?.drawImage(bitmap, b.x0 * bw, b.y0 * bh, (b.x1 - b.x0) * bw, (b.y1 - b.y0) * bh, 0, 0, 256, 64);
+      if (tc) colors.texture = tex.toDataURL('image/jpeg', 0.8);
+    }
+    return colors;
   } finally {
     bitmap.close();
   }

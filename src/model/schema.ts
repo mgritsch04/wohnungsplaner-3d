@@ -149,6 +149,12 @@ export const ModelRefSchema = z.discriminatedUnion('type', [
     topThickness: len(0.005, 0.15).optional(),
     legSize: len(0.01, 0.25).optional(),
     seatHeight: len(0.25, 0.9).optional(),
+    /** small crop of the product photo for the main surface (#273), as data URL so it travels with the project */
+    texture: z
+      .string()
+      .max(80_000)
+      .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
+      .optional(),
   }),
   z.object({
     type: z.literal('gltf'),

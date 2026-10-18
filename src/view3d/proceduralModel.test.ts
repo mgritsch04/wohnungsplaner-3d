@@ -71,3 +71,11 @@ describe('Gestell und Teilmaße (#273)', () => {
     expect(top.p[1]).toBeCloseTo(0.76 - 0.025);
   });
 });
+
+it('nur die Tischplatte nimmt das Produktfoto (#273, Stufe 2)', () => {
+  for (const shape of ['table', 'table-round', 'desk']) {
+    const parts = buildParts(shape, 1.6, 0.9, 0.76, '#c49a6c');
+    expect(parts.filter((p) => p.textured)).toHaveLength(1);
+  }
+  expect(buildParts('sofa', 2, 0.9, 0.85, '#8E9096').some((p) => p.textured)).toBe(false);
+});
