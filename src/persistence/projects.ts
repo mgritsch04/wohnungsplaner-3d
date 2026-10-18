@@ -1,5 +1,5 @@
 import type { Project } from '../model/schema';
-import { parseProjectJson, serializeProject } from '../formats/project/projectFile';
+import { parseProjectJson, serializeProject, type ParsedProject } from '../formats/project/projectFile';
 import { referencedAssetIds } from '../formats/project/packageFile';
 import { db } from './db';
 import { deleteAllVersions, versionAssetIds } from './versions';
@@ -27,7 +27,7 @@ export async function saveProject(p: Project): Promise<void> {
   await db.putMeta(LAST_KEY, p.id);
 }
 
-export async function loadProject(id: string): Promise<{ project: Project; warnings: string[] } | null> {
+export async function loadProject(id: string): Promise<ParsedProject | null> {
   const json = await db.getProject(id);
   if (!json) return null;
   return parseProjectJson(json);

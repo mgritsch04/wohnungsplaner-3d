@@ -69,3 +69,32 @@ test('Einrichtungsvorschlag (#137): Vorschau ansehen, verwerfen, übernehmen (ei
   await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before);
   expect(errors).toEqual([]);
 });
+
+test('gespeichertes Projekt mit doppelter Möbel-ID wird beim Start repariert statt verworfen (#268)', async ({ page }) => {
+  await freshStart(page);
+  const p = (await getProject(page)) as Project;
+  // the bug: one item saved twice with the same id (a suggestion taken over twice)
+  const broken = { ...p, name: 'Kaputter Plan', furniture: [...p.furniture, structuredClone(p.furniture[0])] };
+  await page.evaluate(async (json) => {
+    const put = (dbName: string, store: string, key: string, value: unknown) =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open(dbName);
+        open.onupgradeneeded = () => open.result.createObjectStore(store);
+        open.onsuccess = () => {
+          const tx = open.result.transaction(store, 'readwrite');
+          tx.objectStore(store).put(value, key);
+          tx.oncomplete = () => resolve(null);
+          tx.onerror = () => reject(tx.error);
+        };
+      });
+    const proj = JSON.parse(json) as { id: string };
+    await put('wohnungsplaner-projects', 'projects', proj.id, json);
+    await put('wohnungsplaner-meta', 'meta', 'lastProjectId', proj.id);
+  }, JSON.stringify(broken));
+  await page.goto('/?e2e');
+  await expect(page.locator('input.project-name')).toHaveValue('Kaputter Plan');
+  await expect(page.getByText(/Projekt beim Laden repariert/)).toBeVisible();
+  const loaded = (await getProject(page)) as Project;
+  expect(loaded.furniture).toHaveLength(p.furniture.length);
+  expect(new Set(loaded.furniture.map((f) => f.id)).size).toBe(loaded.furniture.length);
+});

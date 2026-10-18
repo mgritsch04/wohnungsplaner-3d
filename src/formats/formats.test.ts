@@ -38,6 +38,35 @@ describe('project file', () => {
     }
   });
 
+  it('repairs duplicate furniture ids instead of refusing the project (#268)', () => {
+    const p = createSampleProject();
+    const bed = p.furniture[0];
+    const moved = { ...structuredClone(bed), x: bed.x + 1 };
+    const res = parseProject({ ...p, furniture: [...p.furniture, structuredClone(bed), moved] });
+    // the exact copy is dropped, the changed copy keeps its data under a new id
+    expect(res.project.furniture).toHaveLength(p.furniture.length + 1);
+    expect(new Set(res.project.furniture.map((f) => f.id)).size).toBe(res.project.furniture.length);
+    const copy = res.project.furniture[res.project.furniture.length - 1];
+    expect(copy.id).not.toBe(bed.id);
+    expect(copy.x).toBeCloseTo(bed.x + 1);
+    expect(res.repaired).toHaveLength(2);
+    expect(parseProject(p).repaired).toBeUndefined();
+  });
+
+  it('resets invalid settings values to their defaults instead of refusing the project (#268)', () => {
+    const p = createSampleProject();
+    const raw = structuredClone(p) as unknown as { settings: Record<string, unknown>; walls: { thickness: number }[] };
+    raw.settings.walkFov = 12;
+    raw.settings.screenDiagonal = 'x';
+    const res = parseProject(raw);
+    expect(res.project.settings.walkFov).toBe(50);
+    expect(res.project.settings.screenDiagonal).toBe(27);
+    expect(res.repaired?.[0]).toMatch(/walkFov/);
+    // other schema errors still refuse the project
+    raw.walls[0].thickness = -1;
+    expect(() => parseProject(raw)).toThrow(FileFormatError);
+  });
+
   it('rejects inconsistent references', () => {
     const p = createSampleProject();
     p.openings[0].wallId = 'does-not-exist';

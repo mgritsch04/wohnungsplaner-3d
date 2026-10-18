@@ -1,4 +1,6 @@
 import { PROJECT_FORMAT, PROJECT_SCHEMA_VERSION, ProjectSchema, type Project } from '../../model/schema';
+import type { z } from 'zod';
+import { newId } from '../../model/ids';
 import { validateModel } from '../../model/validation';
 import { FileFormatError, formatZodError } from '../zodErrors';
 
@@ -47,17 +49,75 @@ export function migrateProjectObject(raw: unknown): Record<string, unknown> {
 export interface ParsedProject {
   project: Project;
   warnings: string[];
+  /** What was repaired while loading (also part of `warnings`). */
+  repaired?: string[];
+}
+
+/**
+ * Invalid settings values (e.g. a range tightened by an update) fall back to their defaults
+ * instead of making the whole project unreadable (#268). Returns the names of the reset settings.
+ */
+function resetInvalidSettings(obj: Record<string, unknown>, error: z.ZodError): string[] | null {
+  const keys = new Set<string>();
+  for (const i of error.issues) {
+    if (i.path[0] !== 'settings' || typeof i.path[1] !== 'string') return null;
+    keys.add(i.path[1]);
+  }
+  const settings = obj.settings as Record<string, unknown> | undefined;
+  if (!settings || typeof settings !== 'object') return null;
+  for (const k of keys) delete settings[k];
+  return [...keys];
+}
+
+/**
+ * The same furniture id twice (e.g. a suggestion taken over twice) made saved projects
+ * unloadable (#268): an exact copy is dropped, a changed copy keeps its data under a new id.
+ */
+function repairDuplicateFurniture(p: Project): string[] {
+  const seen = new Map<string, string>();
+  const warnings: string[] = [];
+  p.furniture = p.furniture.filter((f) => {
+    const json = JSON.stringify(f);
+    const first = seen.get(f.id);
+    if (first === undefined) {
+      seen.set(f.id, json);
+      return true;
+    }
+    if (first === json) {
+      warnings.push(`Doppelt gespeichertes Möbel „${f.name}“ wurde entfernt.`);
+      return false;
+    }
+    f.id = newId('item');
+    seen.set(f.id, json);
+    warnings.push(`Möbel „${f.name}“ hatte dieselbe ID wie ein anderes und hat eine neue bekommen.`);
+    return true;
+  });
+  return warnings;
 }
 
 /** Parse + migrate + validate a project from a JSON value. Throws FileFormatError. */
 export function parseProject(raw: unknown): ParsedProject {
   const migrated = migrateProjectObject(raw);
-  const res = ProjectSchema.safeParse(migrated);
+  let res = ProjectSchema.safeParse(migrated);
+  const repaired: string[] = [];
+  if (!res.success) {
+    const copy = structuredClone(migrated);
+    const reset = resetInvalidSettings(copy, res.error);
+    if (reset) {
+      const retry = ProjectSchema.safeParse(copy);
+      if (retry.success) {
+        res = retry;
+        repaired.push(`Ungültige Einstellungen auf Standard zurückgesetzt: ${reset.join(', ')}.`);
+      }
+    }
+  }
   if (!res.success) throw new FileFormatError('Das Projekt ist ungültig.', formatZodError(res.error));
-  const issues = validateModel(res.data);
+  const project = res.data;
+  repaired.push(...repairDuplicateFurniture(project));
+  const issues = validateModel(project);
   const errors = issues.filter((i) => i.severity === 'error');
   if (errors.length) throw new FileFormatError('Das Projekt enthält inkonsistente Daten.', errors.map((e) => e.message));
-  return { project: res.data, warnings: issues.map((i) => i.message) };
+  return { project, warnings: [...repaired, ...issues.map((i) => i.message)], ...(repaired.length ? { repaired } : {}) };
 }
 
 export function parseProjectJson(text: string): ParsedProject {

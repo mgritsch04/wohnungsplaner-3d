@@ -72,6 +72,16 @@ describe('furnishing suggestion (#137)', () => {
     expectCollisionFree(p, ids);
   });
 
+  it('taking the same suggestion twice never creates duplicate ids (#268)', () => {
+    const p = roomProject(3.5, 4, 'Schlafzimmer');
+    const s = suggest(p, 'bedroom');
+    const first = applyFurnishing(p, s);
+    const second = applyFurnishing(p, s);
+    expect(second).toHaveLength(first.length);
+    expect(second.some((id) => first.includes(id))).toBe(false);
+    expect(new Set(p.furniture.map((f) => f.id)).size).toBe(p.furniture.length);
+  });
+
   it('living room: coffee table in front of the sofa, TV board opposite, rug under the coffee table', () => {
     const p = roomProject(5, 4, 'Wohnzimmer');
     const s = suggest(p, 'living');
