@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCatalogStore } from '../../catalog/catalogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
-import { addIkeaArticles, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchOutcome } from '../../catalog/ikeaSelection';
+import { useIkeaDrafts, type PendingDraft } from '../../catalog/ikeaDrafts';
+import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchOutcome } from '../../catalog/ikeaSelection';
 import { buildBookmarklet } from '../../catalog/providers/bookmarklet';
 import { fetchBookmarkletToken, helperAvailable } from '../../catalog/providers/ikeaHelper';
-import { parseArticleList } from '../../catalog/providers/ikeaList';
+import { DIM_KEYS, parseArticleList, type DimKey } from '../../catalog/providers/ikeaList';
 import type { CatalogItem } from '../../catalog/types';
 import { formatEuro } from '../../model/units';
 import { useUiStore } from '../../store/uiStore';
@@ -56,7 +57,14 @@ export function IkeaSection() {
         for (const o of got)
           useUiStore
             .getState()
-            .toast(o.ok ? `„${o.name}“ vom Lesezeichen übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}.` : `Lesezeichen: ${o.message}`, o.ok ? 'success' : 'info');
+            .toast(
+              o.ok
+                ? `„${o.name}“ vom Lesezeichen übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}.`
+                : o.pending
+                  ? `„${o.name}“: Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.`
+                  : `Lesezeichen: ${o.message}`,
+              o.ok ? 'success' : 'info',
+            );
       } catch {
         // helper gone – the next status check shows it
       } finally {
@@ -132,6 +140,7 @@ export function IkeaSection() {
         )}
       </div>
       {helper === 'on' && <BookmarkletSetup />}
+      <MissingDims onAdded={(id) => setFresh((prev) => new Set([...prev, id]))} />
       <h3 className={s.heading}>Meine IKEA-Auswahl ({mine.length})</h3>
       {mine.length === 0 ? (
         <p className={s.empty}>Noch keine IKEA-Produkte. Link einfügen und „Holen“ drücken – das Produkt erscheint hier und lässt sich in den Raum setzen.</p>
@@ -270,6 +279,120 @@ function IkeaCard({ item, fresh }: { item: CatalogItem; fresh: boolean }) {
           )}
           <button onClick={() => void useCatalogStore.getState().removeItem(item.id)} aria-label={`${item.name} aus der Auswahl entfernen`}>
             Entfernen
+          </button>
+        </span>
+      </span>
+    </li>
+  );
+}
+
+const DIM_LABEL: Record<DimKey, string> = { width: 'Breite', depth: 'Tiefe', height: 'Höhe' };
+
+/** Products whose page states no (complete) dimensions (#269): enter them here, then they join the selection. */
+function MissingDims({ onAdded }: { onAdded: (id: string) => void }) {
+  const drafts = useIkeaDrafts((st) => st.drafts);
+  if (!drafts.length) return null;
+  return (
+    <section data-testid="ikea-missing-dims">
+      <h3 className={s.heading}>Maße fehlen ({drafts.length})</h3>
+      <p className={s.empty}>
+        Auf diesen Seiten stehen keine vollständigen Maße. Bitte selbst eintragen (bei Pflanzen z. B. den Topfdurchmesser als Breite und Tiefe), dann kommt das
+        Produkt in die Auswahl.
+      </p>
+      <ul className={s.cards}>
+        {drafts.map((d) => (
+          <DraftCard key={d.article} pending={d} onAdded={onAdded} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DraftCard({ pending, onAdded }: { pending: PendingDraft; onAdded: (id: string) => void }) {
+  const d = pending.draft;
+  const [dims, setDims] = useState<Record<DimKey, string>>(() => ({
+    width: d.width ? String(d.width) : '',
+    depth: d.depth ? String(d.depth) : '',
+    height: d.height ? String(d.height) : '',
+  }));
+  const [estimated, setEstimated] = useState<ReadonlySet<DimKey>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const value = (k: DimKey) => {
+    const n = parseFloat(dims[k].replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const estimate = async () => {
+    if (!pending.model) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const m = await estimateFromModel(pending.model);
+      const filled = d.missing.filter((k) => !dims[k].trim());
+      setDims((prev) => ({ ...prev, ...Object.fromEntries(filled.map((k) => [k, String(m[k])])) }));
+      setEstimated(new Set(filled));
+    } catch (e) {
+      setError(`3D-Modell nicht lesbar: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const take = async () => {
+    setBusy(true);
+    setError(null);
+    const o = await completePending(pending, { width: value('width'), depth: value('depth'), height: value('height') });
+    setBusy(false);
+    if (!o.ok) return setError(o.message ?? 'Nicht übernommen.');
+    onAdded(o.id!);
+    useUiStore.getState().toast(`„${o.name}“ übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}.`, 'success');
+  };
+  return (
+    <li className={s.card} data-testid="ikea-draft">
+      <span className={s.image} style={{ background: '#d8d2c8' }} />
+      <span className={s.body}>
+        <span className={s.name}>{d.name}</span>
+        <span className={s.meta}>
+          {d.price !== undefined ? formatEuro(d.price) : 'ohne Preis'}
+          {d.retailer && d.retailer !== 'IKEA Österreich' ? ` · ${d.retailer}` : ''} <Badge kind="info">Maße fehlen</Badge>
+        </span>
+        <span className={s.dims}>
+          {DIM_KEYS.map((k) => (
+            <label key={k}>
+              {DIM_LABEL[k]}
+              <input
+                type="number"
+                min={1}
+                inputMode="decimal"
+                value={dims[k]}
+                onChange={(e) => {
+                  setDims((prev) => ({ ...prev, [k]: e.target.value }));
+                  setEstimated((prev) => new Set([...prev].filter((x) => x !== k)));
+                }}
+                aria-label={`${DIM_LABEL[k]} in cm`}
+              />
+              {estimated.has(k) ? ' ca.' : ''}
+            </label>
+          ))}
+          <span>cm</span>
+        </span>
+        {estimated.size > 0 && <span className={s.meta}>„ca.“ = aus dem 3D-Modell gemessen; bei Pflanzen zählen die Blätter mit. Bitte prüfen.</span>}
+        {error && <span className={s.failed}>{error}</span>}
+        <span className={s.cardActions}>
+          <button className="primary" disabled={busy} onClick={() => void take()}>
+            Übernehmen
+          </button>
+          {pending.model && d.missing.some((k) => !dims[k].trim()) && (
+            <button disabled={busy} onClick={() => void estimate()}>
+              Aus 3D-Modell schätzen
+            </button>
+          )}
+          {d.productUrl && (
+            <a href={d.productUrl} target="_blank" rel="noopener noreferrer">
+              {d.retailer === 'Möbelix Österreich' ? 'moebelix.at' : 'ikea.com'} ↗
+            </a>
+          )}
+          <button onClick={() => useIkeaDrafts.getState().remove(pending.article)} aria-label={`${d.name} verwerfen`}>
+            Verwerfen
           </button>
         </span>
       </span>

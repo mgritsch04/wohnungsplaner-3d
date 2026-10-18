@@ -59,19 +59,28 @@ function retailerFields(p: ParsedProductPage): { brand?: string; retailer: strin
   return { brand: p.brand ?? 'IKEA', retailer: 'IKEA Österreich' };
 }
 
-/**
- * Product list entry (units: cm) from a parsed product page. Returns null when the
- * page lacks complete dimensions or a name – nothing is guessed.
- */
-export function pageToCatalogEntry(p: ParsedProductPage, modelFile?: string): CatalogEntry | null {
-  const { width, depth, height } = p.dimensions;
-  if (!width || !depth || !height || !p.name) return null;
+export type DimKey = 'width' | 'depth' | 'height';
+export const DIM_KEYS: readonly DimKey[] = ['width', 'depth', 'height'];
+
+/** A product whose page lacks some dimensions (#269): taken over once the user fills them in. */
+export interface DraftEntry extends Omit<CatalogEntry, DimKey> {
+  width: number | null;
+  depth: number | null;
+  height: number | null;
+  missing: DimKey[];
+}
+
+/** Everything a product page states (units: cm), also when dimensions are missing. Null without a name. */
+export function pageToDraftEntry(p: ParsedProductPage, modelFile?: string): DraftEntry | null {
+  if (!p.name) return null;
+  const dim = (k: DimKey) => (p.dimensions[k] && p.dimensions[k]! > 0 ? p.dimensions[k] : null);
   return {
     name: p.name,
     category: guessCategory(p.name),
-    width,
-    depth,
-    height,
+    width: dim('width'),
+    depth: dim('depth'),
+    height: dim('height'),
+    missing: DIM_KEYS.filter((k) => dim(k) === null),
     price: p.price?.currency === 'EUR' ? p.price.amount : undefined,
     priceDate: p.retrievedAt.slice(0, 10),
     ...retailerFields(p),
@@ -80,4 +89,27 @@ export function pageToCatalogEntry(p: ParsedProductPage, modelFile?: string): Ca
     articleNumber: p.articleNumber ?? undefined,
     modelFile,
   };
+}
+
+/** The draft with the dimensions the user entered (cm); null while one is missing or not positive. */
+export function completeDraft(d: DraftEntry, dims: Partial<Record<DimKey, number | null>>): CatalogEntry | null {
+  const v = (k: DimKey) => {
+    const x = dims[k] ?? d[k];
+    return x !== null && Number.isFinite(x) && x > 0 ? x : null;
+  };
+  const width = v('width');
+  const depth = v('depth');
+  const height = v('height');
+  if (width === null || depth === null || height === null) return null;
+  const { missing: _missing, ...rest } = d;
+  return { ...rest, width, depth, height };
+}
+
+/**
+ * Product list entry (units: cm) from a parsed product page. Returns null when the
+ * page lacks complete dimensions or a name – nothing is guessed (see pageToDraftEntry).
+ */
+export function pageToCatalogEntry(p: ParsedProductPage, modelFile?: string): CatalogEntry | null {
+  const d = pageToDraftEntry(p, modelFile);
+  return d && !d.missing.length ? completeDraft(d, {}) : null;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { addIkeaArticles, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchDeps } from './ikeaSelection';
-import { fetchHelperProduct, helperAvailable } from './providers/ikeaHelper';
+import type { PendingDraft } from './ikeaDrafts';
+import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchDeps } from './ikeaSelection';
+import { fetchHelperProduct, helperAvailable, readDraft } from './providers/ikeaHelper';
 import type { CatalogItem } from './types';
 
 // synthetic helper answers (no real product data)
@@ -144,5 +145,50 @@ describe('Lesezeichen-Eingang (#221)', () => {
     expect(outcomes[0].id).toBe('import-ikea-auswahl-104.099.32');
     expect(added).toHaveLength(1);
     expect(acked).toEqual([['a', 'b']]);
+  });
+});
+
+describe('Maße fehlen (#269)', () => {
+  // SYNTHETIC plant page result: name and price known, only a height
+  const draft = readDraft({ name: 'TESTPFLANZE Synthetisch', category: 'decor', width: null, depth: null, height: 120, price: 19.99, articleNumber: '000.000.69', modelFile: '00000069.glb', retailer: 'IKEA Österreich' })!;
+
+  it('liest Entwürfe vom Helfer vorsichtig ein', () => {
+    expect(draft.missing).toEqual(['width', 'depth']);
+    expect(readDraft({ name: '' })).toBeUndefined();
+    expect(readDraft({ name: 'X', width: -3, modelFile: '../böse.glb' })).toMatchObject({ width: null, modelFile: undefined, missing: ['width', 'depth', 'height'] });
+  });
+
+  it('legt Produkte ohne vollständige Maße zurück, statt sie zu verwerfen', async () => {
+    const parked: PendingDraft[] = [];
+    const { d, added } = deps({ addDraft: (p) => void parked.push(p) });
+    const acked: string[][] = [];
+    const outcomes = await takeInbox({
+      ...d,
+      fetchInbox: async () => [{ id: 'p', receivedAt: '', product: { article: '000.000.69', entry: null, draft, model: '00000069.glb' } }],
+      ackInbox: async (ids) => void acked.push(ids),
+    });
+    expect(outcomes[0]).toMatchObject({ ok: false, pending: true, name: 'TESTPFLANZE Synthetisch' });
+    expect(parked.map((p) => [p.article, p.model])).toEqual([['000.000.69', '00000069.glb']]);
+    expect(added).toHaveLength(0);
+    expect(acked).toEqual([['p']]);
+  });
+
+  it('übernimmt den Entwurf erst mit allen Maßen, samt 3D-Modell', async () => {
+    const removed: string[] = [];
+    const { d, added } = deps();
+    const pending: PendingDraft = { article: '000.000.69', draft, model: '00000069.glb', receivedAt: '' };
+    const missing = await completePending(pending, { width: 24 }, { ...d, removeDraft: (a) => void removed.push(a) });
+    expect(missing).toMatchObject({ ok: false });
+    expect(missing.message).toMatch(/Breite, Tiefe und Höhe/);
+    const o = await completePending(pending, { width: 24, depth: 24 }, { ...d, removeDraft: (a) => void removed.push(a) });
+    expect(o).toMatchObject({ ok: true, withModel: true, name: 'TESTPFLANZE Synthetisch' });
+    expect(added[0].width).toBeCloseTo(0.24);
+    expect(added[0].height).toBeCloseTo(1.2);
+    expect(removed).toEqual(['000.000.69']);
+  });
+
+  it('schätzt Maße aus dem schon geladenen 3D-Modell (cm, gerundet)', async () => {
+    const { d } = deps({ check: (async (blob: Blob) => ({ blob, info: { size: { x: 0.553, y: 1.304, z: 0.48 } } })) as never });
+    expect(await estimateFromModel('00000069.glb', d)).toEqual({ width: 55, depth: 48, height: 130 });
   });
 });

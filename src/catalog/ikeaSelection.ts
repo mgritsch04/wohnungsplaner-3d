@@ -1,8 +1,11 @@
 import { CATALOG_FORMAT, parseCatalogJsonWithModels } from './catalogFormat';
 import { attachModelFiles, storeAsset } from './catalogImport';
 import { useCatalogStore } from './catalogStore';
+import { useIkeaDrafts, type PendingDraft } from './ikeaDrafts';
+import { checkModelBlob } from './providers/modelFetch';
+import { suggestUnit } from '../import/gltf';
 import { ackInbox, fetchHelperModel, fetchHelperProduct, fetchInbox, type HelperProduct } from './providers/ikeaHelper';
-import { formatArticle, parseArticleList } from './providers/ikeaList';
+import { completeDraft, formatArticle, parseArticleList, type DimKey } from './providers/ikeaList';
 import type { CatalogItem } from './types';
 
 /** Catalog source name of products fetched through the IKEA section. */
@@ -20,6 +23,8 @@ export interface IkeaFetchOutcome {
   id?: string;
   name?: string;
   withModel?: boolean;
+  /** dimensions missing on the page: waits under „Maße fehlen“ (#269) */
+  pending?: boolean;
   message?: string;
 }
 
@@ -29,6 +34,8 @@ export interface IkeaFetchDeps {
   store: (blob: Blob) => Promise<string>;
   check?: Parameters<typeof attachModelFiles>[4];
   addItems: (items: CatalogItem[]) => Promise<number>;
+  /** keeps a product whose dimensions are missing until the user enters them */
+  addDraft?: (d: PendingDraft) => void;
 }
 
 const defaultDeps: IkeaFetchDeps = {
@@ -36,6 +43,7 @@ const defaultDeps: IkeaFetchDeps = {
   fetchModel: fetchHelperModel,
   store: storeAsset,
   addItems: (items) => useCatalogStore.getState().addItems(items),
+  addDraft: (d) => useIkeaDrafts.getState().add(d),
 };
 
 /**
@@ -70,6 +78,10 @@ export async function addIkeaArticles(
  */
 export async function addHelperProduct(hp: HelperProduct, withModel: boolean, deps: IkeaFetchDeps = defaultDeps): Promise<IkeaFetchOutcome> {
   const article = hp.article;
+  if (!hp.entry && hp.draft) {
+    deps.addDraft?.({ article, draft: hp.draft, model: hp.model, receivedAt: new Date().toISOString() });
+    return { article, ok: false, pending: true, name: hp.draft.name, message: 'Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.' };
+  }
   if (!hp.entry) return { article, ok: false, message: hp.reason ?? 'keine Produktdaten' };
   try {
     const list = JSON.stringify({ format: CATALOG_FORMAT, version: 1, name: IKEA_SELECTION_SOURCE, units: 'cm', items: [hp.entry] });
@@ -106,4 +118,35 @@ export async function takeInbox(
   for (const i of items) outcomes.push(await addHelperProduct(i.product, true, deps));
   await deps.ackInbox(items.map((i) => i.id));
   return outcomes;
+}
+
+/**
+ * Take over a product from „Maße fehlen“ (#269) with the dimensions the user entered (cm).
+ * The draft stays when something is still missing or the catalog rejects it.
+ */
+export async function completePending(
+  p: PendingDraft,
+  dims: Partial<Record<DimKey, number | null>>,
+  deps: IkeaFetchDeps & { removeDraft: (article: string) => void } = { ...defaultDeps, removeDraft: (a) => useIkeaDrafts.getState().remove(a) },
+): Promise<IkeaFetchOutcome> {
+  const entry = completeDraft(p.draft, dims);
+  if (!entry) return { article: p.article, ok: false, name: p.draft.name, message: 'Bitte Breite, Tiefe und Höhe eintragen (in cm, größer als 0).' };
+  const outcome = await addHelperProduct({ article: p.article, entry, model: p.model }, !!p.model, deps);
+  if (outcome.ok) deps.removeDraft(p.article);
+  return outcome;
+}
+
+/**
+ * Approximate size (cm) of the IKEA 3D model the helper already cached for this product –
+ * no further download. Plants: the leaves count, not only the pot.
+ */
+export async function estimateFromModel(
+  file: string,
+  deps: Pick<IkeaFetchDeps, 'fetchModel' | 'check'> = defaultDeps,
+): Promise<Record<DimKey, number>> {
+  const { info } = await (deps.check ?? checkModelBlob)(await deps.fetchModel(file));
+  const k = suggestUnit(info.size).factor * 100;
+  const cm = (v: number) => Math.max(1, Math.round(v * k));
+  // glTF: X = width, Y = height, Z = depth
+  return { width: cm(info.size.x), depth: cm(info.size.z), height: cm(info.size.y) };
 }

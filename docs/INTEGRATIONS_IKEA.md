@@ -21,6 +21,11 @@ Katalog › IKEA › „Lesezeichen „An Planer senden““: den Knopf in die 
 * **Kein Scraping:** eine Seite pro Klick, nur die Seite, die man selbst offen hat; der Helfer ruft dabei für IKEA höchstens das auf der Seite deklarierte 3D-Modell ab (nur `web-api.ikea.com/dimma/assets/`). Möbelix: nur Seitendaten, kein Modell. Was die Seite nicht liefert (z. B. Maße), bleibt leer bzw. das Produkt wird nicht übernommen.
 * Getestet 2026-10-17 mit echter Seite (KALLAX 104.099.32): Lesezeichen auf ikea.com → Planer zeigt Name, Maße, Preis, 3D-Modell. Möbelix-Seiten sind aus der Entwicklungsumgebung gesperrt (Cloudflare) → `NEEDS USER TEST`.
 
+## Fehlende Maße, runde Produkte (#269, 2026-10-18)
+* **Runde Produkte:** „Ø“, „Durchmesser“, „Durchmesser Übertopf“, „Topfgröße“ und „diameter“ gelten als Breite und Tiefe, aber nur, wenn keine Breite oder Tiefe genannt ist. „Pflanzenhöhe“ und „Höhe der Pflanze“ gelten als Höhe. Bei Spannen („120-140 cm“) wird nur bei Pflanzengrößen der obere Wert verwendet. Die Zahl im Produktnamen wird nie verwendet.
+* **Maße fehlen trotzdem:** Das Produkt wird nicht verworfen. Es wartet unter Katalog › IKEA › „Maße fehlen“ (gespeichert in localStorage auf diesem Gerät) mit allem, was die Seite angibt. Erst wenn man die fehlenden Maße selbst eingetragen hat, kommt es in die Auswahl (gleiche Schema-Prüfung wie sonst).
+* **Schätzung aus dem 3D-Modell:** Auf Knopfdruck misst der Planer das IKEA-Modell, das der Helfer ohnehin geladen hat (Umrandung, glTF in Metern), ohne weitere Abrufe. Das Ergebnis wird nur als Vorschlag „ca.“ in die leeren Felder eingetragen. Bei Pflanzen zählen die Blätter mit. Nutzung wie beim Modell selbst: nur privat, keine Weitergabe (Nutzungsbedingungen weiterhin nicht einsehbar, siehe unten).
+
 ## Kurzfazit
 - Für **keinen** der beiden Händler gibt es eine offiziell dokumentierte, öffentliche Produkt-API. (`UNVERIFIED` – Recherche, keine Herstellerbestätigung)
 - **Live-Tests waren in der Entwicklungsumgebung nicht möglich:** Die Cloud-Umgebung blockiert `www.ikea.com` und `www.moebelix.at` (`UNAVAILABLE`).

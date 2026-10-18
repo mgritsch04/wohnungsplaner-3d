@@ -65,7 +65,8 @@ export async function fetchIkeaModel(get, url) {
 
 /**
  * Fetch one article. Returns { article, entry | null, model: { file, bytes } | null, page, reason?, note? }.
- * `entry` is a product list entry (cm) or null when the page lacks a name or complete dimensions.
+ * `entry` is a product list entry (cm) or null when the page lacks a name or complete dimensions;
+ * then `draft` carries what the page does state (pageToDraftEntry, #269).
  */
 export async function fetchArticle(mods, get, a, { withModel }) {
   const article = mods.formatArticle(a);
@@ -80,6 +81,10 @@ export async function fetchArticle(mods, get, a, { withModel }) {
     else note = m.note;
   }
   const entry = mods.pageToCatalogEntry(page, model?.file);
-  if (!entry) return { article, entry: null, model, page, reason: 'Maße oder Name fehlen auf der Seite' };
+  if (!entry) {
+    // name known, dimensions missing (#269): the planner asks for them instead of dropping the product
+    const draft = mods.pageToDraftEntry(page, model?.file);
+    return { article, entry: null, ...(draft ? { draft } : {}), model, page, reason: draft ? 'Maße fehlen auf der Seite – bitte im Planer eintragen' : 'Name fehlt auf der Seite' };
+  }
   return { article, entry, model, page, note };
 }

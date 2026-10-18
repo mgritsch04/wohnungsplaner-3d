@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dimsFromText, parseProductPage } from './structuredData';
 import { IKEA_AT, providerForUrl } from './registry';
 import { productToCatalogItem } from './toCatalog';
+import { pageToCatalogEntry, pageToDraftEntry } from './ikeaList';
 
 // SYNTHETIC test fixtures modelled on the schema.org Product/Offer vocabulary.
 // They are NOT copies of real retailer pages; names, numbers and prices are made up for tests.
@@ -116,6 +117,22 @@ describe('robust page-source import (regressions)', () => {
     expect(parseProductPage(html).dimensions).toMatchObject({ width: 218, depth: 88, height: 83 });
     expect(dimsFromText('Sitzhöhe: 45 cm, Sitztiefe 54 cm')).toMatchObject({ height: null, depth: null });
     expect(dimsFromText('Gesamthöhe: 202 cm')).toMatchObject({ height: 202 });
+  });
+
+  it('erkennt Durchmesser und Pflanzenhöhe runder Produkte (#269)', () => {
+    expect(dimsFromText('Topfgröße: 24 cm Pflanzenhöhe: 120-140 cm')).toMatchObject({ width: null, depth: null, height: 140, diameter: 24 });
+    expect(dimsFromText('Durchmesser Übertopf: 12 cm, Höhe: 11 cm')).toMatchObject({ height: 11, diameter: 12 });
+    expect(dimsFromText('Ø 90 cm, Höhe der Pflanze: 65 cm')).toMatchObject({ height: 65, diameter: 90 });
+    expect(dimsFromText('Breite: 80-120 cm')).toMatchObject({ width: null }); // ranges only for plant sizes
+    expect(dimsFromText('YUCCA Pflanze 24 cm')).toMatchObject({ width: null, height: null, diameter: null }); // name alone says nothing
+  });
+
+  it('runde Produkte: Durchmesser = Breite und Tiefe, sonst Entwurf mit fehlenden Maßen (#269)', () => {
+    const page = (text: string) => parseProductPage(`<html><head><meta property="og:title" content="TESTTOPF Synthetisch"></head><body><h1>TESTTOPF Synthetisch</h1><p>${text}</p></body></html>`, 'https://www.ikea.com/at/de/p/testtopf-00000070/');
+    expect(pageToCatalogEntry(page('Durchmesser: 24 cm Höhe: 22 cm'))).toMatchObject({ width: 24, depth: 24, height: 22 });
+    const p = page('Pflanzenhöhe: 65 cm');
+    expect(pageToCatalogEntry(p)).toBeNull();
+    expect(pageToDraftEntry(p)).toMatchObject({ name: 'TESTTOPF Synthetisch', height: 65, width: null, missing: ['width', 'depth'] });
   });
 
   it('falls back to Open Graph / product meta tags and microdata', () => {

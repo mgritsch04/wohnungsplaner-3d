@@ -98,6 +98,7 @@ async function product(query) {
   const out = {
     article: r.article,
     entry: r.entry,
+    ...(r.draft ? { draft: r.draft } : {}),
     model: r.model?.file ?? (existsSync(join(CACHE, `${key}.glb`)) ? `${key}.glb` : null),
     modelAvailable: !!r.page?.modelUrl,
     ...(r.reason ? { reason: r.reason } : {}),
@@ -149,14 +150,23 @@ async function receivePage(body) {
     } else note = m.note;
   }
   const entry = mods.pageToCatalogEntry(page, modelFile);
-  if (!entry) return [422, { error: page.name ? `„${page.name}“: Maße fehlen auf der Seite – nicht übernommen.` : 'Keine Produktdaten auf dieser Seite gefunden (ist es eine Produktseite?).' }];
-  if (!isIkea) entry.id = key;
-  const product = { article: entry.articleNumber ?? key, entry, model: modelFile ?? null, ...(note ? { note } : {}) };
+  // dimensions missing (#269): the planner asks for them instead of dropping the product
+  const draft = entry ? null : mods.pageToDraftEntry(page, modelFile);
+  if (!entry && !draft) return [422, { error: 'Keine Produktdaten auf dieser Seite gefunden (ist es eine Produktseite?).' }];
+  const found = entry ?? draft;
+  if (!isIkea) found.id = key;
+  const product = {
+    article: found.articleNumber ?? key,
+    entry,
+    ...(draft ? { draft, reason: 'Maße fehlen auf der Seite' } : {}),
+    model: modelFile ?? null,
+    ...(note ? { note } : {}),
+  };
   const item = { id: `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, receivedAt: new Date().toISOString(), product };
   inbox = [...inbox.filter((i) => i.product.article !== product.article), item].slice(-50);
   saveInbox();
-  console.log(`Lesezeichen: ${entry.name}${modelFile ? ' + Modell' : ''}`);
-  return [200, { name: entry.name, model: !!modelFile }];
+  console.log(`Lesezeichen: ${found.name}${modelFile ? ' + Modell' : ''}${draft ? ' (Maße fehlen)' : ''}`);
+  return [200, { name: found.name, model: !!modelFile, missingDims: !!draft }];
 }
 
 /**
@@ -177,7 +187,9 @@ addEventListener('message', async (e) => {
     const r = await fetch('/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(e.data.payload) });
     const b = await r.json();
     ok = r.ok;
-    text = ok ? '„' + b.name + '“ ist im Planer (Katalog › IKEA)' + (b.model ? ' – mit 3D-Modell.' : '.') : b.error;
+    text = ok
+      ? '„' + b.name + '“ ist im Planer (Katalog › IKEA)' + (b.model ? ' – mit 3D-Modell' : '') + (b.missingDims ? '. Die Maße fehlen auf der Seite – bitte dort eintragen.' : '.')
+      : b.error;
   } catch (err) {
     text = 'Fehler: ' + err;
   }

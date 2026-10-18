@@ -140,3 +140,21 @@
   cursor: grab;
   text-decoration: none;
 }
+
+.dims {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.dims label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dims input {
+  width: 64px;
+}
