@@ -161,3 +161,57 @@ test('Lesezeichen „An Planer senden“ (#221): Lesezeichen wird angeboten, ges
   await expect(card).toHaveCount(1); // taken over once, not again on the next poll
   expect(errors).toEqual([]);
 });
+
+test('Maße fehlen (#269): gesendete Pflanze ohne Maße wartet, Maße eintragen, dann in der Auswahl', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const cors = { 'access-control-allow-origin': '*' };
+  let inbox = [
+    {
+      id: 'p1',
+      receivedAt: '2026-10-18T12:00:00Z',
+      product: {
+        article: '000.000.69',
+        entry: null,
+        // SYNTHETIC page result: name, price and height known, width/depth missing
+        draft: { name: 'TESTPFLANZE Synthetisch', category: 'decor', width: null, depth: null, height: 120, price: 19.99, priceDate: '2026-10-18', retailer: 'IKEA Österreich', articleNumber: '000.000.69' },
+        reason: 'Maße fehlen auf der Seite',
+        model: null,
+      },
+    },
+  ];
+  await page.route(`${HELPER}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...cors, 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET, POST' } });
+    if (url.pathname === '/status') return route.fulfill({ headers: cors, json: { ok: true, name: 'wohnungsplaner-ikea-helper', version: 2 } });
+    if (url.pathname === '/bookmarklet') return route.fulfill({ headers: cors, json: { token: 'ab12cd34ef56ab12cd34ef56' } });
+    if (url.pathname === '/inbox') return route.fulfill({ headers: cors, json: { items: inbox } });
+    if (url.pathname === '/inbox/ack') {
+      inbox = [];
+      return route.fulfill({ headers: cors, json: { ok: true } });
+    }
+    return route.fulfill({ status: 404, headers: cors, json: { error: 'Nicht gefunden.' } });
+  });
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Katalog' }).click();
+  await left.getByRole('button', { name: 'IKEA', exact: true }).click();
+
+  const draft = left.getByTestId('ikea-draft');
+  await expect(draft).toContainText('TESTPFLANZE Synthetisch');
+  await expect(draft).toContainText('Maße fehlen');
+  await expect(left.getByTestId('ikea-card')).toHaveCount(0);
+  await expect(draft.getByLabel('Höhe in cm')).toHaveValue('120');
+
+  await draft.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(draft).toContainText('Bitte Breite, Tiefe und Höhe eintragen');
+
+  await draft.getByLabel('Breite in cm').fill('24');
+  await draft.getByLabel('Tiefe in cm').fill('24');
+  await draft.getByRole('button', { name: 'Übernehmen' }).click();
+  const card = left.getByTestId('ikea-card');
+  await expect(card).toContainText('TESTPFLANZE Synthetisch');
+  await expect(card).toContainText('24 × 24 × 120 cm');
+  await expect(left.getByTestId('ikea-missing-dims')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

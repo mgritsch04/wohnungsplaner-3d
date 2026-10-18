@@ -180,9 +180,14 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   const fromText = dimsFromText(visibleText);
   const fromEmbedded = dimsFromText(embeddedText);
   const pick = (k: 'width' | 'depth' | 'height') => structured[k] ?? fromSimple[k] ?? fromText[k] ?? fromEmbedded[k] ?? null;
+  let width = pick('width');
+  let depth = pick('depth');
+  // round product (#269): only a diameter is stated → it is both width and depth
+  const diameter = fromText.diameter ?? fromEmbedded.diameter;
+  if (width === null && depth === null && diameter !== null) width = depth = diameter;
   const dimensions = {
-    width: pick('width'),
-    depth: pick('depth'),
+    width,
+    depth,
     height: pick('height'),
     status: { width: 'missing', depth: 'missing', height: 'missing' } as Record<'width' | 'depth' | 'height', FieldStatus>,
     sourceText: [fromText.sourceText, fromEmbedded.sourceText].filter(Boolean).join(' · ') || undefined,
@@ -493,23 +498,31 @@ function unescapeJsonText(s: string): string {
  * Dimension lines, e.g. "Breite: 80 cm", "Gesamthöhe 202 cm", "B/T/H: 80 x 28 x 202 cm".
  * Unlabelled triples ("Maße: 200 x 90 x 82") are ignored – their order differs between shops.
  * Labels must not be part of a longer word: "Sitzhöhe"/"Sitztiefe" are NOT the product's height/depth.
+ * Round products (plants, pots, round tables, #269) state a diameter ("Ø 24 cm", "Topfgröße: 24 cm")
+ * and often a plant height as a range ("Höhe der Pflanze: 120-140 cm" → upper value).
  */
-export function dimsFromText(text: string): { width: number | null; depth: number | null; height: number | null; sourceText?: string } {
-  const val = (labels: string) => {
-    const re = new RegExp(`(?<![\\p{L}])(?:gesamt-?)?(?:${labels})(?![\\p{L}])\\s*[:=]?\\s*(?:ca\\.?\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(cm|mm|m)(?![\\p{L}])`, 'iu');
+export function dimsFromText(text: string): { width: number | null; depth: number | null; height: number | null; diameter: number | null; sourceText?: string } {
+  const NUM = '(\\d+(?:[.,]\\d+)?)';
+  const val = (labels: string, range = false) => {
+    const re = new RegExp(
+      `(?<![\\p{L}])(?:gesamt-?)?(?:${labels})(?![\\p{L}])\\s*[:=]?\\s*(?:ca\\.?\\s*)?${NUM}${range ? `(?:\\s*[-–]\\s*${NUM})?` : '()'}\\s*(cm|mm|m)(?![\\p{L}])`,
+      'iu',
+    );
     const m = text.match(re);
     if (!m) return { v: null as number | null, src: '' };
-    const n = parseNumber(m[1])!;
-    const unit = m[2].toLowerCase();
+    const n = parseNumber(m[2] || m[1])!;
+    const unit = m[3].toLowerCase();
     return { v: unit === 'mm' ? n / 10 : unit === 'm' ? n * 100 : n, src: m[0].trim() };
   };
   const w = val('breite|width');
   const d = val('tiefe|depth');
-  const h = val('höhe|hoehe|height');
+  let h = val('höhe|hoehe|height');
+  if (h.v === null) h = val('pflanzenhöhe|pflanzenhoehe|höhe der pflanze|hoehe der pflanze|plant height', true);
+  const dia = val('ø|durchmesser(?:\\s+(?:übertopf|topf))?|topfdurchmesser|topfgröße|topfgroesse|diameter|pot size', true);
   let width = w.v;
   let depth = d.v;
   let height = h.v;
-  const sources = [w.src, d.src, h.src].filter(Boolean);
+  const sources = [w.src, d.src, h.src, dia.src].filter(Boolean);
   if (width === null && depth === null && height === null) {
     const m = text.match(/(?:B\s*\/\s*T\s*\/\s*H|B\s*x\s*T\s*x\s*H|BxTxH)\s*(?:\(cm\))?\s*:?\s*(?:ca\.?\s*)?(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?/i);
     if (m) {
@@ -519,5 +532,5 @@ export function dimsFromText(text: string): { width: number | null; depth: numbe
       sources.push(m[0].trim());
     }
   }
-  return { width, depth, height, sourceText: sources.length ? sources.join(' · ') : undefined };
+  return { width, depth, height, diameter: dia.v, sourceText: sources.length ? sources.join(' · ') : undefined };
 }
