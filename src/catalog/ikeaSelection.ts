@@ -6,7 +6,8 @@ import { checkModelBlob } from './providers/modelFetch';
 import { suggestUnit } from '../import/gltf';
 import { ackInbox, fetchHelperImage, fetchHelperModel, fetchHelperProduct, fetchInbox, type HelperProduct } from './providers/ikeaHelper';
 import { colorsOfImage, type ProductColors } from './providers/productColor';
-import { completeDraft, formatArticle, parseArticleList, type DimKey } from './providers/ikeaList';
+import { completeDraft, formatArticle, parseArticleList, type DimKey, type DraftEntry } from './providers/ikeaList';
+import { MOEBELIX_AT } from './providers/registry';
 import type { CatalogItem } from './types';
 
 /** Catalog source name of products fetched through the IKEA section. */
@@ -14,8 +15,21 @@ export const IKEA_SELECTION_SOURCE = 'IKEA-Auswahl';
 /** Upper bound per run – the helper fetches one page every 1.5 s. */
 export const IKEA_SELECTION_MAX = 25;
 
-/** Products shown under „Meine IKEA-Auswahl“ (fetched here or imported from an ikea-import folder). */
-export const isIkeaItem = (i: CatalogItem) => i.sourceName === IKEA_SELECTION_SOURCE || i.retailer === 'IKEA Österreich';
+const onMoebelix = (retailer?: string, url?: string) => {
+  if (retailer === MOEBELIX_AT.label) return true;
+  try {
+    return !!url && MOEBELIX_AT.hosts.includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+};
+
+/** Products shown under „Meine Möbelix-Auswahl“ (#278): from the bookmarklet or „Produkt von Händlerseite übernehmen“. */
+export const isMoebelixItem = (i: CatalogItem) => onMoebelix(i.retailer, i.productUrl);
+export const isMoebelixDraft = (d: DraftEntry) => onMoebelix(d.retailer, d.productUrl);
+
+/** Products shown under „Meine IKEA-Auswahl“ (fetched here or imported from an ikea-import folder); Möbelix products have their own list. */
+export const isIkeaItem = (i: CatalogItem) => (i.sourceName === IKEA_SELECTION_SOURCE || i.retailer === 'IKEA Österreich') && !isMoebelixItem(i);
 
 export interface IkeaFetchOutcome {
   article: string;

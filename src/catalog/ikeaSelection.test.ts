@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PendingDraft } from './ikeaDrafts';
-import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, takeInbox, type IkeaFetchDeps } from './ikeaSelection';
+import { addIkeaArticles, completePending, estimateFromModel, IKEA_SELECTION_MAX, isIkeaItem, isMoebelixDraft, isMoebelixItem, takeInbox, type IkeaFetchDeps } from './ikeaSelection';
 import { fetchHelperProduct, helperAvailable, readDraft } from './providers/ikeaHelper';
 import type { CatalogItem } from './types';
 
@@ -228,5 +228,21 @@ describe('Möbelix ohne 3D-Modell: Farbe vom Produktfoto (#273)', () => {
       ackInbox: async () => {},
     });
     expect(added[0].color).toBe(added[1].color); // the category's standard colour
+  });
+});
+
+describe('Möbelix-Auswahl (#278)', () => {
+  const base = { id: 'a', name: 'X', category: 'table', width: 1, depth: 1, height: 1, color: '#fff', tags: [], source: 'imported', model: { type: 'procedural', shape: 'table' } } as unknown as CatalogItem;
+  it('puts Möbelix products in their own list, also old ones from the IKEA selection', () => {
+    const fromBookmarklet = { ...base, sourceName: 'IKEA-Auswahl', retailer: 'Möbelix Österreich' };
+    const fromProductImport = { ...base, sourceName: 'Händlerseite', productUrl: 'https://www.moebelix.at/p/tisch-1' };
+    const ikea = { ...base, sourceName: 'IKEA-Auswahl', retailer: 'IKEA Österreich' };
+    expect([fromBookmarklet, fromProductImport, ikea].map(isMoebelixItem)).toEqual([true, true, false]);
+    expect([fromBookmarklet, fromProductImport, ikea].map(isIkeaItem)).toEqual([false, false, true]);
+    expect(isMoebelixItem({ ...base, productUrl: 'kein link' })).toBe(false);
+  });
+  it('sorts drafts with missing dimensions by shop', () => {
+    expect(isMoebelixDraft({ name: 'P', category: 'decor', width: null, depth: null, height: null, missing: ['width'], retailer: 'Möbelix Österreich' })).toBe(true);
+    expect(isMoebelixDraft({ name: 'P', category: 'decor', width: null, depth: null, height: null, missing: ['width'], retailer: 'IKEA Österreich' })).toBe(false);
   });
 });
