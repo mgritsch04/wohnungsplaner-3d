@@ -73,12 +73,15 @@ export interface DraftEntry extends Omit<CatalogEntry, DimKey> {
 /** Everything a product page states (units: cm), also when dimensions are missing. Null without a name. */
 export function pageToDraftEntry(p: ParsedProductPage, modelFile?: string): DraftEntry | null {
   if (!p.name) return null;
+  const kind = classifyProduct(p.name, p.categoryHints ?? []);
   const dim = (k: DimKey) => (p.dimensions[k] && p.dimensions[k]! > 0 ? p.dimensions[k] : null);
   return {
     name: p.name,
-    category: guessCategory(p.name),
-    // plants (#269): the 3D model keeps its proportions, width/depth are the pot
-    ...(classifyProduct(p.name).shape === 'plant' ? { shape: 'plant' } : {}),
+    // name and the page's own category labels (Möbelix breadcrumbs, #273) choose the substitute shape:
+    // corner sofa, armchair, round table … instead of one box per category; plants (#269) keep their
+    // 3D model's proportions, width/depth are the pot
+    category: kind.category ?? 'decor',
+    ...(kind.shape ? { shape: kind.shape } : {}),
     width: dim('width'),
     depth: dim('depth'),
     height: dim('height'),

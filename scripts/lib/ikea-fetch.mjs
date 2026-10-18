@@ -55,6 +55,32 @@ export function isIkeaModelUrl(url) {
   }
 }
 
+const IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Download the product photo the sent page itself shows (#273: its main colour tints the
+ * substitute 3D shape). Only https, only image types, at most 5 MB. Returns { bytes, ext } or a note.
+ */
+export async function fetchProductImage(get, url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return { bytes: null, note: 'Produktfoto: ungültige Adresse' };
+  }
+  if (u.protocol !== 'https:') return { bytes: null, note: 'Produktfoto: nur https' };
+  // never a computer in the own network – the address comes from the sent page
+  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[|0\.)/i.test(u.hostname) || !u.hostname.includes('.'))
+    return { bytes: null, note: 'Produktfoto: Adresse nicht erlaubt' };
+  const res = await get(u.href, { headers: { 'user-agent': UA, accept: 'image/webp,image/jpeg,image/png' } });
+  const ext = IMAGE_TYPES[(res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()];
+  if (!res.ok || !ext) return { bytes: null, note: `Produktfoto nicht geladen (HTTP ${res.status})` };
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length > MAX_IMAGE_BYTES) return { bytes: null, note: 'Produktfoto zu groß' };
+  return { bytes, ext };
+}
+
 /** Download a declared IKEA 3D model; returns the bytes or a note why not. */
 export async function fetchIkeaModel(get, url) {
   if (!isIkeaModelUrl(url)) return { bytes: null, note: 'Modell-Adresse ist keine IKEA-Modelldatei' };

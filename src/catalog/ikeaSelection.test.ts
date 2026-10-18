@@ -197,3 +197,34 @@ describe('Maße fehlen (#269)', () => {
     expect(await estimateFromModel('00000069.glb', { plant: true }, d)).toEqual({ width: 19, depth: 19, height: 130 });
   });
 });
+
+describe('Möbelix ohne 3D-Modell: Farbe vom Produktfoto (#273)', () => {
+  // SYNTHETIC Möbelix page result (no real product data)
+  const mx = { name: 'TESTTISCH Synthetisch', category: 'table', shape: 'table', width: 160, depth: 90, height: 76, price: 299, priceDate: '2026-10-18', retailer: 'Möbelix', productUrl: 'https://www.moebelix.at/p/testtisch-synthetisch-001' };
+
+  it('färbt das Näherungsmodell mit der Hauptfarbe des Fotos', async () => {
+    const asked: string[] = [];
+    const { d, added } = deps({ colorOf: async (img) => (asked.push(img), '#8a5a2b') });
+    const outcomes = await takeInbox({
+      ...d,
+      fetchInbox: async () => [{ id: 'm', receivedAt: '', product: { article: 'mx0123456789', entry: mx, model: null, image: 'mx0123456789.jpg' } }],
+      ackInbox: async () => {},
+    });
+    expect(outcomes[0]).toMatchObject({ ok: true, withModel: false });
+    expect(asked).toEqual(['mx0123456789.jpg']);
+    expect(added[0].color).toBe('#8a5a2b');
+  });
+
+  it('ohne Foto oder wenn die Farbe nicht erkennbar ist, bleibt die Standardfarbe', async () => {
+    const { d, added } = deps({ colorOf: async () => null });
+    await takeInbox({
+      ...d,
+      fetchInbox: async () => [
+        { id: 'a', receivedAt: '', product: { article: 'mx0000000001', entry: { ...mx, productUrl: `${mx.productUrl}1` }, model: null, image: 'mx0000000001.jpg' } },
+        { id: 'b', receivedAt: '', product: { article: 'mx0000000002', entry: { ...mx, productUrl: `${mx.productUrl}2` }, model: null } },
+      ],
+      ackInbox: async () => {},
+    });
+    expect(added[0].color).toBe(added[1].color); // the category's standard colour
+  });
+});

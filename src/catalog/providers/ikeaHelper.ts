@@ -14,6 +14,8 @@ export interface HelperProduct {
   article: string;
   entry: unknown;
   model: string | null;
+  /** product photo cached by the helper for a page without 3D model (#273) */
+  image?: string;
   /** what the page states when dimensions are missing (#269); the user fills in the rest */
   draft?: DraftEntry;
   reason?: string;
@@ -88,6 +90,16 @@ export async function fetchHelperProduct(a: ArticleRef, opts: { model: boolean; 
   };
 }
 
+const IMAGE_FILE = /^(?:s?\d{8}|mx[0-9a-f]{10})\.(?:jpg|png|webp)$/;
+export const helperImageName = (v: unknown) => (typeof v === 'string' && IMAGE_FILE.test(v) ? v : undefined);
+
+/** A product photo the helper cached for a sent page (#273). */
+export async function fetchHelperImage(file: string, base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<Blob> {
+  const res = await f(`${base}/image/${encodeURIComponent(file)}`);
+  if (!res.ok) throw new Error(`Produktfoto ${file}: HTTP ${res.status}`);
+  return res.blob();
+}
+
 /** The cached 3D model as a File (name = the entry's modelFile). */
 export async function fetchHelperModel(file: string, base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<File> {
   const res = await f(`${base}/model/${encodeURIComponent(file)}`);
@@ -128,6 +140,7 @@ export async function fetchInbox(base = IKEA_HELPER_URL, f: Fetch = fetch): Prom
         entry: i.product.entry ?? null,
         draft: readDraft(i.product.draft),
         model: typeof i.product.model === 'string' && /^s?\d{8}\.glb$/.test(i.product.model) ? i.product.model : null,
+        image: helperImageName(i.product.image),
         note: typeof i.product.note === 'string' ? i.product.note : undefined,
       },
     }));
