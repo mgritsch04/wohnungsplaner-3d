@@ -6,6 +6,8 @@ import { Toolbar } from './ui/Toolbar';
 import { StatusBar } from './ui/StatusBar';
 import { ModalHost, Toasts } from './ui/Modals';
 import { FurnitureHoverCard } from './ui/FurnitureHoverCard';
+import { ObjectContextMenu } from './ui/ObjectContextMenu';
+import { useObjectMenuStore } from './ui/objectMenu';
 import { SaveErrorBanner } from './ui/SaveErrorBanner';
 import { useShortcuts } from './ui/useShortcuts';
 import { useAutosave } from './persistence/useAutosave';
@@ -91,6 +93,8 @@ export default function App() {
     document.addEventListener('selectstart', onSelectStart);
     return () => document.removeEventListener('selectstart', onSelectStart);
   }, [touchUi]);
+  // the object menu's „Eigenschaften“ opens the Details sheet on the phone (#235)
+  useEffect(() => useObjectMenuStore.setState({ onDetails: phone ? () => setSheet('right') : null }), [phone]);
   const grip = phone ? <SheetGrip height={sheetHeight} onHeight={setSheetHeight} /> : null;
 
   return (
@@ -168,6 +172,7 @@ export default function App() {
       <PrintViewHost />
       <Toasts />
       <FurnitureHoverCard />
+      <ObjectContextMenu />
     </div>
   );
 }

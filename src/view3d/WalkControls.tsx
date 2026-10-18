@@ -7,10 +7,12 @@ import { buildColliders, EYE_HEIGHT, resolveCollisions } from './collision';
 import { buildPlacementObstacles, moveFurnitureTo } from '../model/placement';
 import { carryGoal } from './carryTarget';
 import { useProjectStore } from '../store/projectStore';
-import { useUiStore } from '../store/uiStore';
+import { useUiStore, type Selection } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
 import type { Vec2 } from '../model/vec';
 import { toggleOpening } from '../ui/actions';
+import { openObjectMenu, paneCenter } from '../ui/objectMenu';
+import { firstPickTarget } from './pickTarget';
 import { registerWalkRig } from './cameraBookmarks';
 import { goalEyeHeight, walkSpeedFactor } from './walkPosture';
 import { createLookFilter } from './lookFilter';
@@ -190,6 +192,26 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       const opening = targetOpening(at);
       if (opening) toggleOpening(opening);
     };
+    /**
+     * F / right-click (#235): context menu of the object in sight (or under `client` without
+     * pointer lock), else the carried item or the selection. Frees the mouse so the menu can be used.
+     */
+    const openMenu = (client?: { x: number; y: number }) => {
+      const ui = useUiStore.getState();
+      let t: Selection | null = carry.current ? { type: 'furniture', id: carry.current.id } : null;
+      if (!t) {
+        const r = el.getBoundingClientRect();
+        const at = client && r.width >= 1 && r.height >= 1 ? new THREE.Vector2(((client.x - r.left) / r.width) * 2 - 1, -((client.y - r.top) / r.height) * 2 + 1) : CENTER;
+        raycaster.setFromCamera(at, camera);
+        raycaster.far = PICK_RANGE;
+        t = firstPickTarget(raycaster, scene) ?? ui.selection;
+      }
+      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (F).', 'info');
+      if (document.pointerLockElement === el) document.exitPointerLock?.();
+      clear();
+      const c = client ?? paneCenter('3d');
+      openObjectMenu(t, c.x, c.y, client ? '3d' : 'walk');
+    };
     walkApi.current = { toggleCarry, pickOrDrop: () => pickOrDrop(), target: () => target(), targetOpening: () => targetOpening(), toggleOpening: toggleAimedOpening };
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -213,6 +235,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (e.code === 'KeyZ' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // back to the normal view after zooming with the wheel (#228)
         setFov(WALK_FOV);
+        return;
+      }
+      if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // context menu at the crosshair (#235)
+        openMenu();
         return;
       }
       if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -269,6 +296,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     let downAt: { x: number; y: number } | null = null;
     const onDown = (e: MouseEvent) => {
       if (performance.now() - lastTouch < 1000) return;
+      if (e.button === 2) {
+        // right button: context menu (#235) – at the crosshair, or under the free mouse
+        e.preventDefault();
+        openMenu(document.pointerLockElement === el ? undefined : { x: e.clientX, y: e.clientY });
+        return;
+      }
       if (e.button === 1) {
         // middle button: reset the wheel zoom (#228); no autoscroll
         e.preventDefault();

@@ -1,0 +1,61 @@
+/* shared object context menu (#235) – 2D, 3D overview, walkthrough, phone sheet */
+.object-menu {
+  position: fixed;
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  width: 260px;
+  max-width: calc(100vw - 16px);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+.object-menu-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.object-menu-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.object-menu-close {
+  padding: 0 var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+.object-menu-detail {
+  color: var(--color-text-muted);
+}
+.object-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.object-menu-actions button {
+  flex: 1 1 auto;
+}
+/* phone: a sheet from the bottom, above the bottom bar */
+.object-menu.sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  font-size: var(--font-size-md, 1rem);
+}
+.object-menu.sheet .object-menu-actions button {
+  min-height: 44px;
+}

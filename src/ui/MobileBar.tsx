@@ -2,6 +2,7 @@ import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore, type Selection } from '../store/uiStore';
 import type { Project } from '../model/schema';
 import { deleteSelection, duplicateSelection, rotateSelection } from './actions';
+import { openObjectMenu } from './objectMenu';
 import type { PhoneSheet } from './phoneLayout';
 import { IconDuplicate, IconRotateLeft, IconRotateRight, IconTrash } from './icons';
 
@@ -82,6 +83,9 @@ function MobileSelectionBar({ onDetails }: { onDetails: () => void }) {
           <IconTrash />
         </button>
       )}
+      <button type="button" aria-label="Aktionen" title="Aktionen und Infos zum Objekt" data-testid="mobile-object-menu" onClick={() => openObjectMenu(selection, 0, 0, 'sheet')}>
+        ⋯
+      </button>
       <button type="button" onClick={onDetails}>
         Details
       </button>
