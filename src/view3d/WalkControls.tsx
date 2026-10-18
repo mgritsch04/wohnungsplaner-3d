@@ -19,7 +19,7 @@ import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
-import { nextWalkFov, trueScaleFov, wheelPixels, zoomLookFactor } from './walkZoom';
+import { FEEL_FOV, nextWalkFov, wheelPixels, zoomLookFactor } from './walkZoom';
 import { createBob, stepBob } from './headBob';
 import { seatedEyeFromBody } from '../model/body';
 
@@ -42,7 +42,8 @@ interface Props {
  * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
  * A gamepad works alongside keyboard and mouse (#29, see input/gamepad.ts). The mouse wheel
  * zooms by narrowing the field of view; Z or the middle mouse button resets it (#228). With
- * "Echt-Maßstab" the base field of view matches the screen, so sizes look real (#256).
+ * "Gefühlt echt" (#256, reworked in #263) the base field of view is a natural 62° and scale hints
+ * (distance and height at the crosshair, door heights) are shown – see ScaleHints.tsx.
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -55,19 +56,19 @@ const CENTER = new THREE.Vector2(0, 0);
 const FIGURE_RANGE = 15;
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
-function furnitureIdOf(o: THREE.Object3D | null): string | null {
+export function furnitureIdOf(o: THREE.Object3D | null): string | null {
   for (let p = o; p; p = p.parent) if (typeof p.userData.furnitureId === 'string') return p.userData.furnitureId;
   return null;
 }
 
 /** Id of the door/window whose 3D object contains `o` (Architecture sets userData.openingId). */
-function openingIdOf(o: THREE.Object3D | null): string | null {
+export function openingIdOf(o: THREE.Object3D | null): string | null {
   for (let p = o; p; p = p.parent) if (typeof p.userData.openingId === 'string') return p.userData.openingId;
   return null;
 }
 
 export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
-  const { camera, gl, scene, size } = useThree();
+  const { camera, gl, scene } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
   const carry = useRef<{ id: string; last: Vec2 | null } | null>(null);
@@ -81,14 +82,10 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
   const yaw = useRef(0);
   const pitch = useRef(0);
   const dragLook = useRef<{ x: number; y: number } | null>(null);
-  // base field of view: the wide angle, or with "Echt-Maßstab" the real-size angle of this screen (#256)
+  // base field of view: the slider value, or with "Gefühlt echt" a natural 62° (#263)
   const trueScale = useProjectStore((s) => s.project.settings.walkTrueScale);
-  const diagonal = useProjectStore((s) => s.project.settings.screenDiagonal);
-  const distance = useProjectStore((s) => s.project.settings.viewingDistance);
   const walkFov = useProjectStore((s) => s.project.settings.walkFov);
-  const baseFov = trueScale
-    ? trueScaleFov({ diagonalInch: diagonal, distance, viewHeightPx: size.height, screenWidthPx: window.screen?.width ?? 0, screenHeightPx: window.screen?.height ?? 0 })
-    : walkFov;
+  const baseFov = trueScale ? FEEL_FOV : walkFov;
   const base = useRef(baseFov);
   // field of view of the wheel zoom (#228); every walkthrough starts at the base value
   const fov = useRef(baseFov);

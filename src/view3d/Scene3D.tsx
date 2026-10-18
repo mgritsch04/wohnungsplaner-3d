@@ -20,6 +20,7 @@ import { Devices3D } from '../smarthome/Devices3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { eyeFromBody } from '../model/body';
 import { RefFigure } from './RefFigure';
+import { AimProbe, AimReadout, DoorHeightLabels } from './ScaleHints';
 import { useGamepadState } from './input/gamepad';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
@@ -75,6 +76,7 @@ export function Scene3D() {
   const [locked, setLocked] = useState(false);
   const gamepad = useGamepadState((s) => s.connected);
   const ducking = useUiStore((s) => s.walkDuck);
+  const feelReal = useProjectStore((s) => s.project.settings.walkTrueScale);
   const carried = useUiStore((s) => (s.walkCarry ? storeProject.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
@@ -139,6 +141,7 @@ export function Scene3D() {
       {!session && <TapeMeasureButton />}
       {session && <CompareBar />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
+      {cameraMode === 'walk' && feelReal && <AimReadout />}
       {cameraMode === 'walk' && ducking && (
         <div className="walk-duck" data-testid="walk-duck">
           ⤓ Geduckt
@@ -348,6 +351,12 @@ function SceneContent({
       <NarrowPassageMarkers project={project} derived={derived} />
       <WalkPathMarkers />
       <RefFigure derived={derived} start={walkStart} />
+      {cameraMode === 'walk' && project.settings.walkTrueScale && (
+        <>
+          <AimProbe />
+          <DoorHeightLabels derived={derived} />
+        </>
+      )}
       <Devices3D project={project} />
       <TapeMeasure3D />
       {/* also while walking (#227): a drag can only start while the pointer is not locked */}

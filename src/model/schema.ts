@@ -344,7 +344,7 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   /** Reference person of the set body height in 3D (#263). */
   showRefFigure: z.boolean().default(false),
   /** Screen diagonal (inches) and viewing distance (metres) for the true-scale field of view. */
-  screenDiagonal: z.number().min(10).max(100).default(24),
+  screenDiagonal: z.number().min(10).max(100).default(27),
   viewingDistance: z.number().min(0.3).max(3).default(0.6),
   /** How furniture snaps while dragging (#52): grid steps + wall edges, wall edges only, or free. Alt = free temporarily. */
   furnitureSnap: z.enum(['grid5', 'grid10', 'wall', 'off']).default('grid5'),

@@ -1,9 +1,9 @@
 import { useProjectStore } from '../store/projectStore';
-import { WALK_FOV, WALK_FOV_DEFAULT, WALK_FOV_SLIDER_MIN } from '../view3d/walkZoom';
+import { FEEL_FOV, WALK_FOV, WALK_FOV_DEFAULT, WALK_FOV_SLIDER_MIN } from '../view3d/walkZoom';
 
 /**
- * Field of view of the walkthrough (#263): slider plus quick choices "Echt" (real-size angle of
- * this screen, #256), "Normal" (50°) and "Weit" (70°, the old wide angle). Dragging = one undo step.
+ * Field of view of the walkthrough (#263): slider plus quick choices "Gefühlt echt" (62° with scale
+ * hints), "Normal" (50°) and "Weit" (70°, the old wide angle). Dragging = one undo step.
  */
 export function WalkFovControl() {
   const fov = useProjectStore((s) => s.project.settings.walkFov);
@@ -25,7 +25,7 @@ export function WalkFovControl() {
   return (
     <div className="field">
       <label className="field-label" htmlFor="walk-fov">
-        Sichtfeld beim Begehen {trueScale ? 'Echt-Maßstab' : `${fov}°`}
+        Sichtfeld beim Begehen {trueScale ? `Gefühlt echt (${FEEL_FOV}°)` : `${fov}°`}
       </label>
       <div className="field-row">
         <input
@@ -43,7 +43,7 @@ export function WalkFovControl() {
         />
       </div>
       <div className="segmented" role="group" aria-label="Sichtfeld-Schnellwahl">
-        {quick('Echt', 'Echt-Maßstab: aus Bildschirmgröße und Sitzabstand berechnet', trueScale, () =>
+        {quick('Gefühlt echt', `Gefühlt echt: ${FEEL_FOV}° mit Maßstabshinweisen (Entfernung und Höhe am Fadenkreuz, Türhöhen)`, trueScale, () =>
           st().apply((d) => void (d.settings.walkTrueScale = true)),
         )}
         {quick(`Normal (${WALK_FOV_DEFAULT}°)`, 'Natürlich wirkendes Sichtfeld (Standard)', !trueScale && fov === WALK_FOV_DEFAULT, () => setFov(WALK_FOV_DEFAULT, false))}
