@@ -118,6 +118,39 @@ describe('wall details in vector plans (#37)', () => {
     // the wall itself still runs from corner to corner
     const wall = out.walls.find((w) => Math.abs(w.a.x - w.b.x) < 1 && Math.abs(w.a.y - w.b.y) > 350 && w.thickness < 40);
     expect(wall).toBeDefined();
+    // with its own thickness, not mixed with the block's
+    expect(wall!.thickness).toBeCloseTo(20, 0);
+  });
+
+  it('a hollow shaft drawn as a closed outline keeps its outer size', () => {
+    // as above, but the 50 cm block is a hollow shaft: a frame of 12 cm around a cavity, open towards the top wall
+    const segs = [
+      ...room().filter((s) => !(s.x1 === s.x2 && s.x1 <= 20)),
+      ...[S(0, 20, 0, 140), S(50, 20, 50, 140), S(0, 140, 50, 140)], // outline
+      ...[S(12, 20, 12, 128), S(38, 20, 38, 128), S(12, 128, 38, 128)], // cavity
+      ...[S(-3, 145, -3, 400), S(17, 145, 17, 380)],
+    ];
+    const out = detectVectorWalls(segs, mpp, { oblique: false });
+    const block = wallAt(out, 'v', 25);
+    expect(block).toHaveLength(1);
+    expect(block[0].thickness).toBeCloseTo(50, 0);
+    // down to the outline's end, not only to the cavity's
+    expect(Math.max(block[0].a.y, block[0].b.y)).toBeCloseTo(140, 0);
+  });
+
+  it('a hollow shaft box spans its whole outline, not only the cavity', () => {
+    // a 60 cm deep, 1.6 m wide shaft box against the room's top wall: frame lines all round, a cavity inside
+    const segs = [
+      ...room(),
+      ...[S(100, 20, 260, 20), S(100, 80, 260, 80), S(100, 20, 100, 80), S(260, 20, 260, 80)], // outline
+      ...[S(115, 35, 245, 35), S(115, 55, 245, 55), S(115, 35, 115, 55), S(245, 35, 245, 55)], // cavity
+    ];
+    const out = detectVectorWalls(segs, mpp, { oblique: false });
+    const shaft = out.walls.find((w) => Math.abs(w.a.y - w.b.y) < 1 && Math.abs(w.a.y - 50) < 3);
+    expect(shaft).toBeDefined();
+    expect(shaft!.thickness).toBeCloseTo(60, 0);
+    expect(Math.min(shaft!.a.x, shaft!.b.x)).toBeCloseTo(100, 0);
+    expect(Math.max(shaft!.a.x, shaft!.b.x)).toBeCloseTo(260, 0);
   });
 
   it('a second line beside a wall (a neighbouring shaft face) is no wall and gets no doors', () => {

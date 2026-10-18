@@ -17,6 +17,8 @@ interface VectorParams {
   minLen: number;
   /** Largest gap (px) between the pieces of one dashed wall line. */
   dashGap: number;
+  /** How far the two lines of a closed outline may end apart (px). */
+  outlineTol: number;
   angTol: number;
   assemble: AssembleOptions;
 }
@@ -27,6 +29,7 @@ function vectorParams(mpp: number): VectorParams {
     tMax: 0.6 / mpp,
     minLen: 0.3 / mpp,
     dashGap: 0.12 / mpp,
+    outlineTol: 0.03 / mpp,
     angTol: Math.sin((1.5 * Math.PI) / 180),
     assemble: { mergeGap: 0.12 / mpp, minOpening: 0.5 / mpp, maxOpening: 2.6 / mpp, joinTol: 0.08 / mpp, maxThickness: 0.6 / mpp, maxPassage: 1.5 / mpp },
   };
@@ -53,7 +56,7 @@ export function detectVectorWalls(
 
 /** Axis-aligned detection. Only segments accepted by `isWallLine` may form walls; all others count as symbols. */
 function detectInFrame(segments: VectorSegment[], p: VectorParams, isWallLine?: (i: number) => boolean): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
-  const { tMin, tMax, minLen } = p;
+  const { tMin, tMax, minLen, outlineTol } = p;
   const { hs, vs, others } = splitLines(segments, p, isWallLine);
 
   const pair = (lines: L[], o: 'h' | 'v'): Band[] => {
@@ -74,6 +77,17 @@ function detectInFrame(segments: VectorSegment[], p: VectorParams, isWallLine?: 
       if (best) {
         const t = sorted[best.j];
         out.push({ o, a0: Math.max(s.a0, t.a0), a1: Math.min(s.a1, t.a1), c: (s.c + t.c) / 2, t: best.d, conf: 0.7 });
+      }
+      // a shaft or block drawn as a closed outline with shorter lines inside (a hollow shaft, #37):
+      // the outer pair spans the whole outline, the inner pairs only part of it
+      for (let j = i + 1; j < sorted.length; j++) {
+        const t = sorted[j];
+        const d = t.c - s.c;
+        if (d > tMax) break;
+        if (Math.abs(t.a0 - s.a0) > outlineTol || Math.abs(t.a1 - s.a1) > outlineTol || s.a1 - s.a0 < minLen) continue;
+        const inner = sorted.slice(i + 1, j).filter((q) => q.a1 > s.a0 && q.a0 < s.a1);
+        if (inner.length > 0 && inner.every((q) => q.a0 >= s.a0 - outlineTol && q.a1 <= s.a1 + outlineTol) && inner.some((q) => q.a1 - q.a0 < s.a1 - s.a0 - outlineTol))
+          out.push({ o, a0: Math.max(s.a0, t.a0), a1: Math.min(s.a1, t.a1), c: (s.c + t.c) / 2, t: d, conf: 0.7 });
       }
     }
     return out;

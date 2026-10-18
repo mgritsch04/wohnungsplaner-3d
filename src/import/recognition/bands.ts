@@ -142,6 +142,9 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
       if (done[i]) continue;
       let cur = { ...list[i] };
       done[i] = true;
+      // the wall's own pieces, without blocks in line with it: they give its thickness
+      let own: Band[] = [list[i]];
+      let hadBlock = false;
       let progress = true;
       while (progress) {
         progress = false;
@@ -164,13 +167,19 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
           // a much thicker stubby piece in line with a wall (a shaft or pre-wall block beside the wall, #37):
           // the wall runs on through it, and the block stays a wall of its own as well
           const [thin, block] = cur.t < n.t ? [cur, n] : [n, cur];
-          if (gap < opts.minOpening && block.t > 1.5 * thin.t && block.a1 - block.a0 <= 4 * block.t) blocks.push({ ...block });
+          const isBlock = gap < opts.minOpening && block.t > 1.5 * thin.t && block.a1 - block.a0 <= 4 * block.t;
+          if (isBlock) {
+            blocks.push({ ...block });
+            hadBlock = true;
+            if (block === cur) own = [];
+          }
           if (gap >= opts.minOpening) {
             const info = classify(cur, cur.a1, n.a0);
             if (!opening(info.kind, gap)) break;
             openings.push({ center: pointOf(o, (cur.a1 + n.a0) / 2, (cur.c + n.c) / 2), width: gap, ...info });
           }
           const wsum = cur.a1 - cur.a0 + (n.a1 - n.a0);
+          if (!isBlock || block !== n) own.push(n);
           cur = {
             o,
             a0: cur.a0,
@@ -182,6 +191,11 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
           done[bestJ] = true;
           progress = true;
         }
+      }
+      const ownLen = own.reduce((s, b) => s + b.a1 - b.a0, 0);
+      if (hadBlock && ownLen > 0) {
+        cur.c = own.reduce((s, b) => s + b.c * (b.a1 - b.a0), 0) / ownLen;
+        cur.t = own.reduce((s, b) => s + b.t * (b.a1 - b.a0), 0) / ownLen;
       }
       merged.push(cur);
     }

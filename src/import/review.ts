@@ -20,6 +20,9 @@ export function findDraftConflicts(d: ReconstructionDraft): DraftConflict[] {
       // collinear & overlapping?
       const lineDist = Math.abs(cross(da, sub(b.a, a.a)));
       if (lineDist > Math.max(a.thickness, b.thickness) / 2) continue;
+      // a wall running on through a much thicker block in line with it (a shaft, #37) lies inside it on purpose
+      const [thin, thick] = a.thickness < b.thickness ? [a, b] : [b, a];
+      if (thick.thickness > 1.5 * thin.thickness && lineDist + thin.thickness / 2 <= thick.thickness / 2 + 0.03) continue;
       const s = (p: { x: number; y: number }) => (p.x - a.a.x) * da.x + (p.y - a.a.y) * da.y;
       const La = dist(a.a, a.b);
       const s0 = Math.min(s(b.a), s(b.b));
