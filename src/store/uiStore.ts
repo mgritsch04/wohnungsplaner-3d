@@ -58,7 +58,7 @@ interface UiStore {
   walkCarry: string | null;
   /** Crouching in the walkthrough (#20); C toggles it (#47). */
   walkDuck: boolean;
-  /** Seated in the walkthrough (#78) – eyes at settings.sitEyeHeight. */
+  /** Seated in the walkthrough (#78) – eyes at the seated eye height of settings.bodyHeight. */
   walkSit: boolean;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;

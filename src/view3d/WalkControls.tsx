@@ -19,7 +19,9 @@ import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
-import { nextWalkFov, trueScaleFov, WALK_FOV, wheelPixels, zoomLookFactor } from './walkZoom';
+import { nextWalkFov, trueScaleFov, wheelPixels, zoomLookFactor } from './walkZoom';
+import { createBob, stepBob } from './headBob';
+import { seatedEyeFromBody } from '../model/body';
 
 interface Props {
   derived: DerivedPlan;
@@ -62,7 +64,7 @@ function openingIdOf(o: THREE.Object3D | null): string | null {
   return null;
 }
 
-export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
+export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
   const { camera, gl, scene, size } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
@@ -81,9 +83,10 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const trueScale = useProjectStore((s) => s.project.settings.walkTrueScale);
   const diagonal = useProjectStore((s) => s.project.settings.screenDiagonal);
   const distance = useProjectStore((s) => s.project.settings.viewingDistance);
+  const walkFov = useProjectStore((s) => s.project.settings.walkFov);
   const baseFov = trueScale
     ? trueScaleFov({ diagonalInch: diagonal, distance, viewHeightPx: size.height, screenWidthPx: window.screen?.width ?? 0, screenHeightPx: window.screen?.height ?? 0 })
-    : WALK_FOV;
+    : walkFov;
   const base = useRef(baseFov);
   // field of view of the wheel zoom (#228); every walkthrough starts at the base value
   const fov = useRef(baseFov);
@@ -103,8 +106,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     sensitivityRef.current = sensitivity;
   }, [sensitivity]);
   // eye height changes apply immediately, without restarting the walk (pointer lock stays)
-  // seated eye height (#78) comes straight from the project settings
-  const sitEye = useProjectStore((s) => s.project.settings.sitEyeHeight);
+  // seated eye height (#78) follows the body height in the project settings (#263)
+  const sitEye = useProjectStore((s) => seatedEyeFromBody(s.project.settings.bodyHeight));
   const sitEyeRef = useRef(sitEye);
   useEffect(() => {
     sitEyeRef.current = sitEye;
@@ -467,6 +470,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const gamepad = useMemo(() => createGamepadSource(), []);
   useEffect(() => () => gamepad.reset(), [gamepad]);
 
+  const bob = useMemo(() => createBob(), []);
+  const moved = useRef(0);
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
   useFrame((_, dtRaw) => {
@@ -491,7 +496,10 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const goalEye = goalEyeHeight({ eye: eyeRef.current, sitEye: sitEyeRef.current, sitting: seated, ducking });
     eyeNow.current = eyeNow.current === null ? goalEye : eyeNow.current + (goalEye - eyeNow.current) * (1 - Math.exp(-dt / 0.08));
     if (Math.abs(eyeNow.current - goalEye) < 0.001) eyeNow.current = goalEye;
-    camera.position.y = eyeNow.current;
+    // head bob (#263) from the distance walked in the previous frame
+    const bobY = useProjectStore.getState().project.settings.walkHeadBob ? stepBob(bob, moved.current, dt) : 0;
+    moved.current = 0;
+    camera.position.y = eyeNow.current + bobY;
     useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
@@ -544,7 +552,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       };
       p = resolveCollisions(p, collidersRef.current);
     }
-    camera.position.set(p.x, eyeNow.current, p.y);
+    moved.current = Math.hypot(p.x - camera.position.x, p.y - camera.position.z);
+    camera.position.set(p.x, eyeNow.current + bobY, p.y);
   });
 
   return null;

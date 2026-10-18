@@ -18,6 +18,7 @@ import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
+import { eyeFromBody } from '../model/body';
 import { useGamepadState } from './input/gamepad';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { LightingRig } from './LightingRig';
@@ -368,7 +369,7 @@ function SceneContent({
           furniture={project.furniture}
           start={walkStart}
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
-          eyeHeight={project.settings.eyeHeight}
+          eyeHeight={eyeFromBody(project.settings.bodyHeight)}
           onLockChange={onLockChange}
         />
       )}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from './factory';
+import { eyeFromBody } from './body';
 import { buildIndex } from './graph';
 import { computeRoomGeometry, rectangularRoomSize } from './geometry/rooms';
 import { buildWallPieces, computeWallFootprint, resolveOpenings } from './geometry/walls';
@@ -199,11 +200,15 @@ describe('settings', () => {
     expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, mouseSensitivity: 10 } })).toThrow();
   });
 
-  it('older projects get the default eye height of 163 cm in the walkthrough', () => {
+  it('body height defaults to 163 cm; old eye-height settings migrate to a body height (#263)', () => {
     const raw = structuredClone(createEmptyProject()) as unknown as { settings: Record<string, unknown> };
-    delete raw.settings.eyeHeight;
-    expect(ProjectSchema.parse(raw).settings.eyeHeight).toBe(1.63);
-    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, eyeHeight: 3 } })).toThrow();
+    delete raw.settings.bodyHeight;
+    expect(ProjectSchema.parse(raw).settings.bodyHeight).toBe(1.63);
+    expect(ProjectSchema.parse({ ...raw, settings: { ...raw.settings, eyeHeight: 1.63 } }).settings.bodyHeight).toBe(1.63);
+    expect(ProjectSchema.parse({ ...raw, settings: { ...raw.settings, eyeHeight: 1.8 } }).settings.bodyHeight).toBe(1.91);
+    expect(ProjectSchema.parse({ ...raw, settings: { ...raw.settings, eyeHeight: 1.8, bodyHeight: 1.7 } }).settings.bodyHeight).toBe(1.7);
+    expect(eyeFromBody(1.63)).toBe(1.52);
+    expect(() => ProjectSchema.parse({ ...raw, settings: { ...raw.settings, bodyHeight: 3 } })).toThrow();
   });
 
   it('older projects without a lamp setting load with automatic lamps', () => {

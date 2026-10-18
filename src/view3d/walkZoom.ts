@@ -1,9 +1,13 @@
 /**
  * Field of view in the walkthrough: mouse-wheel zoom (#228) narrows it like binoculars, starting
- * from a base value – the usual wide angle or, with "Echt-Maßstab" (#256), the angle the picture
- * actually covers for the viewer, so rooms and furniture look as large as in reality.
+ * from a base value – the slider value (#263, 30–70°, 70° = wide angle) or, with "Echt-Maßstab"
+ * (#256), the angle the picture actually covers for the viewer, so things look as large as in reality.
  */
 export const WALK_FOV = 70;
+/** Default field of view (#263): between the wide angle and the real-size angle, rooms look natural. */
+export const WALK_FOV_DEFAULT = 50;
+/** Range of the field-of-view slider. */
+export const WALK_FOV_SLIDER_MIN = 30;
 export const WALK_FOV_MIN = 20;
 /** The wheel zooms in down to this share of the base field of view (70° → 20°). */
 const ZOOM_RANGE = WALK_FOV_MIN / WALK_FOV;

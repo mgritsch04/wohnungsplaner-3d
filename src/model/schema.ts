@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeight } from './body';
 
 /**
  * Versioned project schema (the full, editable apartment project).
@@ -317,7 +318,7 @@ export const UnderlaySchema = z.object({
 
 export const QualityModeSchema = z.enum(['planning', 'realism']);
 
-export const SettingsSchema = z.object({
+export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   gridSize: len(0.01, 5).default(0.1),
   snapToGrid: z.boolean().default(true),
   defaultWallThickness: len(0.02, 2).default(0.12),
@@ -332,12 +333,16 @@ export const SettingsSchema = z.object({
   mouseSensitivity: z.number().min(0.2).max(3).default(1),
   /** Lamps in realism mode: 'auto' = switched on at dusk, 'on' = always, 'off' = never. */
   lamps: z.enum(['auto', 'on', 'off']).default('auto'),
-  /** Camera (eye) height in the first-person walkthrough, metres. */
-  eyeHeight: z.number().min(1).max(2.2).default(1.63),
-  /** Eye height when seated in the walkthrough (#78), metres – e.g. on the sofa or at the dining table. */
-  sitEyeHeight: z.number().min(0.6).max(1.6).default(1.2),
+  /** Body height of the person walking through (#263), metres; the standing and seated eye heights follow from it (model/body.ts). */
+  bodyHeight: z.number().min(BODY_HEIGHT_MIN).max(BODY_HEIGHT_MAX).default(BODY_HEIGHT_DEFAULT),
   /** Walkthrough "Echt-Maßstab" (#256): field of view from screen size and viewing distance instead of the wide angle. */
   walkTrueScale: z.boolean().default(false),
+  /** Field of view of the walkthrough in degrees (#263) when "Echt-Maßstab" is off; 70 = the old wide angle. */
+  walkFov: z.number().min(30).max(70).default(50),
+  /** Gentle head bob while walking (#263). */
+  walkHeadBob: z.boolean().default(true),
+  /** Reference person of the set body height in 3D (#263). */
+  showRefFigure: z.boolean().default(false),
   /** Screen diagonal (inches) and viewing distance (metres) for the true-scale field of view. */
   screenDiagonal: z.number().min(10).max(100).default(24),
   viewingDistance: z.number().min(0.3).max(3).default(0.6),
@@ -357,7 +362,7 @@ export const SettingsSchema = z.object({
       sumMax: z.number().min(2).max(20).default(8),
     })
     .default({ show: true, sideMin: 1.2, sideMax: 2.7, sumMin: 4, sumMax: 8 }),
-});
+}));
 
 /** Point in 3D world coordinates of the 3D view (metres): x = plan x, y = height, z = plan y. */
 export const Vec3Schema = z.object({ x: finite(), y: finite(), z: finite() });
