@@ -4,7 +4,8 @@ import { useCatalogStore } from './catalogStore';
 import { useIkeaDrafts, type PendingDraft } from './ikeaDrafts';
 import { checkModelBlob } from './providers/modelFetch';
 import { suggestUnit } from '../import/gltf';
-import { ackInbox, fetchHelperModel, fetchHelperProduct, fetchInbox, type HelperProduct } from './providers/ikeaHelper';
+import { ackInbox, fetchHelperImage, fetchHelperModel, fetchHelperProduct, fetchInbox, type HelperProduct } from './providers/ikeaHelper';
+import { colorOfImage } from './providers/productColor';
 import { completeDraft, formatArticle, parseArticleList, type DimKey } from './providers/ikeaList';
 import type { CatalogItem } from './types';
 
@@ -36,6 +37,8 @@ export interface IkeaFetchDeps {
   addItems: (items: CatalogItem[]) => Promise<number>;
   /** keeps a product whose dimensions are missing until the user enters them */
   addDraft?: (d: PendingDraft) => void;
+  /** main colour of a product photo cached by the helper (#273) */
+  colorOf?: (image: string) => Promise<string | null>;
 }
 
 const defaultDeps: IkeaFetchDeps = {
@@ -44,6 +47,7 @@ const defaultDeps: IkeaFetchDeps = {
   store: storeAsset,
   addItems: (items) => useCatalogStore.getState().addItems(items),
   addDraft: (d) => useIkeaDrafts.getState().add(d),
+  colorOf: async (image) => colorOfImage(await fetchHelperImage(image)),
 };
 
 /**
@@ -79,7 +83,7 @@ export async function addIkeaArticles(
 export async function addHelperProduct(hp: HelperProduct, withModel: boolean, deps: IkeaFetchDeps = defaultDeps): Promise<IkeaFetchOutcome> {
   const article = hp.article;
   if (!hp.entry && hp.draft) {
-    deps.addDraft?.({ article, draft: hp.draft, model: hp.model, receivedAt: new Date().toISOString() });
+    deps.addDraft?.({ article, draft: hp.draft, model: hp.model, ...(hp.image ? { image: hp.image } : {}), receivedAt: new Date().toISOString() });
     return { article, ok: false, pending: true, name: hp.draft.name, message: 'Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.' };
   }
   if (!hp.entry) return { article, ok: false, message: hp.reason ?? 'keine Produktdaten' };
@@ -98,6 +102,11 @@ export async function addHelperProduct(hp: HelperProduct, withModel: boolean, de
       } catch (e) {
         warning = `3D-Modell nicht geladen (${e instanceof Error ? e.message : String(e)}) – Näherungsmodell verwendet.`;
       }
+    }
+    // no 3D model: the substitute shape takes the main colour of the product photo (#273)
+    if (hp.image && deps.colorOf && result[0] && result[0].model.type !== 'gltf' && !(hp.entry as { color?: unknown }).color) {
+      const color = await deps.colorOf(hp.image).catch(() => null);
+      if (color) result = result.map((i) => ({ ...i, color }));
     }
     await deps.addItems(result);
     return { article, ok: true, id: result[0].id, name: result[0].name, withModel: result[0].model.type === 'gltf', message: warning ?? hp.note };
@@ -131,7 +140,7 @@ export async function completePending(
 ): Promise<IkeaFetchOutcome> {
   const entry = completeDraft(p.draft, dims);
   if (!entry) return { article: p.article, ok: false, name: p.draft.name, message: 'Bitte Breite, Tiefe und Höhe eintragen (in cm, größer als 0).' };
-  const outcome = await addHelperProduct({ article: p.article, entry, model: p.model }, !!p.model, deps);
+  const outcome = await addHelperProduct({ article: p.article, entry, model: p.model, image: p.image }, !!p.model, deps);
   if (outcome.ok) deps.removeDraft(p.article);
   return outcome;
 }

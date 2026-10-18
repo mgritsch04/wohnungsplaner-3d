@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyProduct } from './classify';
+import { pageToCatalogEntry } from './ikeaList';
 import { parseProductPage } from './structuredData';
 
 // SYNTHETIC pages in the style of a furniture shop (schema.org Product + BreadcrumbList).
@@ -72,5 +73,19 @@ describe('product type from page data (#8)', () => {
     expect(classifyProduct('FEJKA Topfpflanze, künstlich')).toMatchObject({ shape: 'plant' });
     expect(classifyProduct('Pflanzenständer, Bambus').shape).not.toBe('plant');
     expect(classifyProduct('Pflanzentopf 12 cm').shape).not.toBe('plant');
+  });
+});
+
+describe('Möbelix-Lesezeichen: Ersatzform aus Name und Seitenkategorie (#273)', () => {
+  it('Produktname ohne Typwort: die Seitenkategorie wählt Kategorie und Form', () => {
+    const p = parseProductPage(shopPage({ name: 'Aurora', crumbs: ['Startseite', 'Wohnzimmer', 'Ecksofas'] }), 'https://www.moebelix.at/p/aurora-001');
+    expect(pageToCatalogEntry(p)).toMatchObject({ name: 'Aurora', category: 'sofa', shape: 'sofa-corner', retailer: 'Möbelix Österreich', width: 80 });
+  });
+
+  it('ohne Treffer bleibt Deko ohne eigene Form', () => {
+    const p = parseProductPage(shopPage({ name: 'Zeta' }), 'https://www.moebelix.at/p/zeta-001');
+    const e = pageToCatalogEntry(p)!;
+    expect(e.category).toBe('decor');
+    expect(e.shape).toBeUndefined();
   });
 });

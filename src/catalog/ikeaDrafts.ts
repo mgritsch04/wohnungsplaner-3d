@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { readDraft } from './providers/ikeaHelper';
+import { helperImageName, readDraft } from './providers/ikeaHelper';
 import type { DraftEntry } from './providers/ikeaList';
 
 /**
@@ -12,6 +12,8 @@ export interface PendingDraft {
   draft: DraftEntry;
   /** 3D model file cached by the helper, if any */
   model: string | null;
+  /** product photo cached by the helper (#273) */
+  image?: string;
   receivedAt: string;
 }
 
@@ -26,7 +28,7 @@ function load(): PendingDraft[] {
       const draft = readDraft(p?.draft);
       if (!draft || typeof p.article !== 'string') return [];
       const model = typeof p.model === 'string' && /^s?\d{8}\.glb$/i.test(p.model) ? p.model : null;
-      return [{ article: p.article, draft, model, receivedAt: typeof p.receivedAt === 'string' ? p.receivedAt : '' }];
+      return [{ article: p.article, draft, model, image: helperImageName(p.image), receivedAt: typeof p.receivedAt === 'string' ? p.receivedAt : '' }];
     });
   } catch {
     return [];

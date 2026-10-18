@@ -31,6 +31,7 @@
  *   GET /product?article=<nr|url>[&model=1][&refresh=1]
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
+ *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
  *
  * 3D-Modelle und Bilder sind urheberrechtlich geschützt: nur privat nutzen.
  */
@@ -38,7 +39,7 @@ import { createServer } from 'node:http';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fetchArticle, fetchIkeaModel, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
+import { fetchArticle, fetchIkeaModel, fetchProductImage, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
 
 const args = process.argv.slice(2);
 const portArg = args.indexOf('--port');
@@ -149,6 +150,19 @@ async function receivePage(body) {
       writeFileSync(join(CACHE, modelFile), m.bytes);
     } else note = m.note;
   }
+  // no 3D model (Möbelix, #273): the page's own product photo gives the substitute shape its colour
+  let image;
+  if (!modelFile && page.imageUrl) {
+    const existing = ['jpg', 'png', 'webp'].map((e) => `${key}.${e}`).find((f) => existsSync(join(CACHE, f)));
+    if (existing) image = existing;
+    else {
+      const img = await fetchProductImage(get, page.imageUrl);
+      if (img.bytes) {
+        image = `${key}.${img.ext}`;
+        writeFileSync(join(CACHE, image), img.bytes);
+      }
+    }
+  }
   const entry = mods.pageToCatalogEntry(page, modelFile);
   // dimensions missing (#269): the planner asks for them instead of dropping the product
   const draft = entry ? null : mods.pageToDraftEntry(page, modelFile);
@@ -160,6 +174,7 @@ async function receivePage(body) {
     entry,
     ...(draft ? { draft, reason: 'Maße fehlen auf der Seite' } : {}),
     model: modelFile ?? null,
+    ...(image ? { image } : {}),
     ...(note ? { note } : {}),
   };
   const item = { id: `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, receivedAt: new Date().toISOString(), product };
@@ -246,6 +261,11 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/product') {
       const [status, body] = await product(url.searchParams);
       return json(status, body);
+    }
+    const img = url.pathname.match(/^\/image\/((?:s?\d{8}|mx[0-9a-f]{10})\.(jpg|png|webp))$/);
+    if (img && existsSync(join(CACHE, img[1]))) {
+      res.writeHead(200, { 'content-type': img[2] === 'jpg' ? 'image/jpeg' : `image/${img[2]}` }).end(readFileSync(join(CACHE, img[1])));
+      return;
     }
     const m = url.pathname.match(/^\/model\/(s?\d{8}\.glb)$/);
     if (m && existsSync(join(CACHE, m[1]))) {
