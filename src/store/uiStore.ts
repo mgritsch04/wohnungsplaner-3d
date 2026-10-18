@@ -60,6 +60,8 @@ interface UiStore {
   walkDuck: boolean;
   /** Seated in the walkthrough (#78) – eyes at the seated eye height of settings.bodyHeight. */
   walkSit: boolean;
+  /** Where the reference figure stands (#263); null = default spot. Placed with P while walking. */
+  refFigurePos: Vec2 | null;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   /** Shift+click: add/remove a furniture item to/from the selection. */
@@ -84,6 +86,7 @@ interface UiStore {
   /** C in the walkthrough (#47): crouch / stand up again; ignored while seated. */
   toggleWalkDuck: () => void;
   setWalkSit: (sit: boolean) => void;
+  setRefFigurePos: (p: Vec2 | null) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
 }
@@ -108,6 +111,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   walkCarry: null,
   walkDuck: false,
   walkSit: false,
+  refFigurePos: null,
   toasts: [],
   setSelection: (selection) => set({ selection, multi: [], rightTab: selection ? 'properties' : get().rightTab }),
   toggleFurnitureSelection: (id) => {
@@ -146,6 +150,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   toggleWalkDuck: () => set((s) => (s.walkSit ? {} : { walkDuck: !s.walkDuck })),
   // sitting down or standing up (X, buttons, project panel) always ends crouching (#47)
   setWalkSit: (walkSit) => set({ walkSit, walkDuck: false }),
+  setRefFigurePos: (refFigurePos) => set({ refFigurePos }),
   toast: (text, kind = 'info') => {
     const id = toastId++;
     set({ toasts: [...get().toasts, { id, kind, text }] });

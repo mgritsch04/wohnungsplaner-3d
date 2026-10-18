@@ -51,6 +51,8 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 const PICK_RANGE = 6;
 /** A carried item stays this far in front of the eyes (m, horizontal). */
 const CENTER = new THREE.Vector2(0, 0);
+/** Farthest floor point the reference figure is placed at with P (m) (#263). */
+const FIGURE_RANGE = 15;
 
 /** Id of the furniture whose 3D object contains `o` (FurnitureObject sets userData.furnitureId). */
 function furnitureIdOf(o: THREE.Object3D | null): string | null {
@@ -234,6 +236,18 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       const c = client ?? paneCenter('3d');
       openObjectMenu(t, c.x, c.y, client ? '3d' : 'walk');
     };
+    /** P (#263): reference figure to the floor point in sight, or 2 m ahead when looking up. */
+    const placeRefFigure = () => {
+      raycaster.setFromCamera(CENTER, camera);
+      const { origin, direction } = raycaster.ray;
+      const t = direction.y < -0.02 ? -origin.y / direction.y : Infinity;
+      const flat = Math.hypot(direction.x, direction.z) || 1;
+      const reach = Math.min(t * flat, FIGURE_RANGE);
+      const at = reach < FIGURE_RANGE ? origin.clone().addScaledVector(direction, t) : origin.clone().addScaledVector(new THREE.Vector3(direction.x / flat, 0, direction.z / flat), 2);
+      useUiStore.getState().setRefFigurePos({ x: Math.round(at.x * 1000) / 1000, y: Math.round(at.z * 1000) / 1000 });
+      const ps = useProjectStore.getState();
+      if (!ps.project.settings.showRefFigure) ps.apply((d) => void (d.settings.showRefFigure = true));
+    };
     walkApi.current = { toggleCarry, pickOrDrop: () => pickOrDrop(), target: () => target(), targetOpening: () => targetOpening(), toggleOpening: toggleAimedOpening };
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -262,6 +276,11 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // context menu at the crosshair (#235)
         openMenu();
+        return;
+      }
+      if (e.code === 'KeyP' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // place the reference figure where the crosshair meets the floor (#263) and show it
+        placeRefFigure();
         return;
       }
       if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
