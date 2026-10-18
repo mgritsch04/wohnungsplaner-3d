@@ -4149,7 +4149,7 @@ test('catalog: while dragging, the item itself is previewed in 2D and 3D instead
   expect(errors).toEqual([]);
 });
 
-test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size angle, zoom and Z use it, it is saved (#256)', async ({ page }) => {
+test('walkthrough: "Gefühlt echt" uses a natural 62° view with scale hints – distance and height at the crosshair, door heights; it is saved (#256, #263)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -4158,41 +4158,49 @@ test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size an
   // NaN until the 3D scene is mounted (after a reload, too), so expect.poll keeps waiting
   const fovOf = () => page.evaluate(() => ((window as any).__wp.three?.camera.fov ?? NaN) as number);
   await expect.poll(fovOf).toBe(50);
-  const toggle = page.getByRole('button', { name: 'Echt-Maßstab' });
+  await expect(page.getByTestId('aim-readout')).toHaveCount(0);
+  await expect(page.getByTestId('door-height')).toHaveCount(0);
+  const toggle = page.locator('.toolbar').getByRole('button', { name: 'Gefühlt echt' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await expect.poll(fovOf).toBeLessThan(60);
-  const base = await fovOf();
-  expect(base).toBeGreaterThanOrEqual(20);
-  // zoom starts from the real-size value, Z goes back to it
+  await expect.poll(fovOf).toBe(62);
+  // the crosshair readout names distance and height of what is in sight
+  await page.evaluate(() => (window as any).__wp.walk.look(0, -0.3));
+  await expect(page.getByTestId('aim-readout')).toContainText(/\d,\d\d m entfernt/);
+  // a door in sight shows its clear height
+  const doorInSight = await page.evaluate(() => {
+    const p = (window as any).__wp.useProjectStore.getState().project;
+    return p.openings.some((o: any) => o.kind !== 'window');
+  });
+  if (doorInSight) {
+    for (let i = 0; i < 16 && (await page.getByTestId('door-height').count()) === 0; i++) {
+      await page.evaluate((k) => (window as any).__wp.walk.look((k * Math.PI) / 8, 0), i);
+      await page.waitForTimeout(250);
+    }
+    await expect(page.getByTestId('door-height').first()).toContainText(/↕ \d,\d\d m/);
+  }
+  // zoom starts from the base value, Z goes back to it
   const box = (await page.locator('canvas').first().boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, -300);
-  await expect.poll(fovOf).toBeLessThan(base);
-  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 100);
-  await expect.poll(fovOf).toBeCloseTo(base, 3);
-  await page.mouse.wheel(0, -300);
-  await expect.poll(fovOf).toBeLessThan(base);
+  await expect.poll(fovOf).toBeLessThan(62);
   await page.keyboard.press('KeyZ');
-  await expect.poll(fovOf).toBeCloseTo(base, 3);
-  // a larger screen at the same distance widens the real-size angle
-  await page.evaluate(() => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.settings.screenDiagonal = 40)));
-  await expect.poll(fovOf).toBeGreaterThan(base);
-  await page.evaluate(() => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.settings.screenDiagonal = 24)));
-  await expect.poll(fovOf).toBeCloseTo(base, 3);
+  await expect.poll(fovOf).toBe(62);
   // saved: after leaving, reloading and walking again the switch is still on
   await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByTestId('aim-readout')).toHaveCount(0);
   await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(1200);
   await page.reload();
   await expect.poll(async () => (await getProject(page)).settings.walkTrueScale).toBe(true);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
-  await expect.poll(fovOf).toBeLessThan(60);
-  // switched off: the slider angle (default 50°) is back
-  await page.getByRole('button', { name: 'Echt-Maßstab' }).click();
+  await expect.poll(fovOf).toBe(62);
+  // switched off: the slider angle (default 50°) is back, no hints
+  await toggle.click();
   await expect.poll(fovOf).toBe(50);
+  await expect(page.getByTestId('aim-readout')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -4212,8 +4220,8 @@ test('walkthrough: field-of-view slider with quick choices, head bob, reference 
   await expect(quick.getByRole('button', { name: 'Normal (50°)' })).toHaveAttribute('aria-pressed', 'true');
   await quick.getByRole('button', { name: 'Weit (70°)' }).click();
   await expect.poll(fovOf).toBe(70);
-  await quick.getByRole('button', { name: 'Echt', exact: true }).click();
-  await expect.poll(fovOf).toBeLessThan(50);
+  await quick.getByRole('button', { name: 'Gefühlt echt', exact: true }).click();
+  await expect.poll(fovOf).toBe(62);
   expect((await settings()).walkTrueScale).toBe(true);
   const slider = panel.getByRole('slider', { name: 'Sichtfeld beim Begehen' });
   await slider.fill('45');

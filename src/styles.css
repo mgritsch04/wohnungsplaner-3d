@@ -1399,7 +1399,7 @@ code {
   pointer-events: none;
   z-index: 2;
 }
-/* "Gefühlt echt" scale hints (#263): readout under the crosshair, door heights */
+/* "Gefühlt echt" scale hints (issue 263): readout under the crosshair, door heights */
 .aim-readout {
   position: absolute;
   left: 50%;
