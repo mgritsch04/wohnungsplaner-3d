@@ -185,8 +185,9 @@ async function receivePage(body) {
 }
 
 /**
- * Receiving page of the bookmarklet: embedded by the shop page, it takes the page data via
- * postMessage (only from the shop origins) and posts it to /inbox on its own origin.
+ * Receiving page of the bookmarklet: embedded by the shop page (or opened as a small window
+ * where the shop forbids frames, e.g. Möbelix), it takes the page data via postMessage (only
+ * from the shop origins) and posts it to /inbox on its own origin.
  */
 const RECEIVER_PAGE = `<!doctype html><html lang="de"><meta charset="utf-8"><title>An Planer senden</title>
 <style>body{margin:0;padding:12px 14px;font:14px system-ui,sans-serif;color:#111;background:#fff}b{color:#0058a3}</style>
@@ -210,8 +211,11 @@ addEventListener('message', async (e) => {
   }
   show(text);
   e.source.postMessage({ type: 'wp-result', ok, text }, e.origin);
+  if (opener && ok) setTimeout(() => close(), 4000);
 });
-parent.postMessage({ type: 'wp-ready' }, '*');
+const shop = opener || (parent !== window ? parent : null);
+if (shop) shop.postMessage({ type: 'wp-ready' }, '*');
+else show('Diese Seite öffnet das Lesezeichen „An Planer senden“ auf einer Produktseite.');
 </script></html>`;
 
 const server = createServer(async (req, res) => {
