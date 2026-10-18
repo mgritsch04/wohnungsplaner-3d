@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
-import { addRectRoom } from '../model/operations';
-import type { Automation, Project, SmartDevice } from '../model/schema';
+import { addFurniture, addOpening, addRectRoom, setOpeningOpen } from '../model/operations';
+import type { Automation, Furniture, Project, SmartDevice } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
 import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
@@ -175,5 +175,68 @@ describe('detection outline (#170)', () => {
     expect(rulesOf(p, 'b').map((a) => a.id)).toEqual(['a1']);
     expect(rulesOf(p, 'x')).toEqual([]);
     expect(formatDuration(90)).toBe('1,5 min');
+  });
+});
+
+describe('line of sight through door leaves and furniture (#236)', () => {
+  const item = (p: Project, name: string, x: number, height: number, extra: Partial<Furniture> = {}) =>
+    addFurniture(p, { name, category: 'storage', x, y: 1.5, elevation: 0, rotation: 0, width: 0.6, depth: 0.6, height, color: '#b0a898', model: { type: 'procedural', shape: 'box' }, quantity: 1, approximate: true, solid: true, locked: false, ...extra } as Furniture);
+
+  it('a tall wardrobe hides the person, a low sofa does not', () => {
+    const p = twoRooms();
+    const m = p.devices[0];
+    const sp = sensorParams(m);
+    const person = { x: 3, y: 1.5 };
+    item(p, 'Sofa', 1.5, 0.85);
+    expect(inDetectionArea(m, sp, person, occludersOf(p, derivePlan(p)))).toBe(true);
+    item(p, 'Schrank', 2.2, 2.0);
+    expect(inDetectionArea(m, sp, person, occludersOf(p, derivePlan(p)))).toBe(false);
+  });
+
+  it('a medium-high sideboard only hides the area close behind it', () => {
+    const p = twoRooms();
+    const m = p.devices[0];
+    const sp = sensorParams(m);
+    item(p, 'Sideboard', 1.0, 1.4);
+    const occ = occludersOf(p, derivePlan(p));
+    expect(inDetectionArea(m, sp, { x: 1.5, y: 1.5 }, occ)).toBe(false); // line still below 1.4 m there
+    expect(inDetectionArea(m, sp, { x: 3.5, y: 1.5 }, occ)).toBe(true); // line passes above it
+  });
+
+  it('rugs and lamps (not solid) never block', () => {
+    const p = twoRooms();
+    item(p, 'Stehlampe', 1.5, 1.8, { solid: false });
+    expect(inDetectionArea(p.devices[0], sensorParams(p.devices[0]), { x: 3, y: 1.5 }, occludersOf(p, derivePlan(p)))).toBe(true);
+  });
+
+  it('cuts the 2D outline at a tall wardrobe', () => {
+    const p = twoRooms();
+    const m = p.devices[0];
+    item(p, 'Schrank', 2.2, 2.0);
+    const poly = detectionPolygon(m, sensorParams(m), occludersOf(p, derivePlan(p)));
+    const ahead = poly.filter((q) => Math.abs(q.y - 1.5) < 0.05 && q.x > 0.1);
+    expect(ahead.length).toBeGreaterThan(0);
+    expect(Math.max(...ahead.map((q) => q.x))).toBeLessThan(2.0);
+  });
+
+  it('an open door leaf hides the corner behind it, a closed one does not', () => {
+    const p = twoRooms();
+    const room = p.rooms[0];
+    // the room's bottom wall (both nodes on the smallest y)
+    const y = (id: string) => p.nodes.find((n) => n.id === id)!.y;
+    const minY = Math.min(...room.nodeIds.map(y));
+    const wall = p.walls.find((w) => room.nodeIds.includes(w.a) && room.nodeIds.includes(w.b) && Math.abs(y(w.a) - minY) < 1e-6 && Math.abs(y(w.b) - minY) < 1e-6)!;
+    const doorId = addOpening(p, wall.id, 'door', 1.0, { open: true })!;
+    const d = derivePlan(p);
+    const leaf = d.leaves.get(doorId)![0];
+    expect(leaf.open).toBe(true);
+    // the leaf stands 90° into a room along swingDir; look along the wall at the corner it covers
+    const along = (k: number, s: number) => ({ x: leaf.hinge.x + leaf.swingDir.x * s + leaf.closedDir.x * k, y: leaf.hinge.y + leaf.swingDir.y * s + leaf.closedDir.y * k });
+    const sensor: SmartDevice = { ...p.devices[0], ...along(2, 0.4), rotation: Math.atan2(-leaf.closedDir.y, -leaf.closedDir.x), rangeM: 6 };
+    const person = along(-0.3, 0.4);
+    const sp = sensorParams(sensor);
+    expect(inDetectionArea(sensor, sp, person, occludersOf(p, d))).toBe(false);
+    setOpeningOpen(p, doorId, false);
+    expect(inDetectionArea(sensor, sp, person, occludersOf(p, derivePlan(p)))).toBe(true);
   });
 });
