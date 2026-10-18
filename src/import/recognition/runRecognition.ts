@@ -15,7 +15,7 @@ import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
-import type { Underlay } from '../../model/schema';
+import { isGlassDoor, type Underlay } from '../../model/schema';
 
 /** Run the best available local recognizer on the current underlay and open the review. */
 export async function runRecognition() {
@@ -60,11 +60,11 @@ export async function runRecognition() {
       }
     }
     draft.rooms = proposeRooms(draft.walls, { texts });
-    // windows onto a balcony are balcony doors (#37)
+    // openings onto a balcony are glazed balcony doors down to the floor (#37)
     if (texts) {
-      const before = draft.openings.filter((o) => o.kind === 'door').length;
+      const before = draft.openings.filter(isGlassDoor).length;
       draft.openings = balconyDoors(draft.openings, texts, roomInteriors(draft.walls));
-      if (draft.openings.filter((o) => o.kind === 'door').length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als Türen übernommen – bitte prüfen.');
+      if (draft.openings.filter(isGlassDoor).length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als bodentiefe Glastüren übernommen – bitte prüfen.');
     }
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale

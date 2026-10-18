@@ -64,6 +64,16 @@ describe('shortest walking path (#67)', () => {
     expect(crossing).toBe(true);
   });
 
+  it('a glass door (window down to the floor) can be walked through when open, a window cannot (#37)', () => {
+    const p = twoRooms(false);
+    const w = closestWall(p, { x: 4.06, y: 1.75 })!;
+    addOpening(p, w.wall.id, 'window', w.s, { width: 0.9, sillHeight: 0, height: 2.1 });
+    p.openings[0].open = true;
+    expect(walk(p, { x: 1, y: 1 }, { x: 7, y: 2.5 }).ok).toBe(true);
+    p.openings[0].sillHeight = 0.9;
+    expect(walk(p, { x: 1, y: 1 }, { x: 7, y: 2.5 }).ok).toBe(false);
+  });
+
   it('a closed door blocks – with a clear reason', () => {
     const p = twoRooms(true);
     p.openings[0].open = false;

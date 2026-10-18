@@ -15,6 +15,8 @@ interface VectorParams {
   tMin: number;
   tMax: number;
   minLen: number;
+  /** Largest gap (px) between the pieces of one dashed wall line. */
+  dashGap: number;
   angTol: number;
   assemble: AssembleOptions;
 }
@@ -24,8 +26,9 @@ function vectorParams(mpp: number): VectorParams {
     tMin: 0.05 / mpp,
     tMax: 0.6 / mpp,
     minLen: 0.3 / mpp,
+    dashGap: 0.12 / mpp,
     angTol: Math.sin((1.5 * Math.PI) / 180),
-    assemble: { mergeGap: 0.12 / mpp, minOpening: 0.5 / mpp, maxOpening: 2.6 / mpp, joinTol: 0.08 / mpp, maxThickness: 0.6 / mpp },
+    assemble: { mergeGap: 0.12 / mpp, minOpening: 0.5 / mpp, maxOpening: 2.6 / mpp, joinTol: 0.08 / mpp, maxThickness: 0.6 / mpp, maxPassage: 1.5 / mpp },
   };
 }
 
@@ -89,11 +92,45 @@ function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i:
     const len = Math.hypot(dx, dy);
     if (len < 1e-6) return;
     if (s.curve || (isWallLine && !isWallLine(i))) others.push(s);
-    else if (Math.abs(dy) / len <= p.angTol && len >= p.minLen) hs.push({ a0: Math.min(s.x1, s.x2), a1: Math.max(s.x1, s.x2), c: (s.y1 + s.y2) / 2 });
-    else if (Math.abs(dx) / len <= p.angTol && len >= p.minLen) vs.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
+    else if (Math.abs(dy) / len <= p.angTol) hs.push({ a0: Math.min(s.x1, s.x2), a1: Math.max(s.x1, s.x2), c: (s.y1 + s.y2) / 2 });
+    else if (Math.abs(dx) / len <= p.angTol) vs.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
     else others.push(s);
   });
-  return { hs, vs, others };
+  // short pieces that do not join into a dashed wall face stay symbol lines (frames, thresholds)
+  const keep = (lines: L[], o: 'h' | 'v') => {
+    const short = lines.filter((l) => l.a1 - l.a0 < p.minLen);
+    const dashed = joinDashes(short, p.dashGap).filter((d) => d.a1 - d.a0 >= p.minLen && d.n >= 3);
+    for (const l of short)
+      if (!dashed.some((d) => Math.abs(d.c - l.c) <= 0.5 && l.a0 >= d.a0 && l.a1 <= d.a1))
+        others.push(o === 'h' ? { x1: l.a0, y1: l.c, x2: l.a1, y2: l.c } : { x1: l.c, y1: l.a0, x2: l.c, y2: l.a1 });
+    return [...lines.filter((l) => l.a1 - l.a0 >= p.minLen), ...dashed.map(({ a0, a1, c }) => ({ a0, a1, c }))];
+  };
+  return { hs: keep(hs, 'h'), vs: keep(vs, 'v'), others };
+}
+
+/**
+ * Wall faces drawn dashed (light partitions, e.g. between WC and storeroom, #37) arrive as short
+ * collinear pieces; pieces on one line with small gaps are joined into one face (n = number of
+ * pieces). Door and window gaps are much wider and stay open.
+ */
+function joinDashes(lines: L[], gap: number): (L & { n: number })[] {
+  const sorted = [...lines].sort((p, q) => p.c - q.c || p.a0 - q.a0);
+  const out: (L & { n: number })[] = [];
+  const open: (L & { n: number })[] = [];
+  for (const l of sorted) {
+    // lines clearly beside the current one can no longer be joined
+    while (open.length && l.c - open[0].c > 0.5) open.shift();
+    const cur = open.find((o) => l.a0 - o.a1 <= gap);
+    if (cur) {
+      cur.a1 = Math.max(cur.a1, l.a1);
+      cur.n++;
+    } else {
+      const n = { ...l, n: 1 };
+      out.push(n);
+      open.push(n);
+    }
+  }
+  return out;
 }
 
 function makeVectorClassifier(hs: L[], vs: L[], others: VectorSegment[]): GapClassifier {
@@ -109,16 +146,19 @@ function makeVectorClassifier(hs: L[], vs: L[], others: VectorSegment[]): GapCla
     if (Math.abs(dy) / len <= tol) oh.push({ a0: Math.min(s.x1, s.x2), a1: Math.max(s.x1, s.x2), c: (s.y1 + s.y2) / 2 });
     else if (Math.abs(dx) / len <= tol) ov.push({ a0: Math.min(s.y1, s.y2), a1: Math.max(s.y1, s.y2), c: (s.x1 + s.x2) / 2 });
   }
+  // plans with real curves draw swing arcs as curves; straight lines then never make an arc (hatching)
+  const hasCurves = others.some((s) => s.curve);
   return (b, g0, g1) => {
     // window: lines parallel to the wall inside the gap (wall pens or thinner symbol lines)
     const inGapParallel = (l: L) => l.a0 >= g0 - 2 && l.a1 <= g1 + 2 && Math.abs(l.c - b.c) <= b.t / 2 + 1;
     const symbolParallel = (b.o === 'h' ? oh : ov).filter((l) => inGapParallel(l) && l.a1 - l.a0 > (g1 - g0) * 0.5);
     // one thin line across a gap is usually a door threshold; a window frame has two or more
     const parallel = (b.o === 'h' ? hs : vs).filter(inGapParallel).length + (symbolParallel.length >= 2 ? symbolParallel.length : 0);
-    const door = doorSymbol(b, g0, g1, others);
-    // a door symbol wins over frame lines: glazed balcony/patio doors are drawn like windows plus a leaf (#37)
-    if (door) return door;
-    if (parallel >= 1) return { kind: 'window', confidence: 0.6, note: 'Parallele Linien in der Öffnung' };
+    const door = doorSymbol(b, g0, g1, others, hasCurves);
+    // a frame (two or more lines along the gap) wins over a swing symbol: windows are drawn with their
+    // sash swing too (#37); glazed doors onto a balcony are found later from the balcony area
+    if (door && parallel < 2) return door;
+    if (parallel >= 1) return { kind: 'window', confidence: 0.6, ...(door?.hingeSide ? { hingeSide: door.hingeSide } : {}), note: 'Rahmenlinien in der Öffnung' };
     return { kind: 'passage', confidence: 0.4, note: 'Öffnung ohne erkennbares Symbol' };
   };
 }
@@ -126,10 +166,11 @@ function makeVectorClassifier(hs: L[], vs: L[], others: VectorSegment[]): GapCla
 /**
  * Door symbol at the gap g0–g1 of band b: a leaf (straight line about as long as the gap, starting
  * at one gap end and standing about square to the wall) or a swing arc around one gap end. Only these
- * make a door – hatching, labels or furniture lines next to a gap do not (#37). The hinge is the
+ * make a door – hatching, labels or furniture lines next to a gap do not (#37). If the plan has
+ * curves, only curve pieces count as an arc. The hinge is the
  * gap end the symbol starts from, the swing side the side it lies on.
  */
-function doorSymbol(b: Band, g0: number, g1: number, others: VectorSegment[]): GapInfo | null {
+function doorSymbol(b: Band, g0: number, g1: number, others: VectorSegment[], curvesOnly: boolean): GapInfo | null {
   const width = g1 - g0;
   const half = b.t / 2;
   // positions in the band frame: along the wall (a) and across it, relative to the centre line (c)
@@ -155,6 +196,7 @@ function doorSymbol(b: Band, g0: number, g1: number, others: VectorSegment[]): G
           if (atHinge && out && square && len >= 0.6 * width && len <= 1.3 * width) leaf++;
         }
         // arc: pieces at about one gap width from the hinge, running around it (not towards it)
+        if (curvesOnly && !s.curve) continue;
         const r1 = Math.hypot(p.a - hinge, p.c);
         const r2 = Math.hypot(q.a - hinge, q.c);
         if (Math.min(p.c, q.c) < half * 0.5) continue;

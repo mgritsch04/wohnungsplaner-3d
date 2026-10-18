@@ -63,6 +63,25 @@ describe('room proposals', () => {
     expect(right.statedArea).toBe(18.4);
   });
 
+  it('an open area with several room labels gets all names and the sum of their areas (#37)', () => {
+    const rooms = proposeRooms(twoRooms, {
+      texts: [
+        { str: 'Küche', x: 5.5, y: 2 },
+        { str: '7,33 m²', x: 5.5, y: 2.12 },
+        { str: 'Wohnzimmer', x: 5.5, y: 3.5 },
+        { str: '23,04 m²', x: 5.5, y: 3.62 },
+        { str: 'Gang', x: 2, y: 2 },
+        { str: '8,60 m²', x: 2, y: 2.12 },
+        { str: 'Diele', x: 2, y: 4 }, // no area text near it
+      ],
+    });
+    const [left, right] = [...rooms].sort((a, b) => a.labelPoint.x - b.labelPoint.x);
+    expect(right.name).toBe('Küche / Wohnzimmer');
+    expect(right.statedArea).toBe(30.37);
+    expect(left.name).toBe('Gang / Diele');
+    expect(left.statedArea).toBe(8.6); // not all labels have an area: no sum
+  });
+
   it('marks very small areas as uncertain, ignores tiny ones and open wall chains', () => {
     // a 1.2 × 1.2 m shaft (net 1 m²) and a 0.4 × 0.4 m gap between walls
     const shaft = [wall({ x: 0, y: 0 }, { x: 1.2, y: 0 }), wall({ x: 1.2, y: 0 }, { x: 1.2, y: 1.2 }), wall({ x: 1.2, y: 1.2 }, { x: 0, y: 1.2 }), wall({ x: 0, y: 1.2 }, { x: 0, y: 0 })];

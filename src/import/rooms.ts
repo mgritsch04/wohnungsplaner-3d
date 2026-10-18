@@ -78,6 +78,36 @@ export function parseAreaText(s: string): number | null {
   return v > 0 && v < 1000 ? v : null;
 }
 
+/** Distance (m) within which an area text belongs to the room name above or beside it. */
+const LABEL_REACH = 0.6;
+
+/**
+ * Name and stated area of an area from the texts inside it. Name and area may share one text item
+ * ("Wohnen 32,50 m²", as CAD programs often export them). An open area can carry several room
+ * labels (kitchen and living room, hall and corridor without a wall between them, #37): the names
+ * are joined and their areas added up.
+ */
+function roomLabel(inside: PlacedText[]): { named?: string; statedArea?: number } {
+  const areas = inside.map((t) => ({ t, v: parseAreaText(t.str) })).filter((a): a is { t: PlacedText; v: number } => a.v !== null);
+  const labels = inside
+    .map((t) => ({ t, name: t.str.replace(AREA_TEXT, '').trim() }))
+    .filter((l) => NAME_TEXT.test(l.name) && ROOM_WORDS.test(l.name))
+    .sort((p, q) => p.t.y - q.t.y || p.t.x - q.t.x)
+    .map((l) => {
+      const own = parseAreaText(l.t.str);
+      const near = areas
+        .map((a) => ({ v: a.v, d: Math.hypot(a.t.x - l.t.x, a.t.y - l.t.y) }))
+        .filter((a) => a.d <= LABEL_REACH)
+        .sort((p, q) => p.d - q.d)[0];
+      return { name: l.name, area: own ?? near?.v };
+    });
+  const names = [...new Set(labels.map((l) => l.name))];
+  if (names.length <= 1) return { named: names[0], statedArea: labels[0]?.area ?? areas[0]?.v };
+  const all = labels.every((l) => l.area !== undefined);
+  const sum = labels.reduce((s, l) => s + (l.area ?? 0), 0);
+  return { named: names.join(' / '), statedArea: all ? Math.round(sum * 100) / 100 : areas[0]?.v };
+}
+
 /** Room proposals with the clear interior outline of their area. */
 function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: DraftRoom; interior: Vec2[] }[] {
   const minArea = opts.minArea ?? 0.5;
@@ -97,16 +127,15 @@ function roomProposals(walls: DraftWall[], opts: RoomProposalOptions): { room: D
   const usedNames = new Map<string, number>();
   return candidates.map((g, i) => {
     const inside = (opts.texts ?? []).filter((t) => pointInPolygon(t, g.interior));
-    // name and area may share one text item ("Wohnen 32,50 m²", as CAD programs often export them)
-    const named = inside.map((t) => t.str.replace(AREA_TEXT, '').trim()).find((s) => NAME_TEXT.test(s) && ROOM_WORDS.test(s));
+    const { named, statedArea } = roomLabel(inside);
     let name = named ?? `Raum ${i + 1}`;
     if (named) {
       const n = (usedNames.get(named) ?? 0) + 1;
       usedNames.set(named, n);
       if (n > 1) name = `${named} ${n}`;
     }
-    const statedArea = inside.map((t) => parseAreaText(t.str)).find((v): v is number => v !== null);
-    const uncertain = g.area < uncertainBelow;
+    // a small area the plan names (WC, storeroom) is a room; unnamed small areas are doubtful
+    const uncertain = g.area < uncertainBelow && !named;
     const room: DraftRoom = {
       id: newId('drm'),
       name,

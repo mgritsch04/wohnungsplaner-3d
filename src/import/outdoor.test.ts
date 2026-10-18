@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DraftOpening, DraftWall } from './draft';
+import { isGlassDoor } from '../model/schema';
 import { balconyDoors, BALCONY_DOOR_HEIGHT, outdoorRailings, RAILING_HEIGHT } from './outdoor';
 import { proposeRooms, roomInteriors } from './rooms';
 
@@ -58,11 +59,12 @@ describe('balcony doors (#37)', () => {
     status: 'uncertain',
     accepted: true,
   });
-  it('a window in the wall onto the balcony becomes a door to the floor, other windows stay', () => {
+  it('a window in the wall onto the balcony becomes a glass door to the floor, other windows stay', () => {
     const railings = outdoorRailings(flat, texts, [floor], () => false);
     const walls = [...flat, ...railings];
     const out = balconyDoors([opening('window', 2.5, 4), opening('window', 5.2, 4), opening('window', 3, 0)], texts, roomInteriors(walls));
-    expect(out[0]).toMatchObject({ kind: 'door', sillHeight: 0, height: BALCONY_DOOR_HEIGHT });
+    expect(out[0]).toMatchObject({ kind: 'window', sillHeight: 0, height: BALCONY_DOOR_HEIGHT });
+    expect(isGlassDoor(out[0])).toBe(true);
     // beside the balcony (x = 5.2 lies past its end at 4.5) and on the far side: still windows
     expect(out[1].kind).toBe('window');
     expect(out[2].kind).toBe('window');

@@ -53,6 +53,16 @@ export const OpeningKindSchema = z.enum(['door', 'window', 'passage']);
  */
 export const defaultLeafOpen = (kind: z.infer<typeof OpeningKindSchema>): boolean => kind === 'door';
 
+/**
+ * A window down to the floor is a glazed door (balcony/patio door, French window, #37): drawn and
+ * rendered like a window, but people walk through it when its sash is open.
+ */
+export const isGlassDoor = (o: { kind: z.infer<typeof OpeningKindSchema>; sillHeight: number }): boolean => o.kind === 'window' && o.sillHeight < 0.05;
+
+/** German name of an opening for lists and headings. */
+export const openingLabel = (o: { kind: z.infer<typeof OpeningKindSchema>; sillHeight: number }): string =>
+  o.kind === 'door' ? 'Tür' : isGlassDoor(o) ? 'Glastür' : o.kind === 'window' ? 'Fenster' : 'Durchgang';
+
 export const OpeningSchema = z
   .object({
     id: z.string().min(1),

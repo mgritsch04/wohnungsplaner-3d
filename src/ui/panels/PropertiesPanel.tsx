@@ -8,7 +8,7 @@ import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import { catalogColors } from '../../catalog/generic';
 import { useCatalogStore } from '../../catalog/catalogStore';
-import { defaultLeafOpen, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
+import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
@@ -181,7 +181,7 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           {openings.map((o) => (
             <li key={o.id}>
               <button className="link-btn" onClick={() => useUiStore.getState().setSelection({ type: 'opening', id: o.id })}>
-                {o.kind === 'door' ? 'Tür' : o.kind === 'window' ? 'Fenster' : 'Durchgang'} {Math.round(o.width * 100)} cm
+                {openingLabel(o)} {Math.round(o.width * 100)} cm
               </button>
             </li>
           ))}
@@ -320,7 +320,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
           ))}
         </div>
       )}
-      <PanelGroup groupKey="opening.object" title={o.kind === 'door' ? 'Tür' : o.kind === 'window' ? 'Fenster' : 'Durchgang'}>
+      <PanelGroup groupKey="opening.object" title={openingLabel(o)}>
         <ProvenanceInfo p={o.provenance} />
         <SelectField
           label="Typ"

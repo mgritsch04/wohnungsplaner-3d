@@ -3998,11 +3998,11 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   const storeroom = draft.rooms.find((r) => r.name === 'AR')!;
   expect(storeroom.area).toBeGreaterThan(1);
   expect(storeroom.area).toBeLessThan(2);
-  // the opening onto the balcony is a balcony door down to the floor, not a window (#37)
+  // the opening onto the balcony is a glass balcony door down to the floor (a window without sill), not an inner door (#37)
   type O = { kind: string; width: number; sillHeight: number; hingeSide?: { x: number; y: number }; swingSide?: { x: number; y: number } };
   const openings = (draft as unknown as { openings: O[] }).openings;
   const balconyDoor = openings.find((o) => Math.abs(o.width - 1.5) < 0.1)!;
-  expect(balconyDoor).toMatchObject({ kind: 'door', sillHeight: 0 });
+  expect(balconyDoor).toMatchObject({ kind: 'window', sillHeight: 0 });
   // the partition door: leaf and swing arc give the hinge and the swing side (into the bedroom, east)
   const inner = openings.find((o) => Math.abs(o.width - 0.9) < 0.1)!;
   expect(inner.kind).toBe('door');
