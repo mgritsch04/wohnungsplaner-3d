@@ -14,7 +14,7 @@ import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } f
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
 import { usePhoneLayout } from './phoneLayout';
-import { IconCutaway, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconUndo, IconWalk } from './icons';
+import { IconCutaway, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
 
 /**
  * Button that shows only an icon (#103). The name is the `aria-label` (screen readers, tests),
@@ -76,6 +76,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
   const quality = useProjectStore((s) => s.project.settings.quality);
+  const trueScale = useProjectStore((s) => s.project.settings.walkTrueScale);
   const viewMode = useUiStore((s) => s.viewMode);
   const setViewMode = useUiStore((s) => s.setViewMode);
   const cameraMode = useUiStore((s) => s.cameraMode);
@@ -204,6 +205,17 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
                 <IconSit />
               </IconButton>
             </div>
+          )}
+          {cameraMode === 'walk' && (
+            <IconButton
+              label="Echt-Maßstab"
+              text="Echt-Maßstab"
+              tip="Echt-Maßstab: Sichtfeld passend zu Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt (Werte im Projekt-Panel). Aus: gewohnter Weitwinkel"
+              pressed={trueScale}
+              onClick={() => apply((d) => void (d.settings.walkTrueScale = !d.settings.walkTrueScale))}
+            >
+              <IconTrueScale />
+            </IconButton>
           )}
         </div>
       )}

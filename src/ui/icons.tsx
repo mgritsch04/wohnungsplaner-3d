@@ -67,6 +67,15 @@ export const IconWalk = () => (
   </Svg>
 );
 
+/** Person next to a measuring rod: real size (#256). */
+export const IconTrueScale = () => (
+  <Svg>
+    <circle cx="9" cy="4.5" r="1.8" />
+    <path d="M9 8v6l-2 6.5M9 14l2 6.5M6 11l3-2.5 3 2.5" />
+    <path d="M17 3v18M17 6h2M17 10h2M17 14h2M17 18h2" />
+  </Svg>
+);
+
 /** Standing person. */
 export const IconStand = () => (
   <Svg>

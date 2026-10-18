@@ -19,7 +19,7 @@ import { createLookFilter } from './lookFilter';
 import { TOUCH_LOOK_FACTOR, touchWalk, walkCommands } from './touchWalk';
 import { BUTTON, createGamepadSource, LOOK_RATE } from './input/gamepad';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
-import { nextWalkFov, WALK_FOV, wheelPixels, zoomLookFactor } from './walkZoom';
+import { nextWalkFov, trueScaleFov, WALK_FOV, wheelPixels, zoomLookFactor } from './walkZoom';
 
 interface Props {
   derived: DerivedPlan;
@@ -39,7 +39,8 @@ interface Props {
  * openings stay passable, closed doors not) and solid furniture; height is fixed at
  * eye level. Click/E/O at the crosshair opens or closes a door or window (#21, #107).
  * A gamepad works alongside keyboard and mouse (#29, see input/gamepad.ts). The mouse wheel
- * zooms by narrowing the field of view; Z or the middle mouse button resets it (#228).
+ * zooms by narrowing the field of view; Z or the middle mouse button resets it (#228). With
+ * "Echt-Maßstab" the base field of view matches the screen, so sizes look real (#256).
  */
 /** Look speed at sensitivity factor 1 (radians per pixel). */
 export const BASE_LOOK_SENSITIVITY = 0.0022;
@@ -62,7 +63,7 @@ function openingIdOf(o: THREE.Object3D | null): string | null {
 }
 
 export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
-  const { camera, gl, scene } = useThree();
+  const { camera, gl, scene, size } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
   const carry = useRef<{ id: string; last: Vec2 | null } | null>(null);
@@ -76,8 +77,26 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   const yaw = useRef(0);
   const pitch = useRef(0);
   const dragLook = useRef<{ x: number; y: number } | null>(null);
-  // field of view of the wheel zoom (#228); every walkthrough starts at the normal view
-  const fov = useRef(WALK_FOV);
+  // base field of view: the wide angle, or with "Echt-Maßstab" the real-size angle of this screen (#256)
+  const trueScale = useProjectStore((s) => s.project.settings.walkTrueScale);
+  const diagonal = useProjectStore((s) => s.project.settings.screenDiagonal);
+  const distance = useProjectStore((s) => s.project.settings.viewingDistance);
+  const baseFov = trueScale
+    ? trueScaleFov({ diagonalInch: diagonal, distance, viewHeightPx: size.height, screenWidthPx: window.screen?.width ?? 0, screenHeightPx: window.screen?.height ?? 0 })
+    : WALK_FOV;
+  const base = useRef(baseFov);
+  // field of view of the wheel zoom (#228); every walkthrough starts at the base value
+  const fov = useRef(baseFov);
+  useEffect(() => {
+    // a new base (switch toggled, window resized) also ends the zoom; the first value is set on
+    // entering below, which also remembers the overview's field of view
+    if (base.current === baseFov) return;
+    base.current = fov.current = baseFov;
+    const cam = camera as THREE.PerspectiveCamera;
+    if (cam.fov === baseFov) return;
+    cam.fov = baseFov;
+    cam.updateProjectionMatrix();
+  }, [baseFov, camera]);
   // read through a ref: changing the sensitivity must not re-register listeners (or drop pointer lock)
   const sensitivityRef = useRef(sensitivity);
   useEffect(() => {
@@ -119,8 +138,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     camera.rotation.set(0, 0, 0, 'YXZ');
     const cam = camera as THREE.PerspectiveCamera;
     const oldFov = cam.fov;
-    fov.current = WALK_FOV;
-    cam.fov = WALK_FOV;
+    fov.current = base.current;
+    cam.fov = base.current;
     cam.near = 0.05;
     cam.updateProjectionMatrix();
     return () => {
@@ -233,8 +252,8 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
         return;
       }
       if (e.code === 'KeyZ' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // back to the normal view after zooming with the wheel (#228)
-        setFov(WALK_FOV);
+        // back to the base view after zooming with the wheel (#228)
+        setFov(base.current);
         return;
       }
       if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -260,7 +279,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setFov(nextWalkFov(fov.current, wheelPixels(e.deltaY, e.deltaMode)));
+      setFov(nextWalkFov(fov.current, wheelPixels(e.deltaY, e.deltaMode), base.current));
     };
     const clear = () => {
       keys.current.clear();
@@ -268,7 +287,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     };
     const look = (dx: number, dy: number) => {
       // zoomed in, the view turns slower so aiming stays calm (#228)
-      const k = sensitivityRef.current * zoomLookFactor(fov.current);
+      const k = sensitivityRef.current * zoomLookFactor(fov.current, base.current);
       yaw.current -= dx * k;
       pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - dy * k));
     };
@@ -305,7 +324,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       if (e.button === 1) {
         // middle button: reset the wheel zoom (#228); no autoscroll
         e.preventDefault();
-        setFov(WALK_FOV);
+        setFov(base.current);
         return;
       }
       downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
@@ -423,6 +442,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
       targetOpening: () => walkApi.current?.targetOpening() ?? null,
       toggleOpening: () => walkApi.current?.toggleOpening(),
       fov: () => fov.current,
+      baseFov: () => base.current,
     };
     return () => void delete wp.walk;
   }, []);
@@ -453,7 +473,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
     const dt = Math.min(dtRaw, 0.05);
     const pad = gamepad.poll();
     if (pad) {
-      const rate = LOOK_RATE * zoomLookFactor(fov.current) * dt;
+      const rate = LOOK_RATE * zoomLookFactor(fov.current, base.current) * dt;
       yaw.current -= pad.look.x * rate;
       pitch.current = Math.max(-1.4, Math.min(1.4, pitch.current - pad.look.y * rate));
       const api = walkApi.current;

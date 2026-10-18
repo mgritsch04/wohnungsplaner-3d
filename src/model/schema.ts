@@ -336,6 +336,11 @@ export const SettingsSchema = z.object({
   eyeHeight: z.number().min(1).max(2.2).default(1.63),
   /** Eye height when seated in the walkthrough (#78), metres – e.g. on the sofa or at the dining table. */
   sitEyeHeight: z.number().min(0.6).max(1.6).default(1.2),
+  /** Walkthrough "Echt-Maßstab" (#256): field of view from screen size and viewing distance instead of the wide angle. */
+  walkTrueScale: z.boolean().default(false),
+  /** Screen diagonal (inches) and viewing distance (metres) for the true-scale field of view. */
+  screenDiagonal: z.number().min(10).max(100).default(24),
+  viewingDistance: z.number().min(0.3).max(3).default(0.6),
   /** How furniture snaps while dragging (#52): grid steps + wall edges, wall edges only, or free. Alt = free temporarily. */
   furnitureSnap: z.enum(['grid5', 'grid10', 'wall', 'off']).default('grid5'),
   /** Minimum clear width of passages (#68) in metres – a guideline, not a building code. */

@@ -88,6 +88,35 @@ export function ProjectPanel() {
           title="Kamerahöhe beim Sitzen im Begehen-Modus, z. B. auf dem Sofa (Standard 120 cm)"
           onChange={(v) => apply((d) => void (d.settings.sitEyeHeight = Math.max(0.6, Math.min(1.6, v))))}
         />
+        <CheckField
+          label="Echt-Maßstab beim Begehen"
+          checked={s.walkTrueScale}
+          onChange={(v) => apply((d) => void (d.settings.walkTrueScale = v))}
+          title="Sichtfeld aus Bildschirmgröße und Sitzabstand, damit Räume und Möbel so groß wirken wie in echt. Aus: gewohnter Weitwinkel (70°)"
+        />
+        <NumberField
+          label="Bildschirmdiagonale"
+          value={s.screenDiagonal}
+          digits={1}
+          unit="Zoll"
+          min={10}
+          max={100}
+          step={0.5}
+          title="Diagonale deines Bildschirms für den Echt-Maßstab (Standard 24 Zoll)"
+          onChange={(v) => apply((d) => void (d.settings.screenDiagonal = Math.max(10, Math.min(100, v))))}
+        />
+        <NumberField
+          label="Sitzabstand zum Bildschirm"
+          value={s.viewingDistance}
+          factor={100}
+          digits={0}
+          unit="cm"
+          min={30}
+          max={300}
+          step={5}
+          title="Abstand deiner Augen zum Bildschirm für den Echt-Maßstab (Standard 60 cm)"
+          onChange={(v) => apply((d) => void (d.settings.viewingDistance = Math.max(0.3, Math.min(3, v))))}
+        />
         <CheckField label="Beim Begehen sitzen (Taste X)" checked={walkSit} onChange={(v) => useUiStore.getState().setWalkSit(v)} title="Umschalten zwischen Stehen und Sitzen – wirkt sofort beim Begehen" />
       </Section>
 
