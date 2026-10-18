@@ -66,4 +66,15 @@ describe('review conflicts', () => {
     expect(c.some((x) => x.ids.includes('o'))).toBe(true);
     expect(c.some((x) => x.ids.includes('c') && x.ids.length === 2)).toBe(false);
   });
+
+  it('a wall running on through a thick shaft block in line with it is no conflict (#37)', () => {
+    const w = (id: string, ax: number, ay: number, bx: number, by: number, thickness: number) =>
+      ({ id, a: { x: ax, y: ay }, b: { x: bx, y: by }, thickness, height: 2.5, status: 'estimated', accepted: true }) as const;
+    // 10 cm wall, 45 cm block offset to one side but still holding the wall inside
+    const inside = findDraftConflicts({ ...base, walls: [w('wall', 0, 0, 0, 4, 0.1), w('block', 0.15, 0, 0.15, 0.8, 0.45)] });
+    expect(inside).toEqual([]);
+    // a wall sticking out of the block's side still overlaps it
+    const out = findDraftConflicts({ ...base, walls: [w('wall', 0, 0, 0, 4, 0.2), w('block', 0.2, 0, 0.2, 0.8, 0.45)] });
+    expect(out).toHaveLength(1);
+  });
 });
