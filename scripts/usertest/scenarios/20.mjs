@@ -65,15 +65,15 @@ export default {
         const locked = await page.evaluate(() => !!document.pointerLockElement);
         t.stand = await settledY(t);
         return {
-          status: cross === 1 && locked && Math.abs(t.stand - 1.63) < 0.01 ? 'ok' : 'fail',
-          observed: `Nach „Begehen“ und Klick in die Ansicht: Fadenkreuz ${cross ? 'sichtbar' : 'nicht sichtbar'}, Augenhöhe ${cm(t.stand)} cm (Standard 163 cm), Maus ${locked ? 'gefangen (Umsehen mit der Maus aktiv)' : 'nicht gefangen'}.`,
+          status: cross === 1 && locked && Math.abs(t.stand - 1.52) < 0.01 ? 'ok' : 'fail',
+          observed: `Nach „Begehen“ und Klick in die Ansicht: Fadenkreuz ${cross ? 'sichtbar' : 'nicht sichtbar'}, Augenhöhe ${cm(t.stand)} cm (Standard 152 cm bei 163 cm Körpergröße), Maus ${locked ? 'gefangen (Umsehen mit der Maus aktiv)' : 'nicht gefangen'}.`,
         };
       },
     },
     {
       nr: 2,
       action: 'C einmal drücken (Ducken ist ein Umschalter, nicht Halten).',
-      expected: 'Die Kamera senkt sich weich auf etwa 60 % deiner Augenhöhe (bei 163 cm ca. 98 cm, mindestens 80 cm). Oben steht „⤓ Geduckt“, du gehst langsamer, und das bleibt so.',
+      expected: 'Die Kamera senkt sich weich auf etwa 60 % deiner Augenhöhe (bei 152 cm Augenhöhe ca. 91 cm, mindestens 80 cm). Oben steht „⤓ Geduckt“, du gehst langsamer, und das bleibt so.',
       async run(t) {
         const { page } = t;
         const walkStand = await stride(t, 800);
@@ -126,7 +126,7 @@ export default {
         const up = await settledY(t);
         const s2 = await ui(t);
         return {
-          status: s.sit && !s.duck && n === 0 && Math.abs(sitY - 1.2) < 0.01 && Math.abs(up - t.stand) < 0.005 && !s2.sit && !s2.duck ? 'ok' : 'fail',
+          status: s.sit && !s.duck && n === 0 && Math.abs(sitY - 1.21) < 0.01 && Math.abs(up - t.stand) < 0.005 && !s2.sit && !s2.duck ? 'ok' : 'fail',
           observed: `Geduckt (${cm(low)} cm), dann X: ${s.sit ? 'sitzend' : 'nicht sitzend'} auf ${cm(sitY)} cm Augenhöhe, „Geduckt“ ${n ? 'noch da' : 'weg'}. Nochmal X: ${cm(up)} cm, ${s2.duck ? 'wieder geduckt' : 'normal stehend'}.`,
         };
       },
