@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Furniture, QualityMode } from '../model/schema';
 import { planRotationToWorldY, roundMm } from '../model/units';
-import { ProceduralModel } from './ProceduralModel';
+import { lookOf, ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
 import { baseBox, DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
@@ -53,10 +53,11 @@ export const FurnitureObject = memo(
     });
     const shape = item.model.type === 'procedural' ? item.model.shape : item.model.fallbackShape;
     const accent = item.kitchen?.frontColor;
+    const look = lookOf(item.model);
     const castShadow = quality === 'realism' && item.height > 0.05;
 
     const fallback = (
-      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} quality={quality} castShadow={castShadow} />
+      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} quality={quality} castShadow={castShadow} />
     );
 
     /** End the current gesture; `commit` keeps the moved position, otherwise it is reverted. */

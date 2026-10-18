@@ -21,7 +21,7 @@ import type { Furniture, Material, Project } from '../model/schema';
 import { planRotationToWorldY } from '../model/units';
 import { add, pointInPolygon, scale } from '../model/vec';
 import { buildFlatPolygon, buildWallGeometry } from '../view3d/prismGeometry';
-import { buildParts } from '../view3d/ProceduralModel';
+import { buildParts, lookOf } from '../view3d/ProceduralModel';
 
 export interface GlbExportOptions {
   /** Loaded scenes of imported 3D models per furniture id; others get procedural bodies. */
@@ -60,7 +60,7 @@ export function fitModelToItem(model: THREE.Object3D, item: Pick<Furniture, 'wid
 function proceduralBody(f: Furniture): THREE.Group {
   const g = new THREE.Group();
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
-  for (const p of buildParts(shape, f.width, f.depth, f.height, f.color, f.kitchen?.frontColor, f.finish)) {
+  for (const p of buildParts(shape, f.width, f.depth, f.height, f.color, f.kitchen?.frontColor, f.finish, lookOf(f.model))) {
     const mesh = new THREE.Mesh(p.geo, colorMat(p.color, { roughness: p.rough, metalness: p.metal, opacity: p.opacity }));
     mesh.position.set(...p.p);
     mesh.scale.set(...p.s);

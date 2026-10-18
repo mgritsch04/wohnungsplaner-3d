@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type { FurnitureFinish, QualityMode } from '../model/schema';
+import type { FurnitureFinish, ModelRef, QualityMode, TableBase } from '../model/schema';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
 import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
@@ -78,6 +78,8 @@ export interface Part {
   /** Surface structure in realism mode. */
   detail?: DetailKind;
   detailRepeat?: number;
+  /** Takes the product photo texture when the item has one (#273: table tops). */
+  textured?: boolean;
 }
 
 /** Colours of the item's main parts (its colour and shades of it), collected while `buildParts` runs. */
@@ -132,24 +134,84 @@ const BLACK = '#26272a';
  * Parts of a procedural model. With a `finish` (#63) the main parts, i.e. those in the item colour
  * or a shade of it, get that material's surface; fixed parts (metal feet, glass, glowing shades) keep theirs.
  */
-export function buildParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, finish?: FurnitureFinish): Part[] {
-  if (!finish) return shapeParts(shape, w, d, h, color, accent);
+export function buildParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, finish?: FurnitureFinish, look: ProceduralLook = {}): Part[] {
+  if (!finish) return shapeParts(shape, w, d, h, color, accent, look);
   const own = new Set([color.toLowerCase()]);
   tones = own;
   let parts: Part[];
   try {
-    parts = shapeParts(shape, w, d, h, color, accent);
+    parts = shapeParts(shape, w, d, h, color, accent, look);
   } finally {
     tones = null;
   }
-  const look = FINISH_LOOK[finish];
-  return parts.map((p) => (own.has(p.color.toLowerCase()) && !p.emissive && (p.opacity ?? 1) === 1 ? { ...p, ...look } : p));
+  const surface = FINISH_LOOK[finish];
+  return parts.map((p) => (own.has(p.color.toLowerCase()) && !p.emissive && (p.opacity ?? 1) === 1 ? { ...p, ...surface } : p));
 }
 
-function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string): Part[] {
+/** Product details beyond the main colour (#273): frame/leg colour and the kind of table base. */
+export interface ProceduralLook {
+  /** colour of legs, frame or base; default: a shade of the main colour (tables) or the shape's own */
+  secondary?: string;
+  /** table/desk base: four legs (default), sled frames, X frames, centre pedestal or side panels */
+  base?: TableBase;
+  /** part sizes from the product page, in meters */
+  topThickness?: number;
+  legSize?: number;
+  seatHeight?: number;
+  /** product photo crop (data URL) for the main surface, e.g. a table top */
+  texture?: string;
+}
+
+/** The look fields a procedural model reference carries (#273). */
+export function lookOf(model: ModelRef): ProceduralLook {
+  if (model.type !== 'procedural') return {};
+  const { secondaryColor: secondary, base, topThickness, legSize, seatHeight, texture } = model;
+  return { secondary, base, topThickness, legSize, seatHeight, texture };
+}
+
+/** Base under a rectangular table top whose underside is at height `top` (half sizes W, D). */
+function tableBase(base: TableBase, W: number, D: number, top: number, c: string, size?: number): Part[] {
+  const metal: Partial<Part> = { rough: 0.4 };
+  const t = (size ?? 0.04) / 2; // half bar thickness
+  const inset = Math.min(0.18, Math.max(0.06, W * 0.15)); // frames sit a little in from the ends
+  switch (base) {
+    case 'sled':
+      // a closed U/rectangle frame at each end, standing on a floor rail
+      return [-W + inset, W - inset].flatMap((x) => [
+        box(x - t, 0, -D + 0.06, x + t, 0.03, D - 0.06, c, metal),
+        box(x - t, 0, -D + 0.06, x + t, top, -D + 0.1, c, metal),
+        box(x - t, 0, D - 0.1, x + t, top, D - 0.06, c, metal),
+        box(x - t, top - 0.03, -D + 0.06, x + t, top, D - 0.06, c, metal),
+      ]);
+    case 'x': {
+      // a crossed pair of bars at each end
+      const dz = 2 * (D - 0.08);
+      const len = Math.hypot(dz, top);
+      const a = Math.atan2(dz, top);
+      return [-W + 0.1, W - 0.1].flatMap((x) => [a, -a].map((r): Part => ({ ...box(-t, -len / 2, -t, t, len / 2, t, c, metal), p: [x, top / 2, 0], r: [r, 0, 0] })));
+    }
+    case 'pedestal': {
+      // one column (two on long tables) on a flat foot
+      const xs = W > 0.7 ? [-W * 0.55, W * 0.55] : [0];
+      return xs.flatMap((x) => [cyl(x, 0.03, 0, size ? size / 2 : 0.05, top, c, metal), box(x - 0.08, 0, -D * 0.7, x + 0.08, 0.03, D * 0.7, c, metal)]);
+    }
+    case 'panel':
+      return [-W + 0.02, W - 0.02 - 2 * t].map((x) => rbox(x, 0, -D + 0.04, x + 2 * t, top, D - 0.04, 0.005, c));
+    default:
+      return [
+        [-W + 0.06, -D + 0.06],
+        [W - 0.06, -D + 0.06],
+        [-W + 0.06, D - 0.06],
+        [W - 0.06, D - 0.06],
+      ].map(([x, z]) => leg(x, z, top, size ? size / 2 : 0.028, c));
+  }
+}
+
+function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, look: ProceduralLook = {}): Part[] {
   const W = w / 2;
   const D = d / 2;
   const front = accent ?? color;
+  const frame = look.secondary;
   const fabric: Partial<Part> = { rough: 0.95, detail: 'fabric', detailRepeat: 3 };
   const grain: Partial<Part> = { detail: 'woodgrain', detailRepeat: 1 };
   const legs4 = (top: number, inset: number, r: number, c = WOOD) =>
@@ -164,7 +226,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
     case 'sofa':
     case 'armchair': {
       const legH = 0.08;
-      const seatTop = Math.min(0.45, h * 0.55);
+      const seatTop = look.seatHeight ? Math.min(look.seatHeight, h - 0.1) : Math.min(0.45, h * 0.55);
       const arm = Math.min(0.2, w * 0.13);
       const backD = Math.min(0.24, d * 0.27);
       const baseTop = seatTop - 0.16;
@@ -173,7 +235,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
         rbox(-W, legH, -D, W, h - 0.04, -D + backD * 0.6, 0.04, shade(color, 0.9), fabric),
         rbox(-W, legH, -D, -W + arm, seatTop + 0.17, D, 0.06, color, fabric),
         rbox(W - arm, legH, -D, W, seatTop + 0.17, D, 0.06, color, fabric),
-        ...legs4(legH, 0.07, 0.022, '#2f2a26'),
+        ...legs4(legH, 0.07, 0.022, frame ?? '#2f2a26'),
       ];
       const inner = w - 2 * arm;
       const n = shape === 'armchair' ? 1 : Math.max(2, Math.round(inner / 0.65));
@@ -200,8 +262,8 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
         rbox(-W, 0.08, -D, W, h, -D + back, 0.05, color, fabric),
         rbox(W - back, 0.08, -D, W, h, D, 0.05, color, fabric),
         rbox(-W, 0.08, -D, -W + 0.18, seatTop + 0.17, -D + sd, 0.06, color, fabric),
-        ...[-W + 0.08, W - 0.08].map((x) => leg(x, -D + 0.08, 0.08, 0.02, '#2f2a26')),
-        leg(W - 0.08, D - 0.08, 0.08, 0.02, '#2f2a26'),
+        ...[-W + 0.08, W - 0.08].map((x) => leg(x, -D + 0.08, 0.08, 0.02, frame ?? '#2f2a26')),
+        leg(W - 0.08, D - 0.08, 0.08, 0.02, frame ?? '#2f2a26'),
       ];
     }
     case 'bed': {
@@ -226,26 +288,34 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
     }
     case 'table':
     case 'desk': {
-      const top = 0.035;
-      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, 0.008, color, { rough: 0.45, ...grain })];
-      if (shape === 'desk') {
-        parts.push(rbox(-W + 0.02, 0, -D + 0.04, -W + 0.06, h - top, D - 0.04, 0.005, shade(color, 0.9)));
-        parts.push(rbox(W - 0.06, 0, -D + 0.04, W - 0.02, h - top, D - 0.04, 0.005, shade(color, 0.9)));
-        parts.push(box(-W + 0.06, h - top - 0.12, -D + 0.04, W - 0.06, h - top, -D + 0.06, shade(color, 0.9)));
-      } else parts.push(...legs4(h - top, 0.06, 0.028, shade(color, 0.85)));
+      const top = look.topThickness ?? 0.035;
+      const parts: Part[] = [rbox(-W, h - top, -D, W, h, D, Math.min(0.008, top / 3), color, { rough: 0.45, ...grain, textured: true })];
+      const base = look.base ?? (shape === 'desk' ? 'panel' : 'legs4');
+      parts.push(...tableBase(base, W, D, h - top, frame ?? shade(color, shape === 'desk' ? 0.9 : 0.85), look.legSize));
+      if (shape === 'desk') parts.push(box(-W + 0.06, h - top - 0.12, -D + 0.04, W - 0.06, h - top, -D + 0.06, shade(color, 0.9)));
       return parts;
     }
     case 'table-round': {
       const r = Math.min(w, d) / 2;
-      return [cyl(0, h - 0.035, 0, r, h, color, { rough: 0.45, ...grain }), cyl(0, 0.03, 0, 0.045, h - 0.035, shade(color, 0.8)), cyl(0, 0, 0, r * 0.4, 0.03, shade(color, 0.8))];
+      const c = frame ?? shade(color, 0.8);
+      const top = look.topThickness ?? 0.035;
+      const parts: Part[] = [cyl(0, h - top, 0, r, h, color, { rough: 0.45, ...grain, textured: true })];
+      if (look.base === 'legs4' || look.base === 'x') {
+        const k = r * 0.55;
+        for (const [x, z] of [[-k, -k], [k, -k], [-k, k], [k, k]]) parts.push(leg(x, z, h - top, look.legSize ? look.legSize / 2 : 0.026, c));
+      } else parts.push(cyl(0, 0.03, 0, look.legSize ? look.legSize / 2 : 0.045, h - top, c), cyl(0, 0, 0, r * 0.4, 0.03, c));
+      return parts;
     }
-    case 'chair':
+    case 'chair': {
+      const seat = look.seatHeight ? Math.min(look.seatHeight, h - 0.1) : 0.47; // top of the seat
+      const r = look.legSize ? look.legSize / 2 : 0.016;
       return [
-        rbox(-W + 0.01, 0.42, -D + 0.02, W - 0.01, 0.47, D, 0.02, color, { rough: 0.6 }),
-        { ...rbox(-W + 0.02, 0.5, -D, W - 0.02, h, -D + 0.03, 0.015, color, { rough: 0.6 }), r: [-0.08, 0, 0] },
-        ...legs4(0.43, 0.035, 0.016, shade(color, 0.85)),
-        ...[-W + 0.035, W - 0.035].map((x) => box(x - 0.014, 0.43, -D + 0.01, x + 0.014, h - 0.08, -D + 0.035, shade(color, 0.85))),
+        rbox(-W + 0.01, seat - 0.05, -D + 0.02, W - 0.01, seat, D, 0.02, color, { rough: 0.6 }),
+        { ...rbox(-W + 0.02, seat + 0.03, -D, W - 0.02, h, -D + 0.03, 0.015, color, { rough: 0.6 }), r: [-0.08, 0, 0] },
+        ...legs4(seat - 0.04, 0.035, r, frame ?? shade(color, 0.85)),
+        ...[-W + 0.035, W - 0.035].map((x) => box(x - 0.014, seat - 0.04, -D + 0.01, x + 0.014, h - 0.08, -D + 0.035, frame ?? shade(color, 0.85))),
       ];
+    }
     case 'office-chair':
       return [
         rbox(-W * 0.75, 0.45, -D * 0.7, W * 0.75, 0.53, D * 0.75, 0.04, color, fabric),
@@ -445,6 +515,7 @@ export const ProceduralModel = memo(function ProceduralModel({
   color,
   accent,
   finish,
+  look,
   quality,
   castShadow,
 }: {
@@ -455,20 +526,28 @@ export const ProceduralModel = memo(function ProceduralModel({
   color: string;
   accent?: string;
   finish?: FurnitureFinish;
+  look?: ProceduralLook;
   quality: QualityMode;
   castShadow: boolean;
 }) {
-  const parts = useMemo(() => buildParts(shape, width, depth, height, color, accent, finish), [shape, width, depth, height, color, accent, finish]);
+  const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
+  const photo = usePhotoTexture(texture);
+  const parts = useMemo(
+    () => buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
+    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight],
+  );
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
   const materials = useMemo(
     () =>
       parts.map((p) => {
+        // the product photo on the main surface (#273); without it the plain colour material
+        if (p.textured && photo) return new THREE.MeshStandardMaterial({ map: photo, roughness: p.rough ?? 0.6, metalness: 0 });
         const m = getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat });
         // in realism mode, glowing shades follow the lamp switch / time of day
         if (p.emissive && quality === 'realism') registerLampShade(m);
         return m;
       }),
-    [parts, quality],
+    [parts, quality, photo],
   );
   return (
     <group>
@@ -488,6 +567,28 @@ export const ProceduralModel = memo(function ProceduralModel({
     </group>
   );
 });
+
+/** A product photo crop as texture; null while loading or without one. */
+function usePhotoTexture(url: string | undefined): THREE.Texture | null {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let alive = true;
+    let loaded: THREE.Texture | null = null;
+    new THREE.TextureLoader().load(url, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      loaded = t;
+      if (alive) setTex(t);
+      else t.dispose();
+    });
+    return () => {
+      alive = false;
+      loaded?.dispose();
+      setTex(null);
+    };
+  }, [url]);
+  return url ? tex : null;
+}
 
 /** The light of a lamp; its brightness follows the lamp switch / time of day, its shadow keeps it out of neighbouring rooms. */
 function LampBulb({ y }: { y: number }) {

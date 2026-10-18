@@ -74,6 +74,9 @@ export interface DraftEntry extends Omit<CatalogEntry, DimKey> {
 export function pageToDraftEntry(p: ParsedProductPage, modelFile?: string): DraftEntry | null {
   if (!p.name) return null;
   const kind = classifyProduct(p.name, p.categoryHints ?? []);
+  const f = p.features ?? {};
+  const shape = kind.shape === 'table' && f.round ? 'table-round' : kind.shape;
+  const tableLike = shape === 'table' || shape === 'table-round' || shape === 'desk';
   const dim = (k: DimKey) => (p.dimensions[k] && p.dimensions[k]! > 0 ? p.dimensions[k] : null);
   return {
     name: p.name,
@@ -81,7 +84,14 @@ export function pageToDraftEntry(p: ParsedProductPage, modelFile?: string): Draf
     // corner sofa, armchair, round table … instead of one box per category; plants (#269) keep their
     // 3D model's proportions, width/depth are the pot
     category: kind.category ?? 'decor',
-    ...(kind.shape ? { shape: kind.shape } : {}),
+    ...(shape ? { shape } : {}),
+    // what the page text states about the build (#273); photo colours replace the colour words later
+    ...(f.color ? { color: f.color } : {}),
+    ...(f.secondaryColor ? { secondaryColor: f.secondaryColor } : {}),
+    ...(tableLike && f.base ? { base: f.base } : {}),
+    ...(tableLike && f.topThickness ? { topThickness: f.topThickness } : {}),
+    ...(f.legSize ? { legSize: f.legSize } : {}),
+    ...(f.seatHeight && (shape === 'chair' || shape === 'sofa' || shape === 'armchair') ? { seatHeight: f.seatHeight } : {}),
     width: dim('width'),
     depth: dim('depth'),
     height: dim('height'),

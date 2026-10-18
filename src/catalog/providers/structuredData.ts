@@ -1,4 +1,5 @@
 import { providerForUrl } from './registry';
+import { featuresFromText, type ProductFeatures } from './productFeatures';
 import type { FieldStatus, NormalizedProduct } from './types';
 
 /**
@@ -27,6 +28,8 @@ export interface ParsedProductPage extends NormalizedProduct {
   modelCandidates: string[];
   /** The page's own category labels (schema.org `category`, breadcrumb, meta), most general first. */
   categoryHints: string[];
+  /** Shape details from the page text (#273): table base, round top, colour words, part sizes. */
+  features: ProductFeatures;
 }
 
 export const MAX_INPUT_CHARS = 15_000_000;
@@ -227,6 +230,11 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     sources,
     modelCandidates: models,
     categoryHints: [...new Set([...breadcrumbs, ...categoryLabels(p?.category), ...(meta.category ? [meta.category] : [])])],
+    features: {
+      ...featuresFromText(`${visibleText}\n${str(p?.description) ?? ''}`, name),
+      // only a diameter stated (#269) → a round product
+      ...(fromText.diameter !== null && fromText.width === null && fromText.depth === null ? { round: true } : {}),
+    },
   };
 }
 

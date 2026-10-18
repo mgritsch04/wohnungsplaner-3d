@@ -5,6 +5,7 @@
  * article number the user pasted – nothing is searched and nothing is guessed.
  */
 import type { ArticleRef, DraftEntry } from './ikeaList';
+import { TableBaseSchema, type TableBase } from '../../model/schema';
 import { DIM_KEYS, formatArticle } from './ikeaList';
 
 export const IKEA_HELPER_URL = 'http://127.0.0.1:4791';
@@ -33,6 +34,9 @@ export function readDraft(v: unknown): DraftEntry | undefined {
   if (!name) return undefined;
   const dims = { width: pos('width'), depth: pos('depth'), height: pos('height') };
   const modelFile = str('modelFile', 200);
+  const hex = (k: string) => (typeof d[k] === 'string' && /^#[0-9a-f]{6}$/i.test(d[k] as string) ? { [k]: d[k] as string } : {});
+  const size = (k: string) => (pos(k) !== null ? { [k]: pos(k) as number } : {});
+  const base = typeof d.base === 'string' && TableBaseSchema.safeParse(d.base).success ? { base: d.base as TableBase } : {};
   return {
     id: str('id', 100),
     name,
@@ -48,6 +52,13 @@ export function readDraft(v: unknown): DraftEntry | undefined {
     imageUrl: str('imageUrl'),
     articleNumber: str('articleNumber', 60),
     modelFile: modelFile && /^s?\d{8}\.glb$/i.test(modelFile) ? modelFile : undefined,
+    // build details from the page text (#273)
+    ...hex('color'),
+    ...hex('secondaryColor'),
+    ...base,
+    ...size('topThickness'),
+    ...size('legSize'),
+    ...size('seatHeight'),
   };
 }
 
