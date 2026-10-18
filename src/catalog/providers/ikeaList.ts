@@ -77,6 +77,8 @@ export function pageToDraftEntry(p: ParsedProductPage, modelFile?: string): Draf
   return {
     name: p.name,
     category: guessCategory(p.name),
+    // plants (#269): the 3D model keeps its proportions, width/depth are the pot
+    ...(classifyProduct(p.name).shape === 'plant' ? { shape: 'plant' } : {}),
     width: dim('width'),
     depth: dim('depth'),
     height: dim('height'),

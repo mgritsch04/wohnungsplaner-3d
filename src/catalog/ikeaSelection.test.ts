@@ -189,6 +189,11 @@ describe('Maße fehlen (#269)', () => {
 
   it('schätzt Maße aus dem schon geladenen 3D-Modell (cm, gerundet)', async () => {
     const { d } = deps({ check: (async (blob: Blob) => ({ blob, info: { size: { x: 0.553, y: 1.304, z: 0.48 } } })) as never });
-    expect(await estimateFromModel('00000069.glb', d)).toEqual({ width: 55, depth: 48, height: 130 });
+    expect(await estimateFromModel('00000069.glb', {}, d)).toEqual({ width: 55, depth: 48, height: 130 });
+  });
+
+  it('nimmt bei Pflanzen Breite und Tiefe vom Topf, nicht von den Blättern (#269)', async () => {
+    const { d } = deps({ check: (async (blob: Blob) => ({ blob, info: { size: { x: 0.553, y: 1.304, z: 0.48 }, base: { x: 0.19, z: 0.19 } } })) as never });
+    expect(await estimateFromModel('00000069.glb', { plant: true }, d)).toEqual({ width: 19, depth: 19, height: 130 });
   });
 });

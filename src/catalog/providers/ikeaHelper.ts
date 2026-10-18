@@ -35,6 +35,7 @@ export function readDraft(v: unknown): DraftEntry | undefined {
     id: str('id', 100),
     name,
     category: str('category', 40) ?? 'decor',
+    shape: str('shape', 40),
     ...dims,
     missing: DIM_KEYS.filter((k) => dims[k] === null),
     price: typeof d.price === 'number' && Number.isFinite(d.price) && d.price >= 0 ? d.price : undefined,

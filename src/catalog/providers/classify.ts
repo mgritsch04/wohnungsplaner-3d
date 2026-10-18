@@ -53,6 +53,8 @@ const RULES: Rule[] = [
   { re: /kommode|sideboard|lowboard|highboard|anrichte|tv-element|tv-möbel/i, category: 'storage', shape: 'cabinet', label: 'Kommode/Sideboard' },
   { re: /regal|bücherregal|standregal|wandregal/i, category: 'storage', shape: 'shelf', label: 'Regal' },
   { re: /schrank|vitrine|aufbewahrung/i, category: 'storage', shape: 'cabinet', label: 'Schrank' },
+  // real or artificial plants (#269) – not stands, pots or plant lights
+  { re: /(?:pflanze|palme|kaktus|sukkulente|orchidee|monstera|ficus|bonsai)(?!n?(?:ständer|hocker|regal|leuchte|lampe|licht|kübel|topf|tisch|säule))/i, category: 'decor', shape: 'plant', label: 'Pflanze' },
   { re: /pflanze|vase|spiegel|deko|bilderrahmen/i, category: 'decor', shape: 'box', label: 'Deko' },
 ];
 

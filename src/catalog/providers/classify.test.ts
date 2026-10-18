@@ -67,4 +67,10 @@ describe('product type from page data (#8)', () => {
     expect(byTitle.name).toBe('Sessel Lisa');
     expect(byTitle.warnings.join(' ')).toContain('Seitenüberschrift');
   });
+  it('erkennt Pflanzen, aber nicht Pflanzenständer oder -töpfe (#269)', () => {
+    expect(classifyProduct('YUCCA ELEPHANTIPES Pflanze, Palmlilie/2 Stämme, 24 cm')).toMatchObject({ category: 'decor', shape: 'plant' });
+    expect(classifyProduct('FEJKA Topfpflanze, künstlich')).toMatchObject({ shape: 'plant' });
+    expect(classifyProduct('Pflanzenständer, Bambus').shape).not.toBe('plant');
+    expect(classifyProduct('Pflanzentopf 12 cm').shape).not.toBe('plant');
+  });
 });
