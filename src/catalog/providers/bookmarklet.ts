@@ -1,7 +1,7 @@
 /**
  * Bookmarklet „An Planer senden“ (#221). Runs on the product page the user has opened on
- * ikea.com or moebelix.at and sends THIS page's structured data (meta tags, JSON-LD) plus its
- * visible text to the local helper – one page per click, nothing else is fetched.
+ * ikea.com or moebelix.at and sends THIS page's structured data (meta tags, JSON-LD), its
+ * visible text and the addresses of its photos to the local helper – one page per click, nothing else is fetched.
  * The token is the helper's secret; it is embedded only in the user's own bookmark.
  */
 import { IKEA_HELPER_URL } from './ikeaHelper';
@@ -26,7 +26,24 @@ function pageScript() {
   const pick = (sel: string) => Array.from(document.querySelectorAll(sel), (e) => e.outerHTML).join('');
   const text = (document.body?.innerText ?? '').slice(0, 200000).replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
   const html = `<html><head>${pick('meta,link[rel=canonical],script[type="application/ld+json"]')}</head><body><pre>${text}</pre></body></html>`;
-  const payload = { token: '__TOKEN__', url: location.href, html };
+  // photo addresses of this page for the image package (#273); the shop's CSP forbids loading
+  // them from here, so the helper on the user's computer downloads the ones the user picks
+  const images: { url: string; alt: string }[] = [];
+  const addImage = (src: string | null, alt: string) => {
+    if (!src || images.length >= 40) return;
+    try {
+      const u = new URL(src, location.href).href;
+      if (u.startsWith('https:') && !/\.svg(\?|$)/i.test(u) && !images.some((i) => i.url === u)) images.push({ url: u, alt: alt.slice(0, 200) });
+    } catch {
+      // not an address
+    }
+  };
+  document.querySelectorAll('img').forEach((im) => {
+    if (im.naturalWidth > 0 && im.naturalWidth < 200) return; // icons, logos
+    const largest = (im.getAttribute('srcset') ?? '').split(',').map((part) => part.trim().split(/\s+/)[0]).filter(Boolean).pop();
+    addImage(largest ?? (im.currentSrc || im.getAttribute('src') || im.getAttribute('data-src')), im.alt ?? '');
+  });
+  const payload = { token: '__TOKEN__', url: location.href, html, images };
   const frame = document.createElement('iframe');
   frame.src = `${helper}/empfang`;
   frame.title = 'An Planer senden';

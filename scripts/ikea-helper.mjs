@@ -32,6 +32,8 @@
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
  *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
+ *   GET /bildpakete                     → { items: [{ key, name, maße, Seitentext-Zeilen, images: [{ url, alt }] }] }
+ *   GET /bildpaket/<key>/<nr>           → ein Foto dieser Seite (erst auf Anfrage geladen, dann zwischengespeichert)
  *
  * 3D-Modelle und Bilder sind urheberrechtlich geschützt: nur privat nutzen.
  */
@@ -69,6 +71,48 @@ const TOKEN = readFileSync(TOKEN_FILE, 'utf-8').trim();
 const INBOX_FILE = join(CACHE, 'lesezeichen-eingang.json');
 let inbox = existsSync(INBOX_FILE) ? JSON.parse(readFileSync(INBOX_FILE, 'utf-8')) : [];
 const saveInbox = () => writeFileSync(INBOX_FILE, JSON.stringify(inbox, null, 2));
+/** Pages without 3D model with their photo addresses, for the image package (#273). */
+const PACKS_FILE = join(CACHE, 'bildpakete.json');
+let packs = existsSync(PACKS_FILE) ? JSON.parse(readFileSync(PACKS_FILE, 'utf-8')) : [];
+const savePacks = () => writeFileSync(PACKS_FILE, JSON.stringify(packs, null, 2));
+
+/** Photo addresses: the page's JSON-LD images first (the shop's own gallery), then what the bookmarklet saw. */
+function galleryOf(html, sent) {
+  const urls = [];
+  const add = (u, alt = '') => {
+    if (typeof u !== 'string' || urls.length >= 30) return;
+    try {
+      const href = new URL(u).href;
+      if (href.startsWith('https:') && !/\.svg(\?|$)/i.test(href) && !urls.some((i) => i.url === href)) urls.push({ url: href, alt: String(alt).slice(0, 200) });
+    } catch {
+      // not an address
+    }
+  };
+  const walk = (v, depth = 0) => {
+    if (!v || typeof v !== 'object' || depth > 6) return;
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1));
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'image') [x].flat().forEach((i) => add(typeof i === 'string' ? i : (i?.contentUrl ?? i?.url), i?.caption ?? i?.name ?? ''));
+      else walk(x, depth + 1);
+    }
+  };
+  for (const m of html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      walk(JSON.parse(m[1]));
+    } catch {
+      // broken JSON-LD
+    }
+  }
+  if (Array.isArray(sent)) for (const i of sent) add(i?.url, i?.alt ?? '');
+  return urls;
+}
+
+/** Lines of the page text that state sizes (part sizes for the model). */
+function sizeLines(html) {
+  const text = (html.match(/<pre>([\s\S]*)<\/pre>/)?.[1] ?? '').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length <= 160 && /\d\s*(cm|mm)\b|breite|tiefe|h(ö|oe)he|durchmesser|st(ä|ae)rke|material|farbe|gestell/i.test(l));
+  return [...new Set(lines)].slice(0, 60);
+}
 const tokenOk = (t) => typeof t === 'string' && t.length === TOKEN.length && timingSafeEqual(Buffer.from(t), Buffer.from(TOKEN));
 const mods = await loadIkeaModules();
 const get = politeFetcher();
@@ -177,6 +221,12 @@ async function receivePage(body) {
     ...(image ? { image } : {}),
     ...(note ? { note } : {}),
   };
+  if (!modelFile) {
+    const images = galleryOf(String(body.html ?? ''), body.images);
+    const pack = { key, name: found.name, productUrl: found.productUrl ?? url.href, retailer: found.retailer, price: found.price, width: found.width ?? null, depth: found.depth ?? null, height: found.height ?? null, lines: sizeLines(String(body.html ?? '')), images, receivedAt: new Date().toISOString() };
+    packs = [...packs.filter((p) => p.key !== key), pack].slice(-20);
+    savePacks();
+  }
   const item = { id: `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, receivedAt: new Date().toISOString(), product };
   inbox = [...inbox.filter((i) => i.product.article !== product.article), item].slice(-50);
   saveInbox();
@@ -265,6 +315,23 @@ const server = createServer(async (req, res) => {
     const img = url.pathname.match(/^\/image\/((?:s?\d{8}|mx[0-9a-f]{10})\.(jpg|png|webp))$/);
     if (img && existsSync(join(CACHE, img[1]))) {
       res.writeHead(200, { 'content-type': img[2] === 'jpg' ? 'image/jpeg' : `image/${img[2]}` }).end(readFileSync(join(CACHE, img[1])));
+      return;
+    }
+    if (url.pathname === '/bildpakete') return json(200, { items: packs });
+    const pi = url.pathname.match(/^\/bildpaket\/(s?\d{8}|mx[0-9a-f]{10})\/(\d{1,2})$/);
+    if (pi) {
+      const src = packs.find((p) => p.key === pi[1])?.images?.[Number(pi[2])];
+      if (!src) return json(404, { error: 'Foto nicht gefunden.' });
+      const base = `${pi[1]}-b${pi[2]}`;
+      let file = ['jpg', 'png', 'webp'].map((e) => `${base}.${e}`).find((f) => existsSync(join(CACHE, f)));
+      if (!file) {
+        const got = await fetchProductImage(get, src.url);
+        if (!got.bytes) return json(502, { error: got.note });
+        file = `${base}.${got.ext}`;
+        writeFileSync(join(CACHE, file), got.bytes);
+      }
+      const ext = file.split('.').pop();
+      res.writeHead(200, { 'content-type': ext === 'jpg' ? 'image/jpeg' : `image/${ext}` }).end(readFileSync(join(CACHE, file)));
       return;
     }
     const m = url.pathname.match(/^\/model\/(s?\d{8}\.glb)$/);
