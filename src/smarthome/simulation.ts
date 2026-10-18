@@ -1,6 +1,8 @@
 import type { DerivedPlan } from '../model/derived';
 import type { Automation, Project, SmartDevice } from '../model/schema';
 import { sightOccluders, type Segment } from '../model/visibility';
+import { LEAF_OPEN_ANGLE, leafPolygon } from '../model/geometry/leaves';
+import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { boundsOf, pointInPolygon, type Vec2 } from '../model/vec';
 import { sunElevationDeg } from '../view3d/lighting';
 import { ASSUMED, productById } from './catalog';
@@ -10,7 +12,8 @@ import { ASSUMED, productById } from './catalog';
  * ----------------------------
  * Pure step function that behaves like Home Assistant with real sensors: a person moves
  * through the plan, sensors detect them inside their range and opening angle with line of
- * sight (walls and closed doors block, see sightOccluders), report "no motion" only after
+ * sight (walls and closed doors block, see sightOccluders; open door leaves and tall furniture
+ * too, #236), report "no motion" only after
  * their hold time, and automations switch lights. A PIR motion sensor only sees a MOVING
  * person, a mmWave presence sensor also a still one. No real devices are involved.
  */
@@ -72,19 +75,46 @@ export function sensorParams(d: SmartDevice): SensorParams {
   };
 }
 
-function segmentsCross(a: Vec2, b: Vec2, s: Segment): boolean {
+/**
+ * Edge that blocks the line of sight (#236). Without z0/z1 it blocks at any height (wall
+ * faces, closed doors); with them only where the sight line passes between z0 and z1 metres
+ * above the floor (an open door leaf, a wardrobe; a low sofa lies below the line).
+ */
+export interface Occluder extends Segment {
+  z0?: number;
+  z1?: number;
+}
+
+/** Height the sensor aims at: the middle of the body of a standing or walking person (m). */
+export const PERSON_Z = 1.0;
+
+/**
+ * Part of the sight line sensor (height zs) → person (PERSON_Z) inside the vertical band
+ * z0..z1, as fractions [fa, fb] of the line (0 = sensor, 1 = person); null if it misses it.
+ */
+function blockedFractions(zs: number, o: Occluder): [number, number] | null {
+  if (o.z0 === undefined || o.z1 === undefined) return [0, 1];
+  const dz = PERSON_Z - zs;
+  if (Math.abs(dz) < 1e-9) return zs >= o.z0 && zs <= o.z1 ? [0, 1] : null;
+  const f0 = (o.z0 - zs) / dz, f1 = (o.z1 - zs) / dz;
+  const fa = Math.max(0, Math.min(f0, f1)), fb = Math.min(1, Math.max(f0, f1));
+  return fa <= fb ? [fa, fb] : null;
+}
+
+/** Parameter t (0..1) where segment a→b crosses s, or null. */
+function crossing(a: Vec2, b: Vec2, s: Segment): number | null {
   const d1x = b.x - a.x, d1y = b.y - a.y;
   const d2x = s.b.x - s.a.x, d2y = s.b.y - s.a.y;
   const den = d1x * d2y - d1y * d2x;
-  if (Math.abs(den) < 1e-12) return false;
+  if (Math.abs(den) < 1e-12) return null;
   const ax = s.a.x - a.x, ay = s.a.y - a.y;
   const t = (ax * d2y - ay * d2x) / den;
   const u = (ax * d1y - ay * d1x) / den;
-  return t > 1e-9 && t < 1 - 1e-9 && u >= 0 && u <= 1;
+  return t > 1e-9 && t < 1 - 1e-9 && u >= 0 && u <= 1 ? t : null;
 }
 
 /** Inside range and opening angle, with a free line of sight. */
-export function inDetectionArea(d: SmartDevice, params: SensorParams, p: Vec2, occluders: Segment[]): boolean {
+export function inDetectionArea(d: SmartDevice, params: SensorParams, p: Vec2, occluders: Occluder[]): boolean {
   const dx = p.x - d.x, dy = p.y - d.y;
   const r = Math.hypot(dx, dy);
   if (r > params.rangeM) return false;
@@ -97,7 +127,13 @@ export function inDetectionArea(d: SmartDevice, params: SensorParams, p: Vec2, o
   // start a few centimetres in front of the device: it sits on a wall face
   const k = Math.min(0.05, r / 2) / r;
   const start = { x: d.x + dx * k, y: d.y + dy * k };
-  return !occluders.some((s) => segmentsCross(start, p, s));
+  return !occluders.some((s) => {
+    const t = crossing(start, p, s);
+    if (t === null) return false;
+    const band = blockedFractions(d.elevation, s);
+    const f = k + (1 - k) * t; // fraction of the whole line sensor → person
+    return !!band && f >= band[0] && f <= band[1];
+  });
 }
 
 export const isDark = (hour: number) => sunElevationDeg(hour) < 0;
@@ -124,7 +160,7 @@ function passed(from: number, to: number, h: number): boolean {
 }
 
 /** Advance the simulation by `dt` simulated seconds. Returns a new state. */
-export function step(project: Project, occluders: Segment[], prev: SimState, dt: number, input: SimInput): SimState {
+export function step(project: Project, occluders: Occluder[], prev: SimState, dt: number, input: SimInput): SimState {
   const t = prev.t + dt;
   const hour = (prev.hour + dt / 3600) % 24;
   const entities: Record<string, EntityState> = {};
@@ -207,13 +243,26 @@ export function lightOverrides(project: Project, state: SimState): Map<string, {
   return out;
 }
 
-export const occludersOf = (project: Project, derived: DerivedPlan) => sightOccluders(project, derived);
+/**
+ * Everything that blocks a sensor's view: wall faces and closed doors/windows (full height),
+ * opened door leaves and window sashes within their height, and solid furniture within
+ * its height (#236). Rugs, lamps and other non-solid items do not block.
+ */
+export function occludersOf(project: Project, derived: DerivedPlan): Occluder[] {
+  const out: Occluder[] = sightOccluders(project, derived);
+  const outline = (poly: Vec2[], z0: number, z1: number) => {
+    for (let i = 0; i < poly.length; i++) out.push({ a: poly[i], b: poly[(i + 1) % poly.length], z0, z1 });
+  };
+  for (const leaves of derived.leaves.values()) for (const l of leaves) if (l.open) outline(leafPolygon(l, LEAF_OPEN_ANGLE), l.z0, l.z1);
+  for (const f of project.furniture) if (f.solid) outline(furnitureCorners(f), f.elevation, f.elevation + f.height);
+  return out;
+}
 
 /**
  * Share (0..1) of each room's floor that at least one motion/presence sensor covers
  * (grid sampling, line of sight respected). Rooms without a sensor get 0.
  */
-export function roomCoverage(project: Project, derived: DerivedPlan, occluders: Segment[], cell = 0.2): Map<string, number> {
+export function roomCoverage(project: Project, derived: DerivedPlan, occluders: Occluder[], cell = 0.2): Map<string, number> {
   const out = new Map<string, number>();
   const sensors = project.devices.filter(isSensor).map((d) => ({ d, p: sensorParams(d) }));
   for (const room of project.rooms) {
@@ -235,8 +284,15 @@ export function roomCoverage(project: Project, derived: DerivedPlan, occluders: 
   return out;
 }
 
-/** Distance from `o` along unit direction `d` to the nearest occluder (or `max`). */
-function castRay(o: Vec2, d: Vec2, occluders: Segment[], max: number): number {
+/**
+ * Distance from `o` along unit direction `d` to the first point a person can no longer be
+ * seen (or `max`). A full-height occluder hides everything behind its crossing at tc; a
+ * height-limited one (furniture, door leaf) hides a person at distance r when the crossing
+ * lies in its blocked band, i.e. from r = tc / fb on. `back` is the distance from the device
+ * to `o` (the line of sight starts at the device). Conservative: a person far behind a
+ * medium-high item may be visible again, which the 2D outline does not show.
+ */
+function castRay(o: Vec2, d: Vec2, occluders: Occluder[], max: number, zs: number, back: number): number {
   let best = max;
   for (const s of occluders) {
     const ex = s.b.x - s.a.x, ey = s.b.y - s.a.y;
@@ -245,16 +301,21 @@ function castRay(o: Vec2, d: Vec2, occluders: Segment[], max: number): number {
     const ax = s.a.x - o.x, ay = s.a.y - o.y;
     const t = (ax * ey - ay * ex) / den;
     const u = (ax * d.y - ay * d.x) / den;
-    if (t > 1e-9 && t < best && u >= 0 && u <= 1) best = t;
+    if (!(t > 1e-9 && t < best && u >= 0 && u <= 1)) continue;
+    const band = blockedFractions(zs, s);
+    if (!band || band[1] <= 0) continue;
+    // a person at device distance r is hidden when (t + back) / r lies in the band
+    const r = (t + back) / band[1];
+    best = Math.min(best, Math.max(t, r - back));
   }
   return best;
 }
 
 /**
- * Outline of the area a sensor actually covers: its wedge, cut off where walls or closed
- * doors block the line of sight (rays every ~2°). Used for the 2D display.
+ * Outline of the area a sensor actually covers: its wedge, cut off where walls, closed
+ * doors, open door leaves or tall furniture block the line of sight (rays every ~2°). Used for the 2D display.
  */
-export function detectionPolygon(d: SmartDevice, params: SensorParams, occluders: Segment[]): Vec2[] {
+export function detectionPolygon(d: SmartDevice, params: SensorParams, occluders: Occluder[]): Vec2[] {
   const full = params.angleDeg >= 360;
   const span = (Math.min(params.angleDeg, 360) * Math.PI) / 180;
   const n = Math.max(8, Math.ceil(Math.min(params.angleDeg, 360) / 2));
@@ -265,7 +326,7 @@ export function detectionPolygon(d: SmartDevice, params: SensorParams, occluders
     const dir = { x: Math.cos(a), y: Math.sin(a) };
     // start a few centimetres in front of the device (it sits on a wall face), like inDetectionArea
     const o = { x: d.x + dir.x * 0.05, y: d.y + dir.y * 0.05 };
-    const r = castRay(o, dir, occluders, params.rangeM - 0.05) + 0.05;
+    const r = castRay(o, dir, occluders, params.rangeM - 0.05, d.elevation, 0.05) + 0.05;
     pts.push({ x: d.x + dir.x * r, y: d.y + dir.y * r });
   }
   return pts;

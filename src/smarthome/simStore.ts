@@ -1,12 +1,11 @@
 import { create } from 'zustand';
 import { derivePlan } from '../model/derived';
 import type { Project, SmartDeviceKind } from '../model/schema';
-import type { Segment } from '../model/visibility';
 import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
-import { initialState, lightOverrides, occludersOf, step, type SimState } from './simulation';
+import { initialState, lightOverrides, occludersOf, step, type Occluder, type SimState } from './simulation';
 
 /** Device waiting to be placed by a click into the 2D plan (#233). */
 export interface Placing {
@@ -57,11 +56,11 @@ let lastFrame = 0;
 let lastPublish = 0;
 let lastPos: Vec2 | null = null;
 let lastMoveAt = -Infinity;
-let cache: { project: Project; occluders: Segment[] } | null = null;
+let cache: { project: Project; occluders: Occluder[] } | null = null;
 let live: SimState | null = null;
 const triggeredUntil = new Map<string, number>();
 
-function occluders(project: Project): Segment[] {
+function occluders(project: Project): Occluder[] {
   if (cache?.project !== project) cache = { project, occluders: occludersOf(project, derivePlan(project)) };
   return cache.occluders;
 }
