@@ -111,7 +111,7 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
         const handle = { x: d.x + Math.cos(d.rotation) * 44 * px, y: d.y + Math.sin(d.rotation) * 44 * px };
         const s = (1.3 * r) / 24;
         return (
-          <g key={d.id} data-testid="device-2d" data-device={d.name} data-on={on} data-selected={sel}>
+          <g key={d.id} data-testid="device-2d" data-device={d.name} data-device-id={d.id} data-on={on} data-selected={sel}>
             {params && (
               <path
                 d={`M ${detectionPolygon(d, params, occluders).map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}

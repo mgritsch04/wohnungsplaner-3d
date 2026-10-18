@@ -8,6 +8,7 @@ import { useTapeStore } from '../view3d/tapeStore';
 import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, useCompareStore } from '../versions/compareStore';
 import { groupSelection, ungroupSelection } from './groupActions';
 import { orbitKeyMoves } from '../view3d/orbitKeys';
+import { openMenuForSelection } from './objectMenu';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
 
 
@@ -21,9 +22,10 @@ export function useShortcuts() {
       const ps = useProjectStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      // walking keys (G = carry furniture #39, C = crouch #20, E/O = open the door/window in sight #21/#107)
+      // walking keys (G = carry furniture #39, C = crouch #20, E/O = open the door/window in sight #21/#107,
+      // F = context menu at the crosshair #235)
       // belong to the walkthrough – there E does not rotate the selection
-      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'e', 'o'].includes(key) && !mod) return;
+      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'e', 'o', 'f'].includes(key) && !mod) return;
       // W A S D / arrow keys move the 3D overview camera (#132) – handled in Scene3D, so W is not the wall tool there
       const furnitureSelected = ui.selection?.type === 'furniture';
       const comparing = useCompareStore.getState().session !== null;
@@ -90,6 +92,9 @@ export function useShortcuts() {
           e.preventDefault();
           void deleteSelection();
         }
+      } else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+        // context menu of the selection (#235); right-click opens it at the pointer
+        if (openMenuForSelection()) e.preventDefault();
       } else if (e.key === 'Escape') {
         const tape = useTapeStore.getState();
         // 3D tape measure (#88): Esc first removes the measurements

@@ -48,6 +48,7 @@ import { orbitKeyInput, orbitKeyMoves, orbitKeySpeed, orbitPlaneStep, setPointer
 import { useDialogStore } from '../ui/dialogStore';
 import { usePhoneLayout, useTouchUi } from '../ui/phoneLayout';
 import { TouchWalkPad } from './TouchWalkPad';
+import { OrbitContextMenu } from './OrbitContextMenu';
 
 /** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
 interface ComparePreview {
@@ -156,7 +157,7 @@ export function Scene3D() {
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · F: Objekt-Menü · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, Mausrad zoomt, E öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
           )}
@@ -348,6 +349,7 @@ function SceneContent({
       <TapeMeasure3D />
       {/* also while walking (#227): a drag can only start while the pointer is not locked */}
       {!readOnly && <CatalogDrop3D />}
+      {!readOnly && cameraMode === 'orbit' && <OrbitContextMenu />}
       {quality === 'realism' && (
         <EffectsBoundary>
           <RealismEffects aoQuality={tier.aoQuality} />
