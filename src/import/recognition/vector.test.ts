@@ -52,14 +52,71 @@ describe('door symbols in vector plans (#37)', () => {
     expect(o?.kind).not.toBe('door');
   });
 
-  it('window frame lines without a leaf stay a window; with a leaf the opening is a glazed door', () => {
+  it('window frame lines make a window, also with a sash swing drawn (windows are not doors)', () => {
     const frame = [S(200, 387, 290, 387), S(200, 393, 290, 393)];
     // thin frame lines are symbol lines: pass them as non-wall lines like the PDF import does
     const isWallLine = (n: number) => n < room().length;
     const window = detectVectorWalls([...room(), ...frame], mpp, { oblique: false, isWallLine }).openings[0];
     expect(window.kind).toBe('window');
-    const glazed = detectVectorWalls([...room(), ...frame, S(290, 380, 290, 290)], mpp, { oblique: false, isWallLine }).openings[0];
-    expect(glazed.kind).toBe('door');
+    // sash drawn open like a leaf, with a swing arc: still a window (the hinge is kept)
+    const sash = detectVectorWalls([...room(), ...frame, S(290, 380, 290, 290), ...arc(290, 380, 90, Math.PI, 1.5 * Math.PI)], mpp, { oblique: false, isWallLine }).openings[0];
+    expect(sash.kind).toBe('window');
+    expect(sash.hingeSide!.x).toBeGreaterThan(0);
+  });
+
+  it('in a plan with curves, straight lines never count as a swing arc', () => {
+    // straight pieces around the gap end at about the gap width (like hatching) and a real curve elsewhere
+    const fake: VectorSegment[] = [];
+    for (let k = 0; k < 6; k++) {
+      const s = Math.PI + (k * Math.PI) / 12;
+      const t = Math.PI + ((k + 1) * Math.PI) / 12;
+      fake.push(S(290 + 90 * Math.cos(s), 380 + 90 * Math.sin(s), 290 + 90 * Math.cos(t), 380 + 90 * Math.sin(t)));
+    }
+    expect(gapOpening([...room(), ...fake])?.kind).toBe('door'); // a plan without curves: polyline arcs count
+    expect(gapOpening([...room(), ...fake, ...arc(100, 100, 30, 0, Math.PI / 2)])?.kind).toBe('passage');
+  });
+});
+
+describe('wall details in vector plans (#37)', () => {
+  const wallAt = (out: ReturnType<typeof detectVectorWalls>, o: 'h' | 'v', c: number) =>
+    out.walls.filter((w) => (o === 'h' ? Math.abs(w.a.y - c) < 3 && Math.abs(w.b.y - c) < 3 : Math.abs(w.a.x - c) < 3 && Math.abs(w.b.x - c) < 3));
+
+  it('a light partition drawn with dashed lines is a wall', () => {
+    const dashed: VectorSegment[] = [];
+    for (let y = 20; y < 380; y += 30) dashed.push(S(300, y, 300, Math.min(380, y + 20)), S(312, y, 312, Math.min(380, y + 20)));
+    const out = detectVectorWalls([...room(), ...dashed], mpp, { oblique: false });
+    const partition = wallAt(out, 'v', 306);
+    expect(partition).toHaveLength(1);
+    expect(partition[0].thickness).toBeCloseTo(12, 0);
+    // dashes of a single line (furniture, lines above) stay symbols
+    expect(wallAt(detectVectorWalls([...room(), ...dashed.filter((s) => s.x1 === 300)], mpp, { oblique: false }), 'v', 300)).toHaveLength(0);
+  });
+
+  it('a thin wall runs on through a shaft block beside it – no opening into the shaft', () => {
+    // partition (10 cm, y 195–205) from the left wall to a 50 cm shaft block (y 196–246) at the right wall
+    const segs = [...room(), S(20, 195, 290, 195), S(20, 205, 290, 205), S(300, 196, 480, 196), S(300, 246, 480, 246)];
+    const out = detectVectorWalls(segs, mpp, { oblique: false });
+    const partition = wallAt(out, 'h', 200);
+    expect(partition).toHaveLength(1);
+    expect(Math.max(partition[0].a.x, partition[0].b.x)).toBeGreaterThan(480);
+    expect(wallAt(out, 'h', 221)).toHaveLength(1); // the shaft itself
+    expect(out.openings.filter((o) => o.center.y > 150 && o.center.y < 260)).toEqual([]);
+  });
+
+  it('a second line beside a wall (a neighbouring shaft face) is no wall and gets no doors', () => {
+    // a 20 cm layer outside the left wall, from y = 100 to 300, sharing the wall's outer face line
+    const out = detectVectorWalls([...room(), S(-20, 100, -20, 300)], mpp, { oblique: false });
+    expect(out.walls.filter((w) => w.a.x < -5 && w.b.x < -5)).toEqual([]);
+    expect(out.openings.filter((o) => o.center.x < 30)).toEqual([]);
+  });
+
+  it('a wide gap without a door or window symbol is no opening: the walls end there (open corridor)', () => {
+    const segs = [...room().slice(0, 6), S(0, 400, 150, 400), S(20, 380, 150, 380), S(330, 400, 500, 400), S(330, 380, 480, 380)];
+    const out = detectVectorWalls(segs, mpp, { oblique: false });
+    expect(out.openings.filter((o) => o.center.y > 300)).toEqual([]);
+    expect(wallAt(out, 'h', 390)).toHaveLength(2);
+    // a narrow gap still is a passage
+    expect(gapOpening(room())?.kind).toBe('passage');
   });
 });
 

@@ -141,7 +141,7 @@ function railingsForBox(box: { x0: number; x1: number; y0: number; y1: number },
   return out;
 }
 
-/** A window this close (m, centre line to the floor edge) to a balcony/terrace leads onto it. */
+/** An opening this close (m, centre line to the floor edge) to a balcony/terrace leads onto it. */
 const DOOR_REACH = 0.35;
 export const BALCONY_DOOR_HEIGHT = 2.1;
 
@@ -160,16 +160,17 @@ function edgeDistance(p: Vec2, poly: Vec2[]): number {
 }
 
 /**
- * Openings onto a balcony, loggia or terrace are balcony doors, not windows (#37): plans draw them
- * like windows, but they reach down to the floor. `interiors` are the floor outlines of the proposed
- * rooms; those holding an outdoor label are the outdoor areas. Converted openings stay "uncertain".
+ * Openings onto a balcony, loggia or terrace are glazed balcony doors (#37): plans draw them like
+ * windows (or with a leaf), but they reach down to the floor. They become windows down to the floor –
+ * glass doors (see isGlassDoor). `interiors` are the floor outlines of the proposed rooms; those
+ * holding an outdoor label are the outdoor areas. Converted openings stay "uncertain".
  */
 export function balconyDoors(openings: DraftOpening[], texts: PlacedText[], interiors: Vec2[][]): DraftOpening[] {
   const outdoor = interiors.filter((poly) => texts.some((t) => OUTDOOR.test(t.str) && pointInPolygon(t, poly)));
   if (!outdoor.length) return openings;
   return openings.map((o) =>
-    o.kind === 'window' && outdoor.some((poly) => !pointInPolygon(o.center, poly) && edgeDistance(o.center, poly) <= DOOR_REACH)
-      ? { ...o, kind: 'door', sillHeight: 0, height: BALCONY_DOOR_HEIGHT, status: 'uncertain', note: 'Balkontür: Öffnung zum Balkon/zur Terrasse – Art und Höhe prüfen' }
+    o.kind !== 'passage' && outdoor.some((poly) => !pointInPolygon(o.center, poly) && edgeDistance(o.center, poly) <= DOOR_REACH)
+      ? { ...o, kind: 'window', sillHeight: 0, height: BALCONY_DOOR_HEIGHT, status: 'uncertain', note: 'Glas-Balkontür: Öffnung zum Balkon/zur Terrasse – Art und Höhe prüfen' }
       : o,
   );
 }

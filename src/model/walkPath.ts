@@ -27,7 +27,7 @@
 import type { DerivedPlan } from './derived';
 import { clipFootprint } from './geometry/walls';
 import { furnitureFootprint, isPassageObstacle } from './passages';
-import type { Project } from './schema';
+import { isGlassDoor, type Opening, type Project } from './schema';
 import { add, closestPointOnSegment, dist, pointInPolygon, scale, type Vec2 } from './vec';
 
 export interface WalkPathOptions {
@@ -56,7 +56,7 @@ interface ObstacleMode {
   furnitureBlocks: boolean;
 }
 
-const passable = (o: { kind: string; open: boolean }) => o.kind === 'passage' || (o.kind === 'door' && o.open);
+const passable = (o: Opening) => o.kind === 'passage' || ((o.kind === 'door' || isGlassDoor(o)) && o.open);
 
 function buildGrid(project: Project, derived: DerivedPlan, radius: number, cell: number, mode: ObstacleMode): Grid | null {
   const rooms = [...derived.rooms.values()].map((g) => g.interior);
@@ -69,7 +69,7 @@ function buildGrid(project: Project, derived: DerivedPlan, radius: number, cell:
     if (!fp) continue;
     let cursor = -Infinity;
     for (const r of derived.openings.get(w.id) ?? []) {
-      const open = mode.closedDoorsBlock ? passable(r.opening) : r.opening.kind !== 'window';
+      const open = mode.closedDoorsBlock ? passable(r.opening) : r.opening.kind !== 'window' || isGlassDoor(r.opening);
       if (!open) continue;
       solids.push(clipFootprint(fp, cursor, r.s0));
       cursor = r.s1;

@@ -7,6 +7,7 @@ import { applyScaleNotation, PLAN_FILE_ACCEPT, removeUnderlay, startPlanImport }
 import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActions';
 import { useImportStore, useSourceAnalysis } from '../../import/importStore';
 import { dist } from '../../model/vec';
+import { openingLabel } from '../../model/schema';
 import { degToRad, formatArea, formatLength, radToDeg } from '../../model/units';
 import { refreshDraftRooms, runRecognition } from '../../import/recognition/runRecognition';
 import type { DraftStatus } from '../../import/draft';
@@ -393,7 +394,7 @@ function DraftReview() {
               onSelect={() => st().select({ type: 'wall', id: w.id })} onToggle={() => st().updateWall(w.id, { accepted: !w.accepted })} />
           ))}
           {draft.openings.map((o, i) => (
-            <DraftRow key={o.id} label={`${o.kind === 'window' ? 'Fenster' : o.kind === 'door' ? 'Tür' : 'Durchgang'} ${i + 1} · ${Math.round(o.width * 100)} cm`} status={o.status} accepted={o.accepted} active={sel?.id === o.id}
+            <DraftRow key={o.id} label={`${openingLabel(o)} ${i + 1} · ${Math.round(o.width * 100)} cm`} status={o.status} accepted={o.accepted} active={sel?.id === o.id}
               onSelect={() => st().select({ type: 'opening', id: o.id })} onToggle={() => st().updateOpening(o.id, { accepted: !o.accepted })} />
           ))}
           {draft.rooms.map((r) => (
