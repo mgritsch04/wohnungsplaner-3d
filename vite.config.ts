@@ -3,6 +3,7 @@ import { defineConfig, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { pwaPlugin } from './pwa/plugin';
 
 // App version for the bug report (#62): package version + short commit, if git is available
 const pkgVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version;
@@ -41,6 +42,18 @@ function artifactOverrides(): UserConfig {
   };
 }
 
+/**
+ * GitHub-Pages-Build (#179): `vite build --mode pages` → dist-pages/, als installierbare Web-App
+ * unter https://mgritsch04.github.io/wohnungsplaner-3d/ (Manifest, Symbole, Service Worker: pwa/plugin.ts).
+ */
+function pagesOverrides(): UserConfig {
+  return {
+    base: '/wohnungsplaner-3d/',
+    plugins: [react(), pwaPlugin()],
+    build: { outDir: 'dist-pages', emptyOutDir: true, chunkSizeWarningLimit: 1500 },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
   define: {
@@ -55,4 +68,5 @@ export default defineConfig(({ mode }) => ({
     include: ['src/**/*.test.{ts,tsx}'],
   },
   ...(mode === 'artifact' ? artifactOverrides() : {}),
+  ...(mode === 'pages' ? pagesOverrides() : {}),
 }));

@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:artifact": "node scripts/copy-draco.mjs && tsc -b && vite build --mode artifact && node scripts/escape-control-chars.mjs dist-artifact && node scripts/artifact-manifest.mjs",
+    "build:pages": "node scripts/copy-draco.mjs && tsc -b && vite build --mode pages && node scripts/check-pages.mjs",
+    "test:pages": "playwright test -c playwright.pages.config.ts",
     "test:artifact": "playwright test -c playwright.artifact.config.ts",
     "preview": "vite preview",
     "ikea-helper": "node scripts/ikea-helper.mjs",

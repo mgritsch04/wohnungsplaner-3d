@@ -37,6 +37,21 @@ Nur `vite build --mode artifact` ändert sich (`base: './'`, Ausgabe `dist-artif
 Endungen, nur relative Verweise). Projekte im Artefakt liegen getrennt von der PC-App (eigene
 Origin); Export/Import des Projektpakets ist die Brücke.
 
+### Als App aufs iPhone (PWA, #179)
+
+```bash
+npm run build:pages  # Build für GitHub Pages nach dist-pages/ (Unterpfad /wohnungsplaner-3d/) + Prüfung
+npm run test:pages   # eigene E2E-Suite: Manifest, Symbole, Service Worker, Start ohne Netz
+```
+
+Jeder Merge nach `main` wird per `.github/workflows/pages.yml` unter
+https://mgritsch04.github.io/wohnungsplaner-3d/ veröffentlicht (einmalig in den Repo-Einstellungen:
+Pages › Source „GitHub Actions“). Am iPhone in Safari öffnen › Teilen › „Zum Home-Bildschirm“: Die App
+startet dann mit eigenem Symbol im Vollbild und nach dem ersten Besuch auch offline. Manifest, Symbole
+(`pwa/icons/`) und Service Worker (`pwa/sw.js`) entstehen nur in diesem Build (`pwa/plugin.ts`);
+`dist/` und das Claude-Artefakt bleiben unverändert. Pläne liegen nur auf dem Gerät (IndexedDB);
+der lokale IKEA-Helfer ist vom iPhone aus nicht erreichbar.
+
 ## Funktionsumfang (Stand)
 
 | Bereich | Status |
