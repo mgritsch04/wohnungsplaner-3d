@@ -88,7 +88,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.6, sensitivi
   // field of view of the wheel zoom (#228); every walkthrough starts at the base value
   const fov = useRef(baseFov);
   useEffect(() => {
-    // a new base (switch toggled, window resized) also ends the zoom
+    // a new base (switch toggled, window resized) also ends the zoom; the first value is set on
+    // entering below, which also remembers the overview's field of view
+    if (base.current === baseFov) return;
     base.current = fov.current = baseFov;
     const cam = camera as THREE.PerspectiveCamera;
     if (cam.fov === baseFov) return;

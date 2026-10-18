@@ -4063,6 +4063,8 @@ test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving res
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   const fovOf = () => page.evaluate(() => (window as any).__wp.three.camera.fov as number);
+  // the 3D scene mounts asynchronously
+  await expect.poll(() => page.evaluate(() => !!(window as any).__wp.three)).toBe(true);
   const overviewFov = await fovOf();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.getByTestId('crosshair')).toBeVisible();
@@ -4142,5 +4144,51 @@ test('catalog: while dragging, the item itself is previewed in 2D and 3D instead
   const placed = (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
   expect(placed.x).toBeCloseTo(g.x, 2);
   expect(placed.y).toBeCloseTo(g.z, 2);
+  expect(errors).toEqual([]);
+});
+
+test('walkthrough: "Echt-Maßstab" narrows the field of view to the real-size angle, zoom and Z use it, it is saved (#256)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.getByTestId('crosshair')).toBeVisible();
+  const fovOf = () => page.evaluate(() => (window as any).__wp.three.camera.fov as number);
+  await expect.poll(fovOf).toBe(70);
+  const toggle = page.getByRole('button', { name: 'Echt-Maßstab' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(fovOf).toBeLessThan(60);
+  const base = await fovOf();
+  expect(base).toBeGreaterThanOrEqual(20);
+  // zoom starts from the real-size value, Z goes back to it
+  const box = (await page.locator('canvas').first().boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -300);
+  await expect.poll(fovOf).toBeLessThan(base);
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 100);
+  await expect.poll(fovOf).toBeCloseTo(base, 3);
+  await page.mouse.wheel(0, -300);
+  await expect.poll(fovOf).toBeLessThan(base);
+  await page.keyboard.press('KeyZ');
+  await expect.poll(fovOf).toBeCloseTo(base, 3);
+  // a larger screen at the same distance widens the real-size angle
+  await page.evaluate(() => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.settings.screenDiagonal = 40)));
+  await expect.poll(fovOf).toBeGreaterThan(base);
+  await page.evaluate(() => (window as any).__wp.useProjectStore.getState().apply((d: any) => void (d.settings.screenDiagonal = 24)));
+  await expect.poll(fovOf).toBeCloseTo(base, 3);
+  // saved: after leaving, reloading and walking again the switch is still on
+  await page.getByRole('button', { name: 'Übersicht' }).click();
+  await expect(page.getByText('Gespeichert')).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).settings.walkTrueScale).toBe(true);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect.poll(fovOf).toBeLessThan(60);
+  // switched off: the usual wide angle is back
+  await page.getByRole('button', { name: 'Echt-Maßstab' }).click();
+  await expect.poll(fovOf).toBe(70);
   expect(errors).toEqual([]);
 });
