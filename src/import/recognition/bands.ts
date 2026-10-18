@@ -132,6 +132,7 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
   let bands = mergeBands(input, opts.mergeGap, opts.maxThickness);
   if (opts.maxThickness !== undefined) bands = bands.filter((b) => b.t <= opts.maxThickness!);
   const merged: Band[] = [];
+  const blocks: Band[] = [];
   for (const o of ['h', 'v'] as const) {
     // along the wall first: collinear pieces whose centre lines differ by rounding noise
     // (common in PDF coordinates) must still be chained from left to right
@@ -160,6 +161,10 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
         if (bestJ >= 0) {
           const n = list[bestJ];
           const gap = n.a0 - cur.a1;
+          // a much thicker stubby piece in line with a wall (a shaft or pre-wall block beside the wall, #37):
+          // the wall runs on through it, and the block stays a wall of its own as well
+          const [thin, block] = cur.t < n.t ? [cur, n] : [n, cur];
+          if (gap < opts.minOpening && block.t > 1.5 * thin.t && block.a1 - block.a0 <= 4 * block.t) blocks.push({ ...block });
           if (gap >= opts.minOpening) {
             const info = classify(cur, cur.a1, n.a0);
             if (!opening(info.kind, gap)) break;
@@ -181,7 +186,7 @@ export function assembleWalls(input: Band[], opts: AssembleOptions, classify: Ga
       merged.push(cur);
     }
   }
-  bands = merged;
+  bands = [...merged, ...blocks];
 
   // 2. join ends onto perpendicular bands (corners and T-junctions)
   const result = bands.map((b) => ({ ...b }));
