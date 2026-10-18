@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inspectModel, ModelFileError, sniffModelFile, suggestUnit } from './gltf';
+import { baseBox, inspectModel, ModelFileError, sniffModelFile, suggestUnit } from './gltf';
 import { boxGlb } from '../test/glbFixture';
 
 describe('GLB/glTF import', () => {
@@ -29,5 +29,28 @@ describe('GLB/glTF import', () => {
     expect(suggestUnit({ x: 200, y: 90, z: 80 }).factor).toBe(0.01);
     expect(suggestUnit({ x: 2000, y: 900, z: 800 }).factor).toBe(0.001);
     expect(suggestUnit({ x: 2, y: 0.9, z: 0.8 })).toEqual({ factor: 1, note: null });
+  });
+});
+
+describe('baseBox (#269)', () => {
+  it('misst nur den unteren Teil: bei einer Topfpflanze den Topf, nicht die Blätter', async () => {
+    const THREE = await import('three');
+    // SYNTHETIC plant: pot 19 cm wide and 20 cm high, leaves 60 cm wide above it, 1.2 m tall in total
+    const plant = new THREE.Group();
+    const pot = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.2, 0.19));
+    pot.position.y = 0.1;
+    const leaves = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.0, 0.5));
+    leaves.position.set(0.1, 0.7, 0);
+    plant.add(pot, leaves);
+    const b = baseBox(plant)!;
+    const size = b.getSize(new THREE.Vector3());
+    expect(size.x).toBeCloseTo(0.19, 3);
+    expect(size.z).toBeCloseTo(0.19, 3);
+    expect(baseBox(new THREE.Group())).toBeNull();
+    // one mesh for pot and leaves: only its vertices in the lowest slice count
+    const merged = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.095, 1.2, 16, 12));
+    merged.position.y = 0.6;
+    const m = baseBox(merged)!.getSize(new THREE.Vector3());
+    expect(m.x).toBeLessThan(0.25);
   });
 });

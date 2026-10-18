@@ -78,16 +78,30 @@ const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'c
 export function isStackable(f: Pick<Furniture, 'category' | 'width' | 'depth' | 'height' | 'model'> & { kitchen?: Furniture['kitchen'] }): boolean {
   const shape = shapeOf(f);
   if (shape === 'table-lamp') return true;
+  // an imported plant stands with its pot: width/depth are the pot, the leaves above may be tall (#269)
+  if (shape === 'plant' && f.model.type === 'gltf') return Math.max(f.width, f.depth) <= 0.6 && f.height <= 1.6;
   if (f.kitchen || NOT_STACKABLE.has(f.category) || NOT_STACKABLE_SHAPES.has(shape)) return false;
   return Math.max(f.width, f.depth) <= 0.6 && f.height <= 0.8;
 }
 
+/** Categories and shapes of imported models that never offer a top to put things on. */
+const NO_SURFACE_CATEGORIES = new Set(['textile', 'chair', 'sofa', 'bed', 'lighting']);
+const NO_SURFACE_SHAPES = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'k-wall', 'k-hood', 'k-cooktop', 'sofa', 'bed', 'armchair', 'chair', 'stool', 'office-chair', 'wc', 'toilet', 'shower', 'bathtub']);
+
 /** Furniture that offers a top surface for stackable items. */
-export function isSurface(f: Item): boolean {
+export function isSurface(f: Item & { width?: number; depth?: number }): boolean {
   if (isTextile(f) || f.height > 1.3 || f.height < 0.2) return false;
   if (isTableLike(f)) return true;
   const shape = shapeOf(f);
-  return ['cabinet', 'dresser', 'k-base', 'k-sink', 'washer', 'washbasin'].includes(shape) || (f.kitchen?.type === 'countertop');
+  if (['cabinet', 'dresser', 'k-base', 'k-sink', 'washer', 'washbasin', 'shelf'].includes(shape) || f.kitchen?.type === 'countertop') return true;
+  // imported 3D models (IKEA, own .glb, #219): their category or substitute shape is often only a guess,
+  // so any low piece that is not a seat, bed, lamp or plant and is large enough to put something on counts
+  return (
+    f.model.type === 'gltf' &&
+    !NO_SURFACE_CATEGORIES.has(f.category) &&
+    !NO_SURFACE_SHAPES.has(shape) &&
+    Math.min(f.width ?? 0, f.depth ?? 0) >= 0.25
+  );
 }
 
 /**

@@ -6,7 +6,7 @@ import type { Furniture, QualityMode } from '../model/schema';
 import { planRotationToWorldY, roundMm } from '../model/units';
 import { ProceduralModel } from './ProceduralModel';
 import { useAssetUrl } from '../persistence/useAssetUrl';
-import { DRACO_PATH } from '../import/gltf';
+import { baseBox, DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 import { useUiStore } from '../store/uiStore';
 import { requestLampShadowUpdate } from './lampRegistry';
@@ -195,14 +195,18 @@ function GltfModel({ item, fallback, castShadow, receiveShadow }: { item: Furnit
 
 function LoadedGltf({ url, item, castShadow, receiveShadow }: { url: string; item: Furniture; castShadow: boolean; receiveShadow: boolean }) {
   const gltf = useGLTF(url, DRACO_PATH);
+  const plant = item.model.type === 'gltf' && item.model.fallbackShape === 'plant';
   const scene = useMemo(() => {
     const s = gltf.scene.clone(true);
     const box = new THREE.Box3().setFromObject(s);
     const size = box.getSize(new THREE.Vector3());
-    // scale the model to the stored real-world dimensions
-    s.scale.set(item.width / (size.x || 1), item.height / (size.y || 1), item.depth / (size.z || 1));
+    // scale the model to the stored real-world dimensions; a plant keeps its proportions:
+    // width/depth are its pot (footprint, #269), the leaves spread as modelled
+    if (plant) s.scale.setScalar(item.height / (size.y || 1));
+    else s.scale.set(item.width / (size.x || 1), item.height / (size.y || 1), item.depth / (size.z || 1));
     const box2 = new THREE.Box3().setFromObject(s);
-    const c = box2.getCenter(new THREE.Vector3());
+    // a plant stands centred on its pot, wherever its leaves lean
+    const c = ((plant && baseBox(s)) || box2).getCenter(new THREE.Vector3());
     s.position.set(-c.x, -box2.min.y, -c.z);
     s.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
@@ -212,7 +216,7 @@ function LoadedGltf({ url, item, castShadow, receiveShadow }: { url: string; ite
       }
     });
     return s;
-  }, [gltf, item.width, item.height, item.depth, castShadow, receiveShadow]);
+  }, [gltf, plant, item.width, item.height, item.depth, castShadow, receiveShadow]);
   // a loaded model replaces its placeholder: lamp shadows must see it
   useEffect(() => requestLampShadowUpdate(), [scene]);
   return <primitive object={scene} />;

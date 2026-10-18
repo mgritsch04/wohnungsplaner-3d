@@ -6,7 +6,7 @@ import { buildPlacementObstacles, conflictSummary, clipConvex, moveFurnitureTo, 
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
-import { isStackable, seatBackDepth } from './placementRules';
+import { isStackable, isSurface, seatBackDepth } from './placementRules';
 import { pointInPolygon, polygonArea, rotate } from './vec';
 
 const T = 0.12;
@@ -392,6 +392,37 @@ describe('unified furniture rules', () => {
     for (const id of ['generic-sofa-3', 'generic-wardrobe-100', 'generic-dresser', 'generic-bar-stool', 'generic-nightstand', 'generic-k-base-40', 'generic-k-hood-60', 'generic-floor-lamp', 'generic-washer', 'generic-toilet']) {
       expect(isStackable(createFurnitureFromCatalog(cat(id), { x: 0, y: 0 })), id).toBe(false);
     }
+  });
+
+  it('imported 3D models offer their top as a surface, whatever their guessed category (#219)', () => {
+    const glb = (id: string, over: object) => ({ ...createFurnitureFromCatalog(cat(id), { x: 2, y: 1.5 }), model: { type: 'gltf' as const, assetId: 'a1', fallbackShape: 'box' }, ...over });
+    // SYNTHETIC imported pieces: an unknown drawer unit landed in "decor", an own .glb table in "other"
+    const drawers = glb('generic-storage-box', { category: 'decor', width: 0.58, depth: 0.36, height: 0.7 });
+    const ownTable = glb('generic-dining-table-4', { category: 'other' });
+    expect(isSurface(drawers)).toBe(true);
+    expect(isSurface(ownTable)).toBe(true);
+    for (const f of [glb('generic-sofa-2', {}), glb('generic-armchair', {}), glb('generic-storage-box', { width: 0.2, depth: 0.2, height: 0.3 }), glb('generic-storage-box', { height: 1.6 })]) {
+      expect(isSurface(f), f.name).toBe(false);
+    }
+    const { p, d, obs } = room();
+    const box = createFurnitureFromCatalog(cat('generic-storage-box'), { x: 0.6, y: 0.6 });
+    p.furniture.push(ownTable, box);
+    moveFurnitureTo(p, d, obs, box.id, { x: 2.2, y: 1.5 }, { snap: true, collide: true });
+    expect(p.furniture.find((f) => f.id === box.id)!.elevation).toBeCloseTo(ownTable.height, 6);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
+  });
+
+  it('an imported plant stands on a table with its pot; its leaves do not count (#269)', () => {
+    const { p, d, obs } = room();
+    const table = createFurnitureFromCatalog(cat('generic-dining-table-4'), { x: 2, y: 1.5 });
+    // SYNTHETIC plant: pot 19 cm, 1.2 m tall with leaves
+    const plant = { ...createFurnitureFromCatalog(cat('generic-plant'), { x: 0.6, y: 0.6 }), model: { type: 'gltf' as const, assetId: 'a2', fallbackShape: 'plant' }, width: 0.19, depth: 0.19, height: 1.2 };
+    expect(isStackable(plant)).toBe(true);
+    expect(isStackable(createFurnitureFromCatalog(cat('generic-plant'), { x: 0, y: 0 }))).toBe(false); // planner's floor plant stays on the floor
+    p.furniture.push(table, plant);
+    moveFurnitureTo(p, d, obs, plant.id, { x: 2.2, y: 1.5 }, { snap: true, collide: true });
+    expect(p.furniture.find((f) => f.id === plant.id)!.elevation).toBeCloseTo(table.height, 6);
+    expect(furnitureConflicts(p, d, obs).size).toBe(0);
   });
 
   it('a sofa dragged onto a table stays on the floor and is blocked by it (#219)', () => {

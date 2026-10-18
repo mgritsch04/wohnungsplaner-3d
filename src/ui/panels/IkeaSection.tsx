@@ -327,7 +327,7 @@ function DraftCard({ pending, onAdded }: { pending: PendingDraft; onAdded: (id: 
     setBusy(true);
     setError(null);
     try {
-      const m = await estimateFromModel(pending.model);
+      const m = await estimateFromModel(pending.model, { plant: d.shape === 'plant' });
       const filled = d.missing.filter((k) => !dims[k].trim());
       setDims((prev) => ({ ...prev, ...Object.fromEntries(filled.map((k) => [k, String(m[k])])) }));
       setEstimated(new Set(filled));
@@ -375,7 +375,11 @@ function DraftCard({ pending, onAdded }: { pending: PendingDraft; onAdded: (id: 
           ))}
           <span>cm</span>
         </span>
-        {estimated.size > 0 && <span className={s.meta}>„ca.“ = aus dem 3D-Modell gemessen; bei Pflanzen zählen die Blätter mit. Bitte prüfen.</span>}
+        {estimated.size > 0 && (
+          <span className={s.meta}>
+            „ca.“ = aus dem 3D-Modell gemessen{d.shape === 'plant' ? ' (Breite und Tiefe: der Topf, die Blätter zählen nicht)' : ''}. Bitte prüfen.
+          </span>
+        )}
         {error && <span className={s.failed}>{error}</span>}
         <span className={s.cardActions}>
           <button className="primary" disabled={busy} onClick={() => void take()}>

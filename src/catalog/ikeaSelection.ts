@@ -138,15 +138,18 @@ export async function completePending(
 
 /**
  * Approximate size (cm) of the IKEA 3D model the helper already cached for this product –
- * no further download. Plants: the leaves count, not only the pot.
+ * no further download. For a plant, width and depth come from the lowest part of the model
+ * (its pot, #269); the height is the whole plant.
  */
 export async function estimateFromModel(
   file: string,
+  opts: { plant?: boolean } = {},
   deps: Pick<IkeaFetchDeps, 'fetchModel' | 'check'> = defaultDeps,
 ): Promise<Record<DimKey, number>> {
   const { info } = await (deps.check ?? checkModelBlob)(await deps.fetchModel(file));
   const k = suggestUnit(info.size).factor * 100;
   const cm = (v: number) => Math.max(1, Math.round(v * k));
+  const foot = opts.plant && info.base ? info.base : info.size;
   // glTF: X = width, Y = height, Z = depth
-  return { width: cm(info.size.x), depth: cm(info.size.z), height: cm(info.size.y) };
+  return { width: cm(foot.x), depth: cm(foot.z), height: cm(info.size.y) };
 }
