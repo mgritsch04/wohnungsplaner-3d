@@ -15,6 +15,8 @@ import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } fr
 import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
 import { detectFixtures } from './fixtures';
+import { detectInstallations, INSTALLATION_ACCEPT_AT } from './installations';
+import { FIXTURE_ELEVATION, FIXTURE_LABEL } from '../../model/fixtures';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
 import { isGlassDoor, type Underlay } from '../../model/schema';
@@ -100,6 +102,26 @@ export async function runRecognition() {
         accepted: true,
       }));
       if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – werden als Bestand übernommen (nicht im Budget). Bitte prüfen.`);
+      // sockets, switches, LAN, water, radiators from their symbols (#222)
+      draft.installations = detectInstallations(world, draft.walls, rooms).map((i) => {
+        const sure = i.confidence >= INSTALLATION_ACCEPT_AT;
+        return {
+          id: newId('dfi'),
+          kind: i.kind,
+          center: { x: roundMm(i.center.x), y: roundMm(i.center.y) },
+          elevation: FIXTURE_ELEVATION[i.kind],
+          width: i.width,
+          fixtureNote: i.symbol === 'lan' ? 'LAN / Daten' : undefined,
+          status: sure ? ('estimated' as const) : ('uncertain' as const),
+          confidence: i.confidence,
+          note: i.note,
+          accepted: sure,
+        };
+      });
+      if (draft.installations.length) {
+        const unsure = draft.installations.filter((i) => !i.accepted).length;
+        draft.warnings.push(`${draft.installations.length} Installationspunkt(e) (${[...new Set(draft.installations.map((i) => FIXTURE_LABEL[i.kind]))].join(', ')}) aus den Symbolen im Plan erkannt${unsure ? `, davon ${unsure} unsicher (nicht vorausgewählt)` : ''}. Höhen sind Richtwerte – bitte prüfen.`);
+      }
     }
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
@@ -109,7 +131,7 @@ export async function runRecognition() {
     }
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
-    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume${draft.fixtures?.length ? ` und ${draft.fixtures.length} Sanitärobjekte` : ''} vorgeschlagen – bitte prüfen.`, 'success');
+    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume${draft.fixtures?.length ? ` und ${draft.fixtures.length} Sanitärobjekte` : ''}${draft.installations?.length ? `, ${draft.installations.length} Anschlüsse` : ''} vorgeschlagen – bitte prüfen.`, 'success');
   } catch (e) {
     reportError(e, 'Erkennung fehlgeschlagen');
   } finally {

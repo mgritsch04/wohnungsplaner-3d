@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { DraftFixture, DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from './draft';
+import type { DraftFixture, DraftInstallation, DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from './draft';
 
-export type DraftSelection = { type: 'wall' | 'opening' | 'room' | 'fixture'; id: string } | null;
+export type DraftSelection = { type: 'wall' | 'opening' | 'room' | 'fixture' | 'installation'; id: string } | null;
 
 interface ImportStore {
   draft: ReconstructionDraft | null;
@@ -14,7 +14,8 @@ interface ImportStore {
   updateOpening: (id: string, patch: Partial<DraftOpening>) => void;
   updateRoom: (id: string, patch: Partial<DraftRoom>) => void;
   updateFixture: (id: string, patch: Partial<DraftFixture>) => void;
-  removeElement: (type: 'wall' | 'opening' | 'room' | 'fixture', id: string) => void;
+  updateInstallation: (id: string, patch: Partial<DraftInstallation>) => void;
+  removeElement: (type: 'wall' | 'opening' | 'room' | 'fixture' | 'installation', id: string) => void;
   setAllAccepted: (accepted: boolean) => void;
   setProgress: (p: ImportStore['progress']) => void;
   patchDraft: (patch: Partial<ReconstructionDraft>) => void;
@@ -42,6 +43,10 @@ export const useImportStore = create<ImportStore>((set, get) => ({
     const d = get().draft;
     if (d) set({ draft: { ...d, fixtures: d.fixtures?.map((x) => (x.id === id ? { ...x, ...patch } : x)) } });
   },
+  updateInstallation: (id, patch) => {
+    const d = get().draft;
+    if (d) set({ draft: { ...d, installations: d.installations?.map((x) => (x.id === id ? { ...x, ...patch } : x)) } });
+  },
   removeElement: (type, id) => {
     const d = get().draft;
     if (!d) return;
@@ -49,6 +54,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
     if (type === 'opening') set({ draft: { ...d, openings: d.openings.filter((o) => o.id !== id) } });
     if (type === 'room') set({ draft: { ...d, rooms: d.rooms.filter((r) => r.id !== id) } });
     if (type === 'fixture') set({ draft: { ...d, fixtures: d.fixtures?.filter((x) => x.id !== id) } });
+    if (type === 'installation') set({ draft: { ...d, installations: d.installations?.filter((x) => x.id !== id) } });
     if (get().selected?.id === id) set({ selected: null });
   },
   setAllAccepted: (accepted) => {
@@ -61,6 +67,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
         openings: d.openings.map((o) => ({ ...o, accepted })),
         rooms: d.rooms.map((r) => ({ ...r, accepted })),
         fixtures: d.fixtures?.map((x) => ({ ...x, accepted })),
+        installations: d.installations?.map((x) => ({ ...x, accepted })),
       },
     });
   },
