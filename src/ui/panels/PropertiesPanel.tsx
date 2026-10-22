@@ -17,6 +17,7 @@ import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnit
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
+import { InteriorSection } from './InteriorSection';
 import { NotesSection } from '../../planning/NotesSection';
 import { RoomTasksSection } from '../../planning/TaskSections';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
@@ -627,6 +628,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           </button>
         )}
       </PanelGroup>
+      <InteriorSection f={f} upd={upd} />
       <PanelGroup groupKey="furniture.model" title="3D-Modell" defaultOpen={false} actions={f.model.type === 'gltf' ? <Badge kind="ok">GLB</Badge> : <Badge kind="muted">prozedural</Badge>}>
         <div className="btn-row">
           <button onClick={() => useDialogStore.getState().openModal('model', { furnitureId: f.id })}>{f.model.type === 'gltf' ? 'Anderes GLB…' : 'Eigenes GLB hinterlegen…'}</button>

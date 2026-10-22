@@ -194,6 +194,23 @@ export const KitchenModuleSchema = z.object({
 /** Surface type of a furniture body (#63): replaces the model's built-in structure/gloss on its main parts. */
 export const FurnitureFinishSchema = z.enum(['fabric', 'leather', 'wood', 'lacquer', 'metal', 'stone']);
 
+/** One element of a cabinet's inner layout (#85): shelf, drawer or clothes rod in a column. */
+export const InteriorPartSchema = z.object({
+  kind: z.enum(['shelf', 'drawer', 'rod']),
+  /** Column (0-based, left to right as seen from the front). */
+  column: z.number().int().min(0).max(5),
+  /** Height of the part's underside (rod: of the rod) above the inner floor. */
+  z: len(0, 10),
+  /** Drawer front height; ignored for shelf and rod. */
+  h: len(0.01, 2).optional(),
+});
+
+/** Inner layout of a cabinet (#85); optional, so older files stay valid (no migration). */
+export const InteriorSchema = z.object({
+  columns: z.number().int().min(1).max(6),
+  parts: z.array(InteriorPartSchema).max(80),
+});
+
 export const FurnitureSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().optional(),
@@ -230,6 +247,8 @@ export const FurnitureSchema = z.object({
   existing: z.boolean().default(false),
   /** Member of the furniture group with this id (#65), see `ProjectSchema.groups`; absent = not grouped. */
   groupId: z.string().min(1).optional(),
+  /** Inner layout of a cabinet (#85); absent = not planned. */
+  interior: InteriorSchema.optional(),
 });
 
 /**
@@ -549,6 +568,8 @@ export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 export type KitchenModule = z.infer<typeof KitchenModuleSchema>;
 export type Furniture = z.infer<typeof FurnitureSchema>;
+export type InteriorPart = z.infer<typeof InteriorPartSchema>;
+export type Interior = z.infer<typeof InteriorSchema>;
 export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
