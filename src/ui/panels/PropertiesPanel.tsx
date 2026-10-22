@@ -18,6 +18,7 @@ import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
 import { InteriorSection } from './InteriorSection';
+import { PhotosSection } from '../../photos/PhotosSection';
 import { NotesSection } from '../../planning/NotesSection';
 import { RoomTasksSection } from '../../planning/TaskSections';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
@@ -224,6 +225,7 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           ))}
         </ul>
       </PanelGroup>
+      <PhotosSection project={project} wallId={id} length={len} />
       <div className="btn-row padded">
         <button
           onClick={() => {

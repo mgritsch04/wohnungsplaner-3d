@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 4;
+export const PROJECT_SCHEMA_VERSION = 5;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -521,6 +521,27 @@ export const TaskSchema = z.object({
   due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+/**
+ * Reference photo hung on one side of a wall (#86), to compare real rooms with the plan.
+ * The image lives only in the local asset store (`assetId`), never in the repo or on a server.
+ * `along` = distance of the photo's left edge from the wall start (m), `bottom` = height of its
+ * lower edge (m); the height follows from `width` and the image aspect `aspect` (width / height).
+ */
+export const PhotoSchema = z.object({
+  id: z.string().min(1),
+  wallId: z.string().min(1),
+  /** Wall side relative to a→b: left = +normal side. */
+  side: z.enum(['left', 'right']),
+  assetId: z.string().min(1),
+  fileName: z.string().max(300).default(''),
+  aspect: z.number().min(0.05).max(20),
+  width: len(0.05, 20),
+  along: finite(),
+  bottom: finite(),
+  visible: z.boolean().default(true),
+  opacity: z.number().min(0.05).max(1).default(1),
+});
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -553,6 +574,8 @@ export const ProjectSchema = z.object({
   /** Notes as pins (#83), room task lists (#84) and the moving checklist (#91, tasks without roomId); schema 4. */
   notes: z.array(NoteSchema).default([]),
   tasks: z.array(TaskSchema).default([]),
+  /** Reference photos on walls (#86); schema 5. */
+  photos: z.array(PhotoSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -581,6 +604,7 @@ export type Circuit = z.infer<typeof CircuitSchema>;
 export type Load = z.infer<typeof LoadSchema>;
 export type Note = z.infer<typeof NoteSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type Photo = z.infer<typeof PhotoSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;

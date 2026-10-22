@@ -15,6 +15,7 @@ import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
+import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
 import { Fixtures3D } from '../installation/Fixtures3D';
@@ -336,6 +337,7 @@ function SceneContent({
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
       />
+      <Photos3D project={project} derived={derived} />
       {exteriorOn && <Exterior3D project={project} derived={derived} entrance={entrance} />}
       {project.furniture.map((f) => (
         <FurnitureObject

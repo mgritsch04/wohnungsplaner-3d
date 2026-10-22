@@ -21,6 +21,8 @@ export const PROJECT_MIGRATIONS: Record<number, Migration> = {
   2: (raw) => ({ ...raw, schemaVersion: 3 }),
   // 3 → 4 (#83, #84, #91): notes and tasks (room task lists + moving checklist)
   3: (raw) => ({ ...raw, schemaVersion: 4, notes: raw.notes ?? [], tasks: raw.tasks ?? [] }),
+  // 4 → 5 (#86): reference photos on walls
+  4: (raw) => ({ ...raw, schemaVersion: 5, photos: raw.photos ?? [] }),
 };
 
 export function migrateProjectObject(raw: unknown): Record<string, unknown> {
