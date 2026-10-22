@@ -20,7 +20,9 @@ export interface DeviceProposal {
   key: string;
   roomId: string;
   kind: SmartDeviceKind;
-  productId: string;
+  /** absent for loudspeakers (#138): generic type only, no product */
+  productId?: string;
+  speakerType?: SmartDevice['speakerType'];
   name: string;
   x: number;
   y: number;
@@ -127,7 +129,7 @@ const proposalDevice = (kind: SmartDeviceKind, productId: string, s: { x: number
 });
 
 /** The device as the proposal would become it (for drawing the detection area of a preview). */
-export const deviceOfProposal = (p: DeviceProposal): SmartDevice => ({ id: p.key, name: p.name, kind: p.kind, productId: p.productId, x: p.x, y: p.y, rotation: p.rotation, elevation: p.elevation, openingId: p.openingId, lightId: p.lightId });
+export const deviceOfProposal = (p: DeviceProposal): SmartDevice => ({ id: p.key, name: p.name, kind: p.kind, productId: p.productId, speakerType: p.speakerType, x: p.x, y: p.y, rotation: p.rotation, elevation: p.elevation, openingId: p.openingId, lightId: p.lightId });
 
 /**
  * Suggest equipment for the given rooms (default: all). `types` overrides the room type

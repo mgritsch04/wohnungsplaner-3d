@@ -256,7 +256,7 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
-export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip']);
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip', 'speaker']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(100),
@@ -285,6 +285,11 @@ export const SmartDeviceSchema = z.object({
   direction: z.enum(['down', 'back', 'up']).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   kelvin: z.number().min(1500).max(10000).optional(),
+  /**
+   * kind `speaker` (#138): which kind of loudspeaker is planned (generic type, no product);
+   * `rotation` is the direction it fires at, `elevation` its height. Optional: no migration.
+   */
+  speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']).optional(),
 });
 
 /**

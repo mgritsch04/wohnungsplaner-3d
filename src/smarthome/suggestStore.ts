@@ -33,7 +33,7 @@ export function applySmartHomeSuggestion(s: SmartHomeSuggestion): number {
       if (it.lightId && !l) continue;
       const kelvin = productById(it.productId)?.kelvin;
       if (l && kelvin) l.temperature = Math.min(Math.max(l.temperature, kelvin[0]), kelvin[1]);
-      d.devices.push({ id: newId('dev'), name: it.name, kind: it.kind, productId: it.productId, x: it.x, y: it.y, elevation: it.elevation, rotation: it.rotation, openingId: it.openingId, lightId: it.lightId });
+      d.devices.push({ id: newId('dev'), name: it.name, kind: it.kind, productId: it.productId, x: it.x, y: it.y, elevation: it.elevation, rotation: it.rotation, openingId: it.openingId, lightId: it.lightId, speakerType: it.speakerType });
     }
   });
   useSmartSuggestStore.getState().setPreview(null);
