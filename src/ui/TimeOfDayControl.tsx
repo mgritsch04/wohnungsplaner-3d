@@ -3,6 +3,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useSimStore } from '../smarthome/simStore';
 import { TIME_PRESETS } from '../view3d/lighting';
+import { InfoHint } from './InfoHint';
 import { useGraphicsTier, useGraphicsTierStore, type GraphicsTierPref } from '../view3d/graphicsTier';
 
 const fmt = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
@@ -121,6 +122,7 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
         <>
           <TimePresetSelect />
           <LampsSelect />
+          <InfoHint id="lamps" />
         </>
       )}
     </div>

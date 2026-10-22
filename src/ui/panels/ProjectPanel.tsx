@@ -13,6 +13,8 @@ import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
 import { MotionControl } from '../MotionControl';
+import { HintsControl } from '../HintsControl';
+import { InfoHint } from '../InfoHint';
 import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
@@ -31,15 +33,20 @@ export function ProjectPanel() {
       <Section title="Oberfläche">
         <ThemeControl />
         <MotionControl />
+        <HintsControl />
       </Section>
 
       <Section title="Licht & Darstellung (3D)">
         <div className="field">
-          <span className="field-label">Tageszeit (wirkt im Realismusmodus)</span>
+          <span className="field-label">
+            Tageszeit (wirkt im Realismusmodus) <InfoHint id="timeOfDay" />
+          </span>
           <TimeOfDayControl />
         </div>
         <label className="field">
-          <span className="field-label">Belichtung {s.exposure.toFixed(2)}</span>
+          <span className="field-label">
+            Belichtung {s.exposure.toFixed(2)} <InfoHint id="exposure" />
+          </span>
           <input
             type="range"
             min={0.3}
@@ -134,7 +141,7 @@ export function ProjectPanel() {
 
       <Section title="Leistung">
         <p className="small">
-          Modus: <strong>{s.quality === 'planning' ? 'Planung' : 'Realismus'}</strong>
+          Modus: <strong>{s.quality === 'planning' ? 'Planung' : 'Realismus'}</strong> <InfoHint id="realism" />
           {fps !== null && (
             <>
               {' '}
