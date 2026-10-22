@@ -15,6 +15,7 @@ import { normalizeAngle } from './units';
 import { frontClearance, isRug, isStackable, isSurface, pairRule, seatAndTable, seatBackDepth } from './placementRules';
 import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
 import { clipFootprint } from './geometry/walls';
+import { coveredConnections, fixtureCenterZ, fixtureCorners, FIXTURE_LABEL } from './fixtures';
 
 export interface Obstacle {
   polygon: Vec2[];
@@ -339,7 +340,7 @@ export interface CollisionRegion {
 }
 
 export interface PlacementIssue {
-  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance';
+  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance' | 'connection';
   message: string;
   /** Short reason why the item is marked, e.g. „ragt in die Wand“, „überlappt mit „Sofa““ (#16). */
   short: string;
@@ -519,6 +520,18 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
       const culprit = { polygon: oc, z0: o.elevation, z1: o.elevation + o.height };
       issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, short: `überlappt mit „${o.name}“`, refId: o.id, region: intersection(item, fc, culprit), culprit });
     }
+  }
+  // water / waste-water connections must stay reachable (#81)
+  for (const f of coveredConnections(p, item)) {
+    const culprit = { polygon: fixtureCorners(f), z0: 0, z1: fixtureCenterZ(f) + 0.05 };
+    issues.push({
+      kind: 'connection',
+      message: `Steht vor einem ${FIXTURE_LABEL[f.kind]} – der Anschluss bleibt so nicht erreichbar.`,
+      short: `steht vor einem ${FIXTURE_LABEL[f.kind]}`,
+      refId: f.id,
+      region: culprit,
+      culprit,
+    });
   }
   // doors/drawers need free space in front of the item
   const need = frontClearance(item);

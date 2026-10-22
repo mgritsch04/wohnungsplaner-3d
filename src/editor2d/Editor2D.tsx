@@ -32,6 +32,7 @@ import { SightlineOverlay } from './SightlineOverlay';
 import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
+import { Fixtures2D } from '../installation/Fixtures2D';
 import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -40,7 +41,7 @@ import { pressFurnitureSelection, reportGroupTurn, selectFurnitureWithGroups, se
 import { GroupOverlay, groupHandlePoint } from './GroupOverlay';
 
 type Drag =
-  | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean; device?: string | null }
+  | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean; device?: string | null; fixture?: string | null }
   | {
       kind: 'furniture';
       id: string;
@@ -284,7 +285,8 @@ export function Editor2D() {
     if (isPan) {
       // a smart device under a right-click (drawn by its own overlay, not in hitTest) – for the context menu (#235)
       const device = e.button === 2 ? ((e.target as Element).closest?.('[data-device-id]')?.getAttribute('data-device-id') ?? null) : null;
-      drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: false, device };
+      const fixture = e.button === 2 ? ((e.target as Element).closest?.('[data-fixture-id]')?.getAttribute('data-fixture-id') ?? null) : null;
+      drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: false, device, fixture };
       return;
     }
     if (e.button !== 0) return;
@@ -662,7 +664,7 @@ export function Editor2D() {
     if (dr.kind === 'pan') {
       // right-click without dragging: context menu of the object under the pointer (#235)
       if (!dr.moved && e.button === 2 && tool === 'select') {
-        const hit: Selection | null = dr.device ? { type: 'device', id: dr.device } : hitTest(project, derived, toWorld(e), 6 / view.zoom);
+        const hit: Selection | null = dr.device ? { type: 'device', id: dr.device } : dr.fixture ? { type: 'fixture', id: dr.fixture } : hitTest(project, derived, toWorld(e), 6 / view.zoom);
         if (hit) openObjectMenu(hit, e.clientX, e.clientY, '2d');
         return;
       }
@@ -906,6 +908,7 @@ export function Editor2D() {
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
           <WifiOverlay2D project={project} />
+          <Fixtures2D project={project} px={px} />
           <DevicesOverlay2D project={project} px={px} />
 
           {/* node handles */}

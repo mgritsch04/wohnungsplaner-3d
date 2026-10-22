@@ -1,5 +1,6 @@
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { deleteDevice } from '../smarthome/actions';
+import { deleteFixture } from '../installation/actions';
 import type { CatalogItem } from '../catalog/types';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
@@ -63,6 +64,8 @@ export async function deleteSelection() {
     });
   } else if (sel.type === 'device') {
     deleteDevice(sel.id);
+  } else if (sel.type === 'fixture') {
+    deleteFixture(sel.id);
   }
   ui().setSelection(null);
 }

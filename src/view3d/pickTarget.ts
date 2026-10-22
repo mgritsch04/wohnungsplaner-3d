@@ -5,7 +5,7 @@ import { isClippedHit } from './pointer';
 /**
  * The editable object a 3D mesh belongs to (#235): furniture (FurnitureObject sets
  * userData.furnitureId), a door/window (Architecture: openingId) or a smart device
- * (Devices3D: smartDevice). Before/after ghosts, furnishing previews and the catalog drop
+ * (Devices3D: smartDevice) or an installation point (Fixtures3D: fixtureId). Before/after ghosts, furnishing previews and the catalog drop
  * ghost are not editable.
  */
 export function pickTargetOf(o: THREE.Object3D | null): Selection | null {
@@ -15,6 +15,7 @@ export function pickTargetOf(o: THREE.Object3D | null): Selection | null {
     if (typeof u.furnitureId === 'string') return { type: 'furniture', id: u.furnitureId };
     if (typeof u.openingId === 'string') return { type: 'opening', id: u.openingId };
     if (typeof u.smartDevice === 'string') return { type: 'device', id: u.smartDevice };
+    if (typeof u.fixtureId === 'string') return { type: 'fixture', id: u.fixtureId };
   }
   return null;
 }
