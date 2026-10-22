@@ -4302,7 +4302,7 @@ test('walkthrough: field-of-view slider with quick choices, head bob, reference 
   expect(errors).toEqual([]);
 });
 
-test('walkthrough: E still works after a slider or checkbox had focus; text fields hint instead of eating keys silently (#283)', async ({ page }) => {
+test('walkthrough: F still works after a slider or checkbox had focus; text fields hint instead of eating keys silently (#283)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   const p0 = await getProject(page);
@@ -4330,7 +4330,7 @@ test('walkthrough: E still works after a slider or checkbox had focus; text fiel
     document.body.appendChild(i);
     i.focus();
   });
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect.poll(() => openOf(window1.id)).toBe(true);
   // a text field still blocks the walking keys, but says why; Esc hands the keyboard back
   await page.evaluate(() => {
@@ -4340,7 +4340,7 @@ test('walkthrough: E still works after a slider or checkbox had focus; text fiel
     document.body.appendChild(i);
     i.focus();
   });
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect(page.getByText('Eingabefeld aktiv')).toBeVisible();
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('probe-text');
