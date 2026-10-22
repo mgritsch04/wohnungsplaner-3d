@@ -21,7 +21,7 @@ import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { catalogDropPreview, draggedCatalogItem, droppedCatalogItem, isCatalogDrag, useCatalogDragStore, type DropPreview } from '../catalog/catalogDrag';
-import { dropCatalogItemAt } from '../ui/actions';
+import { dropCatalogItemAt, toggleUnderlayVisible } from '../ui/actions';
 import { openObjectMenu } from '../ui/objectMenu';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
@@ -1063,6 +1063,20 @@ export function Editor2D() {
           )}
         </g>
       </svg>
+
+      {project.underlay && (
+        <button
+          type="button"
+          className={`underlay-toggle${project.underlay.visible ? ' active' : ''}`}
+          data-testid="underlay-toggle"
+          aria-pressed={project.underlay.visible}
+          title="Plan-Hintergrund ein- / ausblenden (P)"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => toggleUnderlayVisible()}
+        >
+          Plan-Hintergrund
+        </button>
+      )}
 
       <ZoomSlider
         testId="zoom-2d"

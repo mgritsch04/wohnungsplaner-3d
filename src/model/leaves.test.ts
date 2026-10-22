@@ -12,7 +12,7 @@ import { createSampleProject } from './sample';
 import { parseProject, serializeProject } from '../formats/project/projectFile';
 import { buildColliders, resolveCollisions } from '../view3d/collision';
 import { useProjectStore } from '../store/projectStore';
-import { toggleOpening } from '../ui/actions';
+import { toggleOpening, toggleUnderlayVisible } from '../ui/actions';
 import type { Project } from './schema';
 
 const T = 0.12;
@@ -248,5 +248,25 @@ describe('toggling in the app: one undo step each (#21)', () => {
     const before = s().past.length;
     expect(toggleOpening(door.id)).toBeNull();
     expect(s().past.length).toBe(before);
+  });
+});
+
+describe('plan background toggle (#258)', () => {
+  beforeEach(() => useProjectStore.getState().load(createSampleProject()));
+
+  it('does nothing without a background; otherwise flips underlay.visible as one undo step', () => {
+    const s = useProjectStore.getState;
+    expect(toggleUnderlayVisible()).toBeNull();
+    s().apply((d) => {
+      d.underlay = { imageAssetId: 'asset_test', fileName: 'a.png', sourceKind: 'png', pixelWidth: 1, pixelHeight: 1, metersPerPixel: 1, calibrated: false, scaleSource: 'none', checks: [], x: 0, y: 0, rotation: 0, opacity: 0.5, visible: true, locked: false };
+    });
+    const past = s().past.length;
+    expect(toggleUnderlayVisible()).toBe(false);
+    expect(s().project.underlay!.visible).toBe(false);
+    expect(s().project.underlay!.opacity).toBe(0.5);
+    expect(toggleUnderlayVisible()).toBe(true);
+    expect(s().past.length).toBe(past + 2);
+    s().undo();
+    expect(s().project.underlay!.visible).toBe(false);
   });
 });

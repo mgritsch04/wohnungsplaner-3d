@@ -303,6 +303,20 @@ export async function importProjectFile() {
 }
 
 /**
+ * Show or hide the imported plan background (#258; P key, switch in the 2D view). Same
+ * `underlay.visible` as the checkbox in the Import panel; one undo step. Returns the new
+ * state, or null if there is no background or a drag is in progress.
+ */
+export function toggleUnderlayVisible(): boolean | null {
+  const u = store().project.underlay;
+  if (!u || store().txBase) return null;
+  store().apply((d) => {
+    if (d.underlay) d.underlay.visible = !u.visible;
+  });
+  return !u.visible;
+}
+
+/**
  * Open or close door/window `id` (#21; O key, double-click in 3D, click while walking,
  * panel): one undo step per toggle. Returns the new state, or null if nothing changed
  * (no such opening, a passage, or a drag/carry in progress).

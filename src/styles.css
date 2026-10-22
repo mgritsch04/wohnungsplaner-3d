@@ -1386,6 +1386,14 @@ code {
   border-radius: var(--radius-pill);
   line-height: 1;
 }
+.underlay-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+}
 .walk-duck {
   position: absolute;
   top: 12px;
