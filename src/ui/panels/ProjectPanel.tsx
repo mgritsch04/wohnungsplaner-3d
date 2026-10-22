@@ -12,6 +12,7 @@ import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
+import { DaylightSection } from './DaylightSection';
 import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
@@ -62,6 +63,8 @@ export function ProjectPanel() {
           title="Decken sind nur von unten sichtbar (z. B. beim Begehen)"
         />
       </Section>
+
+      <DaylightSection />
 
       <SightlineSection />
 
