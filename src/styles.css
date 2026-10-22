@@ -1007,6 +1007,39 @@ dl.stats dd {
   flex: 1;
 }
 
+/* ---------- sanfte Übergänge (Issue 101) ----------
+   Dauer --motion-dur siehe theme.css; 0 = keine Animation. */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes ui-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.modal-backdrop {
+  animation: ui-fade-in var(--motion-dur) ease-out;
+}
+.modal {
+  animation: ui-pop-in var(--motion-dur) ease-out;
+}
+.toast {
+  animation: ui-slide-in var(--motion-dur) ease-out;
+}
+.floating-dialog,
+.length-input {
+  animation: ui-fade-in var(--motion-dur) ease-out;
+}
+
 /* ---------- modals & toasts ---------- */
 .modal-backdrop {
   position: fixed;
