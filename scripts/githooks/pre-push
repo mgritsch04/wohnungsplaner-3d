@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Aktivieren: chmod +x scripts/repo-guard.sh scripts/githooks/pre-push && git config core.hooksPath scripts/githooks
+exec bash "$(git rev-parse --show-toplevel)/scripts/repo-guard.sh" mgritsch04/wohnungsplaner-3d wp
