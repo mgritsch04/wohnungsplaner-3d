@@ -1,0 +1,34 @@
+name: Smart Home HA
+# Smart Home 2a (#229): export validation (`check_config`) and bridge test against a real
+# Home Assistant Core with `demo:`. Only runs when smart-home files change (separate workflow,
+# so the required checks `checks`, `e2e` stay untouched).
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - 'src/smarthome/**'
+      - 'scripts/ha/**'
+      - '.github/workflows/smart-home-ha.yml'
+  pull_request:
+    paths: *paths
+concurrency:
+  group: smart-home-ha-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  home-assistant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: scripts/ha/requirements.txt
+      - run: pip install -r scripts/ha/requirements.txt
+      # the demo camera needs the TurboJPEG library, otherwise the whole `demo:` integration fails to set up
+      - run: sudo apt-get update && sudo apt-get install -y libturbojpeg
+      - run: scripts/ha/run-local.sh
