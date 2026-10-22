@@ -328,6 +328,7 @@ export function deleteWalls(d: Project, wallIds: string[]) {
   const set = new Set(wallIds);
   d.walls = d.walls.filter((w) => !set.has(w.id));
   d.openings = d.openings.filter((o) => !set.has(o.wallId));
+  d.photos = d.photos.filter((ph) => !set.has(ph.wallId));
   removeBrokenRooms(d);
   removeOrphanNodes(d);
 }
@@ -537,6 +538,7 @@ export function mergeNodes(d: Project, from: string, to: string) {
     return true;
   });
   d.openings = d.openings.filter((o) => !removed.has(o.wallId));
+  d.photos = d.photos.filter((ph) => !removed.has(ph.wallId));
   for (const r of d.rooms) {
     r.nodeIds = r.nodeIds.map((id) => (id === from ? to : id)).filter((id, i, arr) => id !== arr[(i + 1) % arr.length]);
   }

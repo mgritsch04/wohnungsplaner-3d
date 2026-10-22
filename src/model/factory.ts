@@ -30,5 +30,6 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     loads: [],
     notes: [],
     tasks: [],
+    photos: [],
   };
 }

@@ -43,6 +43,7 @@ export function referencedAssetIds(p: Project): string[] {
     ids.add(p.underlay.imageAssetId);
     if (p.underlay.sourceAssetId) ids.add(p.underlay.sourceAssetId);
   }
+  for (const ph of p.photos) ids.add(ph.assetId);
   for (const f of p.furniture) if (f.model.type === 'gltf' && f.model.assetId) ids.add(f.model.assetId);
   return [...ids];
 }
