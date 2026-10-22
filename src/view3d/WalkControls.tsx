@@ -194,7 +194,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       const o = aimed(at);
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
-    /** E/O: open/close the door/window in sight, else the selected one. */
+    /** F/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
       if (carry.current) return hint('Erst ablegen (G), dann Tür/Fenster mit E bedienen');
       const sel = useUiStore.getState().selection;
@@ -232,10 +232,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       if (id) return useUiStore.getState().setSelection({ type: 'furniture', id });
       // a door or window in sight is opened or closed (#21)
       const opening = targetOpening(at);
-      if (opening) toggleOpening(opening);
+      if (opening) return toggleOpening(opening);
+      // a click into the void clears the selection (#257)
+      useUiStore.getState().setSelection(null);
     };
     /**
-     * F / right-click (#235): context menu of the object in sight (or under `client` without
+     * Right-click (#235): context menu of the object in sight (or under `client` without
      * pointer lock), else the carried item or the selection. Frees the mouse so the menu can be used.
      */
     const openMenu = (client?: { x: number; y: number }) => {
@@ -248,7 +250,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         raycaster.far = PICK_RANGE;
         t = firstPickTarget(raycaster, scene) ?? ui.selection;
       }
-      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (F).', 'info');
+      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (Rechtsklick).', 'info');
       if (document.pointerLockElement === el) document.exitPointerLock?.();
       clear();
       const c = client ?? paneCenter('3d');
@@ -296,18 +298,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         setFov(base.current);
         return;
       }
-      if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // context menu at the crosshair (#235)
-        openMenu();
-        return;
-      }
       if (e.code === 'KeyP' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // place the reference figure where the crosshair meets the floor (#263) and show it
         placeRefFigure();
         return;
       }
-      if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // E (#107) or O: open/close the door or window in sight
+      if ((e.code === 'KeyF' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // F (#257) or O: open/close the door or window in sight
         toggleAimedOpening();
         return;
       }

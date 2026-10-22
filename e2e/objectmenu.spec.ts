@@ -15,6 +15,13 @@ function collectErrors(page: Page) {
   return errors;
 }
 
+/** Right click at the view centre = where the crosshair is (no pointer lock in the test browser). */
+async function openWalkMenu(page: Page) {
+  const box = await page.getByTestId('crosshair').boundingBox();
+  if (!box) throw new Error('no crosshair');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+}
+
 async function freshStart(page: Page) {
   await page.goto('/?e2e');
   await page.evaluate(async () => {
@@ -138,7 +145,7 @@ test('3D overview: right-click on furniture opens the same context menu (#235)',
   expect(errors).toEqual([]);
 });
 
-test('walkthrough: F opens the context menu at the crosshair; carry and drop from it (#235)', async ({ page }) => {
+test('walkthrough: right click opens the context menu at the crosshair; carry and drop from it (#235)', async ({ page }) => {
   const errors = collectErrors(page);
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
@@ -155,16 +162,16 @@ test('walkthrough: F opens the context menu at the crosshair; carry and drop fro
     [table.x, table.y],
   );
   await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.target())).toBe(table.id);
-  await page.keyboard.press('f');
+  await openWalkMenu(page);
   const menu = page.getByTestId('object-menu');
   await expect(menu).toBeVisible();
-  await expect(menu).toHaveAttribute('data-place', 'walk');
+  await expect(menu).toHaveAttribute('data-place', '3d'); // free mouse (no pointer lock): menu opens under the cursor
   await expect(page.getByTestId('object-menu-title')).toHaveText(table.name);
-  // F must not switch the 2D tool (window) while walking
+  // the right click must not switch the 2D tool while walking
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
   await menu.locator('[data-action="carry"]').click();
   await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBe(table.id);
-  await page.keyboard.press('f');
+  await openWalkMenu(page);
   await expect(menu.locator('[data-action="drop"]')).toBeVisible();
   await menu.locator('[data-action="drop"]').click();
   await expect.poll(() => page.evaluate(() => (window as any).__wp.useUiStore.getState().walkCarry)).toBeNull();
