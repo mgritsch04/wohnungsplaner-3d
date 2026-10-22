@@ -156,7 +156,8 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 
 ## Nachtrag 2026-10-22 (Planer-Thread; Tabelle oben endet am 18.10., Status hier maßgeblich für die genannten Nummern)
 Gemergt, Status 🧪 automatischer User-Test offen: #263 (Gefühlt echt, Stufe 1; Panini/Stufe 2 nur auf Gs Go) · #269 · #219 · #273 (Stufe 1–2; Bildpaket Stufe 3 auf Halt bis Gs Urteil, Branch `claude/moebelix-bildpaket-273` nicht löschen) · #278 · #282 · #283 (Strahl an Möbeln vorbei nicht umgesetzt) · #257 · #255 · #258 · #281 · #267 · #285 · #217 (❌ → erneut testen).
-In Progress: #280 (PR #290), #229 (PR #296).
-Ready (Planer-Reihenfolge, klein zuerst): #253 WLAN-Abdeckung · #225 Smart-Home-Vorschlag je Raum · #238 LED-Streifen (pausiert) · #250 vorhandene Lampe smart · #222 Anschlüsse im Import (nach #267, groß) · weitere `planned` laut Issue-Liste.
+Seit 22.10. abends ebenfalls gemergt, 🧪 automatischer User-Test offen: #280 (PR #290) · #253 (PR #300) · #101 (PR #301) · #69/#93 (PR #302) · #79 (PR #303) · #304 Quelltext-Import (PR #305, Zeile 19).
+In Progress: #229 (PR #296), #92 Außenansicht.
+Ready (Planer-Reihenfolge, klein zuerst): #64/#81 Installationsplan (Opus, allein; Voraussetzung für #222 und #135) · #225 Smart-Home-Vorschlag je Raum · #238 LED-Streifen (pausiert) · #250 vorhandene Lampe smart · #222 Anschlüsse im Import (nach #267, groß) · weitere `planned` laut Issue-Liste.
 Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
 Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
