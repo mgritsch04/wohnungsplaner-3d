@@ -65,7 +65,7 @@ export function pairRule(a: Item, b: Item): PairRule {
 }
 
 /** Categories that never stand on other furniture, however small (stools stay under tables). */
-const NOT_STACKABLE = new Set(['textile', 'chair', 'table', 'desk', 'sofa', 'bed', 'bathroom', 'kitchen']);
+const NOT_STACKABLE = new Set(['textile', 'chair', 'table', 'desk', 'sofa', 'bed', 'bathroom', 'kitchen', 'stairs']);
 /** Shapes that hang, stand on the floor or on the wall even when small. */
 const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'k-wall', 'k-hood', 'k-cooktop']);
 

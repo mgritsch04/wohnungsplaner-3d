@@ -7,6 +7,7 @@ import { formatArea, formatLength, radToDeg } from '../model/units';
 import { doorSymbol, openingRect } from './openingSymbols';
 import { useUiStore, type Selection } from '../store/uiStore';
 import { supportsInterior } from '../model/interior';
+import { stepCount } from '../model/stairs';
 import { interiorPlanDetails } from './interiorPlan';
 import { materialById, DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 
@@ -361,6 +362,17 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
     case 'toilet':
       details.push(<ellipse key="seat" cx={0} cy={d * 0.12} rx={w * 0.4} ry={d * 0.32} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
       break;
+    case 'stairs': {
+      // treads across the flight and the walking line with an arrow pointing up the stairs (to local −y, #54)
+      const n = stepCount(f.height);
+      for (let i = 1; i < n; i++) details.push(line(-w / 2, d / 2 - (i * d) / n, w / 2, d / 2 - (i * d) / n, `t${i}`));
+      details.push(line(0, d / 2 - d / n / 2, 0, -d / 2 + d / n / 2, 'walk'));
+      const ah = Math.min(0.2, w * 0.3);
+      details.push(line(0, -d / 2 + d / n / 2, -ah, -d / 2 + d / n / 2 + ah, 'a1'));
+      details.push(line(0, -d / 2 + d / n / 2, ah, -d / 2 + d / n / 2 + ah, 'a2'));
+      details.push(<circle key="start" cx={0} cy={d / 2 - d / n / 2} r={Math.min(0.05, w * 0.1)} style={{ fill: stroke }} />);
+      break;
+    }
     case 'shower':
       details.push(line(-w / 2, -d / 2, w / 2, d / 2, 's1'));
       details.push(line(-w / 2, d / 2, w / 2, -d / 2, 's2'));

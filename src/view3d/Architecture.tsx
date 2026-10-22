@@ -3,7 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Project, QualityMode } from '../model/schema';
-import { add, dist, pointInPolygon, scale } from '../model/vec';
+import { add, dist, pointInPolygon, scale, type Vec2 } from '../model/vec';
 import { BASEBOARD_HEIGHT, BASEBOARD_THICKNESS, computeBaseboards, computeWindowSills } from '../model/geometry/details';
 import {
   DOOR_LEAF_UNDERCUT,
@@ -17,6 +17,7 @@ import {
 } from '../model/geometry/leaves';
 import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MATERIAL_ID, materialById } from '../model/materials';
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
+import { holeInRoom } from '../model/stairs';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { blockBehind, isClick, isClippedHit } from './pointer';
 import { requestLampShadowUpdate } from './lampRegistry';
@@ -30,13 +31,18 @@ interface Props {
   /** Double-click on a door/window opens or closes it (#21); omitted = no toggling (walkthrough). */
   onToggleOpening?: (id: string) => void;
   showCeilings: boolean;
+  /** Stairwells (#54): openings in the floor (stairs coming up) and in the ceiling (stairs going up), plan polygons. */
+  floorHoles?: Vec2[][];
+  ceilingHoles?: Vec2[][];
 }
+
+const NO_HOLES: Vec2[][] = [];
 
 /**
  * Walls, floors, ceilings, doors and windows generated from the shared model.
  * Geometry is rebuilt only when the architecture key (nodes/walls/openings/rooms/materials) changes.
  */
-export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect, onToggleOpening, showCeilings }: Props) {
+export const Architecture = memo(function Architecture({ project, derived, quality, selectedId, onSelect, onToggleOpening, showCeilings, floorHoles = NO_HOLES, ceilingHoles = NO_HOLES }: Props) {
   const shadows = quality === 'realism';
 
   const wallMeshes = useMemo(() => {
@@ -83,16 +89,18 @@ export const Architecture = memo(function Architecture({ project, derived, quali
             .map((id, i) => project.walls.find((w) => (w.a === id && w.b === r.nodeIds[(i + 1) % r.nodeIds.length]) || (w.b === id && w.a === r.nodeIds[(i + 1) % r.nodeIds.length])))
             .filter(Boolean);
           const ceilingH = wallsAround.length ? Math.min(...wallsAround.map((w) => w!.height)) : project.settings.defaultWallHeight;
+          // the part of each stairwell that lies in this room is cut out
+          const inside = (holes: Vec2[][]) => holes.map((h) => holeInRoom(g.interior, h)).filter((h): h is Vec2[] => h !== null);
           return {
             room: r,
-            floor: buildFlatPolygon(g.interior, 0.001, true),
-            ceiling: buildFlatPolygon(g.interior, ceilingH, false),
+            floor: buildFlatPolygon(g.interior, 0.001, true, inside(floorHoles)),
+            ceiling: buildFlatPolygon(g.interior, ceilingH, false, inside(ceilingHoles)),
             floorMat: materialById(project.materials, r.floorMaterialId, DEFAULT_FLOOR_MATERIAL_ID),
             ceilingMat: materialById(project.materials, r.ceilingMaterialId, DEFAULT_CEILING_MATERIAL_ID),
           };
         })
         .filter((x): x is NonNullable<typeof x> => !!x),
-    [project.rooms, project.walls, project.materials, project.settings.defaultWallHeight, derived],
+    [project.rooms, project.walls, project.materials, project.settings.defaultWallHeight, derived, floorHoles, ceilingHoles],
   );
   useEffect(
     () => () =>

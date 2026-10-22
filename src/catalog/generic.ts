@@ -65,6 +65,9 @@ const DEFS: Def[] = [
   ['generic-washbasin', 'Waschtisch 60 cm', 'bathroom', 0.6, 0.46, 0.85, 'washbasin', '#ffffff', 220, { tags: ['waschbecken'] }],
   ['generic-bathtub', 'Badewanne 170×75', 'bathroom', 1.7, 0.75, 0.58, 'bathtub', '#ffffff', 400, { tags: ['wanne'] }],
   ['generic-shower', 'Dusche 90×90', 'bathroom', 0.9, 0.9, 2.0, 'shower', '#dfe8ec', 500, { tags: ['dusche'] }],
+  // storeys (#54): a straight flight; its height is set to the storey height when placed. No price: built in, not bought like furniture
+  ['generic-stairs', 'Treppe gerade 90 cm', 'stairs', 0.9, 3.6, 2.6, 'stairs', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss'] }],
+  ['generic-stairs-wide', 'Treppe gerade 100 cm', 'stairs', 1.0, 4.0, 2.8, 'stairs', '#d9d4cc', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss'] }],
 ];
 
 export const GENERIC_CATALOG: CatalogItem[] = DEFS.map(([id, name, category, width, depth, height, shape, color, price, extra]) => ({

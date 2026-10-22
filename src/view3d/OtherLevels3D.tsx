@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type * as THREE from 'three';
 import { derivePlan } from '../model/derived';
 import { activeLevel, projectOnLevel } from '../model/levels';
+import { stairwells } from '../model/stairs';
 import type { Level, Project, QualityMode } from '../model/schema';
 import type { OtherLevels } from '../store/uiStore';
 import { Architecture } from './Architecture';
@@ -47,6 +48,9 @@ const OtherLevel = memo(function OtherLevel({ project, level, offset, quality, s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => projectOnLevel(project, level.id), [level.plan, project.materials, project.settings.defaultWallHeight]);
   const derived = useMemo(() => derivePlan(view), [view]);
+  const wellsKey = JSON.stringify(stairwells(project, level.id));
+   
+  const wells = useMemo(() => JSON.parse(wellsKey) as ReturnType<typeof stairwells>, [wellsKey]);
   const group = useRef<THREE.Group>(null);
   const seen = useRef(-1);
   // put everything of the storey on its own layer; models load later (GLB), so re-check now and then
@@ -59,7 +63,7 @@ const OtherLevel = memo(function OtherLevel({ project, level, offset, quality, s
   });
   return (
     <group ref={group} position-y={offset} userData={{ levelId: level.id }}>
-      <Architecture project={view} derived={derived} quality={quality} selectedId={null} onSelect={noop} showCeilings={showCeilings} />
+      <Architecture project={view} derived={derived} quality={quality} selectedId={null} onSelect={noop} showCeilings={showCeilings} floorHoles={wells.floor} ceilingHoles={wells.ceiling} />
       {view.furniture.map((f) => (
         <FurnitureObject key={f.id} item={f} quality={quality} selected={false} onSelect={noop} onDragStart={noop} onDrag={noop} onDragEnd={noop} onDragCancel={noop} readOnly />
       ))}
