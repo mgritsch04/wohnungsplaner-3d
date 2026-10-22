@@ -95,7 +95,7 @@ describe('first-person collision', () => {
   });
 
   it('treats solid furniture as obstacles but not rugs', () => {
-    const base = { id: 'f', name: 'x', category: 'table', x: 5, y: 5, elevation: 0, rotation: 0, width: 1, depth: 1, height: 0.75, color: '#ffffff', model: { type: 'procedural' as const, shape: 'box' }, quantity: 1, approximate: true, solid: true, locked: false };
+    const base = { id: 'f', name: 'x', category: 'table', x: 5, y: 5, elevation: 0, rotation: 0, width: 1, depth: 1, height: 0.75, color: '#ffffff', model: { type: 'procedural' as const, shape: 'box' }, quantity: 1, approximate: true, solid: true, locked: false, existing: false };
     expect(buildColliders(derivePlan(p), [base])).toHaveLength(colliders.length + 1);
     expect(buildColliders(derivePlan(p), [{ ...base, solid: false }])).toHaveLength(colliders.length);
     expect(buildColliders(derivePlan(p), [{ ...base, height: 0.01 }])).toHaveLength(colliders.length);

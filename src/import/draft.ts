@@ -52,6 +52,23 @@ export interface DraftRoom {
   accepted: boolean;
 }
 
+/** Sanitary object (tub, basin, WC) recognised from its symbol in the plan; becomes existing furniture (#255). */
+export interface DraftFixture {
+  id: string;
+  /** Generic catalog object it is placed as. */
+  catalogId: string;
+  name: string;
+  center: Vec2;
+  /** Plan rotation in radians, see `Furniture.rotation`. */
+  rotation: number;
+  width: number;
+  depth: number;
+  status: DraftStatus;
+  confidence?: number;
+  note?: string;
+  accepted: boolean;
+}
+
 export interface ReconstructionDraft {
   source: 'json' | 'raster' | 'pdf-vector';
   sourceName: string;
@@ -61,6 +78,8 @@ export interface ReconstructionDraft {
   openings: DraftOpening[];
   rooms: DraftRoom[];
   furniture: Furniture[];
+  /** Fitted sanitary objects found in the plan (#255); absent = none. */
+  fixtures?: DraftFixture[];
   warnings: string[];
   /** Optional project name proposed by the source. */
   name?: string;

@@ -1892,45 +1892,58 @@ test('walkthrough: E opens/closes the door or window in sight; in the overview E
       [x, y, h] as const,
     );
   const target = () => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null);
-  // a selected piece of furniture: E must not rotate it while walking
+  // a selected piece of furniture: F opens, and Q/E rotate it (#257)
   await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), table.id);
   const rot0 = await rotOf(table.id);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
   await expect(page.locator('.walk-overlay')).toBeVisible();
-  // the closed living-room window: E opens it …
+  // the closed living-room window: F opens it …
   const glass = await restingLeaf(window1.id);
   await lookAt(glass.x, glass.y, 1.6);
   await expect.poll(target).toBe(window1.id);
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect.poll(() => openOf(window1.id)).toBe(true);
   await restingLeaf(window1.id);
   await page.screenshot({ path: 'test-results/walk-e-opens-window.png' });
-  // … and E on the opened sash closes it again
+  // … and F on the opened sash closes it again
   const sash = await restingLeaf(window1.id);
   await lookAt(sash.x, sash.y, 1.6);
   await expect.poll(target).toBe(window1.id);
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect.poll(() => openOf(window1.id)).toBe(false);
-  // the open inner door: E closes it; O still works, too
+  // the open inner door: F closes it; O still works, too
   const leaf = await restingLeaf(inner.id);
   await lookAt(leaf.x, leaf.y, 1.0);
   await expect.poll(target).toBe(inner.id);
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect.poll(() => openOf(inner.id)).toBe(false);
   await restingLeaf(inner.id);
   await lookAt(5.0, 2.0, 1.0);
   await expect.poll(target).toBe(inner.id);
   await page.keyboard.press('o');
   await expect.poll(() => openOf(inner.id)).toBe(true);
-  // while walking, E neither rotated the selected table nor reached the 2D tools
+  // while walking, F/O did not rotate the selected table nor reach the 2D tools; E no longer opens (#257)
   expect(await rotOf(table.id)).toBeCloseTo(rot0, 6);
   expect(await page.evaluate(() => (window as any).__wp.useUiStore.getState().tool)).toBe('select');
-  // in the overview, E rotates the selection by 15° again (Q/E)
-  await page.getByRole('button', { name: 'Übersicht' }).click();
-  await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), table.id);
+  const openBefore = await openOf(inner.id);
   await page.keyboard.press('e');
   await expect.poll(() => rotOf(table.id)).toBeCloseTo(rot0 + Math.PI / 12, 6);
+  expect(await openOf(inner.id)).toBe(openBefore);
+  await page.keyboard.press('q');
+  await expect.poll(() => rotOf(table.id)).toBeCloseTo(rot0, 6);
+  // a click into the void (no furniture, door or window under the crosshair) clears the selection
+  await page.evaluate((id) => (window as any).__wp.useUiStore.getState().setSelection({ type: 'furniture', id }), table.id);
+  let void_ = false;
+  for (let i = 0; i < 16 && !void_; i++) {
+    await page.evaluate((yaw) => (window as any).__wp.walk.look(yaw, 0.9), (i * Math.PI) / 8);
+    await page.waitForTimeout(150);
+    void_ = (await target()) === null && (await page.evaluate(() => (window as any).__wp.walk.target())) === null;
+  }
+  expect(void_).toBe(true);
+  await page.evaluate(() => (window as any).__wp.walk.pickOrDrop());
+  expect(await getSelection(page)).toBeNull();
+  await page.getByRole('button', { name: 'Übersicht' }).click();
   expect(await openOf(window1.id)).toBe(false);
   expect(errors).toEqual([]);
 });
@@ -4286,5 +4299,50 @@ test('walkthrough: field-of-view slider with quick choices, head bob, reference 
   await page.keyboard.press('KeyP');
   await expect.poll(figure).not.toBeNull();
   expect((await settings()).showRefFigure).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('walkthrough: E still works after a slider or checkbox had focus; text fields hint instead of eating keys silently (#283)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p0 = await getProject(page);
+  const window1 = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'window' && Math.abs(o.width - 1.8) < 1e-6);
+  const openOf = async (id: string) => (await getProject(page)).openings.find((o: { id: string }) => o.id === id).open as boolean;
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  const aim = async () => {
+    const c = await page.evaluate((oid) => {
+      const t = (window as any).__wp.three;
+      const v = t.scene.getObjectByName(`leaf:${oid}:0`).children[0].getWorldPosition(t.camera.position.clone());
+      const cam = t.camera.position;
+      (window as any).__wp.walk.look(Math.atan2(-(v.x - cam.x), -(v.z - cam.z)), Math.atan2(1.6 - cam.y, Math.hypot(v.x - cam.x, v.z - cam.z)));
+    }, window1.id);
+    return c;
+  };
+  await aim();
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null)).toBe(window1.id);
+  // a focused checkbox/slider no longer swallows E
+  await page.evaluate(() => {
+    const i = document.createElement('input');
+    i.type = 'checkbox';
+    i.id = 'probe-cb';
+    document.body.appendChild(i);
+    i.focus();
+  });
+  await page.keyboard.press('e');
+  await expect.poll(() => openOf(window1.id)).toBe(true);
+  // a text field still blocks the walking keys, but says why; Esc hands the keyboard back
+  await page.evaluate(() => {
+    const i = document.createElement('input');
+    i.type = 'text';
+    i.id = 'probe-text';
+    document.body.appendChild(i);
+    i.focus();
+  });
+  await page.keyboard.press('e');
+  await expect(page.getByText('Eingabefeld aktiv')).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('probe-text');
   expect(errors).toEqual([]);
 });

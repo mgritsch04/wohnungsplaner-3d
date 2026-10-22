@@ -13,9 +13,12 @@ import { balconyDoors, outdoorRailings, type AreaOutline } from '../outdoor';
 import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } from '../rooms';
 import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
+import { detectFixtures } from './fixtures';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
 import { isGlassDoor, type Underlay } from '../../model/schema';
+
+const FIXTURE_NAMES: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC' };
 
 /** Run the best available local recognizer on the current underlay and open the review. */
 export async function runRecognition() {
@@ -66,6 +69,30 @@ export async function runRecognition() {
       draft.openings = balconyDoors(draft.openings, texts, roomInteriors(draft.walls));
       if (draft.openings.filter(isGlassDoor).length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als bodentiefe Glastüren übernommen – bitte prüfen.');
     }
+    // fitted tub, basin and WC from their symbols (#255)
+    if (analysis && analysis.imageAssetId === u.imageAssetId) {
+      const interiors = roomInteriors(draft.walls);
+      const rooms = interiors.map((polygon) => ({ polygon, name: draft.rooms.find((r) => pointInPolygon(r.labelPoint, polygon))?.name ?? '' }));
+      const world = analysis.segments.map((s) => {
+        const a = imageToWorld(u, { x: s.x1, y: s.y1 });
+        const b = imageToWorld(u, { x: s.x2, y: s.y2 });
+        return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, curve: s.curve, areaFill: s.areaFill, darkFill: s.darkFill, faint: s.faint };
+      });
+      draft.fixtures = detectFixtures(world, draft.walls, rooms).map((f) => ({
+        id: newId('dfx'),
+        catalogId: f.catalogId,
+        name: FIXTURE_NAMES[f.catalogId] ?? f.catalogId,
+        center: { x: roundMm(f.center.x), y: roundMm(f.center.y) },
+        rotation: f.rotation,
+        width: roundMm(f.width),
+        depth: roundMm(f.depth),
+        status: 'uncertain' as const,
+        confidence: f.confidence,
+        note: f.note,
+        accepted: true,
+      }));
+      if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – werden als Bestand übernommen (nicht im Budget). Bitte prüfen.`);
+    }
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
     if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
@@ -74,7 +101,7 @@ export async function runRecognition() {
     }
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
-    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume vorgeschlagen – bitte prüfen.`, 'success');
+    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume${draft.fixtures?.length ? ` und ${draft.fixtures.length} Sanitärobjekte` : ''} vorgeschlagen – bitte prüfen.`, 'success');
   } catch (e) {
     reportError(e, 'Erkennung fehlgeschlagen');
   } finally {

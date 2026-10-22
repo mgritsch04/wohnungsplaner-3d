@@ -221,6 +221,8 @@ export const FurnitureSchema = z.object({
   solid: z.boolean().default(true),
   kitchen: KitchenModuleSchema.optional(),
   locked: z.boolean().default(false),
+  /** Already in the flat when moving in (fitted bath, WC): shown in the plan, but not part of budget or shopping list (#255). */
+  existing: z.boolean().default(false),
   /** Member of the furniture group with this id (#65), see `ProjectSchema.groups`; absent = not grouped. */
   groupId: z.string().min(1).optional(),
 });

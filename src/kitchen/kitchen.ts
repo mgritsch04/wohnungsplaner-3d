@@ -265,6 +265,7 @@ export function generateCountertops(d: Project): number {
         solid: true,
         kitchen: { type: 'countertop', front: 'open', generated: true },
         locked: false,
+        existing: false,
       });
       created++;
       run = [];
