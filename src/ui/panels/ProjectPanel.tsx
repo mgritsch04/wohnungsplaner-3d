@@ -12,6 +12,7 @@ import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
+import { DaylightSection } from './DaylightSection';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
 import { InfoHint } from '../InfoHint';
@@ -71,6 +72,8 @@ export function ProjectPanel() {
           title="Decken sind nur von unten sichtbar (z. B. beim Begehen)"
         />
       </Section>
+
+      <DaylightSection />
 
       <SightlineSection />
 
