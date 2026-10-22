@@ -9,7 +9,7 @@ import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, u
 import { groupSelection, ungroupSelection } from './groupActions';
 import { orbitKeyMoves } from '../view3d/orbitKeys';
 import { openMenuForSelection } from './objectMenu';
-import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening } from './actions';
+import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening, toggleUnderlayVisible } from './actions';
 
 
 /** Global keyboard shortcuts (ignored while typing in form fields). */
@@ -121,6 +121,9 @@ export function useShortcuts() {
         useDialogStore.getState().openModal('help');
       } else if (!mod && key === 'h') {
         ui.requestFit();
+      } else if (!mod && !e.altKey && key === 'p' && ui.viewMode !== '3d') {
+        // show/hide the imported plan background (#258)
+        toggleUnderlayVisible();
       } else if (!mod && !e.altKey && key === 'o' && ui.selection?.type === 'opening') {
         // open/close the selected door or window (#21)
         toggleOpening(ui.selection.id);
