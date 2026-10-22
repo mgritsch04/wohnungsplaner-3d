@@ -138,6 +138,12 @@ export function inDetectionArea(d: SmartDevice, params: SensorParams, p: Vec2, o
 
 export const isDark = (hour: number) => sunElevationDeg(hour) < 0;
 
+/** Clock set by hand: the simulation continues from `hour`; pending time triggers are not replayed. */
+export function withHour(state: SimState, hour: number, text = `Uhrzeit von Hand auf ${fmtHour(hour)} gestellt`): SimState {
+  const h = ((hour % 24) + 24) % 24;
+  return { ...state, hour: h, events: [...state.events, { t: state.t, hour: h, text }].slice(-MAX_EVENTS) };
+}
+
 export function initialState(project: Project, hour = project.settings.timeOfDay): SimState {
   const entities: Record<string, EntityState> = {};
   for (const d of project.devices) {

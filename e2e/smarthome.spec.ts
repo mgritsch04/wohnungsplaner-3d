@@ -150,3 +150,27 @@ test('Smart Home (#232, #233): Raum wählen, im Plan klicken, Geräte in 2D und 
   await expect.poll(async () => (await getProject(page)).devices.length).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('Smart Home (#282): Uhrzeit lässt sich bei laufender Simulation von Hand ändern', async ({ page }) => {
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  await panel.locator('[data-testid="device-kind"][data-kind="light"]').click();
+  await panel.getByTestId('device-add').click();
+  await panel.getByRole('button', { name: /Testen/ }).click();
+  await panel.getByTestId('sim-start').click();
+
+  await panel.getByTestId('sim-night').click();
+  await expect(panel.getByTestId('sim-clock')).toContainText('22:');
+  await expect(panel.getByTestId('sim-log')).toContainText('Uhrzeit von Hand auf 22:00 gestellt');
+
+  // the project panel's time slider drives the simulation clock too
+  await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
+  await page.getByLabel('Tageszeit', { exact: true }).fill('12');
+  await expect(panel.getByTestId('sim-clock')).toContainText('12:');
+
+  await panel.getByTestId('sim-stop').click();
+  await page.getByLabel('Tageszeit', { exact: true }).fill('9');
+  await expect.poll(async () => (await getProject(page)).settings.timeOfDay).toBe(9);
+});

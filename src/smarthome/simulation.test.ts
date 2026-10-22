@@ -5,7 +5,7 @@ import { addFurniture, addOpening, addRectRoom, setOpeningOpen } from '../model/
 import type { Automation, Furniture, Project, SmartDevice } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
-import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
+import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, withHour, type SimInput, type SimState } from './simulation';
 import { placementFor } from './actions';
 import { formatDuration, rulesOf, ruleSentence } from './rules';
 
@@ -238,5 +238,18 @@ describe('line of sight through door leaves and furniture (#236)', () => {
     expect(inDetectionArea(sensor, sp, person, occludersOf(p, d))).toBe(false);
     setOpeningOpen(p, doorId, false);
     expect(inDetectionArea(sensor, sp, person, occludersOf(p, derivePlan(p)))).toBe(true);
+  });
+});
+
+describe('manual clock (#282)', () => {
+  it('jumps to the hour, keeps running from there and logs it', () => {
+    const p = twoRooms();
+    let s = initialState(p, 12);
+    s = withHour(s, 22);
+    expect(s.hour).toBe(22);
+    expect(s.events.at(-1)?.text).toContain('22:00');
+    s = run(p, s, 3600, { person: null, moving: false, triggered: new Set() });
+    expect(s.hour).toBeCloseTo(23, 3);
+    expect(withHour(s, 25).hour).toBe(1);
   });
 });
