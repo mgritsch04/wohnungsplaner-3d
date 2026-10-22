@@ -6,7 +6,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../ui/fields';
 import { downloadBlob, safeFileName } from '../ui/fileUtils';
-import { addAutomationFor, deleteAutomation, placeDevice, roomAt, updateAutomation } from './actions';
+import { addAutomationFor, deleteAutomation, makeLightSmartWithFeedback, placeDevice, roomAt, unlinkedLights, updateAutomation } from './actions';
 import { DEVICE_PRODUCTS, KIND_LABEL } from './catalog';
 import { deviceOn, statusLabel } from './DeviceInfo';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
@@ -87,6 +87,8 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
   const setPlacing = useSimStore((s) => s.setPlacing);
   const products = DEVICE_PRODUCTS.filter((p) => p.kind === kind);
   const product = productId === GENERIC ? undefined : productId;
+  const [existingLight, setExistingLight] = useState('');
+  const freeLights = unlinkedLights(project);
   const onKind = (k: SmartDeviceKind) => {
     setKind(k);
     setProductId(DEVICE_PRODUCTS.find((p) => p.kind === k)?.id ?? GENERIC);
@@ -121,11 +123,28 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
             if (placing) setPlacing({ kind, productId: v === GENERIC ? undefined : v });
           }}
         />
+        {kind === 'light' && freeLights.length > 0 && (
+          <SelectField
+            label="Vorhandenes Licht nutzen"
+            value={existingLight}
+            options={[
+              { value: '', label: 'Nein, neues Licht anlegen' },
+              ...freeLights.map((l) => ({ value: l.id, label: `${l.name} (${project.rooms.find((r) => r.id === roomAt(project, derived, l))?.name ?? 'außerhalb'})` })),
+            ]}
+            onChange={setExistingLight}
+          />
+        )}
         <RoomSelect project={project} room={room} setRoomId={setRoomId} />
         <div className="btn-row">
-          <button className="primary" onClick={() => placeDevice(kind, product, room?.id ?? null)} disabled={!room} data-testid="device-add">
-            In „{room?.name ?? '–'}“ platzieren
-          </button>
+          {kind === 'light' && existingLight && freeLights.some((l) => l.id === existingLight) ? (
+            <button className="primary" onClick={() => { makeLightSmartWithFeedback(existingLight, product); setExistingLight(''); }} data-testid="device-add-existing">
+              Vorhandenes Licht smart machen
+            </button>
+          ) : (
+            <button className="primary" onClick={() => placeDevice(kind, product, room?.id ?? null)} disabled={!room} data-testid="device-add">
+              In „{room?.name ?? '–'}“ platzieren
+            </button>
+          )}
           <button onClick={clickToPlace} aria-pressed={!!placing} data-testid="device-place-click">
             {placing ? 'Abbrechen' : 'Im Plan klicken'}
           </button>

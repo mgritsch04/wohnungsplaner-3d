@@ -97,6 +97,41 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
   return id;
 }
 
+/** Lights that no smart device controls yet (#250). */
+export const unlinkedLights = (project: Project) => project.lights.filter((l) => !project.devices.some((dv) => dv.lightId === l.id));
+
+/**
+ * Make an already placed light smart (#250): a lamp device is linked to it via `lightId`, no
+ * second light is created. Position and height stay those of the light; the product only
+ * limits the colour temperature to its range. Returns the device id (or the existing one).
+ */
+export function makeLightSmart(lightId: string, productId?: string): string | null {
+  const st = useProjectStore.getState();
+  const existing = st.project.devices.find((x) => x.lightId === lightId);
+  if (existing) return existing.id;
+  if (!st.project.lights.some((l) => l.id === lightId)) return null;
+  const id = newId('dev');
+  st.apply((d) => {
+    const l = d.lights.find((x) => x.id === lightId);
+    if (!l) return;
+    const product = productById(productId);
+    if (product?.kelvin) l.temperature = Math.min(Math.max(l.temperature, product.kelvin[0]), product.kelvin[1]);
+    d.devices.push({ id, name: nameFor(d, 'light', l.name), kind: 'light', productId: product?.id, x: l.x, y: l.y, elevation: l.elevation, rotation: 0, lightId });
+  });
+  return id;
+}
+
+/** Make a light smart and give the same feedback as placing a device. */
+export function makeLightSmartWithFeedback(lightId: string, productId?: string): string | null {
+  const id = makeLightSmart(lightId, productId);
+  if (!id) return null;
+  const ui = useUiStore.getState();
+  ui.setSelection({ type: 'device', id });
+  useSimStore.getState().setFlash(id);
+  ui.toast('Lampe ist jetzt smart – Strg+Z macht es rückgängig.', 'success');
+  return id;
+}
+
 /** Add a device and give visible feedback (#233): select it, flash it, short message. */
 export function placeDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2): string {
   const id = addDevice(kind, productId, roomId, at);
