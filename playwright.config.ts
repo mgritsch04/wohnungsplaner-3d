@@ -10,7 +10,8 @@ const port = Number(process.env.PW_PORT ?? 4173);
 export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
-  fullyParallel: false,
+  // Every test builds its own page/context and temp dirs, so single tests can be spread over workers and CI shards.
+  fullyParallel: true,
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${port}`,
