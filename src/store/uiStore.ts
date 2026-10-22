@@ -60,6 +60,9 @@ interface UiStore {
   walkDuck: boolean;
   /** Seated in the walkthrough (#78) – eyes at the seated eye height of settings.bodyHeight. */
   walkSit: boolean;
+  /** Cabinets shown open (#85): their inner layout is drawn in 3D and 2D. */
+  interiorOpen: string[];
+  toggleInteriorOpen: (id: string) => void;
   /** Where the reference figure stands (#263); null = default spot. Placed with P while walking. */
   refFigurePos: Vec2 | null;
   toasts: Toast[];
@@ -112,6 +115,8 @@ export const useUiStore = create<UiStore>((set, get) => ({
   walkDuck: false,
   walkSit: false,
   refFigurePos: null,
+  interiorOpen: [],
+  toggleInteriorOpen: (id) => set((s) => ({ interiorOpen: s.interiorOpen.includes(id) ? s.interiorOpen.filter((x) => x !== id) : [...s.interiorOpen, id] })),
   toasts: [],
   setSelection: (selection) => set({ selection, multi: [], rightTab: selection ? 'properties' : get().rightTab }),
   toggleFurnitureSelection: (id) => {

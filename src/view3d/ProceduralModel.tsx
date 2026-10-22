@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type { FurnitureFinish, ModelRef, QualityMode, TableBase } from '../model/schema';
+import type { FurnitureFinish, Interior, ModelRef, QualityMode, TableBase } from '../model/schema';
+import { BOARD, columnWidth, DEFAULT_DRAWER_HEIGHT, innerHeight } from '../model/interior';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
 import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
@@ -146,6 +147,60 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
   }
   const surface = FINISH_LOOK[finish];
   return parts.map((p) => (own.has(p.color.toLowerCase()) && !p.emissive && (p.opacity ?? 1) === 1 ? { ...p, ...surface } : p));
+}
+
+/**
+ * A cabinet with its fronts removed and the planned inner layout (#85): carcass, dividers,
+ * shelves, rods with a few hangers and drawers pulled out a little. Spans the whole cabinet
+ * height (no plinth), so the inner floor lies one board above the ground, as `interior.ts` assumes.
+ */
+export function openCabinetParts(w: number, d: number, h: number, color: string, interior: Interior, accent?: string): Part[] {
+  const W = w / 2;
+  const D = d / 2;
+  const t = BOARD;
+  const front = accent ?? color;
+  const wood = shade(color, 0.96);
+  const parts: Part[] = [
+    box(-W, 0, -D, -W + t, h, D, wood),
+    box(W - t, 0, -D, W, h, D, wood),
+    box(-W + t, 0, -D, W - t, t, D, wood),
+    box(-W + t, h - t, -D, W - t, h, D, wood),
+    box(-W + t, t, -D, W - t, h - t, -D + 0.01, shade(color, 0.88)),
+  ];
+  const n = interior.columns;
+  const cw = columnWidth({ width: w, depth: d, height: h }, n);
+  const x0 = (c: number) => -W + t + c * (cw + t);
+  for (let c = 1; c < n; c++) parts.push(box(x0(c) - t, t, -D, x0(c), h - t, D - 0.02, wood));
+  const pull = Math.min(0.3, d * 0.5);
+  const top = innerHeight({ width: w, depth: d, height: h });
+  for (const p of interior.parts) {
+    if (p.column >= n) continue;
+    const a = x0(p.column);
+    const b = a + cw;
+    const z = t + p.z;
+    if (p.kind === 'shelf') parts.push(box(a, z, -D + 0.01, b, z + t, D - 0.02, wood));
+    else if (p.kind === 'rod') {
+      parts.push({ geo: CYL, p: [(a + b) / 2, t + p.z, 0], s: [0.03, cw, 0.03], r: [0, 0, Math.PI / 2], color: METAL, metal: 0.85, rough: 0.3 });
+      const hangers = Math.max(2, Math.floor(cw / 0.07));
+      for (let k = 0; k < hangers; k++) {
+        const hx = a + 0.03 + ((k + 0.5) * (cw - 0.06)) / hangers;
+        parts.push(box(hx - 0.004, t + p.z - Math.min(1.2, p.z - 0.05), -0.12, hx + 0.004, t + p.z - 0.03, 0.12, k % 3 === 0 ? '#5b6b8a' : k % 3 === 1 ? '#c9b79c' : '#7a4f4f', { rough: 0.9 }));
+      }
+    } else {
+      const dh = Math.min(p.h ?? DEFAULT_DRAWER_HEIGHT, top - p.z);
+      const fz = D - 0.02 + pull; // front panel position when pulled out
+      parts.push(rbox(a + 0.003, z + 0.003, fz, b - 0.003, z + dh - 0.003, fz + t, 0.003, front, { rough: 0.5 }));
+      parts.push(rbox((a + b) / 2 - 0.06, z + dh / 2 - 0.006, fz + t, (a + b) / 2 + 0.06, z + dh / 2 + 0.006, fz + t + 0.02, 0.004, METAL, { metal: 0.85, rough: 0.3 }));
+      const bd = Math.max(0.1, d - 0.08);
+      const zb = fz - bd;
+      const inner = shade(color, 0.9);
+      parts.push(box(a + 0.02, z + 0.01, zb, b - 0.02, z + 0.025, fz, inner));
+      parts.push(box(a + 0.02, z + 0.01, zb, a + 0.032, z + dh - 0.04, fz, inner));
+      parts.push(box(b - 0.032, z + 0.01, zb, b - 0.02, z + dh - 0.04, fz, inner));
+      parts.push(box(a + 0.02, z + 0.01, zb, b - 0.02, z + dh - 0.04, zb + 0.012, inner));
+    }
+  }
+  return parts;
 }
 
 /** Product details beyond the main colour (#273): frame/leg colour and the kind of table base. */
@@ -516,6 +571,7 @@ export const ProceduralModel = memo(function ProceduralModel({
   accent,
   finish,
   look,
+  interior,
   quality,
   castShadow,
 }: {
@@ -527,14 +583,19 @@ export const ProceduralModel = memo(function ProceduralModel({
   accent?: string;
   finish?: FurnitureFinish;
   look?: ProceduralLook;
+  /** Cabinet shown open with this inner layout (#85). */
+  interior?: Interior;
   quality: QualityMode;
   castShadow: boolean;
 }) {
   const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
   const photo = usePhotoTexture(texture);
   const parts = useMemo(
-    () => buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
-    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight],
+    () =>
+      interior
+        ? openCabinetParts(width, depth, height, color, interior, accent)
+        : buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
+    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight, interior],
   );
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
   const materials = useMemo(

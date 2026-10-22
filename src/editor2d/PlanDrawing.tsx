@@ -4,8 +4,10 @@ import { clipFootprint } from '../model/geometry/walls';
 import type { Furniture, Project } from '../model/schema';
 import { add, dist, normalize, perp, scale, sub, type Vec2 } from '../model/vec';
 import { formatArea, formatLength, radToDeg } from '../model/units';
-import type { Selection } from '../store/uiStore';
 import { doorSymbol, openingRect } from './openingSymbols';
+import { useUiStore, type Selection } from '../store/uiStore';
+import { supportsInterior } from '../model/interior';
+import { interiorPlanDetails } from './interiorPlan';
 import { materialById, DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 
 const pts = (poly: Vec2[]) => poly.map((p) => `${p.x},${p.y}`).join(' ');
@@ -295,7 +297,22 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
   const rect = (x: number, y: number, rw: number, rh: number, k: string, rx = 0) => (
     <rect key={k} x={x} y={y} width={rw} height={rh} rx={rx} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />
   );
-  switch (shape) {
+  const open = useUiStore((st) => st.interiorOpen.includes(f.id)) && !!f.interior && supportsInterior(shape);
+  // a cabinet shown open (#85) draws its inner layout instead of the closed-door cross
+  const openDetails = open ? interiorPlanDetails(f) : [];
+  openDetails.forEach((x, i) => {
+    const dash = x.dashed ? '4 3' : undefined;
+    details.push(
+      x.type === 'line' ? (
+        <line key={`i${i}`} x1={x.x1} y1={x.y1} x2={x.x2} y2={x.y2} style={{ stroke }} strokeWidth={W.furnitureDetail} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <rect key={`i${i}`} x={x.x} y={x.y} width={x.w} height={x.h} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+      ),
+    );
+  });
+  switch (open ? 'open' : shape) {
+    case 'open':
+      break;
     case 'sofa':
     case 'armchair':
       details.push(rect(-w / 2, -d / 2, w, d * 0.25, 'back'));

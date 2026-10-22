@@ -10,6 +10,7 @@ import { baseBox, DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 import { useUiStore } from '../store/uiStore';
 import { requestLampShadowUpdate } from './lampRegistry';
+import { supportsInterior } from '../model/interior';
 
 interface Props {
   item: Furniture;
@@ -56,8 +57,11 @@ export const FurnitureObject = memo(
     const look = lookOf(item.model);
     const castShadow = quality === 'realism' && item.height > 0.05;
 
+    const open = useUiStore((s) => s.interiorOpen.includes(item.id));
+    // a cabinet shown open (#85): only the procedural model, a GLB has no known inside
+    const interior = open && item.model.type === 'procedural' && supportsInterior(shape) ? item.interior : undefined;
     const fallback = (
-      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} quality={quality} castShadow={castShadow} />
+      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} interior={interior} quality={quality} castShadow={castShadow} />
     );
 
     /** End the current gesture; `commit` keeps the moved position, otherwise it is reverted. */
