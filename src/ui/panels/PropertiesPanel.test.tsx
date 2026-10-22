@@ -111,7 +111,7 @@ describe('properties panel groups (#99)', () => {
 
   it('groups walls and rooms; room sizes stay open', () => {
     select('wall', useProjectStore.getState().project.walls[0].id);
-    expect([...toggles().keys()]).toEqual(['Wand', 'Position', 'Oberflächen', expect.stringMatching(/^Öffnungen \(\d+\)$/)]);
+    expect([...toggles().keys()]).toEqual(['Wand', 'Position', 'Aufbau und Schallschutz', 'Oberflächen', expect.stringMatching(/^Öffnungen \(\d+\)$/)]);
     expect(labels()).toEqual(expect.arrayContaining(['Länge (Achse)', 'Dicke', 'Höhe', 'Winkel']));
     expect(labels()).not.toContain('Start X');
     const room = useProjectStore.getState().project.rooms[0];

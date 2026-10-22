@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 2;
+export const PROJECT_SCHEMA_VERSION = 3;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -32,6 +32,9 @@ export const NodeSchema = z.object({
   y: finite(),
 });
 
+/** Construction of a wall (#80); only used for a rough sound-insulation estimate. */
+export const WallAssemblySchema = z.enum(['brick', 'drywall', 'concrete', 'aerated']);
+
 export const WallSchema = z.object({
   id: z.string().min(1),
   /** Start node id. */
@@ -43,6 +46,8 @@ export const WallSchema = z.object({
   /** Material ids for the left (+perp) and right side of the wall, relative to a→b. */
   leftMaterialId: z.string().optional(),
   rightMaterialId: z.string().optional(),
+  /** Wall construction (#80); unset = unknown, treated as brick in the estimate. */
+  assembly: WallAssemblySchema.optional(),
   provenance: ProvenanceSchema.optional(),
 });
 
