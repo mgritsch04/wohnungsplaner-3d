@@ -350,6 +350,8 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   /** Hour of day 0..24 for the sun position. */
   timeOfDay: z.number().min(0).max(24).default(14),
   exposure: z.number().min(0.1).max(4).default(1),
+  /** Compass bearing (degrees, 0 = north, 90 = east) the upper edge of the plan points to (#69, #93); 0 = plan up is north. */
+  northDirection: z.number().min(0).max(359).default(0),
   /** Show ceilings in the 3D view (off by default for better overview). */
   showCeilings: z.boolean().default(false),
   /** Mouse sensitivity factor for looking around (walk) and orbiting; 1 = default feel. */
