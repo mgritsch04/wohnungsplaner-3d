@@ -612,6 +612,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       <PanelGroup groupKey="furniture.advanced" title="Erweitert" defaultOpen={false}>
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
+        <CheckField label="Bestand (schon in der Wohnung, nicht im Budget)" checked={f.existing} onChange={(v) => upd((x) => (x.existing = v))} />
       </PanelGroup>
       <div className="btn-row padded">
         <span className="rotate-group" role="group" aria-label="Drehen">
