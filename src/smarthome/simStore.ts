@@ -5,7 +5,7 @@ import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
-import { doorMotionPoints, initialState, lightOverrides, occludersOf, step, type Occluder, type SimState } from './simulation';
+import { doorMotionPoints, initialState, lightOverrides, occludersOf, step, withHour, type Occluder, type SimState } from './simulation';
 
 /** Device waiting to be placed by a click into the 2D plan (#233). */
 export interface Placing {
@@ -38,6 +38,8 @@ interface SimStore {
   setFlash: (id: string | null) => void;
   /** switch a lamp/plug by hand (starts the simulation if needed) */
   setEntity: (id: string, on: boolean) => void;
+  /** set the simulated clock by hand; returns false while the simulation is stopped */
+  setHour: (hour: number) => boolean;
   /** let a sensor report as if it detected something (starts the simulation if needed) */
   trigger: (id: string) => void;
 }
@@ -168,6 +170,13 @@ export const useSimStore = create<SimStore>((set, get) => ({
       events: [...live.events, { t: live.t, hour: live.hour, text: `${name} von Hand ${on ? 'an' : 'aus'}` }].slice(-50),
     };
     set({ state: live });
+  },
+  setHour: (hour) => {
+    if (!get().running || !live) return false;
+    live = withHour(live, hour);
+    set({ state: live });
+    useUiStore.getState().setTimePreview(live.hour);
+    return true;
   },
   trigger: (id) => {
     get().start();

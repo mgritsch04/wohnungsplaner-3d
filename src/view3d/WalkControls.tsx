@@ -50,6 +50,16 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 
 /** Furniture under the crosshair can be picked up to this distance (m). */
 const PICK_RANGE = 6;
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file', 'image']);
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyO', 'KeyG', 'KeyC', 'KeyX', 'KeyF', 'KeyP', 'KeyZ']);
+/** Focus is in a field that takes typed text (#283): text, number, search … inputs, textareas, contenteditable. */
+const isTextEntry = (t: HTMLElement | null): boolean =>
+  !!t && (t.tagName === 'TEXTAREA' || t.isContentEditable || (t.tagName === 'INPUT' && !NON_TEXT_INPUTS.has((t as HTMLInputElement).type)));
+/** Hand the keyboard back to the scene: leave a focused field, slider, checkbox, select or button (#283). */
+const blurFocus = () => {
+  const a = document.activeElement as HTMLElement | null;
+  if (a && a !== document.body && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(a.tagName)) a.blur();
+};
 /** A carried item stays this far in front of the eyes (m, horizontal). */
 const CENTER = new THREE.Vector2(0, 0);
 /** Farthest floor point the reference figure is placed at with P (m) (#263). */
@@ -151,6 +161,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     };
   }, [startX, startY, camera]);
 
+  // starting the walkthrough takes the keyboard away from whatever panel control was used last (#283)
+  useEffect(() => blurFocus(), []);
+
   useEffect(() => {
     const el = gl.domElement;
     const pressed = keys.current;
@@ -167,6 +180,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       }
       return null;
     };
+    /** Short feedback when a key does nothing (#283); not repeated more often than every 2 s. */
+    let lastHint = -Infinity;
+    const hint = (text: string) => {
+      if (performance.now() - lastHint < 2000) return;
+      lastHint = performance.now();
+      useUiStore.getState().toast(text, 'info');
+    };
     /** Furniture under the crosshair. */
     const target = (at?: THREE.Vector2): string | null => furnitureIdOf(aimed(at));
     /** Door/window under the crosshair (#21). */
@@ -174,12 +194,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       const o = aimed(at);
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
-    /** E/O: open/close the door/window in sight, else the selected one. */
+    /** F/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
-      if (carry.current) return;
+      if (carry.current) return hint('Erst ablegen (G), dann Tür/Fenster mit E bedienen');
       const sel = useUiStore.getState().selection;
       const id = targetOpening() ?? (sel?.type === 'opening' ? sel.id : null);
       if (id) toggleOpening(id);
+      else hint('Keine Tür/kein Fenster im Fadenkreuz (max. 6 m)');
     };
     const startCarry = (id: string) => {
       const f = useProjectStore.getState().project.furniture.find((x) => x.id === id);
@@ -211,10 +232,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       if (id) return useUiStore.getState().setSelection({ type: 'furniture', id });
       // a door or window in sight is opened or closed (#21)
       const opening = targetOpening(at);
-      if (opening) toggleOpening(opening);
+      if (opening) return toggleOpening(opening);
+      // a click into the void clears the selection (#257)
+      useUiStore.getState().setSelection(null);
     };
     /**
-     * F / right-click (#235): context menu of the object in sight (or under `client` without
+     * Right-click (#235): context menu of the object in sight (or under `client` without
      * pointer lock), else the carried item or the selection. Frees the mouse so the menu can be used.
      */
     const openMenu = (client?: { x: number; y: number }) => {
@@ -227,7 +250,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         raycaster.far = PICK_RANGE;
         t = firstPickTarget(raycaster, scene) ?? ui.selection;
       }
-      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (F).', 'info');
+      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (Rechtsklick).', 'info');
       if (document.pointerLockElement === el) document.exitPointerLock?.();
       clear();
       const c = client ?? paneCenter('3d');
@@ -249,7 +272,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      // only text entry swallows the walking keys (#283); checkboxes, sliders and buttons do not
+      if (isTextEntry(t)) {
+        if (e.code === 'Escape') t.blur();
+        else if (WALK_KEYS.has(e.code) && !e.ctrlKey && !e.metaKey && !e.altKey) hint('Eingabefeld aktiv – Esc drücken oder in die Ansicht klicken');
+        return;
+      }
       if (e.code === 'KeyG' && !e.repeat && !e.ctrlKey && !e.metaKey) {
         toggleCarry();
         return;
@@ -270,18 +298,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         setFov(base.current);
         return;
       }
-      if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // context menu at the crosshair (#235)
-        openMenu();
-        return;
-      }
       if (e.code === 'KeyP' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // place the reference figure where the crosshair meets the floor (#263) and show it
         placeRefFigure();
         return;
       }
-      if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // E (#107) or O: open/close the door or window in sight
+      if ((e.code === 'KeyF' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // F (#257) or O: open/close the door or window in sight
         toggleAimedOpening();
         return;
       }
@@ -333,6 +356,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     // without pointer lock (refused, e.g. in an embedded page): a short click picks under the mouse
     let downAt: { x: number; y: number } | null = null;
     const onDown = (e: MouseEvent) => {
+      blurFocus();
       if (performance.now() - lastTouch < 1000) return;
       if (e.button === 2) {
         // right button: context menu (#235) – at the crosshair, or under the free mouse

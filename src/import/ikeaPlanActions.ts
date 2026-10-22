@@ -53,6 +53,7 @@ export function applyIkeaPlan(
       approximate: true,
       solid: true,
       locked: false,
+      existing: false,
     });
   });
   return { roomId, furniture: placed.furniture.length, named: enriched?.named ?? 0, priced: enriched?.priced ?? 0, notes: enriched?.notes ?? [] };

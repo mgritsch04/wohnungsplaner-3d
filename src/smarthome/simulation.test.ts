@@ -5,7 +5,7 @@ import { addFurniture, addOpening, addRectRoom, setOpeningOpen } from '../model/
 import type { Automation, Furniture, Project, SmartDevice } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
-import { detectionPolygon, doorMotionPoints, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
+import { detectionPolygon, doorMotionPoints, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, withHour, type SimInput, type SimState } from './simulation';
 import { placementFor } from './actions';
 import { formatDuration, rulesOf, ruleSentence } from './rules';
 
@@ -276,5 +276,18 @@ describe('doors count as motion (#281)', () => {
     const near = addOpening(p, bottomWall(p, 0).id, 'door', 2.0, { open: true })!;
     p.devices[0] = { ...p.devices[0], rotation: Math.PI }; // looks away from the door
     expect(run(p, initialState(p, 22), 2, doorEvent(p, near)).entities.m.on).toBe(false);
+  });
+});
+
+describe('manual clock (#282)', () => {
+  it('jumps to the hour, keeps running from there and logs it', () => {
+    const p = twoRooms();
+    let s = initialState(p, 12);
+    s = withHour(s, 22);
+    expect(s.hour).toBe(22);
+    expect(s.events.at(-1)?.text).toContain('22:00');
+    s = run(p, s, 3600, { person: null, moving: false, triggered: new Set() });
+    expect(s.hour).toBeCloseTo(23, 3);
+    expect(withHour(s, 25).hour).toBe(1);
   });
 });

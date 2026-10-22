@@ -269,7 +269,7 @@ function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
 }
 
 function TestStep({ project, derived, room, setRoomId }: RoomProps) {
-  const { running, speed, state, start, stop, setSpeed, setPerson } = useSimStore();
+  const { running, speed, state, start, stop, setSpeed, setPerson, setHour } = useSimStore();
   const placePerson = () => {
     const g = room && derived.rooms.get(room.id);
     if (g) setPerson(polygonCentroid(g.interior));
@@ -295,9 +295,23 @@ function TestStep({ project, derived, room, setRoomId }: RoomProps) {
         </button>
         <SelectField label="Tempo" value={String(speed)} options={SPEEDS.map((s) => ({ value: String(s), label: s === 1 ? 'Echtzeit' : `${s}× schneller` }))} onChange={(v) => setSpeed(Number(v))} />
         {state && (
-          <p className="small" data-testid="sim-clock">
-            Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
-          </p>
+          <>
+            <p className="small" data-testid="sim-clock">
+              Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
+            </p>
+            <label className="small">
+              Simulierte Uhrzeit
+              <input type="range" min={0} max={24} step={0.25} value={state.hour} aria-label="Simulierte Uhrzeit" data-testid="sim-hour" onChange={(e) => setHour(Number(e.target.value))} />
+            </label>
+            <div className="btn-row">
+              <button onClick={() => setHour(12)} data-testid="sim-day">
+                Tag (12:00)
+              </button>
+              <button onClick={() => setHour(22)} data-testid="sim-night">
+                Nacht (22:00)
+              </button>
+            </div>
+          </>
         )}
       </Section>
       {state && state.events.length > 0 && (
