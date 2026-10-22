@@ -449,6 +449,9 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   minPassageWidth: z.number().min(0.6).max(1.5).default(0.9),
   /** Mark passages narrower than minPassageWidth in 2D and 3D. */
   showNarrowPassages: z.boolean().default(true),
+  /** Rough heating-cost estimate (#90): insulation standard and heating source; orientation only. */
+  insulation: z.enum(['unrenovated', 'partial', 'standard', 'good', 'passive']).default('standard'),
+  heatingSource: z.enum(['gas', 'oil', 'district', 'heatpump', 'electric']).default('gas'),
   /** Kitchen work triangle (#82): display + limits (rule of thumb, not a standard), metres. */
   kitchenTriangle: z
     .object({
