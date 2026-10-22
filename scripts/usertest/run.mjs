@@ -109,7 +109,8 @@ const devices = {
 };
 const context = await browser.newContext({ baseURL, acceptDownloads: true, ...devices[scenario.device ?? 'desktop'] });
 const errors = [];
-const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i, /WebGL/];
+// a scenario may list console messages that its steps cause on purpose (e.g. the logged error behind a shown error message)
+const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i, /WebGL/, ...(scenario.ignoreConsole ?? [])];
 /** Open a tab that reports its errors (the first one, and a reopened one after closing the tab). */
 async function openTab() {
   const p = await context.newPage();
