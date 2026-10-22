@@ -2013,7 +2013,7 @@ code {
     gap: var(--space-2);
   }
   .project-name {
-    width: 132px !important;
+    width: 110px !important;
   }
   .save-state:not(.save-error) .save-dot {
     display: inline-block;
@@ -2027,7 +2027,7 @@ code {
     white-space: nowrap;
   }
   .time-control.compact input[type='range'] {
-    width: 72px;
+    width: 48px;
   }
   .time-control.compact .time-label {
     min-width: 0;

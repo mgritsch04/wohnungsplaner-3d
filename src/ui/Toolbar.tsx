@@ -193,7 +193,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
               <IconButton label="Schnitt" text="Schnitt" tip="Schnitt in 1,20 m Höhe – Blick in die Räume" pressed={cutaway} onClick={() => setCutaway(!cutaway)}>
                 <IconCutaway />
               </IconButton>
-              <IconButton label="Außen" text="Außen" tip="Außen: Blick von außen auf das Gebäude mit Fassade, Fenstern und Eingang; mit der Maus drehen" pressed={exterior} onClick={() => setExterior(!exterior)}>
+              <IconButton label="Außen" tip="Außen: Blick von außen auf das Gebäude mit Fassade, Fenstern und Eingang; mit der Maus drehen" pressed={exterior} onClick={() => setExterior(!exterior)}>
                 <IconExterior />
               </IconButton>
               <IconButton label="Kamera zurücksetzen" onClick={resetCamera}>
