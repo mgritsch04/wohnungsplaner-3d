@@ -51,7 +51,7 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 /** Furniture under the crosshair can be picked up to this distance (m). */
 const PICK_RANGE = 6;
 const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file', 'image']);
-const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyO', 'KeyG', 'KeyC', 'KeyX', 'KeyF', 'KeyP', 'KeyZ']);
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyO', 'KeyG', 'KeyC', 'KeyX', 'KeyF', 'KeyP', 'KeyZ']);
 /** Focus is in a field that takes typed text (#283): text, number, search … inputs, textareas, contenteditable. */
 const isTextEntry = (t: HTMLElement | null): boolean =>
   !!t && (t.tagName === 'TEXTAREA' || t.isContentEditable || (t.tagName === 'INPUT' && !NON_TEXT_INPUTS.has((t as HTMLInputElement).type)));
