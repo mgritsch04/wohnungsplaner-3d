@@ -9,6 +9,8 @@ import { deviceOn } from './DeviceInfo';
 import { GlyphPaths, KIND_COLOR } from './glyphs';
 import { detectionPolygon, occludersOf, sensorParams } from './simulation';
 import { useSelectedDeviceId, useSimStore } from './simStore';
+import { deviceOfProposal } from './suggest';
+import { useSmartSuggestStore } from './suggestStore';
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 /** big enough to catch every click of the plan while placing */
@@ -30,7 +32,8 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
   const selectedId = useSelectedDeviceId();
   const tabOpen = useUiStore((s) => s.leftTab === 'smarthome');
   const [hoverAt, setHoverAt] = useState<Vec2 | null>(null);
-  const occluders = useMemo(() => (project.devices.length ? occludersOf(project, derivePlan(project)) : []), [project]);
+  const preview = useSmartSuggestStore((s) => s.preview);
+  const occluders = useMemo(() => (project.devices.length || preview ? occludersOf(project, derivePlan(project)) : []), [project, preview]);
 
   useEffect(() => {
     if (!placing) return;
@@ -39,7 +42,7 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
     return () => window.removeEventListener('keydown', key);
   }, [placing, setPlacing]);
 
-  if (!project.devices.length && !person && !placing) return null;
+  if (!project.devices.length && !person && !placing && !preview) return null;
 
   const toWorld = (e: React.PointerEvent): Vec2 | null => {
     const m = ref.current?.getScreenCTM();
@@ -170,6 +173,36 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
           </g>
         );
       })}
+      {preview && (
+        <g pointerEvents="none" data-testid="smarthome-preview">
+          {preview.items.map((it) => {
+            const d = deviceOfProposal(it);
+            const color = KIND_COLOR[d.kind];
+            const sensor = d.kind === 'motion' || d.kind === 'presence';
+            const s = (1.3 * r) / 24;
+            return (
+              <g key={it.key} data-testid="device-preview" data-kind={d.kind} data-device={d.name}>
+                {sensor && (
+                  <path
+                    d={`M ${detectionPolygon(d, sensorParams(d), occluders).map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}
+                    fill={color}
+                    fillOpacity={0.14}
+                    stroke={color}
+                    strokeOpacity={0.6}
+                    strokeDasharray="4 3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                <circle cx={d.x} cy={d.y} r={r} fill="#ffffff" fillOpacity={0.85} stroke={color} strokeWidth={2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+                <g transform={`translate(${d.x - 12 * s} ${d.y - 12 * s}) scale(${s})`} fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <GlyphPaths kind={d.kind} />
+                </g>
+                <title>{`${d.name} (Vorschau)`}</title>
+              </g>
+            );
+          })}
+        </g>
+      )}
       {person && (
         <g style={{ cursor: 'grab' }} onPointerDown={(e) => begin(e, { kind: 'person' })} {...handlers} data-testid="sim-person-2d">
           <circle cx={person.x} cy={person.y} r={0.25} fill="#f97316" fillOpacity={0.25} stroke="#f97316" strokeWidth={2} vectorEffect="non-scaling-stroke" />
