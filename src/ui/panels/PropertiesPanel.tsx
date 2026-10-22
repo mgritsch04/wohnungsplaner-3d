@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { makeLightSmartWithFeedback } from '../../smarthome/actions';
 import { DEVICE_PRODUCTS } from '../../smarthome/catalog';
 import { DeviceInfo } from '../../smarthome/DeviceInfo';
+import { FixtureProps } from '../../installation/FixtureProps';
 import { derivePlan } from '../../model/derived';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
@@ -45,6 +46,8 @@ export function PropertiesPanel() {
       return <LightProps id={selection.id} project={project} />;
     case 'device':
       return <DeviceInfo id={selection.id} project={project} />;
+    case 'fixture':
+      return <FixtureProps id={selection.id} project={project} />;
   }
 }
 

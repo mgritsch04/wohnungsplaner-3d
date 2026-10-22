@@ -17,6 +17,7 @@ import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
+import { Fixtures3D } from '../installation/Fixtures3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { eyeFromBody } from '../model/body';
 import { RefFigure } from './RefFigure';
@@ -367,6 +368,7 @@ function SceneContent({
         </>
       )}
       <Devices3D project={project} />
+      <Fixtures3D project={project} />
       <TapeMeasure3D />
       {/* also while walking (#227): a drag can only start while the pointer is not locked */}
       {!readOnly && <CatalogDrop3D />}

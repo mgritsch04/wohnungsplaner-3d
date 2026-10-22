@@ -277,6 +277,31 @@ export const SmartDeviceSchema = z.object({
   openingId: z.string().optional(),
 });
 
+/**
+ * Installation point on a wall (#64, #81): socket, light switch, radiator, water or waste-water
+ * connection – only placement and display, no device logic. Stored like furniture with a plan
+ * position; placing and dragging snap it onto the nearest wall face (model/fixtures.ts), so it
+ * stays put when walls are edited later.
+ */
+export const FixtureKindSchema = z.enum(['socket', 'switch', 'radiator', 'water', 'drain']);
+export const FixtureSchema = z.object({
+  id: z.string().min(1),
+  kind: FixtureKindSchema,
+  /** Centre of the footprint in plan coordinates (in front of the wall face). */
+  x: finite(),
+  y: finite(),
+  /** Plan rotation like furniture: the front (local +y) faces away from the wall into the room. */
+  rotation: finite().default(0),
+  /** Height of the centre (sockets, switches, connections) or of the lower edge (radiator) above the floor. */
+  elevation: len(0, 3),
+  /** Radiator size (m); other kinds use fixed sizes. */
+  width: len(0.2, 3).optional(),
+  height: len(0.2, 2).optional(),
+  /** Sockets: number of outlets side by side (1 = single, 2 = double …). */
+  count: z.number().int().min(1).max(5).default(1),
+  note: z.string().max(200).optional(),
+});
+
 /** Home-Assistant-like automation: trigger → optional condition → light action (#170). */
 export const AutomationSchema = z.object({
   id: z.string().min(1),
@@ -432,6 +457,8 @@ export const ProjectSchema = z.object({
   /** Simulated smart-home devices and automations (#170, schema 2). */
   devices: z.array(SmartDeviceSchema).default([]),
   automations: z.array(AutomationSchema).default([]),
+  /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
+  fixtures: z.array(FixtureSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -452,6 +479,8 @@ export type Light = z.infer<typeof LightSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
+export type FixtureKind = z.infer<typeof FixtureKindSchema>;
+export type Fixture = z.infer<typeof FixtureSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;

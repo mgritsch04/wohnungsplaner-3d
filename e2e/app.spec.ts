@@ -1238,7 +1238,8 @@ test('mouse sensitivity: setting scales walk look and orbit rotation, persists i
     await page.waitForTimeout(200);
     const y0 = await camYaw();
     await page.evaluate(() => document.dispatchEvent(new MouseEvent('mousemove', { movementX: 100, movementY: 0 })));
-    await page.waitForTimeout(300);
+    // the camera follows in the next rendered frame, which can take a while on a busy CI runner
+    await expect.poll(async () => Math.abs((await camYaw()) - y0), { timeout: 10_000 }).toBeGreaterThan(1e-4);
     return Math.abs((await camYaw()) - y0);
   };
   const low = await lookTurn(0.5);
@@ -1306,15 +1307,15 @@ test('walk look: a single huge pointer-lock delta does not flip the view; editin
   await page.evaluate(() => {
     for (const dx of [4, 5, 4, 1400, 5, 4, 4]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
   });
-  await page.waitForTimeout(300);
+  // the camera follows in the next rendered frame, which can take a while on a busy CI runner
+  await expect.poll(async () => Math.abs((await camYaw()) - y0), { timeout: 10_000 }).toBeGreaterThan(1e-4);
   const turned = Math.abs((await camYaw()) - y0);
   expect(turned).toBeCloseTo(26 * 0.0022, 3); // only the small moves count
   // a real fast move (several large events in a row) still turns the view
   await page.evaluate(() => {
     for (const dx of [250, 260, 270]) document.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: 0 }));
   });
-  await page.waitForTimeout(300);
-  expect(Math.abs((await camYaw()) - y0)).toBeGreaterThan(turned + 500 * 0.0022);
+  await expect.poll(async () => Math.abs((await camYaw()) - y0), { timeout: 10_000 }).toBeGreaterThan(turned + 500 * 0.0022);
 
   // a change to the plan while walking (here: selection cleared, a door opened) keeps position and view direction
   const pose = () =>
