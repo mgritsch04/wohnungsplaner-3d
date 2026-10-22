@@ -51,7 +51,7 @@ test('Smart Home (#170): Melder und Lampe platzieren, Automation, Person löst L
   await panel.getByTestId('sh-step-test').click();
 
   const p = await getProject(page);
-  expect(p.schemaVersion).toBe(2);
+  expect(p.schemaVersion).toBe(3);
   expect(p.devices.map((d) => d.kind)).toEqual(['motion', 'light']);
   const light = p.lights.find((l) => l.id === p.devices[1].lightId)!;
   expect(light.on).toBe(false);
