@@ -97,8 +97,10 @@ export function buildWallGeometry(fp: WallFootprint, pieces: WallPiece[]): THREE
 }
 
 /** Horizontal polygon (floor/ceiling) at height y. faceUp=false for ceilings. UV in meters. */
-export function buildFlatPolygon(poly: Vec2[], y: number, faceUp = true): THREE.BufferGeometry {
+export function buildFlatPolygon(poly: Vec2[], y: number, faceUp = true, holes: Vec2[][] = []): THREE.BufferGeometry {
   const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, p.y)));
+  // stairwells (#54): cut-outs that lie inside the polygon
+  for (const h of holes) shape.holes.push(new THREE.Path(h.map((p) => new THREE.Vector2(p.x, p.y))));
   const shapeGeom = new THREE.ShapeGeometry(shape);
   // ShapeGeometry lies in XY with +Z normal. Map (x, y) → (x, height, y).
   const pos = shapeGeom.getAttribute('position') as THREE.BufferAttribute;

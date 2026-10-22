@@ -16,7 +16,9 @@ import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
 import { OtherLevels3D } from './OtherLevels3D';
-import { activeLevel } from '../model/levels';
+import { activeLevel, neighbourLevel } from '../model/levels';
+import { stairwells, walkGroundAt } from '../model/stairs';
+import { goToNeighbourLevel } from '../ui/levelActions';
 import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
@@ -322,6 +324,18 @@ function SceneContent({
   const tier = tierSettings(useGraphicsTier());
   const otherLevels = useUiStore((s) => s.otherLevels);
   const activeElevation = activeLevel(project).elevation;
+  // stairwells (#54): rebuilt only when a stair between storeys changes
+  const wellsKey = JSON.stringify(stairwells(project));
+   
+  const wells = useMemo(() => JSON.parse(wellsKey) as ReturnType<typeof stairwells>, [wellsKey]);
+  // walking up and down stairs (#54)
+  const groundAt = useCallback((pt: { x: number; y: number }) => walkGroundAt(project, pt), [project]);
+  const above = neighbourLevel(project, 1);
+  const below = neighbourLevel(project, -1);
+  const riseUp = above ? above.elevation - activeElevation : null;
+  const riseDown = below ? activeElevation - below.elevation : null;
+  const levelRise = useMemo(() => ({ up: riseUp, down: riseDown }), [riseUp, riseDown]);
+  const onChangeLevel = useCallback((dir: 1 | -1) => goToNeighbourLevel(dir), []);
 
   return (
     <>
@@ -349,6 +363,8 @@ function SceneContent({
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
         showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
+        floorHoles={wells.floor}
+        ceilingHoles={wells.ceiling}
       />
       <Photos3D project={project} derived={derived} />
       {exteriorOn && <Exterior3D project={project} derived={derived} entrance={entrance} />}
@@ -408,6 +424,9 @@ function SceneContent({
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
           eyeHeight={eyeFromBody(project.settings.bodyHeight)}
           onLockChange={onLockChange}
+          groundAt={readOnly ? undefined : groundAt}
+          levelRise={levelRise}
+          onChangeLevel={readOnly ? undefined : onChangeLevel}
         />
       )}
     </>

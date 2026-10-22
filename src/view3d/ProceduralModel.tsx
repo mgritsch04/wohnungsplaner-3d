@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { stepCount } from '../model/stairs';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { FurnitureFinish, Interior, ModelRef, QualityMode, TableBase } from '../model/schema';
 import { BOARD, columnWidth, DEFAULT_DRAWER_HEIGHT, innerHeight } from '../model/interior';
@@ -547,6 +548,25 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       ];
     case 'bathtub':
       return [rbox(-W, 0, -D, W, h, D, 0.06, '#ffffff', { rough: 0.12 }), rbox(-W + 0.07, h - 0.4, -D + 0.07, W - 0.07, h + 0.001, D - 0.07, 0.12, '#e7eef2', { rough: 0.1 })];
+    case 'stairs': {
+      // straight flight (#54): rises from the front (+z) to the back (−z), one block per step, a rail on the right
+      const n = stepCount(h);
+      const rise = h / n;
+      const run = d / n;
+      const parts: Part[] = [];
+      for (let i = 0; i < n; i++) {
+        const z1 = D - i * run;
+        const top = (i + 1) * rise;
+        parts.push(box(-W, Math.max(0, top - rise * 2.2), z1 - run, W, top - 0.03, z1, shade(color, 0.92)));
+        parts.push(box(-W, top - 0.03, z1 - run - 0.02, W, top, z1, color, grain));
+      }
+      const len = Math.hypot(d, h);
+      const tilt = Math.atan2(h, d);
+      parts.push({ geo: BOX, p: [W - 0.03, h / 2 + 0.9, 0], s: [0.04, 0.04, len], r: [tilt, 0, 0], color: METAL, metal: 0.8, rough: 0.3 });
+      parts.push(cyl(W - 0.03, rise, D - run / 2, 0.02, rise + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+      parts.push(cyl(W - 0.03, h, -D + run / 2, 0.02, h + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+      return parts;
+    }
     case 'shower':
       return [
         rbox(-W, 0, -D, W, 0.05, D, 0.01, '#ffffff', { rough: 0.2 }),

@@ -33,6 +33,12 @@ interface Props {
   /** Camera height above the floor (m). */
   eyeHeight?: number;
   onLockChange: (locked: boolean) => void;
+  /** Height of the ground under the walker (stairs, #54), relative to the active storey's floor. */
+  groundAt?: (p: Vec2) => number;
+  /** Height to the storey above / from the storey below (m); null = there is none. */
+  levelRise?: { up: number | null; down: number | null };
+  /** Climbed past half a stair: make the storey above (1) or below (−1) the active one. */
+  onChangeLevel?: (dir: 1 | -1) => boolean;
 }
 
 /**
@@ -77,7 +83,7 @@ export function openingIdOf(o: THREE.Object3D | null): string | null {
   return null;
 }
 
-export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
+export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange, groundAt, levelRise, onChangeLevel }: Props) {
   const { camera, gl, scene } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
@@ -123,6 +129,15 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
   }, [sitEye]);
   const eyeRef = useRef(eyeHeight);
   const eyeNow = useRef<number | null>(null);
+  // stairs (#54): the ground under the walker, smoothed; a storey change shifts it by the storey height
+  const stairs = useRef({ groundAt, levelRise, onChangeLevel });
+  const groundNow = useRef(0);
+  const levelSwitching = useRef(false);
+  useEffect(() => {
+    stairs.current = { groundAt, levelRise, onChangeLevel };
+    // the new storey's ground function has arrived
+    levelSwitching.current = false;
+  }, [groundAt, levelRise, onChangeLevel]);
   useEffect(() => {
     eyeRef.current = eyeHeight;
   }, [eyeHeight]);
@@ -539,7 +554,21 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     // head bob (#263) from the distance walked in the previous frame
     const bobY = useProjectStore.getState().project.settings.walkHeadBob ? stepBob(bob, moved.current, dt) : 0;
     moved.current = 0;
-    camera.position.y = eyeNow.current + bobY;
+    const st = stairs.current;
+    const goalGround = st.groundAt ? st.groundAt({ x: camera.position.x, y: camera.position.z }) : 0;
+    groundNow.current += (goalGround - groundNow.current) * (1 - Math.exp(-dt / 0.06));
+    if (Math.abs(goalGround - groundNow.current) < 0.001) groundNow.current = goalGround;
+    // past half a stair the storey above (or below) becomes the active one; the eyes stay where they are
+    if (!levelSwitching.current && st.onChangeLevel && st.levelRise) {
+      const { up, down } = st.levelRise;
+      const dir = up !== null && goalGround > up / 2 ? 1 : down !== null && goalGround < -down / 2 ? -1 : 0;
+      if (dir !== 0 && st.onChangeLevel(dir)) {
+        levelSwitching.current = true;
+        groundNow.current -= dir === 1 ? up! : -down!;
+      }
+    }
+    const ground = groundNow.current;
+    camera.position.y = ground + eyeNow.current + bobY;
     useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
@@ -593,7 +622,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       p = resolveCollisions(p, collidersRef.current);
     }
     moved.current = Math.hypot(p.x - camera.position.x, p.y - camera.position.z);
-    camera.position.set(p.x, eyeNow.current + bobY, p.y);
+    camera.position.set(p.x, ground + eyeNow.current + bobY, p.y);
   });
 
   return null;

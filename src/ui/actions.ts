@@ -1,4 +1,5 @@
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
+import { defaultStairHeight, isStair } from '../model/stairs';
 import { deleteDevice } from '../smarthome/actions';
 import { deleteFixture } from '../installation/actions';
 import type { CatalogItem } from '../catalog/types';
@@ -183,6 +184,8 @@ export function addCatalogItem(item: CatalogItem) {
     if (!inRoom && derived.rooms.size > 0) at = [...derived.rooms.values()][0].centroid;
   }
   const f = createFurnitureFromCatalog(item, { x: roundMm(at.x), y: roundMm(at.y) });
+  // a stair leads up to the storey above (#54)
+  if (isStair(f)) f.height = defaultStairHeight(p);
   store().apply((d) => {
     d.furniture.push(f);
   });
@@ -202,6 +205,7 @@ export function dropCatalogItemAt(item: CatalogItem, at: { x: number; y: number 
     return false;
   }
   const f = createFurnitureFromCatalog(item, at);
+  if (isStair(f)) f.height = defaultStairHeight(store().project);
   let placed = false;
   store().apply((d) => {
     placed = placeDroppedFurniture(d, derived, f, at, altKey);

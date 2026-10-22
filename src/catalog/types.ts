@@ -13,6 +13,7 @@ export const CATEGORIES = [
   { id: 'appliance', label: 'Geräte' },
   { id: 'bathroom', label: 'Bad' },
   { id: 'decor', label: 'Deko & Pflanzen' },
+  { id: 'stairs', label: 'Treppen' },
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
