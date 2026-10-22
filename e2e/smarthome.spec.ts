@@ -299,3 +299,57 @@ test('Smart-Home-Vorschlag (#225): Vorschau, Verwerfen ändert nichts, Übernehm
   expect((await getProject(page)).devices).toHaveLength(n);
   expect(errors).toEqual([]);
 });
+
+test('LED-Streifen (#238): als Strecke platzieren, Länge, Farbe, Knick, Undo, bleibt nach Reload', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  const right = page.locator('.panel.right');
+
+  await panel.locator('[data-testid="device-kind"][data-kind="strip"]').click();
+  await panel.getByTestId('device-place-click').click();
+  await expect(panel.getByTestId('device-placing-hint')).toContainText('Anfang');
+  const a = await planToScreen(page, 6.5, 1.2);
+  const b = await planToScreen(page, 8.5, 1.2);
+  await page.mouse.click(a.x, a.y);
+  await expect(panel.getByTestId('device-placing-hint')).toBeVisible(); // waiting for the end point
+  await page.mouse.click(b.x, b.y);
+  await expect(panel.getByTestId('device-placing-hint')).toBeHidden();
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(1);
+  const strip = (await getProject(page)).devices[0];
+  expect(strip).toMatchObject({ kind: 'strip', direction: 'down' });
+  expect(strip.points).toHaveLength(2);
+  const info = right.getByTestId('device-info');
+  await expect(info.getByTestId('strip-length')).toContainText('2,0');
+
+  // switch on in the simulation, colour shows in 2D
+  await info.getByTestId('device-toggle').click();
+  const el = page.locator('[data-testid="device-2d"][data-kind="strip"]');
+  await expect(el).toHaveAttribute('data-on', 'true');
+  await info.getByTestId('strip-color').fill('#ff0000');
+  await expect(el).toHaveAttribute('data-color', '#ff0000');
+
+  // add a bend: length grows
+  await info.getByTestId('strip-add-section').click();
+  await expect(info.getByTestId('strip-length')).toContainText('2 Abschnitte');
+  await page.keyboard.press('Control+z');
+  await expect(info.getByTestId('strip-length')).toContainText('1 Abschnitt');
+
+  await expect.poll(async () => (await getProject(page)).devices[0]?.color).toBe('#ff0000');
+  await page.waitForTimeout(1500); // autosave
+  await page.reload();
+  await expect.poll(async () => (await getProject(page)).devices[0]?.color).toBe('#ff0000');
+
+  // a click on the line in 2D selects the strip (the thick transparent stroke is the hit area)
+  const mid = await planToScreen(page, 7.5, 1.2);
+  await page.mouse.click(mid.x, mid.y);
+  await expect.poll(async () => (await getSelection(page))?.id).toBe((await getProject(page)).devices[0].id);
+  await right.getByTestId('device-delete').click();
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(0);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await getProject(page)).devices.length).toBe(1);
+  expect(errors).toEqual([]);
+});

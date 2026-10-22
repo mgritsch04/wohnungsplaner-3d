@@ -155,7 +155,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
         </div>
         {placing && (
           <p className={`small ${css.hint}`} data-testid="device-placing-hint">
-            Klicke im 2D-Plan dorthin, wo {KIND_LABEL[placing.kind]} hin soll. Esc bricht ab.
+            {placing.kind === 'strip' ? 'Klicke im 2D-Plan zuerst den Anfang, dann das Ende des LED-Streifens. An Schrank und Wand rastet er ein. Esc bricht ab.' : `Klicke im 2D-Plan dorthin, wo ${KIND_LABEL[placing.kind]} hin soll. Esc bricht ab.`}
           </p>
         )}
       </Section>
@@ -327,7 +327,7 @@ function RulesStep({ project }: { project: Project }) {
 
 function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
   const derived = useMemo(() => derivePlan(project), [project]);
-  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug');
+  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip');
   const roomName = (d: SmartDevice) => project.rooms.find((r) => r.id === roomAt(project, derived, d))?.name;
   const s = ruleSentence(project, a);
   return (
@@ -350,6 +350,13 @@ function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
           onChange={(v) => updateAutomation(a.id, (x) => void (x.action.deviceIds = v ? [...x.action.deviceIds, t.id] : x.action.deviceIds.filter((id) => id !== t.id)))}
         />
       ))}
+      {a.action.deviceIds.some((id) => project.devices.find((d) => d.id === id)?.kind === 'strip') && (
+        <label className="small">
+          Farbe der LED-Streifen
+          <input type="color" value={a.action.color ?? '#ffb46b'} aria-label="Farbe der LED-Streifen" data-testid="automation-color" onChange={(e) => updateAutomation(a.id, (x) => void (x.action.color = e.target.value))} />
+          {a.action.color && <button className="small" onClick={() => updateAutomation(a.id, (x) => void delete x.action.color)}>zurücksetzen</button>}
+        </label>
+      )}
       <NumberField label="Helligkeit" unit="%" digits={0} value={a.action.brightness ?? 100} min={1} max={100} onChange={(v) => updateAutomation(a.id, (x) => void (x.action.brightness = v))} />
       {a.trigger.type === 'motion' && (
         <NumberField label="Aus nach" unit="s" digits={0} value={a.offAfterS ?? 0} min={0} max={7200} onChange={(v) => updateAutomation(a.id, (x) => void (x.offAfterS = v))} title="Sekunden ohne Bewegung, bis das Licht wieder ausgeht" />

@@ -256,7 +256,7 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
-export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router']);
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(100),
@@ -275,6 +275,16 @@ export const SmartDeviceSchema = z.object({
   lightId: z.string().optional(),
   /** kind `contact`: the door/window it watches. */
   openingId: z.string().optional(),
+  /**
+   * kind `strip` (#238): LED strip along a path (2..12 points, plan metres); x/y stay the first
+   * point. `elevation` is its mounting height, `direction` where it shines (down, back to the
+   * wall, up into a cove). `color` (#rrggbb) or `kelvin` set the planned colour, brightness is
+   * switched in the simulation. All optional: older files without them stay valid (no migration).
+   */
+  points: z.array(Vec2Schema).min(2).max(12).optional(),
+  direction: z.enum(['down', 'back', 'up']).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  kelvin: z.number().min(1500).max(10000).optional(),
 });
 
 /**
@@ -314,7 +324,13 @@ export const AutomationSchema = z.object({
   ]),
   /** only when it is dark (sun below the horizon at the simulated hour) */
   onlyWhenDark: z.boolean().default(false),
-  action: z.object({ deviceIds: z.array(z.string()), on: z.boolean(), brightness: z.number().min(1).max(100).optional() }),
+  action: z.object({
+    deviceIds: z.array(z.string()),
+    on: z.boolean(),
+    brightness: z.number().min(1).max(100).optional(),
+    /** LED strips (#238): colour (#rrggbb) the strip takes when the rule fires */
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  }),
   /** Motion trigger: switch the lights off again once the sensor reports "no motion" for this long (s). */
   offAfterS: z.number().min(0).max(7200).optional(),
 });

@@ -44,6 +44,8 @@ interface SimStore {
   setFlash: (id: string | null) => void;
   /** switch a lamp/plug by hand (starts the simulation if needed) */
   setEntity: (id: string, on: boolean) => void;
+  /** dim an LED strip / lamp or recolour a strip by hand (starts the simulation if needed) */
+  setLevel: (id: string, level: { brightness?: number; color?: string }) => void;
   /** set the simulated clock by hand; returns false while the simulation is stopped */
   setHour: (hour: number) => boolean;
   /** let a sensor report as if it detected something (starts the simulation if needed) */
@@ -179,6 +181,13 @@ export const useSimStore = create<SimStore>((set, get) => ({
       entities: { ...live.entities, [id]: { ...prev, on, brightness: on ? (prev?.brightness ?? 100) : prev?.brightness } },
       events: [...live.events, { t: live.t, hour: live.hour, text: `${name} von Hand ${on ? 'an' : 'aus'}` }].slice(-50),
     };
+    set({ state: live });
+  },
+  setLevel: (id, level) => {
+    get().start();
+    if (!live) return;
+    const prev = live.entities[id] ?? { on: false };
+    live = { ...live, entities: { ...live.entities, [id]: { ...prev, on: true, ...level } } };
     set({ state: live });
   },
   setHour: (hour) => {
