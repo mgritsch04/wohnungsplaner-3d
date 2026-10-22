@@ -13,6 +13,7 @@ import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
 import { DaylightSection } from './DaylightSection';
+import { CircuitsSection } from '../../installation/CircuitsSection';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
 import { InfoHint } from '../InfoHint';
@@ -74,6 +75,8 @@ export function ProjectPanel() {
       </Section>
 
       <DaylightSection />
+
+      <CircuitsSection />
 
       <SightlineSection />
 

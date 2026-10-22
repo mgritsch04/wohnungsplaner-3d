@@ -310,6 +310,25 @@ export const FixtureSchema = z.object({
   /** Sockets: number of outlets side by side (1 = single, 2 = double …). */
   count: z.number().int().min(1).max(5).default(1),
   note: z.string().max(200).optional(),
+  /** Sockets: the circuit (project.circuits) this socket hangs on (#135). */
+  circuitId: z.string().optional(),
+});
+
+/** Electrical circuit with its fuse (#135); the power check is a guide value only. */
+export const CircuitSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(60),
+  /** Fuse rating in ampere. */
+  amps: z.number().min(6).max(63).default(16),
+});
+
+/** Consumer with its power in watt, attached to a socket (fixtureId) or directly to a circuit (circuitId) (#135). */
+export const LoadSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(80),
+  watts: z.number().min(0).max(30000),
+  fixtureId: z.string().optional(),
+  circuitId: z.string().optional(),
 });
 
 /** Home-Assistant-like automation: trigger → optional condition → light action (#170). */
@@ -393,6 +412,8 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   exposure: z.number().min(0.1).max(4).default(1),
   /** Compass bearing (degrees, 0 = north, 90 = east) the upper edge of the plan points to (#69, #93); 0 = plan up is north. */
   northDirection: z.number().min(0).max(359).default(0),
+  /** Share of the fuse rating treated as continuous load before the power check warns (#135), percent. */
+  circuitLimitPct: z.number().min(10).max(100).default(80),
   /** Show ceilings in the 3D view (off by default for better overview). */
   showCeilings: z.boolean().default(false),
   /** Mouse sensitivity factor for looking around (walk) and orbiting; 1 = default feel. */
@@ -475,6 +496,9 @@ export const ProjectSchema = z.object({
   automations: z.array(AutomationSchema).default([]),
   /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
   fixtures: z.array(FixtureSchema).default([]),
+  /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
+  circuits: z.array(CircuitSchema).default([]),
+  loads: z.array(LoadSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -497,6 +521,8 @@ export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
 export type FixtureKind = z.infer<typeof FixtureKindSchema>;
 export type Fixture = z.infer<typeof FixtureSchema>;
+export type Circuit = z.infer<typeof CircuitSchema>;
+export type Load = z.infer<typeof LoadSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;

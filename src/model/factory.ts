@@ -26,5 +26,7 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     cameraBookmarks: [],
     groups: [],
     fixtures: [],
+    circuits: [],
+    loads: [],
   };
 }
