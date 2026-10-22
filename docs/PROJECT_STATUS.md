@@ -1,8 +1,14 @@
 # Projektstatus – Wohnungsplaner 3D
 
-_Zuletzt aktualisiert: 2026-10-17 · Arbeit auf `claude/…`-Branches je Thread · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
+_Zuletzt aktualisiert: 2026-10-22 · Arbeit auf `claude/…`-Branches je Thread · Workflow: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)_
 
 ## Aktuell
+- **Stand 2026-10-22 (Planer-Thread im Ein-Projekt-Modell, Nachtrag; die Einträge darunter enden am 18.10.):**
+  - **Rollen/Brandmauer:** Planer-Thread pflegt STAND/Queue und diese Doku, Arbeits-Threads setzen je ein Issue um; `scripts/repo-guard.sh` + Pre-push-Hook + `repo-firewall.yml` verhindern Vermischung mit dem Fitness-Repo (PR #284). Issue-Referenzen vollqualifiziert (`mgritsch04/wohnungsplaner-3d#nr`).
+  - **CI (PR #288, #285):** e2e in 4 Teile geteilt, parallel zu `checks`, Abbruch bei neuem Push – automatischer User-Test offen (#285), reale Laufzeit noch zu bestätigen.
+  - **Gemergt seit 18.10., automatischer User-Test offen:** Gefühlt echt/Sichtfeld (#263, PR #265/#266) · IKEA-Import Pflanzen/runde Produkte (#269) und Pflanzen auf Tischen (#219, PR #272) · Möbelix: Lesezeichen, Ersatzform und Farbe, Tischplatte-Textur, eigene Liste (#273, #278; Bildpaket Stufe 3 auf Halt) · Uhrzeit bei laufender Simulation änderbar (#282, PR #286) · Begehen: Fokus und Hinweise (#283, PR #287) · Begehen-Tasten neu: F/O öffnen, Q/E drehen, Rechtsklick-Menü (#257, PR #293) · Import erkennt Bad-Bestand (#255, PR #292) · Plan-Hintergrund-Schalter, Taste P (#258, PR #291) · Katalog-Ziehen zeigt das Modell (#217, PR #295; nach Fehlschlag erneut zu testen) · Melder erkennen Türbewegung (#281, PR #289) · Import: Türbreite, Wandstück, Viertelkreis-Schwenkfläche (#267, PR #298).
+  - **Offen/in Arbeit:** Sensor-Blickrichtung als Regler (#280, PR #290, Merge-Konflikt) · HA-Bridge CI (#229, PR #296, Merge von der Umgebung blockiert).
+  - **Statusbegriffe:** „gemergt“ heißt nicht „von G bestätigt“; Labels je Issue genau eines (`planned` → `in-progress` → `auto-user-test` → `user-test`/`done`), siehe `DEVELOPMENT_WORKFLOW.md`.
 - **Phase:** 8 (Stabilisierung) + Arbeitsauftrag „Workflow, autonome Entwicklung und bestehender Arbeitsauftrag“ (Runde 6)
 - **Workflow neu:** Ideen als GitHub-Issues (`idea-inbox`), kuratierter Plan in [`IDEAS.md`](IDEAS.md), Abnahme über `[USERTEST]`-Issues – Ablauf in [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
 - **Erledigt in Runde 6:** Kollisionssystem (#4 → User-Test #4), Nachtbeleuchtung (#7 → #25), Möbelix-Produkttyp (#8 → #26), Drehen mit Kollisionsprüfung (#5 → #31), Augenhöhe 163 cm + Fadenkreuz (#23/#22 → #33), Hover-Info (#9 → #41), Möbel im Begehen auswählen/tragen + Teppich stoppt an Wänden (#39 → #42), Zoom-Regler (#6 → #43), Positionsmarker beim Begehen (#19 → #46), Ducken (#20 → #47), Mehrfachauswahl/Kopieren (→ #94), Speicherfehler-Banner (#60), Möbel-Einrasten wählbar (#52 → #105), CSV mit Maßen/Mengen (#57 → #106), Türen/Fenster öffnen (#21 → #107), Plan als PNG/PDF + Druckansicht (#71/#72 → #112, PR #111), Grundriss-Import schräge Wände/Räume/Maßtexte (#37 → #114), Projektversionen (#66/#58 → #115), Einkaufsliste nach Räumen + „Problem melden“ (#75/#62 → #116), Engstellen (#68 → #118), Laufwege (#67 → #120), Tastenkürzel-Übersicht (#59), UI-Grundlage (#96–#98) + Ausrichten/Verteilen (#51 → #122), Dunkelmodus + Maßlinien + Kamera-Lesezeichen (#73/#50/#55 → #123), Eigenschaften-Panel in Gruppen + Vorher-nachher-Vergleich in 3D (#99/#76 → #126), Küchen-Arbeitsdreieck + GLB-Export + Sitzen beim Begehen + Startkarte (#82/#87/#78/#102 → #127), Touch-Bedienung (#74) von dir verworfen, Prioritäten-/Issue-Regeln (#13, #34–#36, #40), Backlog als Tabelle + Aufgaben-Issues (#15), Modellwahl-Regel (#18)
@@ -150,5 +156,5 @@ Seit 2026-10-17 läuft jeder Test im Feature-Issue selbst (neues Issue-Modell, s
 Siehe [`IDEAS.md`](IDEAS.md) → `Ready` (Reihenfolge dort).
 
 ## Git
-- Branch `claude/quirky-faraday-0d9uep`; `main` = `4f7bc78` (zuletzt gemergt: PR #111, #117, #119, #121).
+- Stand 2026-10-22: `main` = `8fff496` (PR #298). Arbeit auf `claude/wp-…`-Branches; Altbestand `claude/…` (rund 74 Remote-Branches) wird nicht gelöscht.
 - Frühere Runden: PR #1 (`5797457`), PR #2 (`a9cc64f`), PR #3 (IKEA/Smart-Home-Doku).

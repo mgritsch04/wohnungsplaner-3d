@@ -153,3 +153,10 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 - „IKEA-Küchenplanung“ steht nur noch einmal (eine Zeile, Blocked); #14 war bereits geschlossen, die Aufgabe für dich ist jetzt #27.
 - Frühere Inbox-Notizen: „Möbelix-Seiten mit echten Quelltexten testen“ → User-Test #8; „Anleitung PAX-JSON“ → Zeile „IKEA-Import pflegen“ (#10); „Mehrfachauswahl“ und „schräge Wände“ bewertet (als Ready bewertet).
 - Aufgaben für dich als `user-task`-Issues: #27 (IKEA-Küche), #28 (Smart-Home-Entscheidungen), #29 (Gamepad), #30 (Routine einrichten).
+
+## Nachtrag 2026-10-22 (Planer-Thread; Tabelle oben endet am 18.10., Status hier maßgeblich für die genannten Nummern)
+Gemergt, Status 🧪 automatischer User-Test offen: #263 (Gefühlt echt, Stufe 1; Panini/Stufe 2 nur auf Gs Go) · #269 · #219 · #273 (Stufe 1–2; Bildpaket Stufe 3 auf Halt bis Gs Urteil, Branch `claude/moebelix-bildpaket-273` nicht löschen) · #278 · #282 · #283 (Strahl an Möbeln vorbei nicht umgesetzt) · #257 · #255 · #258 · #281 · #267 · #285 · #217 (❌ → erneut testen).
+In Progress: #280 (PR #290), #229 (PR #296).
+Ready (Planer-Reihenfolge, klein zuerst): #253 WLAN-Abdeckung · #225 Smart-Home-Vorschlag je Raum · #238 LED-Streifen (pausiert) · #250 vorhandene Lampe smart · #222 Anschlüsse im Import (nach #267, groß) · weitere `planned` laut Issue-Liste.
+Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
+Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
