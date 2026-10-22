@@ -5,7 +5,7 @@ import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
-import { initialState, lightOverrides, occludersOf, step, type Occluder, type SimState } from './simulation';
+import { doorMotionPoints, initialState, lightOverrides, occludersOf, step, type Occluder, type SimState } from './simulation';
 
 /** Device waiting to be placed by a click into the 2D plan (#233). */
 export interface Placing {
@@ -59,10 +59,28 @@ let lastMoveAt = -Infinity;
 let cache: { project: Project; occluders: Occluder[] } | null = null;
 let live: SimState | null = null;
 const triggeredUntil = new Map<string, number>();
+/** doors that opened or closed a moment ago: motion points until the given time (#281) */
+const doorMotionUntil = new Map<string, { until: number; points: Vec2[] }>();
+let lastOpen: Map<string, boolean> | null = null;
 
 function occluders(project: Project): Occluder[] {
   if (cache?.project !== project) cache = { project, occluders: occludersOf(project, derivePlan(project)) };
   return cache.occluders;
+}
+
+/** Notes doors whose open state changed since the last frame; a moving door counts as motion for TRIGGER_MS. */
+function trackDoors(project: Project, now: number) {
+  const open = new Map(project.openings.filter((o) => o.kind === 'door').map((o) => [o.id, !!o.open]));
+  if (lastOpen) {
+    let derived: ReturnType<typeof derivePlan> | null = null;
+    for (const [id, o] of open) {
+      if (lastOpen.get(id) === undefined || lastOpen.get(id) === o) continue;
+      derived ??= derivePlan(project);
+      doorMotionUntil.set(id, { until: now + TRIGGER_MS, points: doorMotionPoints(derived, id) });
+    }
+  }
+  lastOpen = open;
+  for (const [id, m] of doorMotionUntil) if (m.until < now) doorMotionUntil.delete(id);
 }
 
 /** Position used as "the person": walkthrough camera if walking, else the 2D marker. */
@@ -86,6 +104,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
     if (get().running) return;
     const project = useProjectStore.getState().project;
     live = get().state ?? initialState(project);
+    lastOpen = null;
+    doorMotionUntil.clear();
     set({ running: true, state: live });
     lastFrame = performance.now();
     const frame = (now: number) => {
@@ -102,8 +122,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
       for (const [id, until] of triggeredUntil) if (until < now) triggeredUntil.delete(id);
       const proj = useProjectStore.getState().project;
       const occ = occluders(proj);
+      trackDoors(proj, now);
       let simDt = realDt * s.speed;
-      const input = { person: p, moving: now - lastMoveAt < MOVING_FOR_MS, triggered: new Set(triggeredUntil.keys()) };
+      const input = { person: p, moving: now - lastMoveAt < MOVING_FOR_MS, triggered: new Set(triggeredUntil.keys()), doorMotion: [...doorMotionUntil.values()].flatMap((m) => m.points) };
       // sub-steps of ≤ 1 simulated second keep hold times and off-delays exact
       while (simDt > 0) {
         const d = Math.min(1, simDt);
@@ -123,6 +144,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
     cancelAnimationFrame(raf);
     live = null;
     triggeredUntil.clear();
+    doorMotionUntil.clear();
+    lastOpen = null;
     set({ running: false, state: null });
     useUiStore.getState().setTimePreview(null);
   },

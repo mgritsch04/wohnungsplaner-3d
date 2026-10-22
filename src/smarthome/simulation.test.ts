@@ -5,7 +5,7 @@ import { addFurniture, addOpening, addRectRoom, setOpeningOpen } from '../model/
 import type { Automation, Furniture, Project, SmartDevice } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
-import { detectionPolygon, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
+import { detectionPolygon, doorMotionPoints, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, type SimInput, type SimState } from './simulation';
 import { placementFor } from './actions';
 import { formatDuration, rulesOf, ruleSentence } from './rules';
 
@@ -238,5 +238,43 @@ describe('line of sight through door leaves and furniture (#236)', () => {
     expect(inDetectionArea(sensor, sp, person, occludersOf(p, d))).toBe(false);
     setOpeningOpen(p, doorId, false);
     expect(inDetectionArea(sensor, sp, person, occludersOf(p, derivePlan(p)))).toBe(true);
+  });
+});
+
+describe('doors count as motion (#281)', () => {
+  const bottomWall = (p: Project, roomIdx: number) => {
+    const room = p.rooms[roomIdx];
+    const y = (id: string) => p.nodes.find((n) => n.id === id)!.y;
+    const minY = Math.min(...room.nodeIds.map(y));
+    return p.walls.find((w) => room.nodeIds.includes(w.a) && room.nodeIds.includes(w.b) && Math.abs(y(w.a) - minY) < 1e-6 && Math.abs(y(w.b) - minY) < 1e-6)!;
+  };
+  const doorEvent = (p: Project, doorId: string): SimInput => ({ person: null, moving: false, doorMotion: doorMotionPoints(derivePlan(p), doorId) });
+
+  it('opening a door in sight makes the sensor report motion and switches the light', () => {
+    const p = twoRooms();
+    const doorId = addOpening(p, bottomWall(p, 0).id, 'door', 2.0, { open: false })!;
+    setOpeningOpen(p, doorId, true);
+    let s = initialState(p, 22);
+    s = run(p, s, 2, doorEvent(p, doorId));
+    expect(s.entities.m.on).toBe(true);
+    expect(s.entities.b).toMatchObject({ on: true });
+    expect(s.events.some((e) => e.text === 'Melder Flur: Bewegung erkannt (Tür)')).toBe(true);
+  });
+
+  it('closing a door in sight reports motion as well', () => {
+    const p = twoRooms();
+    const doorId = addOpening(p, bottomWall(p, 0).id, 'door', 2.0, { open: true })!;
+    setOpeningOpen(p, doorId, false);
+    const s = run(p, initialState(p, 22), 2, doorEvent(p, doorId));
+    expect(s.entities.m.on).toBe(true);
+  });
+
+  it('a door behind a wall or outside the viewing angle is not seen', () => {
+    const p = twoRooms();
+    const other = addOpening(p, bottomWall(p, 1).id, 'door', 2.0, { open: true })!;
+    expect(run(p, initialState(p, 22), 2, doorEvent(p, other)).entities.m.on).toBe(false);
+    const near = addOpening(p, bottomWall(p, 0).id, 'door', 2.0, { open: true })!;
+    p.devices[0] = { ...p.devices[0], rotation: Math.PI }; // looks away from the door
+    expect(run(p, initialState(p, 22), 2, doorEvent(p, near)).entities.m.on).toBe(false);
   });
 });
