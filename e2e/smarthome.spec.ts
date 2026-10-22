@@ -273,3 +273,29 @@ test('Smart Home (#253): Router setzen, WLAN-Abdeckung im Plan, Wert je Raum, zw
   await expect(page.getByTestId('wifi-overlay')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('Smart-Home-Vorschlag (#225): Vorschau, Verwerfen ändert nichts, Übernehmen setzt Geräte', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  await panel.getByLabel('Für').selectOption('all');
+  await panel.getByTestId('sh-suggest').click();
+  await expect(panel.getByTestId('sh-suggest-item').first()).toBeVisible();
+  await expect(panel.getByTestId('sh-suggest-cost')).toContainText('€');
+  expect(await page.getByTestId('device-preview').count()).toBeGreaterThan(0);
+  expect((await getProject(page)).devices).toHaveLength(0);
+
+  await panel.getByTestId('sh-suggest-discard').click();
+  await expect(page.getByTestId('device-preview')).toHaveCount(0);
+  expect((await getProject(page)).devices).toHaveLength(0);
+
+  await panel.getByTestId('sh-suggest').click();
+  const n = await panel.getByTestId('sh-suggest-item').count();
+  await panel.getByTestId('sh-suggest-apply').click();
+  await expect(page.getByTestId('device-2d')).toHaveCount(n);
+  expect((await getProject(page)).devices).toHaveLength(n);
+  expect(errors).toEqual([]);
+});

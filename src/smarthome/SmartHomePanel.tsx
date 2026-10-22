@@ -13,6 +13,9 @@ import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
 import { ruleSentence } from './rules';
 import { formatSimHour, occludersOf, roomCoverage } from './simulation';
+import { suggestSmartHome } from './suggest';
+import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
+import { useFurnishStore } from '../suggest/furnishStore';
 import { WifiSection } from './WifiPanel';
 import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
@@ -103,6 +106,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
 
   return (
     <>
+      <SuggestSection project={project} room={room} />
       <Section title="Gerät hinzufügen">
         <div className={css.kinds} role="group" aria-label="Geräteart">
           {KINDS.map((k) => (
@@ -158,6 +162,74 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
       <DeviceList project={project} derived={derived} />
       <WifiSection project={project} />
     </>
+  );
+}
+
+/** „Smart Home vorschlagen“ (#225): basic equipment for one room or the whole flat as a preview in the plan. */
+function SuggestSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const preview = useSmartSuggestStore((s) => s.preview);
+  const setPreview = useSmartSuggestStore((s) => s.setPreview);
+  const roomTypes = useFurnishStore((s) => s.roomTypes);
+  const [scope, setScope] = useState<'room' | 'all'>('room');
+  const roomName = (id: string) => project.rooms.find((r) => r.id === id)?.name ?? '';
+  const propose = () => {
+    const ids = scope === 'room' && room ? [room.id] : undefined;
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const s = suggestSmartHome(project, ids, roomTypes);
+    setPreview(s);
+    if (!s.items.length) ui.toast('Nichts mehr vorzuschlagen – die Räume sind schon ausgestattet.', 'info');
+  };
+  const price = (c: { min: number; max: number }) => (c.min === c.max ? `${c.min.toFixed(2)} €` : `${c.min.toFixed(0)}–${c.max.toFixed(0)} €`);
+  return (
+    <Section title="Smart Home vorschlagen">
+      <p className="muted small">Grundausstattung nach Raumart: Melder dort, wo sie laut Datenblatt den Raum abdecken, Kontakte an Fenstern und Außentüren, vorhandene Lampen smart. Erst Vorschau, dann übernehmen oder verwerfen.</p>
+      <SelectField
+        label="Für"
+        value={scope}
+        options={[
+          { value: 'room', label: `Nur „${room?.name ?? '–'}“` },
+          { value: 'all', label: 'Ganze Wohnung' },
+        ]}
+        onChange={(v) => setScope(v as 'room' | 'all')}
+      />
+      <button className="primary block" onClick={propose} disabled={!room} data-testid="sh-suggest">
+        Vorschlag zeigen
+      </button>
+      {preview && preview.items.length > 0 && (
+        <div data-testid="sh-suggest-result">
+          <ul className={css.list}>
+            {preview.items.map((it) => (
+              <li key={it.key} className="small" data-testid="sh-suggest-item" data-kind={it.kind}>
+                <strong>{it.name}</strong> – {it.reason}
+              </li>
+            ))}
+          </ul>
+          {preview.coverage.map((c) => (
+            <p key={c.roomId} className="small" data-testid="sh-suggest-coverage">
+              {roomName(c.roomId)}: {Math.round(c.before * 100)} % → {Math.round(c.after * 100)} % erfasst
+            </p>
+          ))}
+          <p className="small" data-testid="sh-suggest-cost">
+            Kosten (Schätzung, Preise vor dem Kauf prüfen): {price(preview.cost)}
+            {preview.cost.unknown > 0 && ` + ${preview.cost.unknown} Gerät(e) ohne Preisangabe`}
+          </p>
+          {preview.later.map((l) => (
+            <p key={l.roomId} className="muted small">
+              {roomName(l.roomId)}: {l.text}
+            </p>
+          ))}
+          <div className="btn-row">
+            <button className="primary" onClick={() => applySmartHomeSuggestion(preview)} data-testid="sh-suggest-apply">
+              Übernehmen
+            </button>
+            <button onClick={() => setPreview(null)} data-testid="sh-suggest-discard">
+              Verwerfen
+            </button>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
