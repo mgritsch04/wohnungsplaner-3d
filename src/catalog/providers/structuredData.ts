@@ -30,6 +30,13 @@ export interface ParsedProductPage extends NormalizedProduct {
   categoryHints: string[];
   /** Shape details from the page text (#273): table base, round top, colour words, part sizes. */
   features: ProductFeatures;
+  /** Names of all products found in structured data (index = `options.productIndex`); more than one means a multi-product page. */
+  productCandidates: string[];
+}
+
+export interface ParseOptions {
+  /** Take this product from a multi-product page instead of the automatically chosen one. */
+  productIndex?: number;
 }
 
 export const MAX_INPUT_CHARS = 15_000_000;
@@ -55,7 +62,7 @@ export function detectInputKind(input: string): InputKind {
   return 'text';
 }
 
-export function parseProductPage(input: string, pageUrl?: string): ParsedProductPage {
+export function parseProductPage(input: string, pageUrl?: string, options: ParseOptions = {}): ParsedProductPage {
   const warnings: string[] = [];
   const errors: string[] = [];
   const sources: string[] = [];
@@ -70,7 +77,10 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   let modelUrl: string | null = null;
   const models: string[] = [];
   const breadcrumbs: string[] = [];
+  const embeddedProducts: Json[] = [];
   let heading: string | null = null;
+  let pageTitle: string | null = null;
+  let scriptChars = 0;
 
   if (kind === 'empty') errors.push('Bitte den Seitenquelltext oder JSON-Daten einfügen.');
   if (kind === 'url') {
@@ -106,11 +116,17 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
         breadcrumbs.push(...r.breadcrumbs);
         errors.push(...r.errors);
       } else if (type === 'application/json' || type === '' || type === 'text/javascript' || type === 'module') {
-        // embedded page state – used only as a secondary source for dimension lines
+        // embedded page state (e.g. __NEXT_DATA__): product objects, else a secondary source for dimension lines
+        scriptChars += text.length;
         embeddedText += ' ' + unescapeJsonText(text);
+        if (type === 'application/json') embeddedProducts.push(...findEmbeddedProducts(text));
       }
     }
     if (products.length) sources.push('JSON-LD');
+    else if (embeddedProducts.length) {
+      products = embeddedProducts;
+      sources.push('Produktdaten in eingebetteten Seitendaten');
+    }
     if (!models.length) {
       // no standard declaration: look for other references (experimental heuristics)
       modelUrl = findModelUrl(doc, input);
@@ -118,6 +134,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     }
     meta = readMeta(doc);
     heading = doc.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || null;
+    pageTitle = titleName(doc.querySelector('title')?.textContent);
     if (Object.keys(meta).length) sources.push('Meta-Angaben');
     visibleText = visibleTextOf(doc);
     if (!products.length && block === 0 && !meta.name) {
@@ -136,7 +153,12 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   }
   // several products (e.g. recommendations on the same page): take the one the page is about
   let p = products[0] ?? null;
-  if (products.length > 1) {
+  const productCandidates = products.map((q) => str(q.name) ?? '?');
+  const chosen = options.productIndex !== undefined ? products[options.productIndex] : undefined;
+  if (chosen) {
+    p = chosen;
+    warnings.push(`${products.length} Produkte auf der Seite – ausgewählt: „${str(p.name) ?? '?'}“.`);
+  } else if (products.length > 1) {
     const main = primaryProduct(products, pageUrl?.trim() || meta.url || null, [meta.name, heading]);
     if (main) {
       p = main.product;
@@ -173,6 +195,18 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     amount = parseNumber(String(simple.price));
     currency = str(simple.currency) ?? 'EUR';
   }
+  if (amount === null && kind === 'html') {
+    // no structured price: accept a price from the text only if the page shows exactly one
+    const prices = pricesFromText(visibleText);
+    if (prices.length === 1) {
+      amount = prices[0];
+      currency = 'EUR';
+      sources.push('Preis im Seitentext');
+      warnings.push('Preis stammt aus dem Seitentext (keine strukturierten Daten) – bitte prüfen.');
+    } else if (prices.length > 1) {
+      warnings.push(`Im Seitentext stehen ${prices.length} verschiedene Preise – kein Preis übernommen, bitte selbst eintragen.`);
+    }
+  }
   const price = amount !== null && currency ? { amount, currency: currency.toUpperCase(), status: 'source' as FieldStatus } : null;
   if (amount !== null && !currency) warnings.push('Preis ohne Währungsangabe gefunden – nicht übernommen.');
   if (price && price.currency !== 'EUR') warnings.push(`Preis in ${price.currency}, nicht in EUR.`);
@@ -206,7 +240,19 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
   const imageFromLd = Array.isArray(p?.image) ? str(p?.image[0]) : (str((p?.image as Json)?.url) ?? str(p?.image));
   const image = imageFromLd ?? meta.image ?? str(simple?.imageUrl);
   const brand = str((p?.brand as Json)?.name) ?? str(p?.brand) ?? meta.brand ?? null;
-  const name = str(p?.name) ?? meta.name ?? str(simple?.name) ?? null;
+  const nameFromPage = !p && !meta.name ? (heading ?? pageTitle) : null;
+  const name = str(p?.name) ?? meta.name ?? str(simple?.name) ?? nameFromPage;
+  if (nameFromPage) {
+    sources.push(heading ? 'Seitenüberschrift (h1)' : 'Seitentitel');
+    warnings.push(`Name stammt aus ${heading ? 'der Seitenüberschrift' : 'dem Seitentitel'} – bitte prüfen.`);
+  }
+  if (kind === 'html' && !p && !name && width === null && depth === null && dimensions.height === null) {
+    errors.push(
+      scriptChars > 20_000 || visibleText.length < 300
+        ? 'In diesem Quelltext stehen keine Produktdaten. Die Seite lädt ihre Inhalte vermutlich erst per JavaScript nach. Bitte die Seite fertig laden lassen, den sichtbaren Text markieren und kopieren (Option „Seitentext“) oder Name, Preis und Maße selbst eintragen.'
+        : 'Im eingefügten Quelltext wurden weder Produktdaten noch Maße gefunden. Bitte prüfen, ob es die Produktseite ist, oder Name, Preis und Maße selbst eintragen.',
+    );
+  }
   const quality = name && price && missingDims.length === 0 ? 'complete-from-source' : name ? 'partial' : 'insufficient';
   return {
     provider: provider.id,
@@ -230,6 +276,7 @@ export function parseProductPage(input: string, pageUrl?: string): ParsedProduct
     sources,
     modelCandidates: models,
     categoryHints: [...new Set([...breadcrumbs, ...categoryLabels(p?.category), ...(meta.category ? [meta.category] : [])])],
+    productCandidates,
     features: {
       ...featuresFromText(`${visibleText}\n${str(p?.description) ?? ''}`, name),
       // only a diameter stated (#269) → a round product
@@ -517,7 +564,15 @@ export function dimsFromText(text: string): { width: number | null; depth: numbe
       'iu',
     );
     const m = text.match(re);
-    if (!m) return { v: null as number | null, src: '' };
+    if (!m) {
+      // unit in the label, e.g. "Breite (cm): 80" or "Höhe in mm: 800"
+      const lre = new RegExp(`(?<![\\p{L}])(?:gesamt-?)?(?:${labels})(?![\\p{L}])\\s*(?:\\(\\s*(cm|mm|m)\\s*\\)|in\\s+(cm|mm|m)(?![\\p{L}]))\\s*[:=]?\\s*(?:ca\\.?\\s*)?${NUM}${range ? `(?:\\s*[-–]\\s*${NUM})?` : '()'}`, 'iu');
+      const l = text.match(lre);
+      if (!l) return { v: null as number | null, src: '' };
+      const ln = parseNumber(l[4] || l[3])!;
+      const lu = (l[1] || l[2]).toLowerCase();
+      return { v: lu === 'mm' ? ln / 10 : lu === 'm' ? ln * 100 : ln, src: l[0].trim() };
+    }
     const n = parseNumber(m[2] || m[1])!;
     const unit = m[3].toLowerCase();
     return { v: unit === 'mm' ? n / 10 : unit === 'm' ? n * 100 : n, src: m[0].trim() };
@@ -541,4 +596,43 @@ export function dimsFromText(text: string): { width: number | null; depth: numbe
     }
   }
   return { width, depth, height, diameter: dia.v, sourceText: sources.length ? sources.join(' · ') : undefined };
+}
+
+/** Product name from a page title like "Sessel Klippan | Shop" → "Sessel Klippan". */
+function titleName(t: string | null | undefined): string | null {
+  const first = (t ?? '').replace(/\s+/g, ' ').split(/\s+[|–—]\s+/)[0].trim();
+  return first || null;
+}
+
+/** Distinct euro amounts in visible text ("129,00 €", "€ 1.299,-", "EUR 49,90"). */
+export function pricesFromText(text: string): number[] {
+  const out = new Set<number>();
+  const AMT = '(\\d{1,3}(?:\\.\\d{3})*(?:,\\d{2}|,-)?|\\d+(?:,\\d{2}|,-)?)';
+  for (const re of [new RegExp(`${AMT}\\s*(?:€|EUR)`, 'g'), new RegExp(`(?:€|EUR)\\s*${AMT}`, 'g')]) {
+    for (const m of text.matchAll(re)) {
+      const n = parseNumber(m[1].replace(/,-$/, '').replace(/^(\d{1,3}(?:\.\d{3})+)$/, (t) => t.replace(/\./g, '')));
+      if (n !== null && n > 0) out.add(n);
+    }
+  }
+  return [...out];
+}
+
+/** Objects of type Product inside embedded JSON page state (e.g. `__NEXT_DATA__`), depth-limited. */
+function findEmbeddedProducts(raw: string): Json[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const out: Json[] = [];
+  const visit = (node: unknown, depth: number) => {
+    if (!node || typeof node !== 'object' || depth > 12 || out.length >= 50) return;
+    if (Array.isArray(node)) return node.forEach((n) => visit(n, depth + 1));
+    const o = node as Json;
+    if (typeNames(o).includes('Product') && str(o.name)) out.push(o);
+    for (const v of Object.values(o)) visit(v, depth + 1);
+  };
+  visit(value, 0);
+  return out;
 }
