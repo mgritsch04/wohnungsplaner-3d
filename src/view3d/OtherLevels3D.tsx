@@ -49,7 +49,6 @@ const OtherLevel = memo(function OtherLevel({ project, level, offset, quality, s
   const view = useMemo(() => projectOnLevel(project, level.id), [level.plan, project.materials, project.settings.defaultWallHeight]);
   const derived = useMemo(() => derivePlan(view), [view]);
   const wellsKey = JSON.stringify(stairwells(project, level.id));
-   
   const wells = useMemo(() => JSON.parse(wellsKey) as ReturnType<typeof stairwells>, [wellsKey]);
   const group = useRef<THREE.Group>(null);
   const seen = useRef(-1);
