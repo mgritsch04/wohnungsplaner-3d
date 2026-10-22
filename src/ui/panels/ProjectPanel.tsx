@@ -13,6 +13,7 @@ import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
 import { DaylightSection } from './DaylightSection';
+import { MotionControl } from '../MotionControl';
 import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
@@ -30,6 +31,7 @@ export function ProjectPanel() {
     <div className="panel-scroll">
       <Section title="Oberfläche">
         <ThemeControl />
+        <MotionControl />
       </Section>
 
       <Section title="Licht & Darstellung (3D)">
