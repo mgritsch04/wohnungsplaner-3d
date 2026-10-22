@@ -15,6 +15,7 @@ import { ThemeControl } from '../ThemeControl';
 import { DaylightSection } from './DaylightSection';
 import { HeatingSection } from './HeatingSection';
 import { CircuitsSection } from '../../installation/CircuitsSection';
+import { MoveChecklistSection } from '../../planning/TaskSections';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
 import { InfoHint } from '../InfoHint';
@@ -79,6 +80,7 @@ export function ProjectPanel() {
       <HeatingSection />
 
       <CircuitsSection />
+      <MoveChecklistSection project={project} />
 
       <SightlineSection />
 

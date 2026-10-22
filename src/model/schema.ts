@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -483,6 +483,25 @@ export const CameraBookmarkSchema = z.object({
   cutaway: z.boolean().optional(),
 });
 
+/** Short note pinned to a room or a piece of furniture (#83); shown as a pin in the 2D plan. */
+export const NoteSchema = z.object({
+  id: z.string().min(1),
+  target: z.object({ type: z.enum(['room', 'furniture']), id: z.string().min(1) }),
+  text: z.string().max(500),
+});
+
+/**
+ * Checkable to-do. With `roomId` it belongs to that room's task list (#84); without it, it is a
+ * step of the project-wide moving checklist (#91). `due` is an optional date (YYYY-MM-DD).
+ */
+export const TaskSchema = z.object({
+  id: z.string().min(1),
+  roomId: z.string().min(1).optional(),
+  text: z.string().max(200),
+  done: z.boolean().default(false),
+  due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -512,6 +531,9 @@ export const ProjectSchema = z.object({
   /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
   circuits: z.array(CircuitSchema).default([]),
   loads: z.array(LoadSchema).default([]),
+  /** Notes as pins (#83), room task lists (#84) and the moving checklist (#91, tasks without roomId); schema 4. */
+  notes: z.array(NoteSchema).default([]),
+  tasks: z.array(TaskSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -536,6 +558,8 @@ export type FixtureKind = z.infer<typeof FixtureKindSchema>;
 export type Fixture = z.infer<typeof FixtureSchema>;
 export type Circuit = z.infer<typeof CircuitSchema>;
 export type Load = z.infer<typeof LoadSchema>;
+export type Note = z.infer<typeof NoteSchema>;
+export type Task = z.infer<typeof TaskSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;
