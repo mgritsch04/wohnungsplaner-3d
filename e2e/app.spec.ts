@@ -4340,7 +4340,7 @@ test('walkthrough: F still works after a slider or checkbox had focus; text fiel
     document.body.appendChild(i);
     i.focus();
   });
-  await page.keyboard.press('e');
+  await page.keyboard.press('f');
   await expect(page.getByText('Eingabefeld aktiv')).toBeVisible();
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('probe-text');
