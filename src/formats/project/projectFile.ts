@@ -19,6 +19,8 @@ export const PROJECT_MIGRATIONS: Record<number, Migration> = {
   1: (raw) => ({ ...raw, schemaVersion: 2, devices: raw.devices ?? [], automations: raw.automations ?? [] }),
   // 2 → 3 (#80): optional wall assembly (Wall.assembly) – nothing to convert
   2: (raw) => ({ ...raw, schemaVersion: 3 }),
+  // 3 → 4 (#83, #84, #91): notes and tasks (room task lists + moving checklist)
+  3: (raw) => ({ ...raw, schemaVersion: 4, notes: raw.notes ?? [], tasks: raw.tasks ?? [] }),
 };
 
 export function migrateProjectObject(raw: unknown): Record<string, unknown> {

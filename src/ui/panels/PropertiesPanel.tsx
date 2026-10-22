@@ -17,6 +17,8 @@ import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnit
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
+import { NotesSection } from '../../planning/NotesSection';
+import { RoomTasksSection } from '../../planning/TaskSections';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
@@ -319,6 +321,8 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
         <MaterialSelect label="Wände" value={r.wallMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'tile', 'wood', 'stone']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.wallMaterialId = m))} />
         <MaterialSelect label="Decke" value={r.ceilingMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'wood']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.ceilingMaterialId = m))} />
       </PanelGroup>
+      <RoomTasksSection project={project} roomId={id} />
+      <NotesSection project={project} type="room" targetId={id} />
       <div className="btn-row padded">
         <button onClick={() => void deleteSelection()}>Raum entfernen (Wände behalten)</button>
         <button
@@ -655,6 +659,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
         <CheckField label="Bestand (schon in der Wohnung, nicht im Budget)" checked={f.existing} onChange={(v) => upd((x) => (x.existing = v))} />
       </PanelGroup>
+      <NotesSection project={project} type="furniture" targetId={id} />
       <div className="btn-row padded">
         <span className="rotate-group" role="group" aria-label="Drehen">
           <button onClick={() => (group ? rotateSelection(-Math.PI / 2) : setFurnitureRotation(f.id, f.rotation - Math.PI / 2))} disabled={f.locked} title="90° gegen den Uhrzeigersinn">

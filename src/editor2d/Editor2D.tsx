@@ -28,6 +28,7 @@ import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
+import { NotePins2D } from '../planning/NotePins2D';
 import { SightlineOverlay } from './SightlineOverlay';
 import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
@@ -910,6 +911,7 @@ export function Editor2D() {
           <WifiOverlay2D project={project} />
           <Fixtures2D project={project} px={px} />
           <DevicesOverlay2D project={project} px={px} />
+          <NotePins2D project={project} derived={derived} px={px} />
 
           {/* node handles */}
           {(tool === 'select' || tool === 'wall') &&
