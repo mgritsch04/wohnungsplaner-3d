@@ -5,6 +5,7 @@ import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
+import type { WifiBand } from './wifi';
 import { doorMotionPoints, initialState, lightOverrides, occludersOf, step, withHour, type Occluder, type SimState } from './simulation';
 
 /** Device waiting to be placed by a click into the 2D plan (#233). */
@@ -30,6 +31,11 @@ interface SimStore {
   /** open step of the Smart Home tab */
   step: PanelStep;
   setStep: (s: PanelStep) => void;
+  /** WLAN coverage layer in the 2D plan (#253) and its band */
+  wifiOn: boolean;
+  wifiBand: WifiBand;
+  setWifi: (on: boolean) => void;
+  setWifiBand: (b: WifiBand) => void;
   start: () => void;
   stop: () => void;
   setSpeed: (s: number) => void;
@@ -102,6 +108,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
   flash: null,
   step: 'devices',
   setStep: (step) => set({ step }),
+  wifiOn: false,
+  wifiBand: '2.4',
+  setWifi: (wifiOn) => set({ wifiOn }),
+  setWifiBand: (wifiBand) => set({ wifiBand }),
   start: () => {
     if (get().running) return;
     const project = useProjectStore.getState().project;

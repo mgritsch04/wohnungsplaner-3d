@@ -52,6 +52,7 @@ export function statusLabel(d: SmartDevice, on: boolean, brightness?: number): s
   if (d.kind === 'contact') return on ? 'offen' : 'zu';
   if (d.kind === 'light') return on ? `an ${brightness ?? 100} %` : 'aus';
   if (d.kind === 'plug') return on ? 'an' : 'aus';
+  if (d.kind === 'router') return 'sendet';
   return on ? 'Bewegung' : 'ruhig';
 }
 

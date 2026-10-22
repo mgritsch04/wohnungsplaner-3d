@@ -13,6 +13,7 @@ import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
 import { ruleSentence } from './rules';
 import { formatSimHour, occludersOf, roomCoverage } from './simulation';
+import { WifiSection } from './WifiPanel';
 import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
 
@@ -136,6 +137,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
         )}
       </Section>
       <DeviceList project={project} derived={derived} />
+      <WifiSection project={project} />
     </>
   );
 }

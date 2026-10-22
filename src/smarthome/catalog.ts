@@ -165,9 +165,10 @@ export const KIND_LABEL: Record<SmartDeviceKind, string> = {
   contact: 'Tür-/Fensterkontakt',
   light: 'Smarte Lampe',
   plug: 'Smarte Steckdose',
+  router: 'Router / Access Point',
 };
 
 export const productById = (id: string | undefined): DeviceProduct | undefined => (id ? DEVICE_PRODUCTS.find((p) => p.id === id) : undefined);
 
 /** Default mounting height (m) per kind. */
-export const DEFAULT_ELEVATION: Record<SmartDeviceKind, number> = { motion: 2.1, presence: 2.1, contact: 1.2, light: 2.3, plug: 0.3 };
+export const DEFAULT_ELEVATION: Record<SmartDeviceKind, number> = { motion: 2.1, presence: 2.1, contact: 1.2, light: 2.3, plug: 0.3, router: 1.5 };
