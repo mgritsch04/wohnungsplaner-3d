@@ -2234,3 +2234,36 @@ code {
 .color-auto[aria-pressed='true'] {
   border-color: var(--color-accent);
 }
+
+/* Info-Symbole mit kurzer Erklärung (#79) */
+.info-hint {
+  display: inline;
+}
+.info-hint-btn {
+  padding: 0 var(--space-1);
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: inherit;
+  line-height: 1;
+}
+.info-hint-btn:hover,
+.info-hint-btn[aria-expanded='true'] {
+  color: var(--color-accent, currentColor);
+}
+.info-hint-text {
+  display: block;
+  margin-top: var(--space-0);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+.term-list dt {
+  font-weight: 600;
+  margin-top: var(--space-1);
+}
+.term-list dd {
+  margin: 0;
+}

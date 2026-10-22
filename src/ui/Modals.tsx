@@ -10,6 +10,7 @@ import { ProductImportModal } from './ProductImportModal';
 import { ModelImportModal } from './ModelImportModal';
 import { BugReportModal } from './BugReportModal';
 import { SHORTCUT_GROUPS } from './shortcutCatalog';
+import { HELP_TEXTS } from './helpTexts';
 import { VersionsModal } from '../versions/VersionsModal';
 
 export function ModalHost() {
@@ -191,6 +192,15 @@ function HelpModal() {
           </section>
         ))}
       </div>
+      <h3>Begriffe</h3>
+      <dl className="term-list">
+        {Object.entries(HELP_TEXTS).map(([id, t]) => (
+          <Fragment key={id}>
+            <dt>{t.term}</dt>
+            <dd className="small">{t.text}</dd>
+          </Fragment>
+        ))}
+      </dl>
       <h3>Koordinaten & Einheiten</h3>
       <p className="small">
         Alle Maße werden intern in Metern gespeichert und in Zentimetern angezeigt. Im Grundriss zeigt x nach rechts und y nach unten; in 3D ist die Höhe die Y-Achse. Raummaße im
