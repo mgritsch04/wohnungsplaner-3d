@@ -9,6 +9,7 @@ import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
 import { checkScale, scaleCheckMessage } from '../dimensions';
+import { applyDoorWidths, JAMB_ALLOWANCE } from '../doorWidths';
 import { balconyDoors, outdoorRailings, type AreaOutline } from '../outdoor';
 import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } from '../rooms';
 import { pointInPolygon } from '../../model/vec';
@@ -68,6 +69,13 @@ export async function runRecognition() {
       const before = draft.openings.filter(isGlassDoor).length;
       draft.openings = balconyDoors(draft.openings, texts, roomInteriors(draft.walls));
       if (draft.openings.filter(isGlassDoor).length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als bodentiefe Glastüren übernommen – bitte prüfen.');
+    }
+    // clear door width from the label ("80 / 200") or the gap minus jambs (#267)
+    {
+      const widths = applyDoorWidths(draft.openings, texts);
+      draft.openings = widths.openings;
+      if (widths.labelled + widths.reduced > 0)
+        draft.warnings.push(`Türbreiten: ${widths.labelled} aus der Beschriftung im Plan, ${widths.reduced} als Wandlücke minus Zarge (${Math.round(JAMB_ALLOWANCE * 100)} cm) geschätzt – bitte prüfen.`);
     }
     // fitted tub, basin and WC from their symbols (#255)
     if (analysis && analysis.imageAssetId === u.imageAssetId) {
