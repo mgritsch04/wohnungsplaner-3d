@@ -10,6 +10,8 @@ const distToSeg = (p: Vec2, a: Vec2, b: Vec2) => closestPointOnSegment(p, a, b).
 import type { DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from '../../import/draft';
 import { FileFormatError, formatZodError } from '../zodErrors';
 import { FLOORPLAN_FORMAT, FLOORPLAN_VERSION, FloorPlanSchema, type FloorPlanFile } from './schema';
+import { createFurnitureFromCatalog } from '../../catalog/instantiate';
+import { findCatalogItem } from '../../catalog/generic';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
 import { buildIndex } from '../../model/graph';
 
@@ -149,6 +151,7 @@ export function floorPlanToDraft(fp: FloorPlanFile, sourceName: string): Reconst
     approximate: true,
     solid: true,
     locked: false,
+    existing: false,
   }));
 
   return {
@@ -170,6 +173,7 @@ export interface ApplyResult {
   wallsAdded: number;
   openingsAdded: number;
   roomsAdded: number;
+  fixturesAdded: number;
 }
 
 /** Insert the ACCEPTED draft elements into the project draft (mutates `d`). */
@@ -246,7 +250,16 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     }
   }
   for (const f of draft.furniture) d.furniture.push(structuredClone(f));
-  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded };
+  let fixturesAdded = 0;
+  for (const x of draft.fixtures ?? []) {
+    const item = x.accepted ? findCatalogItem(x.catalogId) : undefined;
+    if (!item) continue;
+    // fitted objects: from the generic catalog (no invented products), measured size, no price
+    const f = createFurnitureFromCatalog({ ...item, width: x.width, depth: x.depth, price: undefined }, { x: x.center.x, y: x.center.y, rotation: x.rotation });
+    d.furniture.push({ ...f, existing: true });
+    fixturesAdded++;
+  }
+  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded, fixturesAdded };
 }
 
 /** Export the project's architecture (and optionally furniture) as apartment-plan.json. */

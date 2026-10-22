@@ -253,6 +253,8 @@ function UnderlayControls() {
 const STATUS_LABEL: Record<DraftStatus, string> = { confirmed: 'bestätigt', estimated: 'geschätzt', uncertain: 'unsicher' };
 const STATUS_KIND: Record<DraftStatus, 'ok' | 'warn' | 'error'> = { confirmed: 'ok', estimated: 'warn', uncertain: 'error' };
 
+const FIXTURE_LABELS: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC' };
+
 function DraftReview() {
   const draft = useImportStore((s) => s.draft)!;
   const selected = useImportStore((s) => s.selected);
@@ -262,11 +264,13 @@ function DraftReview() {
     walls: draft.walls.filter((w) => w.accepted).length,
     openings: draft.openings.filter((o) => o.accepted).length,
     rooms: draft.rooms.filter((r) => r.accepted).length,
+    fixtures: (draft.fixtures ?? []).filter((x) => x.accepted).length,
   };
   const sel = selected;
   const selWall = sel?.type === 'wall' ? draft.walls.find((w) => w.id === sel.id) : undefined;
   const selOpening = sel?.type === 'opening' ? draft.openings.find((o) => o.id === sel.id) : undefined;
   const selRoom = sel?.type === 'room' ? draft.rooms.find((r) => r.id === sel.id) : undefined;
+  const selFixture = sel?.type === 'fixture' ? draft.fixtures?.find((x) => x.id === sel.id) : undefined;
 
   return (
     <div className="panel-scroll">
@@ -275,7 +279,7 @@ function DraftReview() {
           Quelle: <strong>{draft.sourceName}</strong> ({draft.source === 'json' ? 'JSON-Datei' : draft.source === 'pdf-vector' ? 'PDF-Vektordaten' : 'Bilderkennung'})
         </p>
         <p className="small">
-          Ausgewählt: {accepted.walls}/{draft.walls.length} Wände · {accepted.openings}/{draft.openings.length} Öffnungen · {accepted.rooms}/{draft.rooms.length} Räume
+          Ausgewählt: {accepted.walls}/{draft.walls.length} Wände · {accepted.openings}/{draft.openings.length} Öffnungen · {accepted.rooms}/{draft.rooms.length} Räume{draft.fixtures?.length ? ` · ${accepted.fixtures}/${draft.fixtures.length} Sanitärobjekte` : ''}
         </p>
         <div className="legend small">
           <span className="lg lg-confirmed" /> bestätigt <span className="lg lg-estimated" /> geschätzt <span className="lg lg-uncertain" /> unsicher
@@ -295,7 +299,7 @@ function DraftReview() {
           <button onClick={() => st().setAllAccepted(false)}>Keine</button>
         </div>
         <div className="btn-row">
-          <button className="primary" onClick={() => void acceptDraft()} disabled={accepted.walls + accepted.openings + accepted.rooms === 0}>
+          <button className="primary" onClick={() => void acceptDraft()} disabled={accepted.walls + accepted.openings + accepted.rooms + accepted.fixtures === 0}>
             In Plan übernehmen
           </button>
           <button onClick={() => st().setDraft(null)}>Verwerfen</button>
@@ -387,6 +391,32 @@ function DraftReview() {
         </Section>
       )}
 
+      {selFixture && (
+        <Section title="Ausgewähltes Sanitärobjekt" actions={<Badge kind={STATUS_KIND[selFixture.status]}>{STATUS_LABEL[selFixture.status]}</Badge>}>
+          {selFixture.note && <p className="muted small">{selFixture.note}</p>}
+          <p className="muted small">Wird als Bestand übernommen: steht im Plan, aber nicht in Budget und Einkaufsliste.</p>
+          <SelectField
+            label="Art"
+            value={selFixture.catalogId}
+            options={Object.entries(FIXTURE_LABELS).map(([value, label]) => ({ value, label }))}
+            onChange={(catalogId) => st().updateFixture(selFixture.id, { catalogId, name: FIXTURE_LABELS[catalogId] })}
+          />
+          <div className="field-grid">
+            <NumberField label="Mitte X" value={selFixture.center.x} factor={100} unit="cm" onChange={(v) => st().updateFixture(selFixture.id, { center: { ...selFixture.center, x: v } })} />
+            <NumberField label="Mitte Y" value={selFixture.center.y} factor={100} unit="cm" onChange={(v) => st().updateFixture(selFixture.id, { center: { ...selFixture.center, y: v } })} />
+            <NumberField label="Breite" value={selFixture.width} factor={100} unit="cm" min={10} max={300} onChange={(v) => st().updateFixture(selFixture.id, { width: v })} />
+            <NumberField label="Tiefe" value={selFixture.depth} factor={100} unit="cm" min={10} max={300} onChange={(v) => st().updateFixture(selFixture.id, { depth: v })} />
+            <NumberField label="Drehung" value={Math.round((selFixture.rotation * 180) / Math.PI)} unit="°" min={-360} max={360} onChange={(v) => st().updateFixture(selFixture.id, { rotation: (v * Math.PI) / 180 })} />
+          </div>
+          <ElementActions
+            accepted={selFixture.accepted}
+            onToggle={() => st().updateFixture(selFixture.id, { accepted: !selFixture.accepted })}
+            onConfirm={() => st().updateFixture(selFixture.id, { status: 'confirmed' })}
+            onRemove={() => st().removeElement('fixture', selFixture.id)}
+          />
+        </Section>
+      )}
+
       <Section title="Elemente">
         <ul className="draft-list">
           {draft.walls.map((w, i) => (
@@ -400,6 +430,10 @@ function DraftReview() {
           {draft.rooms.map((r) => (
             <DraftRow key={r.id} label={`Raum „${r.name}“${r.area !== undefined ? ` · ${formatArea(r.area)}` : ''}`} status={r.status} accepted={r.accepted} active={sel?.id === r.id}
               onSelect={() => st().select({ type: 'room', id: r.id })} onToggle={() => st().updateRoom(r.id, { accepted: !r.accepted })} />
+          ))}
+          {(draft.fixtures ?? []).map((x) => (
+            <DraftRow key={x.id} label={`${x.name} (Bestand) · ${Math.round(x.width * 100)} × ${Math.round(x.depth * 100)} cm`} status={x.status} accepted={x.accepted} active={sel?.id === x.id}
+              onSelect={() => st().select({ type: 'fixture', id: x.id })} onToggle={() => st().updateFixture(x.id, { accepted: !x.accepted })} />
           ))}
         </ul>
         {draft.source !== 'json' && (

@@ -42,7 +42,9 @@ export interface BudgetSummary {
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
-export function computeBudget(items: Furniture[], roomOf?: RoomOf): BudgetSummary {
+export function computeBudget(all: Furniture[], roomOf?: RoomOf): BudgetSummary {
+  // fitted objects that came with the flat are not bought (#255)
+  const items = all.filter((f) => !f.existing);
   const lines: BudgetLine[] = items.map((f) => {
     const unit = f.price ? f.price.amount : null;
     const room = roomOf?.(f) ?? null;
