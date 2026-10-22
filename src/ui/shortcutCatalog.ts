@@ -133,6 +133,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Z / mittlere Maustaste', action: 'Zoom zurücksetzen (eingestelltes Sichtfeld)', match: ['KeyZ'] },
       { keys: 'Klick', action: 'Möbel im Fadenkreuz auswählen bzw. Tür/Fenster öffnen oder schließen; Klick ins Leere hebt die Auswahl auf', match: [] },
       { keys: 'G', action: 'Möbel tragen / absetzen', match: ['KeyG'] },
+      { keys: 'Q / E', action: 'Ausgewähltes Möbel um 15° drehen', match: ['KeyE'] },
       { keys: 'F / O', action: 'Tür oder Fenster im Fadenkreuz öffnen / schließen', match: ['KeyF', 'KeyO'] },
       { keys: 'Rechtsklick', action: 'Kontextmenü des Objekts im Fadenkreuz (gibt die Maus frei; danach wieder in die Ansicht klicken)', match: [] },
       { keys: 'Esc', action: 'Maus freigeben', match: [] },
