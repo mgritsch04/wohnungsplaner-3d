@@ -22,10 +22,9 @@ export function useShortcuts() {
       const ps = useProjectStore.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-      // walking keys (G = carry furniture #39, C = crouch #20, E/O = open the door/window in sight #21/#107,
-      // F = context menu at the crosshair #235, P = place the reference figure #263)
-      // belong to the walkthrough – there E does not rotate the selection
-      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'e', 'o', 'f', 'p'].includes(key) && !mod) return;
+      // walking keys (G = carry furniture #39, C = crouch #20, F/O = open the door/window in sight #21/#107/#257,
+      // P = place the reference figure #263) belong to the walkthrough; Q/E still rotate the selection there (#257)
+      if (ui.cameraMode === 'walk' && ui.viewMode !== '2d' && ['w', 'a', 's', 'd', 'g', 'c', 'o', 'f', 'p'].includes(key) && !mod) return;
       // W A S D / arrow keys move the 3D overview camera (#132) – handled in Scene3D, so W is not the wall tool there
       const furnitureSelected = ui.selection?.type === 'furniture';
       const comparing = useCompareStore.getState().session !== null;
