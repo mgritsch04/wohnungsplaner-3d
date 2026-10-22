@@ -20,7 +20,7 @@ export function slug(name: string): string {
   return s || 'geraet';
 }
 
-const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch' };
+const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch', router: 'device_tracker' };
 
 /** Entity id per device; duplicates get a numeric suffix. */
 export function entityIds(devices: SmartDevice[]): Map<string, string> {

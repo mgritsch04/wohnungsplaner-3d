@@ -256,7 +256,7 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
-export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug']);
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(100),

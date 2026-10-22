@@ -13,6 +13,7 @@ const SIZE: Record<SmartDevice['kind'], [number, number, number]> = {
   contact: [0.04, 0.12, 0.03],
   plug: [0.09, 0.09, 0.06],
   light: [0.12, 0.02, 0.12],
+  router: [0.16, 0.04, 0.12],
 };
 
 /**

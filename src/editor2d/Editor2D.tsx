@@ -32,6 +32,7 @@ import { SightlineOverlay } from './SightlineOverlay';
 import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
+import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
 import { groupBounds, groupCenter, groupName, moveGroupBy, rotateGroupPoses, selectedGroup, settleGroup, type GroupTurnResult } from '../model/groups';
@@ -904,6 +905,7 @@ export function Editor2D() {
           {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
+          <WifiOverlay2D project={project} />
           <DevicesOverlay2D project={project} px={px} />
 
           {/* node handles */}

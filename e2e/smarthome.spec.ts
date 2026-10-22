@@ -221,3 +221,55 @@ test('Smart Home (#282): Uhrzeit lÃ¤sst sich bei laufender Simulation von Hand Ã
   await page.getByLabel('Tageszeit', { exact: true }).fill('9');
   await expect.poll(async () => (await getProject(page)).settings.timeOfDay).toBe(9);
 });
+
+test('Smart Home (#253): Router setzen, WLAN-Abdeckung im Plan, Wert je Raum, zweiter Access Point verbessert, bleibt nach Reload', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  const dbm = async (room: string) => Number(await panel.locator(`[data-testid="wifi-room"][data-room="${room}"]`).getAttribute('data-dbm'));
+
+  await panel.getByLabel('Raum').selectOption({ label: 'Wohnzimmer' });
+  await panel.locator('[data-testid="device-kind"][data-kind="router"]').click();
+  await panel.getByTestId('device-add').click();
+  await expect(page.locator('[data-testid="device-2d"][data-device="Router / Access Point Wohnzimmer"]')).toBeVisible();
+
+  // off by default; on: colour layer, legend, value per room, estimate hint
+  await expect(page.getByTestId('wifi-overlay')).toHaveCount(0);
+  await panel.getByLabel('Abdeckung im Plan anzeigen').check();
+  await expect(page.getByTestId('wifi-overlay')).toBeVisible();
+  await expect(panel.getByTestId('wifi-hint')).toContainText('Messen mit dem Handy ersetzt das nicht');
+  const rooms = (await getProject(page)).rooms.map((r) => r.name);
+  await expect(panel.getByTestId('wifi-room')).toHaveCount(rooms.length);
+  await expect(panel.locator('[data-testid="wifi-room"][data-room="Wohnzimmer"]')).toHaveAttribute('data-level', 'good');
+  const far = rooms.filter((n) => n !== 'Wohnzimmer');
+  const near = await dbm('Wohnzimmer');
+  const values = await Promise.all(far.map(dbm));
+  expect(Math.min(...values)).toBeLessThan(near);
+
+  const weakest = far[values.indexOf(Math.min(...values))];
+  const before = await dbm(weakest);
+
+  // second access point in the weakest room improves it
+  await panel.getByLabel('Raum').selectOption({ label: weakest });
+  await panel.getByTestId('device-add').click();
+  const improved = await dbm(weakest);
+  expect(improved).toBeGreaterThan(before + 3);
+
+  // band 5 GHz is weaker
+  await panel.getByLabel('Band').selectOption('5');
+  expect(await dbm(weakest)).toBeLessThan(improved);
+
+  // survives save and reload
+  await page.waitForTimeout(800);
+  await page.reload();
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  expect((await getProject(page)).devices.filter((d) => d.kind === 'router')).toHaveLength(2);
+  await panel.getByLabel('Abdeckung im Plan anzeigen').check();
+  await panel.getByLabel('Band').selectOption('2.4');
+  expect(await dbm(weakest)).toBe(improved);
+  await expect(page.getByTestId('wifi-overlay')).toBeVisible();
+  expect(errors).toEqual([]);
+});
