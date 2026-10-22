@@ -4253,16 +4253,17 @@ test('walkthrough: field-of-view slider with quick choices, head bob, reference 
     await focusScene();
     await page.evaluate(() => (window as any).__wp.walk.look(0, 0));
     await page.keyboard.down('KeyW');
+    // sample densely over several bob periods so a single sample cannot land on the zero crossing
     const ys: number[] = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 40; i++) {
       ys.push(await page.evaluate(() => (window as any).__wp.three.camera.position.y as number));
-      await page.waitForTimeout(60);
+      await page.waitForTimeout(30);
     }
     await page.keyboard.up('KeyW');
     return Math.min(...ys);
   };
   expect((await settings()).walkHeadBob).toBe(true);
-  expect(await sampleY()).toBeLessThan(1.52 - 0.002);
+  await expect.poll(sampleY, { timeout: 15_000 }).toBeLessThan(1.52 - 0.002);
   const camY = () => page.evaluate(() => (window as any).__wp.three.camera.position.y as number);
   await expect.poll(camY).toBeCloseTo(1.52, 3); // settles when standing still
   await panel.getByLabel('Kopfwippen beim Gehen').uncheck();
