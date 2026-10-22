@@ -3,6 +3,7 @@ import { createEmptyProject } from './factory';
 import { addOpening, addPolygonRoom, addRectRoom, closestWall, insertWall } from './operations';
 import { derivePlan } from './derived';
 import { buildPlacementObstacles, conflictSummary, clipConvex, moveFurnitureTo, rotateFurnitureTo, mtv, collidingObstacles, constrainMove, furnitureConflicts, placementIssues, snapToWalls, type Pose } from './placement';
+import { doorSymbol } from '../editor2d/openingSymbols';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { findCatalogItem } from '../catalog/generic';
@@ -131,6 +132,21 @@ describe('doors', () => {
     const sofa = createFurnitureFromCatalog(sofaItem, { x: leafX, y: leafY + 0.9, rotation: Math.PI / 2 });
     const issues = placementIssues(p, d, sofa, obs);
     expect(issues.some((i) => i.kind === 'door-swing' || i.kind === 'door-leaf')).toBe(true);
+  });
+
+  it('is a quarter circle: the corner of the bounding square is free, the arc interior is blocked', () => {
+    const p = twoRooms();
+    const d = derivePlan(p);
+    const r = [...d.openings.values()].flat().find((x) => x.opening.kind === 'door')!;
+    const ds = doorSymbol(d.footprints.get(r.opening.wallId)!, r);
+    const n = { x: (ds.openTip.x - ds.hinge.x) / ds.radius, y: (ds.openTip.y - ds.hinge.y) / ds.radius };
+    const u = { x: (ds.closedTip.x - ds.hinge.x) / ds.radius, y: (ds.closedTip.y - ds.hinge.y) / ds.radius };
+    const at = (a: number, b: number) => ({ x: ds.hinge.x + ds.radius * (a * u.x + b * n.x), y: ds.hinge.y + ds.radius * (a * u.y + b * n.y) });
+    const box = (c: { x: number; y: number }) => createFurnitureFromCatalog(findCatalogItem('generic-sofa-3')!, { x: c.x, y: c.y, rotation: 0 });
+    const small = (c: { x: number; y: number }) => ({ ...box(c), width: 0.1, depth: 0.1, height: 0.5, elevation: 0, solid: true });
+    const swing = (c: { x: number; y: number }) => placementIssues(p, d, small(c)).some((i) => i.kind === 'door-swing');
+    expect(swing(at(0.97, 0.97))).toBe(false); // square corner, outside the arc
+    expect(swing(at(0.5, 0.5))).toBe(true);
   });
 });
 

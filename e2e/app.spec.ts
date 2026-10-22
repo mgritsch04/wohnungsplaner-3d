@@ -218,7 +218,7 @@ test('imports a raster plan, calibrates the scale and recognises walls', async (
   const d = draft as { walls: { thickness: number }[]; openings: { kind: string; width: number }[] };
   expect(d.walls.length).toBeGreaterThanOrEqual(4);
   expect(d.openings.length).toBeGreaterThanOrEqual(1);
-  expect(Math.abs(d.openings[0].width - 1)).toBeLessThan(0.1);
+  expect(Math.abs(d.openings[0].width - 1)).toBeLessThan(0.15); // doors lose the jamb allowance (#267)
   await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
   // uncertain elements require confirmation
   await page.getByRole('button', { name: 'Übernehmen', exact: true }).click();
@@ -2081,7 +2081,7 @@ test('recognises a sloped 30° wall in a raster plan and proposes the rooms (#37
   const doorCenter = { x: (d0.x + d1.x) / 2, y: (d0.y + d1.y) / 2 };
   const door = draft.openings.find((o) => Math.hypot(o.center.x - doorCenter.x, o.center.y - doorCenter.y) < 0.1);
   expect(door).toBeDefined();
-  expect(Math.abs(door!.width - 0.9)).toBeLessThan(0.05);
+  expect(Math.abs(door!.width - 0.8)).toBeLessThan(0.05); // 90 cm gap minus 10 cm jambs (#267)
   // two rooms proposed with their net areas, listed in the review
   expect(draft.rooms).toHaveLength(2);
   const areas = draft.rooms.map((r) => r.area).sort((x, y) => x - y);
@@ -4017,7 +4017,7 @@ test('CAD layout: lines hidden behind the viewport are ignored, a wall cut by it
   const balconyDoor = openings.find((o) => Math.abs(o.width - 1.5) < 0.1)!;
   expect(balconyDoor).toMatchObject({ kind: 'window', sillHeight: 0 });
   // the partition door: leaf and swing arc give the hinge and the swing side (into the bedroom, east)
-  const inner = openings.find((o) => Math.abs(o.width - 0.9) < 0.1)!;
+  const inner = openings.find((o) => Math.abs(o.width - 0.8) < 0.1)!; // 90 cm gap minus jambs (#267)
   expect(inner.kind).toBe('door');
   expect(inner.hingeSide).toBeDefined();
   expect(inner.swingSide!.x).toBeGreaterThan(0);
