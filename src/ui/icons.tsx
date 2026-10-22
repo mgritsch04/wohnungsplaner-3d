@@ -104,6 +104,16 @@ export const IconCutaway = () => (
   </Svg>
 );
 
+/** Building seen from outside: facade with windows and a door. */
+export const IconExterior = () => (
+  <Svg>
+    <path d="M5 20V5h14v15" />
+    <path d="M3 20h18" />
+    <path d="M8 9h2M14 9h2M8 13h2" />
+    <path d="M14 20v-5h3v5" />
+  </Svg>
+);
+
 /** Camera inside a circular arrow: back to the start view. */
 export const IconResetCamera = () => (
   <Svg>

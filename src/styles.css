@@ -1466,6 +1466,15 @@ code {
   font-size: var(--font-size-sm);
   white-space: nowrap;
 }
+.exterior-label {
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
 .multi-note {
   margin: var(--space-3) var(--space-5) 0;
   padding: var(--space-3) var(--space-4);
@@ -2004,7 +2013,7 @@ code {
     gap: var(--space-2);
   }
   .project-name {
-    width: 132px !important;
+    width: 110px !important;
   }
   .save-state:not(.save-error) .save-dot {
     display: inline-block;
@@ -2018,7 +2027,7 @@ code {
     white-space: nowrap;
   }
   .time-control.compact input[type='range'] {
-    width: 72px;
+    width: 48px;
   }
   .time-control.compact .time-label {
     min-width: 0;
