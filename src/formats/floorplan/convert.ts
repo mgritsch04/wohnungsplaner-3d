@@ -1,5 +1,6 @@
 import { derivePlan } from '../../model/derived';
 import { newId } from '../../model/ids';
+import { FIXTURE_ELEVATION, RADIATOR_DEFAULT, snapFixtureToWall } from '../../model/fixtures';
 import { addOpening, closestWall, insertWall } from '../../model/operations';
 import { faceAtPoint, sameCycle } from '../../model/roomDetection';
 import type { Project } from '../../model/schema';
@@ -174,6 +175,7 @@ export interface ApplyResult {
   openingsAdded: number;
   roomsAdded: number;
   fixturesAdded: number;
+  installationsAdded: number;
 }
 
 /** Insert the ACCEPTED draft elements into the project draft (mutates `d`). */
@@ -259,7 +261,20 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     d.furniture.push({ ...f, existing: true });
     fixturesAdded++;
   }
-  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded, fixturesAdded };
+  // installation points go on the nearest wall of the result (#222)
+  let installationsAdded = 0;
+  for (const x of draft.installations ?? []) {
+    if (!x.accepted) continue;
+    const base = { kind: x.kind, elevation: x.elevation ?? FIXTURE_ELEVATION[x.kind], count: 1, ...(x.kind === 'radiator' ? { width: x.width ?? RADIATOR_DEFAULT.width, height: RADIATOR_DEFAULT.height } : {}) };
+    const snap = snapFixtureToWall(d, base, x.center);
+    if (!snap) {
+      warnings.push(`Anschluss (${x.kind}) bei (${x.center.x.toFixed(2)}, ${x.center.y.toFixed(2)}) liegt an keiner Wand und wurde nicht übernommen.`);
+      continue;
+    }
+    d.fixtures.push({ id: newId('fix'), ...base, x: snap.x, y: snap.y, rotation: snap.rotation, ...(x.fixtureNote ? { note: x.fixtureNote } : {}) });
+    installationsAdded++;
+  }
+  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded, fixturesAdded, installationsAdded };
 }
 
 /** Export the project's architecture (and optionally furniture) as apartment-plan.json. */

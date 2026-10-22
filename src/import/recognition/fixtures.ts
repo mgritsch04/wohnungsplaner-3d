@@ -51,7 +51,7 @@ interface Component {
   segs: FixtureSegment[];
 }
 
-function components(segs: FixtureSegment[]): Component[] {
+export function components(segs: FixtureSegment[]): Component[] {
   const parent = segs.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   const grid = new Map<string, number[]>();
@@ -79,7 +79,7 @@ function components(segs: FixtureSegment[]): Component[] {
 }
 
 /** Smallest enclosing rectangle (searched in 3° steps): long side `l` along direction `phi`, short side `w`. */
-function orientedBox(points: Vec2[]): { l: number; w: number; phi: number; center: Vec2 } {
+export function orientedBox(points: Vec2[]): { l: number; w: number; phi: number; center: Vec2 } {
   let best = { area: Infinity, l: 0, w: 0, phi: 0, center: { x: 0, y: 0 } };
   for (let deg = 0; deg < 90; deg += 3) {
     const phi = (deg * Math.PI) / 180;

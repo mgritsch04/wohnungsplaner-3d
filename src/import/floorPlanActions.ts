@@ -32,7 +32,7 @@ export async function importFloorPlanJsonFile() {
 export async function acceptDraft() {
   const draft = useImportStore.getState().draft;
   if (!draft) return;
-  const uncertain = [...draft.walls, ...draft.openings, ...(draft.fixtures ?? [])].filter((x) => x.accepted && x.status === 'uncertain').length;
+  const uncertain = [...draft.walls, ...draft.openings, ...(draft.fixtures ?? []), ...(draft.installations ?? [])].filter((x) => x.accepted && x.status === 'uncertain').length;
   if (!draft.scaleConfirmed) {
     const ok = await confirmDialog('Der Maßstab ist nicht bestätigt. Die übernommenen Maße können falsch sein. Trotzdem übernehmen?', { confirmLabel: 'Trotzdem übernehmen', danger: true });
     if (!ok) return;
@@ -59,7 +59,7 @@ export async function acceptDraft() {
   ui.requestFit();
   ui.setLeftTab('tools');
   if (r) {
-    ui.toast(`Übernommen: ${r.wallsAdded} Wandsegmente, ${r.openingsAdded} Öffnungen, ${r.roomsAdded} Räume${r.fixturesAdded ? `, ${r.fixturesAdded} Sanitärobjekte (Bestand)` : ''}.`, 'success');
+    ui.toast(`Übernommen: ${r.wallsAdded} Wandsegmente, ${r.openingsAdded} Öffnungen, ${r.roomsAdded} Räume${r.fixturesAdded ? `, ${r.fixturesAdded} Sanitärobjekte (Bestand)` : ''}${r.installationsAdded ? `, ${r.installationsAdded} Anschlüsse` : ''}.`, 'success');
     const skippedNote =
       skipped.length === 1
         ? ['Ein vorgeschlagener Raum liegt in einem bestehenden Raum und wurde nicht übernommen.']

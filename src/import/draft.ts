@@ -1,4 +1,4 @@
-import type { Furniture, OpeningKind } from '../model/schema';
+import type { FixtureKind, Furniture, OpeningKind } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 
 export type DraftStatus = 'confirmed' | 'estimated' | 'uncertain';
@@ -69,6 +69,24 @@ export interface DraftFixture {
   accepted: boolean;
 }
 
+/** Installation point (socket, switch, radiator, water / waste-water) read from its plan symbol (#222); becomes a `Fixture` on the nearest wall. */
+export interface DraftInstallation {
+  id: string;
+  kind: FixtureKind;
+  /** Where the symbol stands in the plan; the point is snapped to the nearest wall when applied. */
+  center: Vec2;
+  /** Height of the centre (radiator: lower edge) above the floor – guide value, the plan rarely states it. */
+  elevation: number;
+  /** Radiator length (m). */
+  width?: number;
+  /** Note kept on the installed point (e.g. LAN / Daten), not the review note. */
+  fixtureNote?: string;
+  status: DraftStatus;
+  confidence?: number;
+  note?: string;
+  accepted: boolean;
+}
+
 export interface ReconstructionDraft {
   source: 'json' | 'raster' | 'pdf-vector';
   sourceName: string;
@@ -80,6 +98,8 @@ export interface ReconstructionDraft {
   furniture: Furniture[];
   /** Fitted sanitary objects found in the plan (#255); absent = none. */
   fixtures?: DraftFixture[];
+  /** Installation points found in the plan (#222); absent = none. */
+  installations?: DraftInstallation[];
   warnings: string[];
   /** Optional project name proposed by the source. */
   name?: string;
