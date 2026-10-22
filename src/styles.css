@@ -2276,3 +2276,49 @@ code {
 .term-list dd {
   margin: 0;
 }
+
+/* Etagen-Wahl über Plan und 3D-Ansicht (#54): wie Aufzugknöpfe, oberste Etage oben */
+.level-bar {
+  position: absolute;
+  left: var(--space-3);
+  bottom: 56px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  background: var(--color-surface-floating);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-md);
+  max-height: calc(100% - 80px);
+  overflow: auto;
+}
+.level-bar > button {
+  text-align: left;
+  white-space: nowrap;
+}
+.level-bar-other {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+.level-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.level-list li {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.level-list li.active {
+  border-color: var(--color-accent);
+}

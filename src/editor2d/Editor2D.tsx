@@ -25,6 +25,7 @@ import { dropCatalogItemAt, toggleUnderlayVisible } from '../ui/actions';
 import { openObjectMenu } from '../ui/objectMenu';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
+import { LowerLevelOverlay } from './LowerLevelOverlay';
 import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
@@ -888,6 +889,7 @@ export function Editor2D() {
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
+          <LowerLevelOverlay project={project} />
           <PlanDrawing
             project={project}
             derived={derived}

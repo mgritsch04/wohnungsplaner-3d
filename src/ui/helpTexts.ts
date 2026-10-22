@@ -28,6 +28,10 @@ export const HELP_TEXTS = {
     term: 'Grafikqualität',
     text: '„Hoch“ zeigt feinere Spiegelungen und Schatten, braucht aber eine starke Grafikkarte. „Automatisch“ wählt „Hoch“ nur am PC mit Grafikkarte.',
   },
+  levels: {
+    term: 'Etagen',
+    text: 'Für Häuser mit mehreren Geschossen. Jede Etage hat ihren eigenen Plan; du bearbeitest immer eine. Die anderen zeigt die 3D-Ansicht mit. Wechseln: Etagen-Knöpfe am Plan oder Bild auf / Bild ab.',
+  },
 } as const satisfies Record<string, HelpText>;
 
 export type HelpId = keyof typeof HELP_TEXTS;

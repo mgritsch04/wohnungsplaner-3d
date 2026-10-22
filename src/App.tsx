@@ -28,6 +28,7 @@ import { PrintViewHost } from './export/PrintView';
 import { useCompareStore } from './versions/compareStore';
 import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
+import { LevelBar } from './ui/LevelBar';
 import { MobileBar } from './ui/MobileBar';
 import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
 import { FileFormatError } from './formats/zodErrors';
@@ -137,6 +138,7 @@ export default function App() {
         </aside>
         <main className={`workspace view-${viewMode}`}>
           <StartCard />
+          <LevelBar />
           {viewMode !== '3d' && (
             <div className="pane pane-2d">
               <Editor2D />

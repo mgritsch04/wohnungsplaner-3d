@@ -76,6 +76,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { keys: '1 / 2 / 3', action: '2D / 2D + 3D nebeneinander / 3D (wie die Ansicht-Knöpfe oben)', match: ['1', '2', '3'] },
       { keys: 'H', action: 'Plan einpassen', match: ['h'] },
+      { keys: 'Bild auf / Bild ab', action: 'Etage darüber / darunter (nur bei mehreren Etagen; anlegen unter Projekt › Etagen)', match: ['pageup', 'pagedown'] },
       { keys: 'P', action: 'Plan-Hintergrund (importierter Grundriss) ein- / ausblenden (2D; beim Begehen setzt P stattdessen die Referenzfigur)', match: ['p'] },
       { keys: '?', action: 'Diese Übersicht öffnen (auch Fragezeichen-Symbol oben rechts)', match: ['?'] },
       { keys: 'Mausrad', action: 'Zoomen', match: [] },

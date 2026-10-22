@@ -23,6 +23,9 @@ export function validateModel(p: Project): ModelIssue[] {
   p.furniture.forEach((f) => checkId(f.id, 'Objekt'));
 
   const index = buildIndex(p);
+  // a wall with a missing node is reported below; then no footprints are built (their corners use the neighbours)
+  const nodesOk = p.walls.every((w) => index.nodes.has(w.a) && index.nodes.has(w.b));
+  const footprintOf = (w: Project['walls'][number]) => (nodesOk ? computeWallFootprint(w, index) : null);
   for (const w of p.walls) {
     if (!index.nodes.has(w.a) || !index.nodes.has(w.b)) {
       issues.push({ severity: 'error', message: `Wand ${w.id} verweist auf fehlende Knoten`, elementId: w.id });
@@ -38,7 +41,7 @@ export function validateModel(p: Project): ModelIssue[] {
       issues.push({ severity: 'error', message: `Öffnung ${o.id} verweist auf fehlende Wand`, elementId: o.id });
       continue;
     }
-    const fp = computeWallFootprint(w, index);
+    const fp = footprintOf(w);
     if (!fp) continue;
     if (o.offset - o.width / 2 < -1e-6 || o.offset + o.width / 2 > fp.length + 1e-6) {
       issues.push({ severity: 'warning', message: `Öffnung ${o.id} ragt über die Wand hinaus`, elementId: o.id });
@@ -50,7 +53,7 @@ export function validateModel(p: Project): ModelIssue[] {
   for (const [wallId, list] of index.openingsByWall) {
     const w = index.walls.get(wallId);
     if (!w) continue;
-    const fp = computeWallFootprint(w, index);
+    const fp = footprintOf(w);
     if (!fp) continue;
     const res = resolveOpenings(w, fp, list);
     for (let i = 1; i < res.length; i++) {

@@ -7,6 +7,7 @@ import { BOOKMARK_KEYS, jumpToBookmarkIndex } from '../view3d/cameraBookmarks';
 import { useTapeStore } from '../view3d/tapeStore';
 import { notifyCompareLocked, showCompareSide, stopCompare, toggleCompareSide, useCompareStore } from '../versions/compareStore';
 import { groupSelection, ungroupSelection } from './groupActions';
+import { goToNeighbourLevel } from './levelActions';
 import { orbitKeyMoves } from '../view3d/orbitKeys';
 import { openMenuForSelection } from './objectMenu';
 import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pasteClipboard, rotateSelection, saveNow, toggleOpening, toggleUnderlayVisible } from './actions';
@@ -60,7 +61,11 @@ export function useShortcuts() {
         }
         return;
       }
-      if (mod && key === 'z' && !e.shiftKey) {
+      if ((e.key === 'PageUp' || e.key === 'PageDown') && !mod && !e.altKey && ps.project.levels.length > 1) {
+        // storeys (#54): Bild auf / Bild ab = the storey above / below
+        e.preventDefault();
+        if (!goToNeighbourLevel(e.key === 'PageUp' ? 1 : -1)) ui.toast(e.key === 'PageUp' ? 'Keine Etage darüber.' : 'Keine Etage darunter.', 'info');
+      } else if (mod && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         ps.undo();
       } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {

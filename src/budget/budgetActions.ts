@@ -1,14 +1,15 @@
-import { derivePlan } from '../model/derived';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { downloadBlob, safeFileName } from '../ui/fileUtils';
 import { budgetToCsv, computeBudget } from './budget';
-import { furnitureRoomLookup } from './rooms';
+import { buildingFurniture } from './rooms';
 
 /** Shopping list as CSV; `byRoom` groups it by room with a subtotal per room (#75). */
 export function exportShoppingCsv(byRoom = false) {
   const p = useProjectStore.getState().project;
-  const b = computeBudget(p.furniture, furnitureRoomLookup(p, derivePlan(p)));
+  // the whole building (#54), not only the storey shown
+  const all = buildingFurniture(p);
+  const b = computeBudget(all.furniture, all.roomOf);
   if (b.lines.length === 0) {
     useUiStore.getState().toast('Noch keine Möbel oder Geräte im Projekt.', 'info');
     return;
