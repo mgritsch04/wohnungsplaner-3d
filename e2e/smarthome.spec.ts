@@ -150,3 +150,50 @@ test('Smart Home (#232, #233): Raum wählen, im Plan klicken, Geräte in 2D und 
   await expect.poll(async () => (await getProject(page)).devices.length).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('Smart Home (#280): Blickrichtung per Regler, ein Ziehvorgang = ein Undo-Schritt, Feld und Regler synchron, bleibt nach Reload', async ({ page }) => {
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  const right = page.locator('.panel.right');
+  await panel.getByLabel('Raum').selectOption({ label: 'Wohnzimmer' });
+  await panel.locator('[data-testid="device-kind"][data-kind="motion"]').click();
+  await panel.getByTestId('device-add').click();
+  await page.getByTestId('device-2d').first().getByTestId('device-hit').click();
+  const info = right.getByTestId('device-info');
+  const slider = info.getByTestId('device-rotation-slider');
+  const field = info.getByRole('textbox', { name: /^Blickrichtung/ });
+  const rotation = async () => (await getProject(page)).devices[0].rotation;
+
+  // drag in several steps: field follows live, and the whole drag is one undo step
+  const initial = await slider.inputValue();
+  await slider.dispatchEvent('pointerdown');
+  await slider.fill('120');
+  await slider.fill('250');
+  await slider.fill('330');
+  await slider.dispatchEvent('pointerup');
+  const dragged = Number(await slider.inputValue());
+  expect(dragged).toBeGreaterThan(300);
+  await expect(field).toHaveValue(String(dragged));
+  expect(Math.round(((await rotation()) * 180) / Math.PI)).toBe(dragged);
+
+  // field sets slider
+  await field.fill('90');
+  await field.press('Enter');
+  await expect(slider).toHaveValue('90');
+
+  await page.keyboard.press('Control+z'); // field entry
+  await expect(slider).toHaveValue(String(dragged));
+  await page.keyboard.press('Control+z'); // the whole drag
+  await expect(slider).toHaveValue(initial);
+
+  await page.getByRole('button', { name: 'Wiederholen' }).click();
+  await page.getByRole('button', { name: 'Wiederholen' }).click();
+  await expect(slider).toHaveValue('90');
+  await page.waitForTimeout(800);
+  await page.reload();
+  await page.locator('.panel.left').getByRole('button', { name: 'Smart Home' }).click();
+  await page.getByTestId('device-2d').first().getByTestId('device-hit').click();
+  await expect(page.locator('.panel.right').getByTestId('device-rotation-slider')).toHaveValue('90');
+});

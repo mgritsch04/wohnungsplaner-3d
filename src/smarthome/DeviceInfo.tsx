@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useProjectStore } from '../store/projectStore';
 import { derivePlan } from '../model/derived';
 import type { Project, SmartDevice } from '../model/schema';
 import { useUiStore } from '../store/uiStore';
@@ -14,6 +15,37 @@ import css from './SmartHomePanel.module.css';
 
 const isSensor = (d: SmartDevice) => d.kind === 'motion' || d.kind === 'presence';
 const deg = (rad: number) => Math.round(((((rad * 180) / Math.PI) % 360) + 360) % 360);
+
+/** Slider 0–360° for the view direction; one drag is one undo step (transaction like dragging in the plan). */
+function DirectionSlider({ id, rotation }: { id: string; rotation: number }) {
+  const st = () => useProjectStore.getState();
+  const set = (value: number) => {
+    const rad = (value * Math.PI) / 180;
+    if (st().txBase) {
+      st().updateTransient((p) => {
+        const dev = p.devices.find((x) => x.id === id);
+        if (dev) dev.rotation = rad;
+      });
+    } else updateDevice(id, { rotation: rad });
+  };
+  const end = () => st().commitTransaction();
+  return (
+    <input
+      type="range"
+      min={0}
+      max={360}
+      step={1}
+      value={deg(rotation)}
+      aria-label="Blickrichtung (Regler)"
+      data-testid="device-rotation-slider"
+      onPointerDown={() => st().beginTransaction()}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onBlur={end}
+      onChange={(e) => set(Number(e.target.value))}
+    />
+  );
+}
 
 /** Status text of a device in the simulation (or its resting state while it is stopped). */
 export function statusLabel(d: SmartDevice, on: boolean, brightness?: number): string {
@@ -94,7 +126,7 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
               </button>
             )}
           </div>
-          <p className="muted small">Verschieben: im 2D-Plan ziehen{isSensor(d) ? ', Blickrichtung mit dem blauen Griff' : ''}.</p>
+          <p className="muted small">Verschieben: im 2D-Plan ziehen{isSensor(d) ? ', Blickrichtung mit Regler, Zahlenfeld oder blauem Griff' : ''}.</p>
         </div>
       </section>
 
@@ -161,6 +193,7 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
                 {params.assumed.hold && assumed}
               </div>
               <NumberField label="Blickrichtung" unit="°" digits={0} value={deg(d.rotation)} min={0} max={360} onChange={(v) => updateDevice(d.id, { rotation: (v * Math.PI) / 180 })} />
+              <DirectionSlider id={d.id} rotation={d.rotation} />
             </>
           )}
           {d.kind === 'contact' && (
