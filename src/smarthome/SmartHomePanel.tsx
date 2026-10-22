@@ -257,7 +257,7 @@ function AudioSection({ project, room }: { project: Project; room: Project['room
   return (
     <Section title="Audio-Setup vorschlagen">
       <p className="muted small">Lautsprecher-Arten (keine Modelle, keine Preise) je Raum mit Platz und Abstand: Wohnzimmer zum Sofa, Schlafzimmer am Bett, Arbeitszimmer am Schreibtisch. Wünsche wie „kompakter“, „Design nicht gut“ oder „mit Subwoofer“ geben einen neuen Vorschlag; der alte bleibt, bis du einen übernimmst.</p>
-      <SelectField label="Für" value={scope} options={[{ value: 'room', label: `Nur „${room?.name ?? '–'}“` }, { value: 'all', label: 'Ganze Wohnung' }]} onChange={(v) => setScope(v as 'room' | 'all')} />
+      <SelectField label="Bereich" value={scope} options={[{ value: 'room', label: `Nur „${room?.name ?? '–'}“` }, { value: 'all', label: 'Ganze Wohnung' }]} onChange={(v) => setScope(v as 'room' | 'all')} />
       <TextField label="Wunsch (optional)" value={wish} onChange={setWish} />
       <button className="primary block" onClick={propose} disabled={!room} data-testid="audio-suggest">
         {audio ? 'Neuer Vorschlag mit Wunsch' : 'Vorschlag zeigen'}
