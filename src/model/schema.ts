@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 5;
+export const PROJECT_SCHEMA_VERSION = 6;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -542,6 +542,41 @@ export const PhotoSchema = z.object({
   opacity: z.number().min(0.05).max(1).default(1),
 });
 
+/**
+ * Plan content of one storey (#54): everything with a plan position or a reference to plan
+ * elements. The ACTIVE storey keeps it in the project's top-level fields, so every editor and
+ * view works on one storey as before; the other storeys keep theirs in `Level.plan` until they
+ * are switched to (model/levels.ts swaps the two).
+ */
+export const LevelPlanSchema = z.object({
+  nodes: z.array(NodeSchema).default([]),
+  walls: z.array(WallSchema).default([]),
+  openings: z.array(OpeningSchema).default([]),
+  rooms: z.array(RoomSchema).default([]),
+  furniture: z.array(FurnitureSchema).default([]),
+  lights: z.array(LightSchema).default([]),
+  groups: z.array(FurnitureGroupSchema).default([]),
+  devices: z.array(SmartDeviceSchema).default([]),
+  fixtures: z.array(FixtureSchema).default([]),
+  loads: z.array(LoadSchema).default([]),
+  notes: z.array(NoteSchema).default([]),
+  photos: z.array(PhotoSchema).default([]),
+  underlay: UnderlaySchema.nullable().default(null),
+});
+
+/** Storey of a building (#54), e.g. Erdgeschoss, Obergeschoss, Keller. */
+export const LevelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(60),
+  /** Height of the storey's floor above the floor of the ground storey (m); negative = cellar. */
+  elevation: len(-50, 500),
+  /** Stored plan of an inactive storey; absent for the active storey (its plan is the top-level fields). */
+  plan: LevelPlanSchema.optional(),
+});
+
+export const DEFAULT_LEVEL_ID = 'level_0';
+export const DEFAULT_LEVEL_NAME = 'Erdgeschoss';
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -576,6 +611,9 @@ export const ProjectSchema = z.object({
   tasks: z.array(TaskSchema).default([]),
   /** Reference photos on walls (#86); schema 5. */
   photos: z.array(PhotoSchema).default([]),
+  /** Storeys (#54, schema 6), sorted by elevation; the plan fields above belong to `activeLevelId`. */
+  levels: z.array(LevelSchema).min(1).max(30).default([{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }]),
+  activeLevelId: z.string().min(1).default(DEFAULT_LEVEL_ID),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -612,3 +650,5 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export type Vec3 = z.infer<typeof Vec3Schema>;
 export type CameraBookmark = z.infer<typeof CameraBookmarkSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type LevelPlan = z.infer<typeof LevelPlanSchema>;
+export type Level = z.infer<typeof LevelSchema>;

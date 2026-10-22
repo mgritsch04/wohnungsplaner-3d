@@ -15,6 +15,8 @@ import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
+import { OtherLevels3D } from './OtherLevels3D';
+import { activeLevel } from '../model/levels';
 import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
@@ -318,6 +320,8 @@ function SceneContent({
   // behind the furniture), by touch a finger drag would move furniture or select walls/floors
   const walkPick = cameraMode === 'walk';
   const tier = tierSettings(useGraphicsTier());
+  const otherLevels = useUiStore((s) => s.otherLevels);
+  const activeElevation = activeLevel(project).elevation;
 
   return (
     <>
@@ -326,7 +330,16 @@ function SceneContent({
       {quality === 'realism' && <EnvironmentLight stepHours={tier.envStepHours} size={tier.envSize} />}
       <FpsMeter />
       <AdaptiveQuality />
-      <Ground quality={quality} />
+      {/* the ground lies at the ground storey's floor (#54); a cellar as active storey is shown without it */}
+      {activeElevation >= 0 && <Ground quality={quality} y={-activeElevation} />}
+      <OtherLevels3D
+        project={project}
+        mode={otherLevels}
+        cameraMode={cameraMode}
+        exterior={exteriorOn}
+        quality={quality}
+        showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
+      />
       <Architecture
         project={project}
         derived={derived}

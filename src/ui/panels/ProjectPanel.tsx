@@ -19,6 +19,7 @@ import { MoveChecklistSection } from '../../planning/TaskSections';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
 import { InfoHint } from '../InfoHint';
+import { LevelsSection } from '../LevelBar';
 import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
@@ -39,6 +40,8 @@ export function ProjectPanel() {
         <MotionControl />
         <HintsControl />
       </Section>
+
+      <LevelsSection />
 
       <Section title="Licht & Darstellung (3D)">
         <div className="field">

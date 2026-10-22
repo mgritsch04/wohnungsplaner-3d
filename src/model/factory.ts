@@ -1,6 +1,6 @@
 import { newId } from './ids';
 import { DEFAULT_MATERIALS } from './materials';
-import { PROJECT_FORMAT, PROJECT_SCHEMA_VERSION, SettingsSchema, type Project } from './schema';
+import { DEFAULT_LEVEL_ID, DEFAULT_LEVEL_NAME, PROJECT_FORMAT, PROJECT_SCHEMA_VERSION, SettingsSchema, type Project } from './schema';
 
 export function createEmptyProject(name = 'Neue Wohnung'): Project {
   const now = new Date().toISOString();
@@ -31,5 +31,7 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     notes: [],
     tasks: [],
     photos: [],
+    levels: [{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }],
+    activeLevelId: DEFAULT_LEVEL_ID,
   };
 }

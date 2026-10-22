@@ -15,6 +15,11 @@ export interface ProjectStore {
   revision: number;
   /** Apply an undoable change. The callback mutates a fresh draft. */
   apply: (fn: (draft: Project) => void) => void;
+  /**
+   * Apply a change that is no undo step of its own (switching the storey, #54): undo and redo
+   * still restore whole states, including the storey that was active then.
+   */
+  applyWithoutHistory: (fn: (draft: Project) => void) => void;
   /** Start a drag-like interaction: subsequent transient updates collapse into one undo step. */
   beginTransaction: () => void;
   updateTransient: (fn: (draft: Project) => void) => void;
@@ -53,6 +58,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       future: [],
       revision: revision + 1,
     });
+  },
+  applyWithoutHistory: (fn) => {
+    const { project, txBase, revision } = get();
+    if (txBase) return;
+    set({ project: produce(project, fn), revision: revision + 1 });
   },
   beginTransaction: () => {
     if (!get().txBase) set({ txBase: get().project });

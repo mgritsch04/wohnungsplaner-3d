@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useBudgetGroupStore, type BudgetGrouping } from '../budgetGroupStore';
 import { computeBudget, priceStatusLabel } from '../../budget/budget';
 import { exportShoppingCsv } from '../../budget/budgetActions';
-import { furnitureRoomLookup } from '../../budget/rooms';
-import { derivePlan } from '../../model/derived';
+import { buildingFurniture } from '../../budget/rooms';
+import { furnitureOnAnyLevel, levelOfFurniture } from '../../model/levels';
+import { goToLevel } from '../levelActions';
 import { formatEuro } from '../../model/units';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
@@ -15,9 +16,15 @@ export function BudgetPanel() {
   const walls = useProjectStore((s) => s.project.walls);
   const openings = useProjectStore((s) => s.project.openings);
   const rooms = useProjectStore((s) => s.project.rooms);
+  const levels = useProjectStore((s) => s.project.levels);
   const apply = useProjectStore((s) => s.apply);
-  const roomOf = useMemo(() => furnitureRoomLookup({ rooms }, derivePlan({ nodes, walls, openings, rooms })), [nodes, walls, openings, rooms]);
-  const b = useMemo(() => computeBudget(furniture, roomOf), [furniture, roomOf]);
+  // the whole building (#54): furniture of every storey
+  const all = useMemo(
+    () => buildingFurniture(useProjectStore.getState().project),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [furniture, nodes, walls, openings, rooms, levels],
+  );
+  const b = useMemo(() => computeBudget(all.furniture, all.roomOf), [all]);
   const group = useBudgetGroupStore((s) => s.grouping);
   const setGroup = useBudgetGroupStore((s) => s.setGrouping);
 
@@ -79,7 +86,7 @@ export function BudgetPanel() {
             <ul className="budget-lines">
               {g.lines.map((l) => (
                 <li key={l.id}>
-                  <button className="link-btn" onClick={() => useUiStore.getState().setSelection({ type: 'furniture', id: l.id })}>
+                  <button className="link-btn" onClick={() => selectAnywhere(l.id)}>
                     {l.name}
                   </button>
                   <span className="qty">
@@ -87,7 +94,7 @@ export function BudgetPanel() {
                       aria-label="Menge verringern"
                       onClick={() =>
                         apply((d) => {
-                          const f = d.furniture.find((x) => x.id === l.id);
+                          const f = furnitureOnAnyLevel(d, l.id);
                           if (f && f.quantity > 1) f.quantity--;
                         })
                       }
@@ -99,7 +106,7 @@ export function BudgetPanel() {
                       aria-label="Menge erhöhen"
                       onClick={() =>
                         apply((d) => {
-                          const f = d.furniture.find((x) => x.id === l.id);
+                          const f = furnitureOnAnyLevel(d, l.id);
                           if (f && f.quantity < 999) f.quantity++;
                         })
                       }
@@ -124,4 +131,12 @@ export function BudgetPanel() {
       </Section>
     </div>
   );
+}
+
+/** Select an item of the list; on another storey (#54) that storey is shown first. */
+function selectAnywhere(id: string) {
+  const p = useProjectStore.getState().project;
+  const level = levelOfFurniture(p, id);
+  if (level && level !== p.activeLevelId) goToLevel(level);
+  useUiStore.getState().setSelection({ type: 'furniture', id });
 }

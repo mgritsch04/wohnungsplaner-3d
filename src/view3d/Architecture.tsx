@@ -405,8 +405,8 @@ function BaseboardInstances({ boards, material, shadows }: { boards: ReturnType<
   return <instancedMesh key={boards.length} ref={ref} args={[geometry, material, boards.length]} receiveShadow={shadows} raycast={() => null} />;
 }
 
-/** A large neutral ground plane under the apartment. */
-export function Ground({ quality }: { quality: QualityMode }) {
+/** A large neutral ground plane under the apartment; `y` = its height relative to the active storey (#54). */
+export function Ground({ quality, y = 0 }: { quality: QualityMode; y?: number }) {
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#d6d3cd', roughness: 1 }), []);
   const lam = useMemo(() => new THREE.MeshLambertMaterial({ color: '#d6d3cd' }), []);
   useEffect(
@@ -417,7 +417,7 @@ export function Ground({ quality }: { quality: QualityMode }) {
     [mat, lam],
   );
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} receiveShadow={quality === 'realism'} material={quality === 'realism' ? mat : lam}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y - 0.005, 0]} receiveShadow={quality === 'realism'} material={quality === 'realism' ? mat : lam}>
       <planeGeometry args={[400, 400]} />
     </mesh>
   );
