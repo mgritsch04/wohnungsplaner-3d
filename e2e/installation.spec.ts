@@ -143,3 +143,46 @@ test('Installationsplan (#64, #81): Steckdose, Heizkörper und Wasseranschluss a
   await expect(page.getByTestId('fixture-2d')).toHaveCount(3);
   expect(errors).toEqual([]);
 });
+
+test('Steckdosen-Leistung (#135): Stromkreis anlegen, Steckdose zuordnen, Geräte eintragen, Warnung bei Überschreitung', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  const right = page.locator('.panel.right');
+  await left.getByRole('button', { name: /Steckdosen & Anschlüsse/ }).click();
+  const p0 = await getProject(page);
+  await place(page, 'Steckdose', nearWall(p0, 0, 0.3));
+
+  // circuit in the project tab
+  await right.locator('nav.tabs button', { hasText: 'Projekt' }).click();
+  await right.getByRole('button', { name: '+ Stromkreis' }).click();
+  await expect(right.getByTestId('circuit-item')).toHaveCount(1);
+  await expect(right.getByTestId('circuit-disclaimer')).toContainText('keine fachliche Freigabe');
+  await expect(right.getByTestId('circuit-summary')).toContainText('0 W von 3.680 W (0 %)');
+
+  // socket → circuit, with a consumer
+  const socketId = (await getProject(page)).fixtures[0].id;
+  await page.evaluate((id) => {
+    const wp = (window as unknown as { __wp: { useUiStore: { getState: () => { setSelection: (s: unknown) => void } } } }).__wp;
+    wp.useUiStore.getState().setSelection({ type: 'fixture', id });
+  }, socketId);
+  await right.locator('nav.tabs button', { hasText: 'Eigenschaften' }).click();
+  const circuitId = (await getProject(page)).circuits[0].id;
+  await right.getByTestId('socket-circuit').selectOption(circuitId);
+  await right.getByLabel('Verbraucher hinzufügen').selectOption('Wasserkocher');
+  await right.getByLabel('Verbraucher hinzufügen').selectOption('Toaster');
+  const p1 = await getProject(page);
+  expect(p1.fixtures[0].circuitId).toBe(circuitId);
+  expect(p1.loads.map((l) => [l.name, l.watts])).toEqual([['Wasserkocher', 2000], ['Toaster', 900]]);
+
+  await right.locator('nav.tabs button', { hasText: 'Projekt' }).click();
+  await expect(right.getByTestId('circuit-summary')).toContainText('2.900 W von 3.680 W (79 %)');
+  await expect(right.getByTestId('circuit-warning')).toHaveCount(0);
+
+  // a third appliance pushes it over the limit
+  await right.getByLabel('Verbraucher hinzufügen').first().selectOption('Mikrowelle');
+  await expect(right.getByTestId('circuit-warning')).toBeVisible();
+  await expect(right.getByTestId('circuit-item')).toHaveAttribute('data-status', 'over');
+  expect(errors).toEqual([]);
+});

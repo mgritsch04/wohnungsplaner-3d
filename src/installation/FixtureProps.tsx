@@ -3,6 +3,8 @@ import type { FixtureKind, Project } from '../model/schema';
 import { deleteSelection } from '../ui/actions';
 import { NumberField, PanelGroup, SelectField, TextField } from '../ui/fields';
 import { updateFixture } from './actions';
+import { setSocketCircuit } from './circuitActions';
+import { CIRCUIT_DISCLAIMER, SocketLoads } from './CircuitsSection';
 
 const HEIGHT_HINT: Record<FixtureKind, string> = {
   socket: 'Mitte der Dose über dem Boden (üblich 30 cm, über der Arbeitsplatte etwa 115 cm)',
@@ -29,6 +31,26 @@ export function FixtureProps({ id, project }: { id: string; project: Project }) 
             <NumberField label="Breite" value={f.width ?? 0.8} factor={100} unit="cm" min={20} max={300} onChange={(v) => upd((x) => (x.width = v))} />
             <NumberField label="Höhe" value={f.height ?? 0.6} factor={100} unit="cm" min={20} max={200} onChange={(v) => upd((x) => (x.height = v))} />
           </div>
+        )}
+        {f.kind === 'socket' && (
+          <>
+            <label className="field">
+              <span className="field-label">Stromkreis</span>
+              <span className="field-input">
+                <select value={f.circuitId ?? ''} data-testid="socket-circuit" onChange={(e) => setSocketCircuit(f.id, e.target.value || undefined)}>
+                  <option value="">– keiner –</option>
+                  {project.circuits.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.amps} A)
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </label>
+            {project.circuits.length === 0 && <p className="muted small">Stromkreise legst du unter „Projekt“ an.</p>}
+            <SocketLoads fixtureId={f.id} project={project} />
+            <p className="muted small">{CIRCUIT_DISCLAIMER}</p>
+          </>
         )}
         <TextField label="Notiz" value={f.note ?? ''} placeholder="z. B. Kaltwasser, Herdanschluss" onChange={(v) => upd((x) => (x.note = v.trim() ? v.slice(0, 200) : undefined))} />
         <p className="muted small">Verschieben: im 2D-Plan ziehen – das Element rastet an der nächsten Wand ein.</p>
