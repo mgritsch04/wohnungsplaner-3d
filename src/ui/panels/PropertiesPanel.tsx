@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { makeLightSmartWithFeedback } from '../../smarthome/actions';
+import { DEVICE_PRODUCTS } from '../../smarthome/catalog';
 import { DeviceInfo } from '../../smarthome/DeviceInfo';
 import { FixtureProps } from '../../installation/FixtureProps';
 import { derivePlan } from '../../model/derived';
@@ -676,12 +678,36 @@ function LightProps({ id, project }: { id: string; project: Project }) {
           <input type="range" min={0} max={5} step={0.1} value={l.intensity} onChange={(e) => upd((x) => (x.intensity = Number(e.target.value)))} />
         </label>
       </PanelGroup>
+      <LightSmart id={id} project={project} />
       <div className="btn-row padded">
         <button className="danger" onClick={() => void deleteSelection()}>
           Löschen
         </button>
       </div>
     </div>
+  );
+}
+
+/** „Smart machen“ for a placed light (#250): links a smart lamp device to it instead of adding a second light. */
+function LightSmart({ id, project }: { id: string; project: Project }) {
+  const lamps = DEVICE_PRODUCTS.filter((p) => p.kind === 'light');
+  const [productId, setProductId] = useState(lamps[0]?.id ?? '');
+  const dev = project.devices.find((x) => x.lightId === id);
+  return (
+    <PanelGroup groupKey="light.smart" title="Smart Home">
+      {dev ? (
+        <p className="small" data-testid="light-smart-linked">
+          Smart: {dev.name}. Im Smart-Home-Reiter schaltbar; beim Löschen des Geräts bleibt die Leuchte erhalten.
+        </p>
+      ) : (
+        <>
+          <SelectField label="Produkt" value={productId} options={[...lamps.map((p) => ({ value: p.id, label: `${p.brand} ${p.model}` })), { value: '', label: 'Allgemein (Annahmewerte)' }]} onChange={setProductId} />
+          <button onClick={() => makeLightSmartWithFeedback(id, productId || undefined)} data-testid="light-make-smart">
+            Smart machen
+          </button>
+        </>
+      )}
+    </PanelGroup>
   );
 }
 

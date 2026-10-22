@@ -4,6 +4,7 @@ import { db } from '../persistence/db';
 import { newId } from '../model/ids';
 import { useCatalogStore } from '../catalog/catalogStore';
 import { CATEGORIES, type CatalogItem } from '../catalog/types';
+import { SCAN_NOTE, setDim, type Dims } from '../catalog/scanDims';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { addCatalogItem } from './actions';
@@ -25,6 +26,9 @@ export function ModelImportModal() {
   const [unitNote, setUnitNote] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState(targetItem?.category ?? 'decor');
+  const [scan, setScan] = useState(false);
+  const [proportional, setProportional] = useState(true);
+  const [override, setOverride] = useState<Dims | null>(null);
 
   const choose = async (f: File | undefined) => {
     if (!f) return;
@@ -39,6 +43,7 @@ export function ModelImportModal() {
       setInfo(i);
       setUnit(s.factor as Unit);
       setUnitNote(s.note);
+      setOverride(null);
       setName(f.name.replace(/\.(glb|gltf)$/i, ''));
     } catch (e) {
       setError(e instanceof ModelFileError ? e.message : `Fehler: ${e instanceof Error ? e.message : String(e)}`);
@@ -47,7 +52,11 @@ export function ModelImportModal() {
     }
   };
 
-  const dims = info ? { w: info.size.x * unit, h: info.size.y * unit, d: info.size.z * unit } : null;
+  const modelDims: Dims | null = info ? { w: info.size.x * unit, h: info.size.y * unit, d: info.size.z * unit } : null;
+  const dims = override && modelDims ? override : modelDims;
+  const editDim = (axis: keyof Dims, cm: number) => {
+    if (dims) setOverride(setDim(dims, axis, cm / 100, proportional));
+  };
 
   const store = async () => {
     const assetId = newId('asset');
@@ -67,12 +76,12 @@ export function ModelImportModal() {
       height: dims.h,
       color: '#b8b0a4',
       model: { type: 'gltf', assetId, fallbackShape: 'box' },
-      approximate: false,
+      approximate: scan,
       solid: !['textile', 'lighting'].includes(category),
-      tags: ['glb'],
+      tags: scan ? ['glb', 'scan'] : ['glb'],
       source: 'imported',
       sourceName: 'Eigene 3D-Modelle',
-      description: `Aus ${file.name}, Maße aus dem Modell${unit !== 1 ? ` (Einheit ${unit === 0.01 ? 'cm' : 'mm'})` : ''}.`,
+      description: `Aus ${file.name}, Maße ${override ? 'von Hand angepasst' : 'aus dem Modell'}${unit !== 1 ? ` (Einheit ${unit === 0.01 ? 'cm' : 'mm'})` : ''}.${scan ? ` ${SCAN_NOTE}` : ''}`,
     };
     await useCatalogStore.getState().addItems([item]);
     close();
@@ -87,8 +96,8 @@ export function ModelImportModal() {
       if (!f) return;
       const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
       f.model = { type: 'gltf', assetId, fallbackShape: shape };
-      f.approximate = false;
-      if (!keepDims) {
+      f.approximate = scan;
+      if (!keepDims || override) {
         f.width = dims.w;
         f.depth = dims.d;
         f.height = dims.h;
@@ -135,10 +144,36 @@ export function ModelImportModal() {
                 </span>
               </label>
               {unitNote && <p className="warn-text small">{unitNote}</p>}
-              <p className="small">
-                Maße aus dem Modell: <strong>{Math.round(dims.w * 1000) / 10}</strong> × <strong>{Math.round(dims.d * 1000) / 10}</strong> ×{' '}
-                <strong>{Math.round(dims.h * 1000) / 10}</strong> cm (B × T × H)
-              </p>
+              <label className="field">
+                <span className="field-label">Handy-Scan (z. B. aus einer Scan-App)</span>
+                <span className="field-input">
+                  <input type="checkbox" checked={scan} onChange={(e) => setScan(e.target.checked)} aria-label="Handy-Scan" />
+                </span>
+              </label>
+              {scan && <p className="warn-text small">{SCAN_NOTE}</p>}
+              <div className="field-grid">
+                {([['w', 'Breite (cm)'], ['d', 'Tiefe (cm)'], ['h', 'Höhe (cm)']] as const).map(([axis, label]) => (
+                  <label className="field" key={axis}>
+                    <span className="field-label">{label}</span>
+                    <span className="field-input">
+                      <input
+                        type="number"
+                        min={1}
+                        step={0.5}
+                        value={Math.round(dims[axis] * 1000) / 10}
+                        onChange={(e) => editDim(axis, Number(e.target.value))}
+                        aria-label={label}
+                      />
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <label className="field">
+                <span className="field-label">Proportionen beibehalten</span>
+                <span className="field-input">
+                  <input type="checkbox" checked={proportional} onChange={(e) => setProportional(e.target.checked)} aria-label="Proportionen beibehalten" />
+                </span>
+              </label>
               {!targetItem && (
                 <div className="field-grid">
                   <label className="field">
