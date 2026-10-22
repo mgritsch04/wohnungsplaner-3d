@@ -52,6 +52,8 @@ import { useDialogStore } from '../ui/dialogStore';
 import { usePhoneLayout, useTouchUi } from '../ui/phoneLayout';
 import { TouchWalkPad } from './TouchWalkPad';
 import { OrbitContextMenu } from './OrbitContextMenu';
+import { Exterior3D } from './Exterior3D';
+import { exteriorWalls, facadeViewDirection, findEntrance, type Entrance } from './exterior';
 
 /** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
 interface ComparePreview {
@@ -303,6 +305,12 @@ function SceneContent({
   const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
   const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 4);
+  // outside view (#92): only in the overview, never while comparing
+  const exteriorOn = usePerformanceStore((s) => s.exterior) && cameraMode === 'orbit' && !readOnly;
+  const entrance = useMemo(
+    () => (exteriorOn ? findEntrance(project, derived, exteriorWalls(project, derived)) : null),
+    [exteriorOn, project, derived],
+  );
   // walking (#164, #185): selecting happens at the crosshair (WalkControls) – the scene's click
   // handlers stay off: under pointer lock they would pick at the stale mouse position (the wall
   // behind the furniture), by touch a finger drag would move furniture or select walls/floors
@@ -325,8 +333,9 @@ function SceneContent({
         onSelect={readOnly || walkPick ? noop : onSelectArch}
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
-        showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
+        showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
       />
+      {exteriorOn && <Exterior3D project={project} derived={derived} entrance={entrance} />}
       {project.furniture.map((f) => (
         <FurnitureObject
           key={f.id}
@@ -370,7 +379,7 @@ function SceneContent({
       <CameraBookmarkDriver />
       {cameraMode === 'orbit' ? (
         <>
-          <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
+          <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} exterior={exteriorOn} entrance={entrance} rotateSpeed={project.settings.mouseSensitivity} />
           <OrbitKeyControls controlsRef={orbitRef} comparing={readOnly} />
         </>
       ) : (
@@ -473,12 +482,17 @@ function OrbitCamera({
   center,
   span,
   rotateSpeed,
+  exterior,
+  entrance,
 }: {
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   center: { x: number; y: number };
   span: number;
   /** Orbit rotation speed (OrbitControls default = 1). */
   rotateSpeed: number;
+  /** Outside view (#92): frame the whole building from the entrance side. */
+  exterior: boolean;
+  entrance: Entrance | null;
 }) {
   const { camera, get } = useThree();
   const resetRequest = usePerformanceStore((s) => s.cameraReset);
@@ -492,13 +506,14 @@ function OrbitCamera({
       const vfov = THREE.MathUtils.degToRad(cam.fov);
       const aspect = size.width / Math.max(1, size.height);
       const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-      const radius = span * 0.62 + 1;
+      const radius = exterior ? span * 0.85 + 3 : span * 0.62 + 1;
       const distance = radius / Math.sin(Math.min(vfov, hfov) / 2);
-      const dir = new THREE.Vector3(0.35, 0.95, 1.05).normalize();
+      const f = exterior ? facadeViewDirection(entrance) : null;
+      const dir = (f ? new THREE.Vector3(f.x, f.y, f.z) : new THREE.Vector3(0.35, 0.95, 1.05)).normalize();
       if (controlsRef.current) stopOrbitMotion(controlsRef.current);
-      camera.position.set(center.x + dir.x * distance, dir.y * distance, center.y + dir.z * distance);
-      camera.lookAt(center.x, 0, center.y);
-      controlsRef.current?.target.set(center.x, 0.8, center.y);
+      camera.position.set(center.x + dir.x * distance, dir.y * distance + (exterior ? 1.2 : 0), center.y + dir.z * distance);
+      camera.lookAt(center.x, exterior ? 1.4 : 0, center.y);
+      controlsRef.current?.target.set(center.x, exterior ? 1.4 : 0.8, center.y);
       controlsRef.current?.update();
     };
     fit();
@@ -507,7 +522,7 @@ function OrbitCamera({
     return () => clearTimeout(t);
     // only on mount, explicit reset or layout change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetRequest, viewMode]);
+  }, [resetRequest, viewMode, exterior]);
   // zoom slider (#6): report the camera distance, let the slider move the camera
   useEffect(() => {
     const c = controlsRef.current;

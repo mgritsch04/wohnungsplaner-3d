@@ -4346,3 +4346,17 @@ test('walkthrough: F still works after a slider or checkbox had focus; text fiel
   expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('probe-text');
   expect(errors).toEqual([]);
 });
+
+test('3D: Blick von außen zeigt Gebäude und Eingang und lässt sich umschalten (#92)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Außen' }).click();
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId('exterior-entrance-label')).toBeVisible();
+  await page.screenshot({ path: 'test-results/exterior-view.png' });
+  await page.getByRole('button', { name: 'Außen' }).click();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('exterior-entrance-label')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

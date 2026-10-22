@@ -1466,6 +1466,15 @@ code {
   font-size: var(--font-size-sm);
   white-space: nowrap;
 }
+.exterior-label {
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
 .multi-note {
   margin: var(--space-3) var(--space-5) 0;
   padding: var(--space-3) var(--space-4);
