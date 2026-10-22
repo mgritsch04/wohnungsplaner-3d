@@ -94,6 +94,7 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
       dev.lightId = lightId;
       dev.elevation = Math.max(1, d.settings.defaultWallHeight - 0.15);
     }
+    if (kind === 'speaker') dev.speakerType = 'bookshelf';
     if (kind === 'strip') {
       // a 1 m strip centred on the spot; the user pulls the ends to the right length
       dev.points = [{ x: r3(pos.x - 0.5), y: pos.y }, { x: r3(pos.x + 0.5), y: pos.y }];

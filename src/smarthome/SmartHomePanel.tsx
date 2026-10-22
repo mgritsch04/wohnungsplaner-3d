@@ -13,6 +13,7 @@ import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
 import { ruleSentence } from './rules';
 import { formatSimHour, occludersOf, roomCoverage } from './simulation';
+import { parseWishes, SPEAKER_TYPES, suggestAudio } from './audio';
 import { suggestSmartHome } from './suggest';
 import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
 import { useFurnishStore } from '../suggest/furnishStore';
@@ -107,6 +108,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
   return (
     <>
       <SuggestSection project={project} room={room} />
+      <AudioSection project={project} room={room} />
       <Section title="Gerät hinzufügen">
         <div className={css.kinds} role="group" aria-label="Geräteart">
           {KINDS.map((k) => (
@@ -226,6 +228,56 @@ function SuggestSection({ project, room }: { project: Project; room: Project['ro
             <button onClick={() => setPreview(null)} data-testid="sh-suggest-discard">
               Verwerfen
             </button>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** „Audio-Setup vorschlagen“ (#138): speaker types per room as a preview; wishes in plain text make a new proposal, the old one stays until one is applied. */
+function AudioSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const preview = useSmartSuggestStore((s) => s.preview);
+  const setPreview = useSmartSuggestStore((s) => s.setPreview);
+  const roomTypes = useFurnishStore((s) => s.roomTypes);
+  const [wish, setWish] = useState('');
+  const [scope, setScope] = useState<'room' | 'all'>('room');
+  const audio = preview?.items.some((i) => i.kind === 'speaker') ? preview : null;
+  const propose = () => {
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const s = suggestAudio(project, scope === 'room' && room ? [room.id] : undefined, parseWishes(wish), roomTypes);
+    if (!s.items.length) {
+      ui.toast(s.later[0]?.text ?? 'Kein Audio-Vorschlag möglich: Sofa, Bett oder Schreibtisch fehlen im Raum.', 'info');
+      return;
+    }
+    setPreview(s);
+  };
+  const roomName = (id: string) => project.rooms.find((r) => r.id === id)?.name ?? '';
+  return (
+    <Section title="Audio-Setup vorschlagen">
+      <p className="muted small">Lautsprecher-Arten (keine Modelle, keine Preise) je Raum mit Platz und Abstand: Wohnzimmer zum Sofa, Schlafzimmer am Bett, Arbeitszimmer am Schreibtisch. Wünsche wie „kompakter“, „Design nicht gut“ oder „mit Subwoofer“ geben einen neuen Vorschlag; der alte bleibt, bis du einen übernimmst.</p>
+      <SelectField label="Für" value={scope} options={[{ value: 'room', label: `Nur „${room?.name ?? '–'}“` }, { value: 'all', label: 'Ganze Wohnung' }]} onChange={(v) => setScope(v as 'room' | 'all')} />
+      <TextField label="Wunsch (optional)" value={wish} onChange={setWish} />
+      <button className="primary block" onClick={propose} disabled={!room} data-testid="audio-suggest">
+        {audio ? 'Neuer Vorschlag mit Wunsch' : 'Vorschlag zeigen'}
+      </button>
+      {audio && (
+        <div data-testid="audio-result">
+          <ul className={css.list}>
+            {audio.items.map((it) => (
+              <li key={it.key} className="small" data-testid="audio-item" data-type={it.speakerType}>
+                <strong>{it.name}</strong> ({it.speakerType ? SPEAKER_TYPES[it.speakerType].label : ''}) – {it.reason}
+              </li>
+            ))}
+          </ul>
+          {audio.later.map((l) => (
+            <p key={l.roomId} className="muted small">{roomName(l.roomId)}: {l.text}</p>
+          ))}
+          <p className="small" data-testid="audio-cost">Preis: offen – erst ein echtes Produkt wählen, dann Preis und Quelle prüfen.</p>
+          <div className="btn-row">
+            <button className="primary" onClick={() => applySmartHomeSuggestion(audio)} data-testid="audio-apply">Übernehmen</button>
+            <button onClick={() => setPreview(null)} data-testid="audio-discard">Verwerfen</button>
           </div>
         </div>
       )}

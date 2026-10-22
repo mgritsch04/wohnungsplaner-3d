@@ -6,6 +6,7 @@ import { useUiStore } from '../store/uiStore';
 import { Badge, NumberField, SelectField, TextField } from '../ui/fields';
 import { deleteSelection, toggleOpening } from '../ui/actions';
 import { addAutomationFor, roomAt, setStripPoints, updateDevice } from './actions';
+import { SPEAKER_TYPES, speakerHints, type SpeakerType } from './audio';
 import { KIND_LABEL, productById } from './catalog';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { rulesOf, ruleSentence } from './rules';
@@ -157,10 +158,10 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
           </div>
         </header>
         <div className="panel-section-body">
-          <p className="small">
+          {d.kind !== 'speaker' && <p className="small">
             Status: <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness)}</Badge>
             {!running && <span className="muted"> (Simulation aus)</span>}
-          </p>
+          </p>}
           <div className="btn-row">
             {(d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip') && (
               <button className="primary" onClick={() => sim.setEntity(d.id, !st.on)} data-testid="device-toggle">
@@ -178,6 +179,16 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
               </button>
             )}
           </div>
+          {d.kind === 'speaker' && (
+            <SelectField label="Art" value={d.speakerType ?? 'bookshelf'} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value, label: s.label }))} onChange={(v) => updateDevice(d.id, { speakerType: v as SpeakerType, elevation: SPEAKER_TYPES[v as SpeakerType].elevation })} />
+          )}
+          {d.kind === 'speaker' && (
+            <ul className="small" data-testid="speaker-hints">
+              {speakerHints(project, derived, d).map((h, i) => (
+                <li key={i} data-ok={h.ok}>{h.ok ? '✓' : '⚠'} {h.text}</li>
+              ))}
+            </ul>
+          )}
           {d.kind === 'strip' && (
             <p className="small" data-testid="strip-length">
               Länge: <strong>{formatLength(stripLengthM(stripPoints(d)))}</strong> ({stripPoints(d).length - 1} {stripPoints(d).length === 2 ? 'Abschnitt' : 'Abschnitte'})
