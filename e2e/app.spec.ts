@@ -4288,3 +4288,48 @@ test('walkthrough: field-of-view slider with quick choices, head bob, reference 
   expect((await settings()).showRefFigure).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('walkthrough: E still works after a slider or checkbox had focus; text fields hint instead of eating keys silently (#283)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await freshStart(page);
+  const p0 = await getProject(page);
+  const window1 = p0.openings.find((o: { kind: string; width: number }) => o.kind === 'window' && Math.abs(o.width - 1.8) < 1e-6);
+  const openOf = async (id: string) => (await getProject(page)).openings.find((o: { id: string }) => o.id === id).open as boolean;
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.getByRole('button', { name: 'Begehen' }).click();
+  await expect(page.locator('.walk-overlay')).toBeVisible();
+  const aim = async () => {
+    const c = await page.evaluate((oid) => {
+      const t = (window as any).__wp.three;
+      const v = t.scene.getObjectByName(`leaf:${oid}:0`).children[0].getWorldPosition(t.camera.position.clone());
+      const cam = t.camera.position;
+      (window as any).__wp.walk.look(Math.atan2(-(v.x - cam.x), -(v.z - cam.z)), Math.atan2(1.6 - cam.y, Math.hypot(v.x - cam.x, v.z - cam.z)));
+    }, window1.id);
+    return c;
+  };
+  await aim();
+  await expect.poll(() => page.evaluate(() => (window as any).__wp.walk.targetOpening() as string | null)).toBe(window1.id);
+  // a focused checkbox/slider no longer swallows E
+  await page.evaluate(() => {
+    const i = document.createElement('input');
+    i.type = 'checkbox';
+    i.id = 'probe-cb';
+    document.body.appendChild(i);
+    i.focus();
+  });
+  await page.keyboard.press('e');
+  await expect.poll(() => openOf(window1.id)).toBe(true);
+  // a text field still blocks the walking keys, but says why; Esc hands the keyboard back
+  await page.evaluate(() => {
+    const i = document.createElement('input');
+    i.type = 'text';
+    i.id = 'probe-text';
+    document.body.appendChild(i);
+    i.focus();
+  });
+  await page.keyboard.press('e');
+  await expect(page.getByText('Eingabefeld aktiv')).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('probe-text');
+  expect(errors).toEqual([]);
+});
