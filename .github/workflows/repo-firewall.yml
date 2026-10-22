@@ -1,0 +1,18 @@
+# Brandmauer: PRs mit Fremdpräfix oder Verweis auf das andere Repo schlagen fehl.
+name: repo-firewall
+on: pull_request
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      OTHER: fitness-coach
+      PREFIX: wp
+    steps:
+      - name: Branch und Text prüfen
+        env:
+          HEAD: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          case "$HEAD" in claude/*) case "$HEAD" in claude/$PREFIX-*) ;; claude/fit-*|claude/wp-*) echo "Fremdpräfix"; exit 1;; esac;; esac
+          if printf '%s\n%s' "$TITLE" "$BODY" | grep -q "mgritsch04/$OTHER"; then echo "Verweis auf mgritsch04/$OTHER"; exit 1; fi
