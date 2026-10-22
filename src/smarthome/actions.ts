@@ -5,7 +5,9 @@ import { dist, pointInPolygon, polygonCentroid, type Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useSimStore } from './simStore';
+import { sightOccluders } from '../model/visibility';
 import { DEFAULT_ELEVATION, KIND_LABEL, productById } from './catalog';
+import { formatLength, snapToEdges, stripLengthM } from './strip';
 
 /** Editing operations for smart-home devices and automations (#170); each is one undo step. */
 
@@ -92,9 +94,49 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
       dev.lightId = lightId;
       dev.elevation = Math.max(1, d.settings.defaultWallHeight - 0.15);
     }
+    if (kind === 'strip') {
+      // a 1 m strip centred on the spot; the user pulls the ends to the right length
+      dev.points = [{ x: r3(pos.x - 0.5), y: pos.y }, { x: r3(pos.x + 0.5), y: pos.y }];
+      dev.x = dev.points[0].x;
+      dev.direction = 'down';
+    }
     d.devices.push(dev);
   });
   return id;
+}
+
+/** Snap a strip point to a nearby wall face or furniture edge (#238). */
+export function snapStripPoint(project: Project, p: Vec2): Vec2 {
+  const snapped = snapToEdges(p, project, sightOccluders(project, derivePlan(project)));
+  return { x: r3(snapped.x), y: r3(snapped.y) };
+}
+
+/** Place an LED strip along `points` (already snapped); one undo step, selected and flashed like other devices. */
+export function placeStrip(points: Vec2[]): string | null {
+  if (points.length < 2) return null;
+  const id = newId('dev');
+  const st = useProjectStore.getState();
+  const derived = derivePlan(st.project);
+  const room = st.project.rooms.find((r) => r.id === roomAt(st.project, derived, points[0]));
+  st.apply((d) => {
+    d.devices.push({ id, name: nameFor(d, 'strip', room?.name), kind: 'strip', x: points[0].x, y: points[0].y, rotation: 0, elevation: DEFAULT_ELEVATION.strip, points, direction: 'down' });
+  });
+  const ui = useUiStore.getState();
+  ui.setSelection({ type: 'device', id });
+  useSimStore.getState().setFlash(id);
+  ui.toast(`LED-Streifen (${formatLength(stripLengthM(points))}) platziert – Strg+Z macht es rückgängig.`, 'success');
+  return id;
+}
+
+/** Replace the path of a strip (keeps x/y = first point). */
+export function setStripPoints(id: string, points: Vec2[]) {
+  useProjectStore.getState().apply((d) => {
+    const dev = d.devices.find((x) => x.id === id);
+    if (!dev || points.length < 2) return;
+    dev.points = points;
+    dev.x = points[0].x;
+    dev.y = points[0].y;
+  });
 }
 
 /** Lights that no smart device controls yet (#250). */
@@ -150,6 +192,10 @@ export function updateDevice(id: string, patch: Partial<Omit<SmartDevice, 'id' |
     const dev = d.devices.find((x) => x.id === id);
     if (!dev) return;
     Object.assign(dev, patch);
+    if (dev.kind === 'strip' && dev.points) {
+      dev.x = dev.points[0].x;
+      dev.y = dev.points[0].y;
+    }
     syncLight(d, dev);
   });
 }

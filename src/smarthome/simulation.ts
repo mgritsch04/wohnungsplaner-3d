@@ -22,6 +22,8 @@ export interface EntityState {
   on: boolean;
   /** lights: 1..100 % */
   brightness?: number;
+  /** LED strips (#238): colour (#rrggbb) set by a rule; unset = the strip's planned colour */
+  color?: string;
   /** sensors: simulated second of the last detection */
   lastSeen?: number;
 }
@@ -168,7 +170,8 @@ export function withHour(state: SimState, hour: number, text = `Uhrzeit von Hand
 export function initialState(project: Project, hour = project.settings.timeOfDay): SimState {
   const entities: Record<string, EntityState> = {};
   for (const d of project.devices) {
-    if (d.kind === 'light') {
+    if (d.kind === 'strip') entities[d.id] = { on: false, brightness: 100 };
+    else if (d.kind === 'light') {
       const l = project.lights.find((x) => x.id === d.lightId);
       entities[d.id] = { on: l?.on ?? false, brightness: 100 };
     } else if (d.kind === 'contact') {
@@ -225,11 +228,13 @@ export function step(project: Project, occluders: Occluder[], prev: SimState, dt
   const act = (a: Automation, on: boolean) => {
     for (const id of a.action.deviceIds) {
       const d = devices.get(id);
-      if (!d || (d.kind !== 'light' && d.kind !== 'plug')) continue;
+      if (!d || (d.kind !== 'light' && d.kind !== 'plug' && d.kind !== 'strip')) continue;
       const e = (entities[id] ??= { on: false });
-      if (e.on === on && (!on || e.brightness === (a.action.brightness ?? 100))) continue;
+      const color = d.kind === 'strip' && on ? a.action.color : undefined;
+      if (e.on === on && (!on || (e.brightness === (a.action.brightness ?? 100) && (color === undefined || e.color === color)))) continue;
       e.on = on;
       if (on) e.brightness = a.action.brightness ?? 100;
+      if (color) e.color = color;
       log(`${a.name}: ${d.name} ${on ? 'an' : 'aus'}`);
     }
   };

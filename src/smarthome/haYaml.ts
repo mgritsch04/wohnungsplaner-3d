@@ -20,7 +20,7 @@ export function slug(name: string): string {
   return s || 'geraet';
 }
 
-const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch', router: 'device_tracker' };
+const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch', router: 'device_tracker', strip: 'light' };
 
 /** Entity id per device; duplicates get a numeric suffix. */
 export function entityIds(devices: SmartDevice[]): Map<string, string> {
@@ -35,6 +35,9 @@ export function entityIds(devices: SmartDevice[]): Map<string, string> {
   }
   return out;
 }
+
+/** #rrggbb → [r, g, b] (LED strips, #238) */
+const hexToRgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
 const q = (s: string) => JSON.stringify(s);
 const hhmmss = (h: number) => {
@@ -53,12 +56,28 @@ function automationYaml(a: Automation, ids: Map<string, string>, devices: Map<st
   const targets = a.action.deviceIds.filter((id) => devices.has(id) && ids.has(id));
   const target = (domain: string) => targets.filter((id) => ids.get(id)!.startsWith(`${domain}.`)).map((id) => ids.get(id)!);
   const call = (on: boolean) => {
-    for (const domain of ['light', 'switch']) {
-      const ents = target(domain);
-      if (!ents.length) continue;
-      L.push(`    - action: ${domain}.turn_${on ? 'on' : 'off'}`, '      target:', '        entity_id:', ...ents.map((e) => `          - ${e}`));
-      if (on && domain === 'light' && a.action.brightness !== undefined) L.push('      data:', `        brightness_pct: ${Math.round(a.action.brightness)}`);
+    // a strip with its own planned colour/colour temperature gets its own call (#238)
+    const planned = (id: string) => {
+      const d = devices.get(id);
+      return !a.action.color && d?.kind === 'strip' ? (d.color ? `rgb_color: [${hexToRgb(d.color).join(', ')}]` : d.kelvin ? `color_temp_kelvin: ${Math.round(d.kelvin)}` : null) : null;
+    };
+    const lights = targets.filter((id) => ids.get(id)!.startsWith('light.'));
+    const own = on ? lights.filter(planned) : [];
+    const groups: { ents: string[]; extra: string | null }[] = [
+      { ents: lights.filter((id) => !own.includes(id)).map((id) => ids.get(id)!), extra: null },
+      ...own.map((id) => ({ ents: [ids.get(id)!], extra: planned(id) })),
+    ];
+    for (const g of groups) {
+      if (!g.ents.length) continue;
+      L.push(`    - action: light.turn_${on ? 'on' : 'off'}`, '      target:', '        entity_id:', ...g.ents.map((e) => `          - ${e}`));
+      const data: string[] = [];
+      if (on && a.action.brightness !== undefined) data.push(`brightness_pct: ${Math.round(a.action.brightness)}`);
+      if (on && a.action.color) data.push(`rgb_color: [${hexToRgb(a.action.color).join(', ')}]`);
+      if (on && g.extra) data.push(g.extra);
+      if (data.length) L.push('      data:', ...data.map((x) => `        ${x}`));
     }
+    const sw = target('switch');
+    if (sw.length) L.push(`    - action: switch.turn_${on ? 'on' : 'off'}`, '      target:', '        entity_id:', ...sw.map((e) => `          - ${e}`));
   };
   L.push('  actions:');
   call(a.action.on);

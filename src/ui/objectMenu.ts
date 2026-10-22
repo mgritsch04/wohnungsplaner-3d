@@ -151,7 +151,7 @@ export function objectMenuModel(p: Project, d: DerivedPlan, target: Selection, c
       const details = [KIND_LABEL[dev.kind]];
       if (ctx.deviceStatus) details.push(`Status: ${ctx.deviceStatus.label}`);
       const actions: ObjectAction[] = [];
-      if (dev.kind === 'light' || dev.kind === 'plug') actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Ausschalten' : 'Einschalten' });
+      if (dev.kind === 'light' || dev.kind === 'plug' || dev.kind === 'strip') actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Ausschalten' : 'Einschalten' });
       if (dev.kind === 'motion' || dev.kind === 'presence') actions.push({ id: 'trigger-device', label: 'Auslösen (testen)', hint: 'Meldet sofort „Bewegung“' });
       if (dev.kind === 'contact' && dev.openingId) actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Schließen' : 'Öffnen' });
       actions.push(del, properties);
