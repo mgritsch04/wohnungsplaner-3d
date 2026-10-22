@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { catalogDropPreview, draggedCatalogItem, droppedCatalogItem, isCatalogDrag, useCatalogDragStore, type DropPreview } from '../catalog/catalogDrag';
 import { derivePlan, type DerivedPlan } from '../model/derived';
@@ -8,7 +8,9 @@ import type { Furniture, Project } from '../model/schema';
 import { planRotationToWorldY } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { dropCatalogItemAt } from '../ui/actions';
-import { ProceduralModel } from './ProceduralModel';
+import { FurnitureObject } from './FurnitureObject';
+
+const noop = () => {};
 
 const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
@@ -89,7 +91,7 @@ function DropGhost({ item, color }: { item: Furniture; color: string }) {
   const model = useRef<THREE.Group>(null);
   const clones = useRef(new Set<THREE.Material>());
   // translucent copies of the model's materials (shared materials of placed furniture stay untouched)
-  useLayoutEffect(() => {
+  const makeTranslucent = () => {
     model.current?.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -107,7 +109,10 @@ function DropGhost({ item, color }: { item: Furniture; color: string }) {
       });
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
     });
-  });
+  };
+  useLayoutEffect(makeTranslucent);
+  // a GLB that finishes loading while dragging replaces the placeholder: make it translucent too
+  useFrame(makeTranslucent);
   useEffect(() => {
     const set = clones.current;
     return () => {
@@ -115,11 +120,12 @@ function DropGhost({ item, color }: { item: Furniture; color: string }) {
       set.clear();
     };
   }, []);
-  const shape = item.model.type === 'procedural' ? item.model.shape : item.model.fallbackShape;
+  // the same renderer as for the placed piece (GLB with cache, standard shape while it loads), at the group's origin
+  const local = useMemo(() => ({ ...item, x: 0, y: 0, elevation: 0, rotation: 0 }), [item]);
   return (
     <group name="catalog-drop-ghost" position={[item.x, item.elevation, item.y]} rotation={[0, planRotationToWorldY(item.rotation), 0]} userData={{ catalogDropGhost: true, name: item.name }}>
       <group ref={model}>
-        <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} quality="planning" castShadow={false} />
+        <FurnitureObject item={local} quality="planning" selected={false} readOnly onSelect={noop} onDragStart={noop} onDrag={noop} onDragEnd={noop} onDragCancel={noop} />
       </group>
       <lineSegments geometry={edges} position={[0, h / 2, 0]} raycast={() => null} renderOrder={3}>
         <lineBasicMaterial color={color} depthTest={false} transparent opacity={0.9} />
