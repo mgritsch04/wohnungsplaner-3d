@@ -3,6 +3,10 @@ on:
   push:
     branches: [main]
   pull_request:
+# A newer push to a PR makes the older run obsolete; never cancel runs on main.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -14,12 +18,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npx tsc -b
       - run: npm test
+      # `npm run build` is `tsc -b && vite build`, so this also type-checks
       - run: npm run build
-  e2e:
+  # e2e runs in parallel to `checks` and is split into shards (playwright --shard splits by test, see fullyParallel)
+  e2e-shard:
+    name: e2e-shard (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    needs: checks
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,12 +36,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - id: pw
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.pw.outputs.version }}
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test
+      # stop a broken run early instead of working through every remaining test
+      - run: npx playwright test --shard=${{ matrix.shard }}/4 --max-failures=3
       # screenshots and diagnostics of failed tests (e.g. #157), kept for a week
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-test-results
+          name: e2e-test-results-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+  # Single stable check name `e2e` (as before) that is green only if all shards are.
+  e2e:
+    if: always()
+    needs: e2e-shard
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.e2e-shard.result }}" = "success"
