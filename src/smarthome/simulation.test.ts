@@ -3,6 +3,7 @@ import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
 import { addFurniture, addOpening, addRectRoom, setOpeningOpen } from '../model/operations';
 import type { Automation, Furniture, Project, SmartDevice } from '../model/schema';
+import { PROJECT_SCHEMA_VERSION } from '../model/schema';
 import { migrateProjectObject, parseProject } from '../formats/project/projectFile';
 import { automationsYaml, entityIds, slug } from './haYaml';
 import { detectionPolygon, doorMotionPoints, initialState, inDetectionArea, occludersOf, roomCoverage, sensorParams, step, withHour, type SimInput, type SimState } from './simulation';
@@ -132,7 +133,7 @@ describe('schema 2 migration (#170)', () => {
   it('adds empty devices/automations to version-1 projects and keeps saved devices', () => {
     const p = twoRooms();
     const { devices: _d, automations: _a, ...v1 } = { ...p, schemaVersion: 1 };
-    expect(migrateProjectObject(v1)).toMatchObject({ schemaVersion: 2, devices: [], automations: [] });
+    expect(migrateProjectObject(v1)).toMatchObject({ schemaVersion: PROJECT_SCHEMA_VERSION, devices: [], automations: [] });
     const back = parseProject(JSON.parse(JSON.stringify(p))).project;
     expect(back.devices).toHaveLength(2);
     expect(back.automations[0].offAfterS).toBe(120);

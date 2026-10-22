@@ -3,6 +3,7 @@ import { makeLightSmartWithFeedback } from '../../smarthome/actions';
 import { DEVICE_PRODUCTS } from '../../smarthome/catalog';
 import { DeviceInfo } from '../../smarthome/DeviceInfo';
 import { FixtureProps } from '../../installation/FixtureProps';
+import { ASSEMBLIES, estimateInsulation, ratingOf, soundIssues, wallRooms, type WallAssembly } from '../../model/acoustics';
 import { derivePlan } from '../../model/derived';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
@@ -152,6 +153,34 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           <NumberField label="Ende Y" value={b.y} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.b, { x: b.x, y: v }))} />
         </div>
       </PanelGroup>
+      <PanelGroup groupKey="wall.sound" title="Aufbau und Schallschutz">
+        <SelectField
+          label="Aufbau"
+          value={w.assembly ?? ''}
+          options={[{ value: '', label: 'unbekannt (wie Ziegel)' }, ...ASSEMBLIES.map((x) => ({ value: x.id as string, label: x.label }))]}
+          onChange={(v) =>
+            apply((d) => {
+              const x = d.walls.find((q) => q.id === id);
+              if (x) x.assembly = v ? (v as WallAssembly) : undefined;
+            })
+          }
+        />
+        <dl className="stats">
+          <dt>Schallschutz (Schätzung)</dt>
+          <dd>
+            ca. {estimateInsulation(w)} dB, {ratingOf(estimateInsulation(w))}
+          </dd>
+        </dl>
+        {soundIssues(project)
+          .filter((i) => i.wallId === id)
+          .map((i) => (
+            <p key={i.quietRoomId} className="warning small">
+              Laut neben ruhig: {project.rooms.find((r) => r.id === i.loudRoomId)?.name} grenzt an {project.rooms.find((r) => r.id === i.quietRoomId)?.name}.
+            </p>
+          ))}
+        {wallRooms(project, id).length < 2 && <p className="muted small">Grenzt an höchstens einen Raum – Raumnachbarn werden nur zwischen zwei Räumen bewertet.</p>}
+        <p className="muted small">Grobe Schätzung zur Orientierung, keine bauphysikalische Berechnung. Typische Richtwerte je Bauart.</p>
+      </PanelGroup>
       <PanelGroup groupKey="wall.surfaces" title="Oberflächen">
         <MaterialSelect
           label="Seite links"
@@ -262,6 +291,13 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
             <dd>{furnitureInRoom}</dd>
           </dl>
         )}
+        {soundIssues(project)
+          .filter((i) => i.loudRoomId === id || i.quietRoomId === id)
+          .map((i) => (
+            <p key={i.wallId} className="warning small">
+              Schall (Schätzung): {project.rooms.find((q) => q.id === i.loudRoomId)?.name} grenzt an {project.rooms.find((q) => q.id === i.quietRoomId)?.name} – Wand mit ca. {i.db} dB, {i.rating}.
+            </p>
+          ))}
         {!area?.closed && <p className="warning small">Der Raum ist nicht vollständig von Wänden umschlossen.</p>}
       </PanelGroup>
       {rect && (
