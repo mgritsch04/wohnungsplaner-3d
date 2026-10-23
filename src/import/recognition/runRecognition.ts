@@ -17,6 +17,7 @@ import { imageToWorld } from '../underlayTransform';
 import { detectFixtures } from './fixtures';
 import { detectInstallations, INSTALLATION_ACCEPT_AT } from './installations';
 import { FIXTURE_ELEVATION, FIXTURE_LABEL } from '../../model/fixtures';
+import { dedupeOpenings } from './dedupe';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
 import { isGlassDoor, type Underlay } from '../../model/schema';
@@ -49,7 +50,10 @@ export async function runRecognition() {
       out = await raster.recognize(input, (v) => progress({ label: `${raster.label}…`, value: v }));
       source = 'raster';
     }
+    const deduped = dedupeOpenings(out.openings);
+    out = { ...out, openings: deduped.openings };
     const draft = outputToDraft(out, u, source, recognizer.label);
+    if (deduped.removed) draft.warnings.push(`${deduped.removed} doppelt erkannte Öffnung(en) an derselben Stelle zusammengeführt.`);
     if (draft.walls.length === 0) {
       useUiStore.getState().toast('Es wurden keine Wände erkannt. Bitte die Wände manuell nachzeichnen (Werkzeug „Wand“).', 'info');
       return;
@@ -80,7 +84,8 @@ export async function runRecognition() {
         draft.warnings.push(`Türbreiten: ${widths.labelled} aus der Beschriftung im Plan, ${widths.reduced} als Wandlücke minus Zarge (${Math.round(JAMB_ALLOWANCE * 100)} cm) geschätzt – bitte prüfen.`);
     }
     // fitted tub, basin and WC from their symbols (#255)
-    if (analysis && analysis.imageAssetId === u.imageAssetId) {
+    const { detectSanitary, detectInstallationSymbols } = useImportStore.getState().options;
+    if (analysis && analysis.imageAssetId === u.imageAssetId && (detectSanitary || detectInstallationSymbols)) {
       const interiors = roomInteriors(draft.walls);
       const rooms = interiors.map((polygon) => ({ polygon, name: draft.rooms.find((r) => pointInPolygon(r.labelPoint, polygon))?.name ?? '' }));
       const world = analysis.segments.map((s) => {
@@ -88,7 +93,7 @@ export async function runRecognition() {
         const b = imageToWorld(u, { x: s.x2, y: s.y2 });
         return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, curve: s.curve, areaFill: s.areaFill, darkFill: s.darkFill, faint: s.faint };
       });
-      draft.fixtures = detectFixtures(world, draft.walls, rooms).map((f) => ({
+      draft.fixtures = (detectSanitary ? detectFixtures(world, draft.walls, rooms) : []).map((f) => ({
         id: newId('dfx'),
         catalogId: f.catalogId,
         name: FIXTURE_NAMES[f.catalogId] ?? f.catalogId,
@@ -99,11 +104,11 @@ export async function runRecognition() {
         status: 'uncertain' as const,
         confidence: f.confidence,
         note: f.note,
-        accepted: true,
+        accepted: false,
       }));
-      if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – werden als Bestand übernommen (nicht im Budget). Bitte prüfen.`);
+      if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – sind nicht vorausgewählt (Bestand, nicht im Budget). Bitte prüfen.`);
       // sockets, switches, LAN, water, radiators from their symbols (#222)
-      draft.installations = detectInstallations(world, draft.walls, rooms).map((i) => {
+      draft.installations = (detectInstallationSymbols ? detectInstallations(world, draft.walls, rooms, draft.openings) : []).map((i) => {
         const sure = i.confidence >= INSTALLATION_ACCEPT_AT;
         return {
           id: newId('dfi'),

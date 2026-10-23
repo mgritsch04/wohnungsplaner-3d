@@ -97,6 +97,8 @@ function UnderlayControls() {
   const tool = useUiStore((s) => s.tool);
   const measurements = useUiStore((s) => s.measurements);
   const analysis = useSourceAnalysis((s) => s.analysis);
+  const recOptions = useImportStore((s) => s.options);
+  const setRecOptions = useImportStore((s) => s.setOptions);
   const [checks, setChecks] = useState<Record<string, string>>({});
   const [scaleText, setScaleText] = useState('100');
   const [cropOn, setCropOn] = useState(!!u.crop);
@@ -244,6 +246,13 @@ function UnderlayControls() {
           Wände – und schlägt für geschlossene Wandzüge Räume vor. Das Ergebnis ist ein Vorschlag und muss geprüft werden. Funktioniert am besten bei sauberen
           Plänen.
         </p>
+        <label className="row small">
+          <input type="checkbox" checked={recOptions.detectSanitary} onChange={(e) => setRecOptions({ detectSanitary: e.target.checked })} /> WC, Badewanne, Waschbecken aus Symbolen suchen
+        </label>
+        <label className="row small">
+          <input type="checkbox" checked={recOptions.detectInstallationSymbols} onChange={(e) => setRecOptions({ detectInstallationSymbols: e.target.checked })} /> Steckdosen, Schalter, Heizkörper aus Symbolen suchen
+        </label>
+        <p className="muted small">Beides ist aus, weil Symbole leicht mit Türen und Möbeln verwechselt werden. Gefundenes wird nur vorgeschlagen.</p>
         <button className="block" disabled={!u.calibrated || !!progress} onClick={() => void runRecognition()} title={u.calibrated ? '' : 'Erst den Maßstab kalibrieren'}>
           Erkennung starten
         </button>
