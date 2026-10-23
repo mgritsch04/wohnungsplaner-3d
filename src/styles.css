@@ -807,10 +807,12 @@ dl.stats dd {
 .budget-total strong {
   font-size: var(--font-size-xl);
 }
-.budget-group + .budget-group {
+.budget-group + .budget-group,
+.purchase-group + .purchase-group {
   margin-top: var(--space-4);
 }
-.budget-group-head {
+.budget-group-head,
+.purchase-group-head {
   display: flex;
   justify-content: space-between;
   font-weight: var(--font-weight-semibold);
@@ -848,6 +850,19 @@ dl.stats dd {
   align-items: center;
   justify-content: flex-end;
   font-variant-numeric: tabular-nums;
+}
+
+.phase-budget {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+}
+.phase-budget input {
+  width: 8em;
+}
+.budget-lines select {
+  justify-self: end;
 }
 
 /* kitchen */

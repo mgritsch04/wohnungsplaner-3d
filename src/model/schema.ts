@@ -211,6 +211,9 @@ export const InteriorSchema = z.object({
   parts: z.array(InteriorPartSchema).max(80),
 });
 
+/** Phase of the purchase plan (#363): bought for moving in, in month 2, or "some time later". Absent = moving in. */
+export const BuyPhaseSchema = z.enum(['movein', 'month2', 'later']);
+
 export const FurnitureSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().optional(),
@@ -251,6 +254,8 @@ export const FurnitureSchema = z.object({
   interior: InteriorSchema.optional(),
   /** Luminous flux of a lamp in lumen (#360), e.g. from the packaging; absent = typical value of the lamp type is assumed. */
   lumen: z.number().min(0).max(20000).optional(),
+  /** Purchase phase (#363); absent = moving in. Optional: older files stay valid (no migration). */
+  buyPhase: BuyPhaseSchema.optional(),
 });
 
 /**
@@ -318,6 +323,8 @@ export const SmartDeviceSchema = z.object({
   speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']).optional(),
   /** kind `speaker` (#336): the own device (project.audioCatalog) this speaker is; its size and coverage feed the hints. */
   audioDefId: z.string().optional(),
+  /** Purchase phase (#363); absent = by the smart-home concept phase of the device kind. */
+  buyPhase: BuyPhaseSchema.optional(),
 });
 
 /**
@@ -637,6 +644,8 @@ export const ProjectSchema = z.object({
   /** Storeys (#54, schema 6), sorted by elevation; the plan fields above belong to `activeLevelId`. */
   /** Own audio devices (#336, schema 7); shared by all storeys. */
   audioCatalog: z.array(AudioDeviceDefSchema).max(100).default([]),
+  /** Budget in EUR per purchase phase (#363); a phase without an entry has no limit. Projects saved before lack the field. */
+  purchaseBudgets: z.object({ movein: z.number().min(0).max(1e8).optional(), month2: z.number().min(0).max(1e8).optional(), later: z.number().min(0).max(1e8).optional() }).default({}),
   levels: z.array(LevelSchema).min(1).max(30).default([{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }]),
   activeLevelId: z.string().min(1).default(DEFAULT_LEVEL_ID),
 });
@@ -650,6 +659,7 @@ export type Room = z.infer<typeof RoomSchema>;
 export type MaterialKind = z.infer<typeof MaterialKindSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
 export type FurnitureFinish = z.infer<typeof FurnitureFinishSchema>;
+export type BuyPhase = z.infer<typeof BuyPhaseSchema>;
 export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 export type KitchenModule = z.infer<typeof KitchenModuleSchema>;
