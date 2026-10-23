@@ -349,7 +349,7 @@ function MissingDims({ shop, onAdded }: { shop: 'ikea' | 'moebelix'; onAdded: (i
     <section data-testid={`${shop}-missing-dims`}>
       <h3 className={s.heading}>Maße fehlen ({drafts.length})</h3>
       <p className={s.empty}>
-        Auf diesen Seiten stehen keine vollständigen Maße. Bitte selbst eintragen (bei Pflanzen z. B. den Topfdurchmesser als Breite und Tiefe), dann kommt das
+        Auf diesen Seiten stehen keine vollständigen Maße. Bitte selbst eintragen (bei runden Dingen wie Pflanzen den Durchmesser – er gilt dann als Breite und Tiefe), dann kommt das
         Produkt in die Auswahl.
       </p>
       <ul className={s.cards}>
@@ -427,6 +427,23 @@ function DraftCard({ pending, onAdded }: { pending: PendingDraft; onAdded: (id: 
             </label>
           ))}
           <span>cm</span>
+        </span>
+        <span className={s.dims}>
+          <label>
+            Oder Durchmesser
+            <input
+              type="number"
+              min={1}
+              inputMode="decimal"
+              value={dims.width !== '' && dims.width === dims.depth ? dims.width : ''}
+              onChange={(e) => {
+                setDims((prev) => ({ ...prev, width: e.target.value, depth: e.target.value }));
+                setEstimated((prev) => new Set([...prev].filter((x) => x !== 'width' && x !== 'depth')));
+              }}
+              aria-label="Durchmesser in cm (Breite und Tiefe)"
+            />
+          </label>
+          <span>cm (= Breite und Tiefe)</span>
         </span>
         {estimated.size > 0 && (
           <span className={s.meta}>
