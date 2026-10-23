@@ -18,6 +18,8 @@ import { suggestSmartHome } from './suggest';
 import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { WifiSection } from './WifiPanel';
+import { DayRoutineSection } from './DayRoutineSection';
+import { useDayStore } from './dayReplay';
 import { ConceptSection } from './ConceptPanel';
 import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
@@ -491,7 +493,15 @@ function TestStep({ project, derived, room, setRoomId }: RoomProps) {
               Simulation stoppen
             </button>
           ) : (
-            <button className="primary" onClick={start} disabled={!project.devices.length} data-testid="sim-start">
+            <button
+              className="primary"
+              onClick={() => {
+                useDayStore.getState().clear();
+                start();
+              }}
+              disabled={!project.devices.length}
+              data-testid="sim-start"
+            >
               Simulation starten
             </button>
           )}
@@ -521,6 +531,7 @@ function TestStep({ project, derived, room, setRoomId }: RoomProps) {
           </>
         )}
       </Section>
+      <DayRoutineSection hasDevices={project.devices.length > 0} />
       {state && state.events.length > 0 && (
         <Section title="Protokoll">
           <ol className={css.log} data-testid="sim-log">
