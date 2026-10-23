@@ -53,6 +53,14 @@ describe('room type from name (#137)', () => {
 });
 
 describe('furnishing suggestion (#137)', () => {
+  it('sample bedroom: both table lamps stand on the two nightstands, also the one beside the window (#346)', () => {
+    const p = createSampleProject();
+    const room = p.rooms.find((r) => r.name === 'Schlafzimmer')!;
+    const s = suggestFurnishing(p, [{ roomId: room.id, type: 'bedroom', wishes: [{ catalogId: 'generic-table-lamp', quantity: 2 }] }]);
+    expect(s.rooms[0].missing).toEqual([]);
+    expect(s.items.filter((f) => f.name === 'Tischlampe')).toHaveLength(2);
+  });
+
   it('bedroom: bed against the longest wall, nightstands beside it, lamps on them, wardrobe – all collision free', () => {
     const p = roomProject(4, 3.5, 'Schlafzimmer');
     const s = suggest(p, 'bedroom');
