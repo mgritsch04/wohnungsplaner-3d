@@ -4385,3 +4385,22 @@ test('3D: Blick von außen zeigt Gebäude und Eingang und lässt sich umschalten
   await expect(page.getByTestId('exterior-entrance-label')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('Plan-Hintergrund-Schalter liegt nicht hinter dem Zoomregler und ist per Mausklick bedienbar (#258)', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.panel.left').getByRole('button', { name: 'Import' }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('.dropzone').click();
+  await (await chooser).setFiles({ name: 'grundriss.png', mimeType: 'image/png', buffer: syntheticPlanPng() });
+  await expect(page.getByText('Nicht kalibriert', { exact: true })).toBeVisible();
+  const toggle = page.getByTestId('underlay-toggle');
+  const slider = page.getByTestId('zoom-2d');
+  const tb = (await toggle.boundingBox())!;
+  const sb = (await slider.boundingBox())!;
+  expect(tb.y + tb.height).toBeLessThanOrEqual(sb.y + 1);
+  expect((await getProject(page)).underlay.visible).toBe(true);
+  await toggle.click();
+  expect((await getProject(page)).underlay.visible).toBe(false);
+});
