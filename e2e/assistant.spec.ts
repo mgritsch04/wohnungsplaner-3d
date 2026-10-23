@@ -240,7 +240,7 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
     const sample = {
       json: async (input: string, options?: { tools?: Tool[] }) => {
         await new Promise((r) => setTimeout(r, 30));
-        if (options?.tools) await new Promise((r) => setTimeout(r, 400));
+        if (options?.tools) await new Promise((r) => setTimeout(r, 2500));
         if (options?.tools && /Monstera/.test(input)) return { products: [] };
         if (options?.tools) {
           // product search: open the search page through the page function, then report what was "read"
@@ -289,8 +289,8 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   const proposal = panel.getByTestId('design-proposal');
   // one step: the real product is found without a second click; the progress is shown meanwhile
   await expect(panel.getByTestId('design-search')).toContainText(/Suche .* 1\/2/);
-  await page.screenshot({ path: 'test-results/design-350-progress.png' });
   await expect(panel.getByRole('button', { name: 'Suche stoppen' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/design-350-progress.png' });
   const pick = panel.getByTestId('design-pick').first();
   await expect(pick).toContainText('TESTSESSEL Cord');
   await expect(pick).toHaveAttribute('data-placeholder', 'no');
