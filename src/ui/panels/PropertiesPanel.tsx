@@ -5,6 +5,7 @@ import { DeviceInfo } from '../../smarthome/DeviceInfo';
 import { FixtureProps } from '../../installation/FixtureProps';
 import { ASSEMBLIES, estimateInsulation, ratingOf, soundIssues, wallRooms, type WallAssembly } from '../../model/acoustics';
 import { derivePlan } from '../../model/derived';
+import { statedAreaSummary } from '../../model/statedArea';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
@@ -805,6 +806,7 @@ function LightSmart({ id, project }: { id: string; project: Project }) {
 function NothingSelected({ project }: { project: Project }) {
   const derived = useMemo(() => derivePlan(project), [project]);
   const total = [...derived.rooms.values()].reduce((s, g) => s + g.area, 0);
+  const stated = statedAreaSummary(project.rooms, derived.rooms);
   return (
     <div className="panel-scroll">
       <Section title="Nichts ausgewählt">
@@ -814,6 +816,12 @@ function NothingSelected({ project }: { project: Project }) {
           <dd>{project.rooms.length}</dd>
           <dt>Gesamtfläche</dt>
           <dd>{formatArea(total)}</dd>
+          {stated && (
+            <>
+              <dt>Laut Plan</dt>
+              <dd data-testid="stated-area">{formatArea(stated.stated)}</dd>
+            </>
+          )}
           <dt>Wände</dt>
           <dd>{project.walls.length}</dd>
           <dt>Türen / Fenster</dt>
@@ -823,6 +831,12 @@ function NothingSelected({ project }: { project: Project }) {
           <dt>Objekte</dt>
           <dd>{project.furniture.length}</dd>
         </dl>
+        {stated && (
+          <p className="muted small" data-testid="stated-area-note">
+            Die Gesamtfläche ist die Summe der Netto-Raumflächen (lichte Maße zwischen den Wandoberflächen). Der Plan nennt für {stated.withStated} Räume zusammen {formatArea(stated.stated)}; die berechnete Summe dieser Räume ist {formatArea(stated.computed)} ({stated.diff >= 0 ? '+' : '−'}
+            {formatArea(Math.abs(stated.diff))}). Abweichungen entstehen durch gerundete Plan-Angaben, anders gezeichnete Wandstärken und Flächen, die der Plan nicht als Raum ausweist (Flur, Nischen, Schächte).
+          </p>
+        )}
       </Section>
       {project.rooms.length > 0 && (
         <Section title="Räume">

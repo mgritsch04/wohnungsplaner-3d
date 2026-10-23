@@ -102,6 +102,8 @@ export const RoomSchema = z.object({
   floorMaterialId: z.string().optional(),
   wallMaterialId: z.string().optional(),
   ceilingMaterialId: z.string().optional(),
+  /** Floor area (m²) the imported source plan states for this room; the computed area is the net clear area. */
+  statedArea: z.number().positive().optional(),
   provenance: ProvenanceSchema.optional(),
 });
 
