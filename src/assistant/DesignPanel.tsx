@@ -61,10 +61,10 @@ let controller: AbortController | null = null;
 let searchCtl: AbortController | null = null;
 
 const FIELDS: { key: 'interests' | 'needs' | 'wants' | 'colors'; label: string; placeholder: string }[] = [
-  { key: 'interests', label: 'Interessen / Hobbys', placeholder: 'Gaming, Lesen, Yoga' },
-  { key: 'needs', label: 'Was du brauchst', placeholder: 'Schlafplatz, Arbeitsplatz, Stauraum' },
-  { key: 'wants', label: 'Was du dir wünschst', placeholder: 'großes Sofa, Pflanzenecke' },
-  { key: 'colors', label: 'Farben (optional)', placeholder: 'Holz hell, Grün' },
+  { key: 'interests', label: 'Interessen / Hobbys', placeholder: 'z. B. Gaming, Lesen, Yoga\nein Stichpunkt pro Zeile' },
+  { key: 'needs', label: 'Was du brauchst', placeholder: 'z. B. Schlafplatz für Gäste\nArbeitsplatz mit Monitor\nviel Stauraum' },
+  { key: 'wants', label: 'Was du dir wünschst', placeholder: 'z. B. großes Sofa\nPflanzenecke am Fenster' },
+  { key: 'colors', label: 'Farben (optional)', placeholder: 'z. B. Holz hell, Grün' },
 ];
 
 const cm = (v: number) => Math.round(v * 100);
@@ -439,7 +439,7 @@ export function DesignPanel() {
               <label key={f.key} className="field">
                 <span className="field-label">{f.label}</span>
                 <span className="field-input">
-                  <input type="text" value={w[f.key]} placeholder={f.placeholder} maxLength={MAX_FIELD} onChange={(e) => text(f.key, e.target.value)} />
+                  <textarea className="design-wish" rows={4} value={w[f.key]} placeholder={f.placeholder} maxLength={MAX_FIELD} onChange={(e) => text(f.key, e.target.value)} />
                 </span>
               </label>
             ))}
@@ -806,7 +806,7 @@ function DislikeRow({
       <label className="field">
         <span className="field-label">Was soll anders werden?</span>
         <span className="field-input">
-          <input type="text" value={open} maxLength={MAX_FIELD} placeholder="z. B. weniger vollgestellt, Sofa zum Fenster, mehr Stauraum" onChange={(e) => onText(e.target.value)} />
+          <textarea className="design-wish" rows={3} value={open} maxLength={MAX_FIELD} placeholder="z. B. weniger vollgestellt, Sofa zum Fenster, mehr Stauraum" onChange={(e) => onText(e.target.value)} />
         </span>
       </label>
       <div className="btn-row">
