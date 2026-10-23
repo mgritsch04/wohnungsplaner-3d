@@ -16,7 +16,7 @@ import path from 'node:path';
 
 const { join } = path;
 
-export const SHOP_FETCH = ['WebFetch(domain:www.ikea.com)', 'WebFetch(domain:www.moebelix.at)'];
+export const SHOP_FETCH = ['WebFetch(domain:www.ikea.com)', 'WebFetch(domain:www.moebelix.at)', 'WebFetch(domain:moebelix.at)'];
 const BLOCKED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Task', 'Agent'];
 
 /** Argumente für `claude`; die Anfrage selbst kommt über stdin (Längengrenze der Kommandozeile). */
