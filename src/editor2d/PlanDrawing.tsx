@@ -6,6 +6,7 @@ import { ICON_MIN_ZOOM, roomLabelDetail } from './viewTransform';
 import { add, dist, normalize, perp, scale, sub, type Vec2 } from '../model/vec';
 import { formatArea, formatLength, radToDeg } from '../model/units';
 import { doorSymbol, openingRect } from './openingSymbols';
+import { markKindInfo, markLabels } from '../model/marks';
 import { useUiStore, type Selection } from '../store/uiStore';
 import { supportsInterior } from '../model/interior';
 import { stairLayout } from '../model/stairLayout';
@@ -192,6 +193,7 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
           </g>
         ))}
       </g>
+      <MarksLayer marks={project.marks} px={px} />
       {showDimensions && zoom >= ICON_MIN_ZOOM && <RoomDimensions project={project} derived={derived} px={px} fontSize={fontSize} />}
       <g>
         {project.rooms.map((r) => {
@@ -429,3 +431,25 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
     </g>
   );
 });
+
+/** Mieter-Paket markers (#362): numbered dots – blue = Zustand, red = Bohrloch, orange = Klebestelle. */
+function MarksLayer({ marks, px }: { marks: Project['marks']; px: number }) {
+  if (marks.length === 0) return null;
+  const labels = markLabels(marks);
+  return (
+    <g data-testid="marks-layer" pointerEvents="none">
+      {marks.map((m) => {
+        const info = markKindInfo(m.kind);
+        const r = 7 * px;
+        return (
+          <g key={m.id} data-testid="mark" data-kind={m.kind}>
+            <circle cx={m.x} cy={m.y} r={r} fill={info.color} stroke="#ffffff" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            <text x={m.x + r + 2 * px} y={m.y + 4 * px} fontSize={11 * px} fontWeight={700} fill={info.color} paintOrder="stroke" stroke="#ffffff" strokeWidth={3 * px}>
+              {labels.get(m.id)}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}

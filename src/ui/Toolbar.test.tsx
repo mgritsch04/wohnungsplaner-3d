@@ -83,6 +83,7 @@ describe('toolbar (#100, #103)', () => {
       'Grundriss (apartment-plan.json)',
       'Einkaufsliste (CSV)',
       'Plan drucken / PDF / PNG…',
+      'Übergabeprotokoll (Mieter-Paket)…',
       '3D-Modell als GLB …',
     ]);
     expect(host.querySelector('[aria-label="Lampen"]')).toBeNull();

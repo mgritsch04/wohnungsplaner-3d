@@ -5,6 +5,7 @@ import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
+import { MarksSection } from './MarksSection';
 import { FIXTURE_KINDS, FIXTURE_LABEL } from '../../model/fixtures';
 import { guessAndPlaceSockets } from '../../installation/actions';
 import { useFixtureStore } from '../../installation/fixtureStore';
@@ -19,6 +20,7 @@ const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
   { id: 'passage', label: 'Durchgang', key: 'G', hint: 'Türlose Öffnung in eine Wand setzen' },
   { id: 'measure', label: 'Messen', key: 'M', hint: 'Abstand zwischen zwei Punkten messen' },
   { id: 'walkpath', label: 'Laufweg', key: 'L', hint: 'Kürzesten begehbaren Weg zwischen zwei Punkten messen' },
+  { id: 'mark', label: 'Markierung', key: '', hint: 'Mieter-Paket: Zustand, Bohrloch oder Klebestelle im Plan setzen' },
 ];
 
 export function ToolsPanel() {
@@ -57,10 +59,10 @@ export function ToolsPanel() {
       <Section title="Werkzeuge">
         <div className="tool-grid">
           {TOOLS.map((t) => (
-            <button key={t.id} className={`tool-btn ${tool === t.id ? 'active' : ''}`} onClick={() => setTool(t.id)} title={`${t.hint} (${t.key})`}>
+            <button key={t.id} className={`tool-btn ${tool === t.id ? 'active' : ''}`} onClick={() => setTool(t.id)} title={t.key ? `${t.hint} (${t.key})` : t.hint}>
               <ToolIcon id={t.id} />
               <span>{t.label}</span>
-              <kbd>{t.key}</kbd>
+              {t.key && <kbd>{t.key}</kbd>}
             </button>
           ))}
         </div>
@@ -73,6 +75,8 @@ export function ToolsPanel() {
           </button>
         )}
       </Section>
+
+      <MarksSection />
 
       <PanelGroup groupKey="tools.room" title="Raum mit Maßen anlegen">
         <p className="muted small">Innenmaße (lichte Weite). Der neue Raum erscheint rechts neben dem Plan und lässt sich danach verschieben.</p>

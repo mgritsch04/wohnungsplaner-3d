@@ -9,6 +9,7 @@ import { exportFloorPlanJson, importFloorPlanJsonFile } from '../import/floorPla
 import { importPlanFile } from '../import/underlayImport';
 import { exportShoppingCsv } from '../budget/budgetActions';
 import { openPrintView } from '../export/PrintView';
+import { openHandoverView } from '../export/HandoverView';
 import { exportGlbFile } from '../export/exportGlbFile';
 import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } from './TimeOfDayControl';
 import { ToolbarMenu } from './ToolbarMenu';
@@ -275,6 +276,7 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
           <button onClick={closeAfter(exportFloorPlanJson)}>Grundriss (apartment-plan.json)</button>
           <button onClick={closeAfter(exportShoppingCsv)}>Einkaufsliste (CSV)</button>
           <button onClick={closeAfter(openPrintView)}>Plan drucken / PDF / PNG…</button>
+          <button onClick={closeAfter(openHandoverView)}>Übergabeprotokoll (Mieter-Paket)…</button>
           <button onClick={closeAfter(exportGlbFile)}>3D-Modell als GLB …</button>
           {show3d && realism && (
             <>

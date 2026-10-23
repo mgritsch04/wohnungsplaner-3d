@@ -26,6 +26,7 @@ import { ProjectPanel } from './ui/panels/ProjectPanel';
 import { useCatalogStore } from './catalog/catalogStore';
 import { useImportStore } from './import/importStore';
 import { PrintViewHost } from './export/PrintView';
+import { HandoverViewHost } from './export/HandoverView';
 import { useCompareStore } from './versions/compareStore';
 import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
@@ -189,6 +190,7 @@ export default function App() {
       </div>
       <ModalHost />
       <PrintViewHost />
+      <HandoverViewHost />
       <Toasts />
       <FurnitureHoverCard />
       <ObjectContextMenu />

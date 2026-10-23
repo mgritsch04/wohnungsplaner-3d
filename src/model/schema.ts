@@ -532,6 +532,21 @@ export const CameraBookmarkSchema = z.object({
   cutaway: z.boolean().optional(),
 });
 
+/**
+ * Mieter-Paket (#362): Markierung im Plan für das Übergabeprotokoll – Zustand beim Einzug,
+ * Bohrloch oder Klebestelle (für Rückgabe und Kaution). Das Foto liegt nur im lokalen Asset-Speicher.
+ */
+export const MarkKindSchema = z.enum(['condition', 'drill', 'glue']);
+export const MarkSchema = z.object({
+  id: z.string().min(1),
+  kind: MarkKindSchema,
+  x: finite(),
+  y: finite(),
+  note: z.string().max(500).default(''),
+  /** Local photo (asset store); never part of the repository. */
+  photoAssetId: z.string().optional(),
+});
+
 /** Short note pinned to a room or a piece of furniture (#83); shown as a pin in the 2D plan. */
 export const NoteSchema = z.object({
   id: z.string().min(1),
@@ -591,6 +606,8 @@ export const LevelPlanSchema = z.object({
   loads: z.array(LoadSchema).default([]),
   notes: z.array(NoteSchema).default([]),
   photos: z.array(PhotoSchema).default([]),
+  /** Mieter-Paket marks (#362) of this storey. */
+  marks: z.array(MarkSchema).default([]),
   underlay: UnderlaySchema.nullable().default(null),
 });
 
@@ -631,6 +648,8 @@ export const ProjectSchema = z.object({
   /** Simulated smart-home devices and automations (#170, schema 2). */
   devices: z.array(SmartDeviceSchema).default([]),
   automations: z.array(AutomationSchema).default([]),
+  /** Mieter-Paket marks (#362); projects saved before lack the field. */
+  marks: z.array(MarkSchema).default([]),
   /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
   fixtures: z.array(FixtureSchema).default([]),
   /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
@@ -672,6 +691,8 @@ export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
 export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
+export type MarkKind = z.infer<typeof MarkKindSchema>;
+export type Mark = z.infer<typeof MarkSchema>;
 export type FixtureKind = z.infer<typeof FixtureKindSchema>;
 export type Fixture = z.infer<typeof FixtureSchema>;
 export type Circuit = z.infer<typeof CircuitSchema>;

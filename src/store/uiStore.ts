@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { MarkKind } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 
 export type SelectionType = 'wall' | 'node' | 'room' | 'opening' | 'furniture' | 'light' | 'device' | 'fixture';
@@ -7,7 +8,7 @@ export interface Selection {
   id: string;
 }
 
-export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'calibrate';
+export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'mark' | 'calibrate';
 export type ViewMode = '2d' | '3d' | 'split';
 export type CameraMode = 'orbit' | 'walk';
 export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'check' | 'import';
@@ -48,6 +49,9 @@ interface UiStore {
   /** Increment to ask the 2D editor to zoom to fit. */
   fitRequest: number;
   measurements: Measurement[];
+  /** Kind of the next mark set with the mark tool (Mieter-Paket, #362). */
+  markKind: MarkKind;
+  setMarkKind: (k: MarkKind) => void;
   cursor: Vec2 | null;
   fps: number | null;
   /**
@@ -112,6 +116,8 @@ export const useUiStore = create<UiStore>((set, get) => ({
   view2d: { cx: 4, cy: 2, zoom: 60 },
   fitRequest: 1,
   measurements: [],
+  markKind: 'condition',
+  setMarkKind: (markKind) => set({ markKind }),
   cursor: null,
   fps: null,
   timePreview: null,

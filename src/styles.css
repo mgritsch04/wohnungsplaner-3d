@@ -1649,6 +1649,31 @@ code {
   font-size: 7.5pt;
 }
 
+.handover-page h2 {
+  font-size: 11pt;
+  margin: 3mm 0 1.5mm;
+}
+.handover-plan svg {
+  display: block;
+  margin: 0 auto;
+}
+.handover-photo {
+  max-width: 60mm;
+  max-height: 45mm;
+  display: block;
+}
+.handover-room,
+.handover-plan {
+  break-inside: avoid;
+}
+.mark-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
 @media print {
   html,
   body,

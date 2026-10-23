@@ -8,13 +8,13 @@ import type { Furniture, Level, LevelPlan, Project } from './schema';
  */
 
 /** Project fields that belong to a storey (see LevelPlanSchema). */
-export const LEVEL_PLAN_KEYS = ['nodes', 'walls', 'openings', 'rooms', 'furniture', 'lights', 'groups', 'devices', 'fixtures', 'loads', 'notes', 'photos', 'underlay'] as const;
+export const LEVEL_PLAN_KEYS = ['nodes', 'walls', 'openings', 'rooms', 'furniture', 'lights', 'groups', 'devices', 'fixtures', 'loads', 'notes', 'photos', 'marks', 'underlay'] as const;
 
 /** Height of a newly added storey above the one below when nothing else is known (m). */
 export const DEFAULT_STOREY_HEIGHT = 2.8;
 
 export function emptyLevelPlan(): LevelPlan {
-  return { nodes: [], walls: [], openings: [], rooms: [], furniture: [], lights: [], groups: [], devices: [], fixtures: [], loads: [], notes: [], photos: [], underlay: null };
+  return { nodes: [], walls: [], openings: [], rooms: [], furniture: [], lights: [], groups: [], devices: [], fixtures: [], loads: [], notes: [], photos: [], marks: [], underlay: null };
 }
 
 /** The active storey's plan, taken from the top-level fields (same objects, not copied). */
