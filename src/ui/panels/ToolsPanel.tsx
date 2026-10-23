@@ -6,6 +6,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
 import { MarksSection } from './MarksSection';
+import { ZonesSection } from './ZonesSection';
 import { FIXTURE_KINDS, FIXTURE_LABEL } from '../../model/fixtures';
 import { guessAndPlaceSockets } from '../../installation/actions';
 import { useFixtureStore } from '../../installation/fixtureStore';
@@ -20,6 +21,7 @@ const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
   { id: 'passage', label: 'Durchgang', key: 'G', hint: 'Türlose Öffnung in eine Wand setzen' },
   { id: 'measure', label: 'Messen', key: 'M', hint: 'Abstand zwischen zwei Punkten messen' },
   { id: 'walkpath', label: 'Laufweg', key: 'L', hint: 'Kürzesten begehbaren Weg zwischen zwei Punkten messen' },
+  { id: 'zone', label: 'Bereich', key: '', hint: 'Bereich aufziehen (oder Punkte klicken für eine freie Form, Doppelklick schließt) und dazuschreiben, wofür er ist – für den Einrichtungsvorschlag mit Claude' },
   { id: 'mark', label: 'Markierung', key: '', hint: 'Mieter-Paket: Zustand, Bohrloch oder Klebestelle im Plan setzen' },
 ];
 
@@ -75,6 +77,8 @@ export function ToolsPanel() {
           </button>
         )}
       </Section>
+
+      <ZonesSection />
 
       <MarksSection />
 
@@ -280,6 +284,13 @@ function ToolIcon({ id }: { id: Tool }) {
           <circle cx="5" cy="19" r="2" />
           <circle cx="19" cy="5" r="2" />
           <path d="M7 19h5a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h8" strokeDasharray="2 2" />
+        </svg>
+      );
+    case 'zone':
+      return (
+        <svg {...common}>
+          <rect x="4" y="5" width="16" height="14" rx="1" strokeDasharray="3 2" fill="currentColor" fillOpacity={0.15} />
+          <path d="M8 12h8" />
         </svg>
       );
     default:
