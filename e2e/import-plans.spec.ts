@@ -783,7 +783,7 @@ async function importInstallationPlan(page: Page, opts: { symbols: boolean }) {
   });
   if (opts.symbols) {
     await page.getByLabel(/Steckdosen, Schalter, Heizkörper aus Symbolen suchen/).check();
-    await page.getByLabel(/WC, Badewanne, Waschbecken aus Symbolen suchen/).check();
+    await page.getByLabel(/WC, Badewanne, Waschbecken, Waschmaschine aus Symbolen suchen/).check();
   }
   await page.getByRole('button', { name: 'Erkennung starten' }).click();
   await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
