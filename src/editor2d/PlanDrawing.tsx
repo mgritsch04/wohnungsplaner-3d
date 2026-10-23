@@ -7,7 +7,9 @@ import { formatArea, formatLength, radToDeg } from '../model/units';
 import { doorSymbol, openingRect } from './openingSymbols';
 import { useUiStore, type Selection } from '../store/uiStore';
 import { supportsInterior } from '../model/interior';
+import { stairLayout } from '../model/stairLayout';
 import { stepCount } from '../model/stairs';
+import { polygonCentroid } from '../model/vec';
 import { interiorPlanDetails } from './interiorPlan';
 import { materialById, DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 
@@ -378,6 +380,26 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
       details.push(line(-w / 2, d / 2, w / 2, -d / 2, 's2'));
       break;
     default:
+      if (shape.startsWith('stairs-')) {
+        // turning stairs (#335): the treads of the shared layout and the walking line through them, arrow at the top
+        const layout = stairLayout(shape, w, d, f.height);
+        if (layout) {
+          layout.treads.forEach((t, i) =>
+            details.push(<polygon key={`t${i}`} points={t.poly.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />),
+          );
+          const walk = layout.treads.map((t) => polygonCentroid(t.poly));
+          if (walk.length >= 2) {
+            details.push(<polyline key="walk" points={walk.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
+            const a = walk[walk.length - 2];
+            const b = walk[walk.length - 1];
+            const ang = Math.atan2(b.y - a.y, b.x - a.x);
+            const ah = Math.min(0.2, w * 0.15);
+            for (const side of [-1, 1]) details.push(line(b.x, b.y, b.x - Math.cos(ang + side * 0.5) * ah, b.y - Math.sin(ang + side * 0.5) * ah, `ah${side}`));
+            details.push(<circle key="start" cx={walk[0].x} cy={walk[0].y} r={Math.min(0.05, w * 0.05)} style={{ fill: stroke }} />);
+          }
+          break;
+        }
+      }
       // front indicator (local +y is the front)
       details.push(line(-w / 2 + Math.min(0.04, w * 0.1), d / 2 - Math.min(0.04, d * 0.15), w / 2 - Math.min(0.04, w * 0.1), d / 2 - Math.min(0.04, d * 0.15), 'front'));
   }

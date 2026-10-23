@@ -1,6 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { stairLayout } from '../model/stairLayout';
 import { stepCount } from '../model/stairs';
+import { polygonArea, type Vec2 } from '../model/vec';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { FurnitureFinish, Interior, ModelRef, QualityMode, TableBase } from '../model/schema';
 import { BOARD, columnWidth, DEFAULT_DRAWER_HEIGHT, innerHeight } from '../model/interior';
@@ -263,7 +265,43 @@ function tableBase(base: TableBase, W: number, D: number, top: number, c: string
   }
 }
 
+/** Prisms over a plan polygon (cached by outline); plan y becomes the model's z. */
+const prismCache = new Map<string, THREE.BufferGeometry>();
+function prism(poly: Vec2[], height: number): THREE.BufferGeometry {
+  const key = poly.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(';') + `|${height.toFixed(3)}`;
+  let g = prismCache.get(key);
+  if (!g) {
+    const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, -p.y)));
+    g = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false }).rotateX(-Math.PI / 2);
+    prismCache.set(key, g);
+    if (prismCache.size > 2000) {
+      const first = prismCache.keys().next().value!;
+      prismCache.get(first)?.dispose();
+      prismCache.delete(first);
+    }
+  }
+  return g;
+}
+
+/** Turning stairs (#335): one block per tread of the shared stair layout, landings solid down to the floor. */
+function turningStairParts(shape: string, w: number, d: number, h: number, color: string, grain: Partial<Part>): Part[] {
+  const layout = stairLayout(shape, w, d, h);
+  if (!layout) return [];
+  const rise = layout.treads.length > 0 ? layout.treads[0].top : h;
+  const parts: Part[] = [];
+  for (const t of layout.treads) {
+    const y0 = polygonArea(t.poly) > 0.5 ? 0 : Math.max(0, t.top - rise * 2.2);
+    parts.push({ geo: prism(t.poly, t.top - 0.03 - y0), p: [0, y0, 0], s: [1, 1, 1], color: shade(color, 0.92) });
+    parts.push({ geo: prism(t.poly, 0.03), p: [0, t.top - 0.03, 0], s: [1, 1, 1], color, ...grain });
+  }
+  if (shape.startsWith('stairs-spiral')) {
+    parts.push(cyl(0, 0, 0, 0.05, h + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+  }
+  return parts;
+}
+
 function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, look: ProceduralLook = {}): Part[] {
+  if (shape.startsWith('stairs-')) return turningStairParts(shape, w, d, h, color, { detail: 'woodgrain', detailRepeat: 1 });
   const W = w / 2;
   const D = d / 2;
   const front = accent ?? color;

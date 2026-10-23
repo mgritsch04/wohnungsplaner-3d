@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
-import { findCatalogItem } from '../catalog/generic';
+import { findCatalogItem, GENERIC_CATALOG } from '../catalog/generic';
 import { addLevel, switchLevel } from './levels';
 import { createSampleProject } from './sample';
 import type { Furniture, Project } from './schema';
+import { layoutSurfaceAt, parseStairShape, stairLayout } from './stairLayout';
+import { pointInPolygon, polygonCentroid } from './vec';
 import { defaultStairHeight, holeInRoom, isStair, reachesAbove, stairSurfaceAt, stairwells, stepCount, walkGroundAt } from './stairs';
 
 /** Sample flat with a storey above (2.6 m) and a 0.9 × 3.6 m stair in the living room, rising to −y. */
@@ -88,5 +90,82 @@ describe('Treppenloch im Raum (#54)', () => {
     expect(hole.every((p) => p.y > 0 && p.y < 2 && p.x > 1 && p.x < 2)).toBe(true);
     expect(holeInRoom(room, [...well].reverse())).not.toBeNull();
     expect(holeInRoom(room, well.map((p) => ({ x: p.x + 10, y: p.y })))).toBeNull();
+  });
+});
+
+describe('gewendelte Treppen und Podeste (#335)', () => {
+  const shapes = ['quarter-landing', 'quarter-winder', 'half-landing', 'half-winder', 'spiral'].flatMap((k) => [`stairs-${k}`, `stairs-${k}-r`]);
+
+  it('Katalog: alle Formen vorhanden, nicht massiv, als Treppe erkannt', () => {
+    for (const shape of shapes) {
+      const item = GENERIC_CATALOG.find((c) => c.id === `generic-${shape}`);
+      expect(item, shape).toBeDefined();
+      const f = createFurnitureFromCatalog(item!, { x: 2, y: 2 });
+      expect(isStair(f)).toBe(true);
+      expect(f.solid).toBe(false);
+    }
+    expect(parseStairShape('stairs-r')).toBeNull();
+    expect(parseStairShape('sofa')).toBeNull();
+  });
+
+  for (const shape of shapes) {
+    it(`${shape}: durchgehend begehbar vom Fuß bis zur Oberkante, Stufen gleichmäßig`, () => {
+      const item = GENERIC_CATALOG.find((c) => c.id === `generic-${shape}`)!;
+      const layout = stairLayout(shape, item.width, item.depth, 2.6)!;
+      const n = layout.treads.length;
+      // tread tops climb in equal steps up to the storey height
+      layout.treads.forEach((t, i) => expect(t.top).toBeCloseTo(((i + 1) * 2.6) / n, 6));
+      expect(n).toBeGreaterThanOrEqual(5);
+      // the walking line through the treads: always on the surface, never falling, never jumping by more than a step
+      let prev = -Infinity;
+      for (const t of layout.treads) {
+        const c = polygonCentroid(t.poly);
+        const z = layoutSurfaceAt(layout, c);
+        expect(z, 'Tritt liegt auf der Lauffläche').not.toBeNull();
+        expect(z!).toBeGreaterThanOrEqual(prev - 1e-6);
+        expect(z! - Math.max(prev, 0)).toBeLessThanOrEqual((2.6 / n) * 2.2);
+        expect(Math.abs(z! - t.top)).toBeLessThanOrEqual((2.6 / n) * 1.6);
+        prev = z!;
+      }
+      expect(prev).toBeGreaterThan(2.6 - (2.6 / n) * 1.6);
+      expect(prev).toBeLessThanOrEqual(2.6 + 1e-6);
+      // every tread lies in the stairwell
+      for (const t of layout.treads) {
+        const c = polygonCentroid(t.poly);
+        expect(layout.well.some((part) => pointInPolygon(c, part))).toBe(true);
+      }
+    });
+  }
+
+  it('Podest ist eben, Wendelstufen steigen mit dem Winkel, Spiegelung dreht die Laufrichtung', () => {
+    const landing = stairLayout('stairs-half-landing', 1.8, 2.6, 2.6)!;
+    const a = layoutSurfaceAt(landing, { x: -0.5, y: -1.1 })!;
+    const b = layoutSurfaceAt(landing, { x: 0.6, y: -0.9 })!;
+    expect(a).toBeCloseTo(b, 6);
+    const winder = stairLayout('stairs-half-winder', 1.8, 2.4, 2.6)!;
+    const around = [0.3, 0.9, 1.5, 2.1, 2.8].map((th) => layoutSurfaceAt(winder, { x: -Math.cos(th) * 0.4, y: -1.2 + 0.9 - Math.sin(th) * 0.4 })!);
+    for (let i = 1; i < around.length; i++) expect(around[i]).toBeGreaterThan(around[i - 1]);
+    const left = stairLayout('stairs-quarter-landing', 2.4, 2.8, 2.6)!;
+    const right = stairLayout('stairs-quarter-landing-r', 2.4, 2.8, 2.6)!;
+    expect(layoutSurfaceAt(left, { x: -1.0, y: 1.3 })).toBeCloseTo(layoutSurfaceAt(right, { x: 1.0, y: 1.3 })!, 6);
+    expect(layoutSurfaceAt(left, { x: 1.0, y: 1.3 })).toBeNull();
+  });
+
+  it('Treppenloch folgt dem Umriss: L-Treppe zwei Teile, U und Wendeltreppe eins; Begehen steigt und wechselt die Etage', () => {
+    const { p, up } = house();
+    p.furniture = [];
+    const item = GENERIC_CATALOG.find((c) => c.id === 'generic-stairs-quarter-landing')!;
+    const s = createFurnitureFromCatalog(item, { x: 2, y: 2 });
+    s.height = defaultStairHeight(p);
+    p.furniture.push(s);
+    expect(stairwells(p).ceiling).toHaveLength(2);
+    // foot of the stair is at floor level, the end of the second flight reaches the storey above
+    expect(walkGroundAt(p, { x: 2 - 1.2 + 0.4, y: 2 + 1.35 })).toBeLessThan(0.2);
+    expect(walkGroundAt(p, { x: 2 + 1.15, y: 2 - 1.4 + 0.45 })).toBeGreaterThan(2.3);
+    // empty inner corner is not a stair
+    expect(walkGroundAt(p, { x: 2 + 0.5, y: 2 + 0.5 })).toBe(0);
+    switchLevel(p, up);
+    expect(stairwells(p).floor).toHaveLength(2);
+    expect(walkGroundAt(p, { x: 2 + 1.15, y: 2 - 1.4 + 0.45 })).toBeGreaterThan(-0.3);
   });
 });

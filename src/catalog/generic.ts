@@ -65,9 +65,19 @@ const DEFS: Def[] = [
   ['generic-washbasin', 'Waschtisch 60 cm', 'bathroom', 0.6, 0.46, 0.85, 'washbasin', '#ffffff', 220, { tags: ['waschbecken'] }],
   ['generic-bathtub', 'Badewanne 170×75', 'bathroom', 1.7, 0.75, 0.58, 'bathtub', '#ffffff', 400, { tags: ['wanne'] }],
   ['generic-shower', 'Dusche 90×90', 'bathroom', 0.9, 0.9, 2.0, 'shower', '#dfe8ec', 500, { tags: ['dusche'] }],
-  // storeys (#54): a straight flight; its height is set to the storey height when placed. No price: built in, not bought like furniture
+  // storeys (#54, #335): straight and turning flights; its height is set to the storey height when placed. No price: built in, not bought like furniture
   ['generic-stairs', 'Treppe gerade 90 cm', 'stairs', 0.9, 3.6, 2.6, 'stairs', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss'] }],
   ['generic-stairs-wide', 'Treppe gerade 100 cm', 'stairs', 1.0, 4.0, 2.8, 'stairs', '#d9d4cc', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss'] }],
+  ['generic-stairs-quarter-landing', 'Treppe viertelgewendelt mit Podest, Rechtskurve', 'stairs', 2.4, 2.8, 2.6, 'stairs-quarter-landing', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'viertelgewendelt','podest','eckpodest'] }],
+  ['generic-stairs-quarter-landing-r', 'Treppe viertelgewendelt mit Podest, Linkskurve', 'stairs', 2.4, 2.8, 2.6, 'stairs-quarter-landing-r', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'viertelgewendelt','podest','eckpodest'] }],
+  ['generic-stairs-quarter-winder', 'Treppe viertelgewendelt mit Wendelstufen, Rechtskurve', 'stairs', 2.4, 2.8, 2.6, 'stairs-quarter-winder', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'viertelgewendelt','gewendelt','wendelstufen'] }],
+  ['generic-stairs-quarter-winder-r', 'Treppe viertelgewendelt mit Wendelstufen, Linkskurve', 'stairs', 2.4, 2.8, 2.6, 'stairs-quarter-winder-r', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'viertelgewendelt','gewendelt','wendelstufen'] }],
+  ['generic-stairs-half-landing', 'Treppe halbgewendelt mit Podest (U), Rechtskurve', 'stairs', 1.8, 2.6, 2.6, 'stairs-half-landing', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'halbgewendelt','podest','u-treppe','zweilaeufig'] }],
+  ['generic-stairs-half-landing-r', 'Treppe halbgewendelt mit Podest (U), Linkskurve', 'stairs', 1.8, 2.6, 2.6, 'stairs-half-landing-r', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'halbgewendelt','podest','u-treppe','zweilaeufig'] }],
+  ['generic-stairs-half-winder', 'Treppe halbgewendelt mit Wendelstufen (U), Rechtskurve', 'stairs', 1.8, 2.4, 2.6, 'stairs-half-winder', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'halbgewendelt','gewendelt','wendelstufen','u-treppe'] }],
+  ['generic-stairs-half-winder-r', 'Treppe halbgewendelt mit Wendelstufen (U), Linkskurve', 'stairs', 1.8, 2.4, 2.6, 'stairs-half-winder-r', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'halbgewendelt','gewendelt','wendelstufen','u-treppe'] }],
+  ['generic-stairs-spiral', 'Wendeltreppe Ø 160 cm, gegen den Uhrzeigersinn', 'stairs', 1.6, 1.6, 2.6, 'stairs-spiral', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'wendeltreppe','spindeltreppe','spirale'] }],
+  ['generic-stairs-spiral-r', 'Wendeltreppe Ø 160 cm, im Uhrzeigersinn', 'stairs', 1.6, 1.6, 2.6, 'stairs-spiral-r', '#b8946a', null, { solid: false, tags: ['treppe', 'stiege', 'etage', 'geschoss', 'wendeltreppe','spindeltreppe','spirale'] }],
 ];
 
 export const GENERIC_CATALOG: CatalogItem[] = DEFS.map(([id, name, category, width, depth, height, shape, color, price, extra]) => ({

@@ -1,26 +1,27 @@
 import { neighbourLevel, planOfLevel, storeyHeight } from './levels';
 import type { Furniture, Project } from './schema';
+import { layoutSurfaceAt, parseStairShape, stairLayout, STEP_RISE, stepCount } from './stairLayout';
 import { add, polygonArea, rotate, signedArea, sub, type Vec2 } from './vec';
 
+export { STEP_RISE, stepCount };
+
 /**
- * Stairs between storeys (#54). A stair is a piece of furniture with the procedural shape
- * `stairs`: a straight flight that rises from its front (local +y) to its back (local −y) by its
- * height. It is not solid: the walkthrough walks up its slope and changes to the storey above at
+ * Stairs between storeys (#54, #335). A stair is a piece of furniture with a procedural stair shape
+ * (see `stairLayout.ts`): a straight flight that rises from its front (local +y) to its back
+ * (local −y) by its height, or a turning stair (quarter/half turn with landing or winders, spiral). It is not solid: the walkthrough walks up its slope and changes to the storey above at
  * the top. A stair that reaches the storey above cuts its footprint out of that storey's floor
  * and out of its own storey's ceiling.
  */
 export const STAIR_SHAPE = 'stairs';
-/** Comfortable rise of one step (m); the number of steps follows from the height. */
-export const STEP_RISE = 0.18;
 /** A stair "reaches" the storey above when its top is this close to that floor (m). */
 const REACH_TOLERANCE = 0.35;
 
-export function isStair(f: Pick<Furniture, 'model'>): boolean {
-  return (f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape) === STAIR_SHAPE;
+function shapeOf(f: Pick<Furniture, 'model'>): string {
+  return f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
 }
 
-export function stepCount(height: number): number {
-  return Math.max(2, Math.round(height / STEP_RISE));
+export function isStair(f: Pick<Furniture, 'model'>): boolean {
+  return parseStairShape(shapeOf(f)) !== null;
 }
 
 function local(f: Pick<Furniture, 'x' | 'y' | 'rotation'>, p: Vec2): Vec2 {
@@ -44,10 +45,17 @@ export function stairFootprint(f: Pick<Furniture, 'x' | 'y' | 'width' | 'depth' 
  * (a smooth slope instead of single steps, so walking feels even); null outside the stair.
  */
 export function stairSurfaceAt(f: Furniture, p: Vec2): number | null {
-  const q = local(f, p);
-  if (Math.abs(q.x) > f.width / 2 || Math.abs(q.y) > f.depth / 2) return null;
-  const t = (f.depth / 2 - q.y) / f.depth;
-  return f.elevation + Math.min(1, Math.max(0, t)) * f.height;
+  const layout = stairLayout(shapeOf(f), f.width, f.depth, f.height);
+  if (!layout) return null;
+  const z = layoutSurfaceAt(layout, local(f, p));
+  return z === null ? null : f.elevation + z;
+}
+
+/** Convex parts of the stairwell of a stair in plan coordinates (an L-shaped stair has two). */
+export function stairWellParts(f: Furniture): Vec2[][] {
+  const layout = stairLayout(shapeOf(f), f.width, f.depth, f.height);
+  if (!layout) return [stairFootprint(f)];
+  return layout.well.map((part) => part.map((c) => add({ x: f.x, y: f.y }, rotate(c, f.rotation))));
 }
 
 /** Whether a stair standing on a storey leads up to the floor `rise` metres above it. */
@@ -75,7 +83,7 @@ export function stairsUp(p: Project, levelId = p.activeLevelId): Furniture[] {
 
 /** Openings a storey needs (plan polygons): in its floor for stairs coming up, in its ceiling for stairs going up. */
 export function stairwells(p: Project, levelId = p.activeLevelId): { floor: Vec2[][]; ceiling: Vec2[][] } {
-  return { floor: stairsFromBelow(p, levelId).stairs.map(stairFootprint), ceiling: stairsUp(p, levelId).map(stairFootprint) };
+  return { floor: stairsFromBelow(p, levelId).stairs.flatMap(stairWellParts), ceiling: stairsUp(p, levelId).flatMap(stairWellParts) };
 }
 
 /**
