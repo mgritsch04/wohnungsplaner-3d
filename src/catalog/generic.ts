@@ -41,6 +41,7 @@ const DEFS: Def[] = [
   ['generic-pendant', 'Pendelleuchte', 'lighting', 0.4, 0.4, 0.5, 'pendant', '#2d2d2d', 70, { solid: false, elevation: 1.9, tags: ['lampe', 'decke'] }],
   ['generic-rug-200', 'Teppich 200×300', 'textile', 2.0, 3.0, 0.01, 'rug', '#bfb3a2', 150, { solid: false, tags: ['teppich'] }],
   ['generic-rug-160', 'Teppich 160×230', 'textile', 1.6, 2.3, 0.01, 'rug', '#9aa5a0', 100, { solid: false, tags: ['teppich'] }],
+  ['generic-runner', 'Läufer 80×200', 'textile', 0.8, 2.0, 0.01, 'rug', '#a89f91', 40, { solid: false, tags: ['läufer', 'teppich', 'flur'] }],
   ['generic-curtain', 'Vorhang 140×250', 'textile', 1.4, 0.06, 2.5, 'curtain', '#e8e1d4', 40, { solid: false, tags: ['vorhang', 'gardine'] }],
   ['generic-plant', 'Zimmerpflanze groß', 'decor', 0.5, 0.5, 1.4, 'plant', '#4f7a43', 45, { solid: false, tags: ['pflanze'] }],
   ['generic-plant-small', 'Zimmerpflanze klein', 'decor', 0.3, 0.3, 0.5, 'plant', '#4f7a43', 15, { solid: false, tags: ['pflanze'] }],

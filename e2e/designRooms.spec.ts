@@ -37,7 +37,9 @@ async function fakeDesigner(page: Page) {
   await page.addInitScript(() => {
     const w = window as unknown as { claude: unknown; __prompts: string[] };
     w.__prompts = [];
-    const it = (catalogId: string, quantity = 1) => ({ catalogId, quantity, reason: 'passt zum Konzept' });
+    // placeholder colours from the apartment palette (Runde 2): warm, matching tones instead of the catalogue defaults
+    const COLORS: Record<string, string> = { 'generic-sofa-3': '#9caf88', 'generic-armchair': '#d4a94a', 'generic-rug-200': '#d8c3a5', 'generic-tv-sideboard': '#d8bf98', 'generic-coffee-table': '#d8bf98', 'generic-bed-160': '#efe6d6', 'generic-wardrobe-150': '#f4f1ea', 'generic-nightstand': '#d8bf98' };
+    const it = (catalogId: string, quantity = 1) => ({ catalogId, quantity, reason: 'passt zum Konzept', ...(COLORS[catalogId] ? { color: COLORS[catalogId] } : {}) });
     const brief = (purpose: string, focus: string) => ({ purpose, zones: ['Hauptzone'], focus, paths: 'Tür bis Fenster frei', palette: ['Sand', 'Salbei'], decor: 'Bild, Pflanze' });
     const answers: Record<string, unknown> = {
       Wohnzimmer: { type: 'living', brief: brief('Entspannen und Gäste', 'großes Bild über dem Sofa'), items: [it('generic-sofa-3'), it('generic-coffee-table'), it('generic-rug-200'), it('generic-tv-sideboard'), it('generic-tv'), it('generic-armchair'), it('generic-floor-lamp'), it('generic-picture-large')] },
@@ -119,6 +121,7 @@ test('Einrichtungsvorschlag (#350): jeder Raumtyp mit Leitfaden, Planer-Prüfung
   expect(has('generic-storage-box').every((b) => b.elevation > 0.05)).toBe(true);
   expect(has('generic-balcony-chair')).toHaveLength(2);
   expect(has('generic-picture-large')[0].elevation).toBeGreaterThan(1);
+  expect(has('generic-sofa-3')[0].color).toBe('#9caf88');
 
   // large plan and 3D view to look at the result room by room
   const setView = (viewMode: string) => page.evaluate((v) => (window as unknown as { __wp: { useUiStore: { setState: (s: object) => void } } }).__wp.useUiStore.setState({ viewMode: v }), viewMode);

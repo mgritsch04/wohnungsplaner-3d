@@ -65,6 +65,8 @@ export interface WishItem {
   quantity: number;
   /** Marked area (#416) the item belongs to: it is placed only inside this zone. */
   zoneId?: string;
+  /** Colour for a placeholder (#350, from the apartment palette). */
+  color?: string;
 }
 
 /** Typical furnishing per room type, from the built-in generic catalogue (sizes/prices are guide values). */
@@ -825,8 +827,9 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
     const userZones = (project.zones ?? []).filter((z) => zoneRoomId(project, derived, z) === room.id);
     const pieces: { item: CatalogItem; role: Role; zone?: PlanZone }[] = [];
     for (const w of req.wishes) {
-      const item = findCatalogItem(w.catalogId, catalog);
-      if (!item) continue;
+      const found = findCatalogItem(w.catalogId, catalog);
+      if (!found) continue;
+      const item = w.color ? { ...found, color: w.color } : found;
       const zone = w.zoneId ? project.zones?.find((z) => z.id === w.zoneId) : undefined;
       for (let i = 0; i < w.quantity; i++) pieces.push({ item, role: roleOf(item), ...(zone ? { zone } : {}) });
     }

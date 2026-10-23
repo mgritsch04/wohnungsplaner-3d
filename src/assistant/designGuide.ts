@@ -68,6 +68,7 @@ export const GUIDES: Record<RoomType, Guide> = {
       { label: 'Stehlampe', has: (f) => f.category === 'lighting', add: 'generic-floor-lamp' },
       { label: 'Teppich', has: is('rug'), add: 'generic-rug-200', minArea: 12 },
       { label: 'Wanddeko', has: isWallArt, add: 'generic-picture-large' },
+      { label: 'Pflanze', has: is('plant'), add: 'generic-plant', minArea: 14 },
     ],
     misfits: [LOOSE_BOX, { test: is('bed'), why: 'ein Bett gehört ins Schlafzimmer' }],
   },
@@ -84,6 +85,7 @@ export const GUIDES: Record<RoomType, Guide> = {
       { label: 'Bett', has: (f) => f.category === 'bed' && shapeOf(f) === 'bed', add: 'generic-bed-160' },
       { label: 'Nachttisch', has: (f) => f.category === 'bed' && shapeOf(f) !== 'bed', add: 'generic-nightstand', quantity: 2 },
       { label: 'Kleiderschrank', has: is('wardrobe'), add: 'generic-wardrobe-150' },
+      { label: 'Leselampe', has: (f) => f.category === 'lighting', add: 'generic-table-lamp', quantity: 2 },
       { label: 'Wanddeko', has: isWallArt, add: 'generic-picture' },
       { label: 'Vorhang', has: is('curtain'), add: 'generic-curtain', needsWindow: true },
     ],
@@ -105,6 +107,7 @@ export const GUIDES: Record<RoomType, Guide> = {
     essentials: [
       { label: 'Schreibtisch', has: (f) => f.category === 'desk', add: 'generic-desk' },
       { label: 'Bürostuhl', has: is('office-chair'), add: 'generic-office-chair' },
+      { label: 'Arbeitslicht', has: (f) => f.category === 'lighting', add: 'generic-floor-lamp' },
       { label: 'Wanddeko', has: isWallArt, add: 'generic-wall-shelf' },
     ],
     misfits: [LOOSE_BOX],
@@ -145,7 +148,7 @@ export const GUIDES: Record<RoomType, Guide> = {
     rules: [
       'Der Gang ist ein Durchgang: mindestens 90 cm Laufweg frei, nur flache Möbel (Tiefe bis ca. 40 cm).',
       'Pflicht: Schuhschrank oder schmale Kommode, Wandgarderobe mit Haken nahe der Eingangstür, ein großer Spiegel.',
-      'Licht an der Decke statt Stehlampen im Weg; Bilder an der langen Wand; kein großer Kleiderschrank, wenn der Gang schmal ist.',
+      'Licht an der Decke statt Stehlampen im Weg; Bilder an der langen Wand; ein Läufer (generic-runner) statt eines großen Teppichs; kein großer Kleiderschrank, wenn der Gang schmal ist.',
     ],
     example: 'Beispiel Gang 1,4 × 4 m: Schuhschrank 80×30 cm, Wandgarderobe mit Haken neben der Tür, Wandspiegel, zwei Bilder, Läufer.',
     essentials: [

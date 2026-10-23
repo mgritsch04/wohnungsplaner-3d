@@ -31,6 +31,25 @@ export const RETAILER_CHOICES: { value: RetailerChoice; label: string }[] = [
 
 export const STYLES = ['skandinavisch', 'modern', 'gemütlich', 'industriell', 'minimalistisch', 'Landhaus'];
 
+/**
+ * Colours per style (#350): every room request gets the same palette, so rooms planned in
+ * parallel still match. The user's own colours come first.
+ */
+const STYLE_PALETTES: Record<string, string[]> = {
+  skandinavisch: ['Weiß #f4f1ea', 'helle Eiche #d8bf98', 'Hellgrau #c9c9c4', 'Salbeigrün #9caf88', 'Senfgelb #d4a94a'],
+  modern: ['Weiß #f2f2f0', 'Anthrazit #3c3f43', 'Nussbaum #7a5638', 'Taupe #a59b8c', 'Petrol #2f6f73'],
+  gemütlich: ['Creme #efe6d6', 'Walnuss #6f4e37', 'Terrakotta #c46f4c', 'Olivgrün #7b7d4f', 'Sand #d8c3a5'],
+  industriell: ['Betongrau #9a9a96', 'Schwarz #2b2b2b', 'Cognac-Leder #9c5b32', 'Altholz #8b6a4a', 'Rostrot #a4502f'],
+  minimalistisch: ['Weiß #f6f5f2', 'Hellgrau #d9d8d4', 'Esche hell #e0cfb1', 'Schwarz #2a2a2a', 'Steingrau #8e8c86'],
+  Landhaus: ['Cremeweiß #f1ebdd', 'Eiche rustikal #b08a5a', 'Salbei #a3b19b', 'Taubenblau #8ea2b5', 'Leinen #d9cdb6'],
+};
+
+export function apartmentPalette(w: Pick<DesignWishes, 'style' | 'colors'>): string[] {
+  const own = clip(w.colors, MAX_FIELD);
+  const base = STYLE_PALETTES[w.style] ?? STYLE_PALETTES.skandinavisch;
+  return own ? [`Wunschfarben: ${own}`, ...base.slice(0, 3)] : base;
+}
+
 export interface DesignWishes {
   interests: string;
   needs: string;
@@ -192,6 +211,7 @@ export function buildDesignPrompt(
     field('Wünscht sich', w.wants),
     field('Stil', w.style),
     field('Farben', w.colors),
+    `Farbpalette der ganzen Wohnung (verbindlich für jeden Raum, damit alles zusammenpasst; je Raum eine Akzentfarbe daraus): ${apartmentPalette(w).join(', ')}`,
     `Budget: ${
       w.budget > 0 ? (room ? `höchstens ${Math.round(w.budget)} € für diesen Raum (Anteil am Gesamtbudget von ${Math.round(room.wholeBudget)} €, nach Fläche verteilt)` : `höchstens ${Math.round(w.budget)} € für alles zusammen`) : 'kein festes Budget'
     }`,
@@ -225,18 +245,22 @@ export function buildDesignPrompt(
     `- Nur catalogId aus A oder B. Je Raum höchstens ${MAX_PICKS} verschiedene Einträge.`,
     '- Achte auf Raumgröße, vorhandene Möbel, Türen und Fenster; lieber weniger, dafür passend. Vorhandene Möbel nicht doppelt kaufen.',
     '- Jeder Eintrag mit einer kurzen Begründung (1 Satz, Bezug auf die Wünsche).',
-    '- Für Platzhalter (B): "label" = kurze Beschreibung des gesuchten Produkts (Art, Material, Farbe, Stil), "search" = kurzer Suchbegriff für den Shop. Keine Produktnamen, Artikelnummern oder Preise erfinden.',
+    '- Für Platzhalter (B): "label" = kurze Beschreibung des gesuchten Produkts (Art, Material, Farbe, Stil), "search" = kurzer Suchbegriff für den Shop, "color" = Farbe als Hex-Code aus der Palette der Wohnung (so erscheint der Platzhalter im 3D-Plan). Keine Produktnamen, Artikelnummern oder Preise erfinden.',
+    '- Licht und Deko gehören dazu: in Wohn-, Schlaf- und Arbeitsräumen mindestens zwei Lichtquellen (Steh-, Tisch- oder Pendelleuchte), Textilien (Teppich, Vorhang) und Wanddeko oder Pflanzen; im Flur ein Läufer statt eines großen Teppichs.',
+    '- Größen zur Fläche: lieber ein kleineres Modell, das mit Laufwegen passt, als ein großes, das den Raum zustellt (ein Möbel ohne Platz kostet mehr als ein kleineres).',
     `- Für größere Möbel (Bett, Sofa, Schrank, Tisch, Schreibtisch, Regal …) bis zu ${MAX_ALTERNATIVES} Alternativen in "alternatives" (andere catalogId, gleiche Regeln, kurze Begründung, z. B. günstiger oder größer).`,
     `- Die App stellt die Möbel selbst kollisionsfrei nach den Leitlinien auf (Rückwand an die Wand, Vorhang ans Fenster, Bild über Sofa/Bett, Spiegel über den Waschtisch, Boxen ins Regal); keine Positionen angeben. Im Bad Waschtisch, WC und Dusche nur planen, wenn sie nicht schon im Raum stehen; ${kitchen?.length ? 'die Küchenzeile nur im Feld "kitchen"' : 'keine Küchenzeilen planen'}.`,
     `- "type" je Raum: einer von ${ROOM_TYPES.map((t) => t.id).join(', ')}.`,
     '',
     'Antworte nur mit JSON in genau dieser Form:',
-    `{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"${kitchen?.length ? 'kitchen' : 'living'}","brief":{"purpose":"wofür der Raum da ist","zones":["Zone: was dort passiert"],"focus":"Blickfang","paths":"Laufwege","palette":["Farbe"],"decor":"Wanddeko, Textilien, Pflanzen"},"concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern",${plan.listedZones.length ? '"zone":"nur bei Möbeln für einen markierten Bereich, z. B. Z1",' : ''}"alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]${kitchen?.length ? `,${KITCHEN_JSON_HINT}` : ''}}]}`,
+    `{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"${kitchen?.length ? 'kitchen' : 'living'}","brief":{"purpose":"wofür der Raum da ist","zones":["Zone: was dort passiert"],"focus":"Blickfang","paths":"Laufwege","palette":["Farbe"],"decor":"Wanddeko, Textilien, Pflanzen"},"concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern","color":"#rrggbb nur bei Platzhaltern",${plan.listedZones.length ? '"zone":"nur bei Möbeln für einen markierten Bereich, z. B. Z1",' : ''}"alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]${kitchen?.length ? `,${KITCHEN_JSON_HINT}` : ''}}]}`,
   ].join('\n');
 }
 
 export interface DesignOption {
   catalogId: string;
+  /** Placeholder: colour from the apartment palette (#350), shown on the placeholder model. */
+  color?: string;
   reason: string;
   /** Placeholder (generic catalogue): Claude's description of the wanted product and a shop search term. */
   placeholder: boolean;
@@ -285,7 +309,7 @@ export interface DesignProposal {
   dropped: number;
 }
 
-const OptionSchema = z.object({ catalogId: z.unknown(), reason: z.unknown().optional(), label: z.unknown().optional(), search: z.unknown().optional() });
+const OptionSchema = z.object({ catalogId: z.unknown(), reason: z.unknown().optional(), label: z.unknown().optional(), search: z.unknown().optional(), color: z.unknown().optional() });
 const ItemSchema = OptionSchema.extend({ quantity: z.unknown().optional(), zone: z.unknown().optional(), alternatives: z.array(OptionSchema).optional().catch([]) });
 const DesignSchema = z.object({
   summary: z.unknown().optional(),
@@ -308,7 +332,8 @@ export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: stri
     const id = typeof it.catalogId === 'string' ? it.catalogId.trim() : '';
     const g = !real.has(id) ? generic.get(id) : undefined;
     if (!real.has(id) && !g) return null;
-    return { catalogId: id, reason: clip(it.reason, 300), placeholder: !!g, label: g ? clip(it.label, 80) || g.name : '', search: g ? clip(it.search, 60) || g.name : '' };
+    const color = g && typeof it.color === 'string' && /^#[0-9a-f]{6}$/i.test(it.color.trim()) ? it.color.trim().toLowerCase() : undefined;
+    return { catalogId: id, reason: clip(it.reason, 300), placeholder: !!g, label: g ? clip(it.label, 80) || g.name : '', search: g ? clip(it.search, 60) || g.name : '', ...(color ? { color } : {}) };
   };
   for (const r of parsed.data.rooms) {
     const key = typeof r.room === 'string' ? r.room.trim().toUpperCase() : '';
