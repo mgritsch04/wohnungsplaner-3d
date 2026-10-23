@@ -1,7 +1,7 @@
 import { derivePlan } from '../../model/derived';
 import { newId } from '../../model/ids';
 import { FIXTURE_ELEVATION, RADIATOR_DEFAULT, snapFixtureToWall } from '../../model/fixtures';
-import { addOpening, closestWall, insertWall } from '../../model/operations';
+import { addOpening, closestWall, insertWall, openAdjacentWalls } from '../../model/operations';
 import { faceAtPoint, sameCycle } from '../../model/roomDetection';
 import type { Project } from '../../model/schema';
 import { degToRad, radToDeg, roundMm } from '../../model/units';
@@ -228,6 +228,9 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     });
     if (id) openingsAdded++;
   }
+  // a door must not end at a doubled/adjacent wall (re-import onto a slightly shifted plan, linings)
+  const cut = openAdjacentWalls(d);
+  if (cut) warnings.push(`${cut} Tür(en) lag(en) an einer zweiten, direkt anliegenden Wand – dort als Durchgang geöffnet. Bitte prüfen, ob die doppelte Wand gelöscht werden soll.`);
   let roomsAdded = 0;
   const index = () => derivePlan(d);
   for (const r of draft.rooms) {

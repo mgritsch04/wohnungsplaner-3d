@@ -463,6 +463,46 @@ export function addOpening(d: Project, wallId: string, kind: OpeningKind, s: num
   return id;
 }
 
+/**
+ * A door or passage must not end at a second wall right next to it: walls running parallel and
+ * touching/overlapping the opening's wall (e.g. a doubled wall from a re-import or a recognised
+ * lining) get a passage (no second leaf) at the same spot. Returns the number of openings added.
+ */
+export function openAdjacentWalls(d: Project, openingIds?: string[]): number {
+  const ids = openingIds ? new Set(openingIds) : null;
+  let added = 0;
+  const sources = d.openings.filter((o) => o.kind !== 'window' && (!ids || ids.has(o.id)));
+  for (const o of sources) {
+    const w = d.walls.find((x) => x.id === o.wallId);
+    if (!w) continue;
+    const a = nodeById(d, w.a)!;
+    const b = nodeById(d, w.b)!;
+    const dir = normalize(sub(b, a));
+    const c = add(a, scale(dir, o.offset));
+    for (const w2 of d.walls) {
+      if (w2.id === w.id) continue;
+      const a2 = nodeById(d, w2.a)!;
+      const b2 = nodeById(d, w2.b)!;
+      const L2 = dist(a2, b2);
+      if (L2 < 0.2) continue;
+      const dir2 = normalize(sub(b2, a2));
+      if (Math.abs(cross(dir, dir2)) > 0.02) continue;
+      // touching or overlapping footprints (+2 cm for drawing/rounding gaps)
+      const lineDist = Math.abs(cross(dir2, sub(c, a2)));
+      if (lineDist > (w.thickness + w2.thickness) / 2 + 0.02) continue;
+      // the other wall must run along most of the opening
+      const s = dot(sub(c, a2), dir2);
+      const overlap = Math.min(L2, s + o.width / 2) - Math.max(0, s - o.width / 2);
+      if (overlap < 0.5 * o.width) continue;
+      if (d.openings.some((x) => x.wallId === w2.id && Math.abs(x.offset - s) < (x.width + o.width) / 2)) continue;
+      // the leaf stays in the original wall; the neighbour just gets the hole
+      const id = addOpening(d, w2.id, 'passage', s, { width: o.width, height: o.height, sillHeight: o.sillHeight, provenance: o.provenance });
+      if (id) added++;
+    }
+  }
+  return added;
+}
+
 /** Doors and windows have a leaf/sash that can be opened; passages have none. */
 export const hasLeaf = (o: Pick<Opening, 'kind'>): boolean => o.kind !== 'passage';
 
