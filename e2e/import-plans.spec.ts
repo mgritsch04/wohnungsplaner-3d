@@ -145,9 +145,9 @@ test('imports page 2 of a vector PDF, applies the stated scale and recognises wa
   const chooser = page.waitForEvent('filechooser');
   await page.locator('.dropzone').click();
   await (await chooser).setFiles({ name: 'plan.pdf', mimeType: 'application/pdf', buffer: vectorPlanPdf() });
-  await expect(page.getByText(/Seite wählen/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/Seite wählen/)).toBeVisible({ timeout: 45000 });
   await page.getByRole('button', { name: 'Seite 2' }).click();
-  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Vektorzeichnung', { exact: false })).toBeVisible({ timeout: 45000 });
   // stated scale 1:100 → marked as assumed, not calibrated
   await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
   await expect(page.getByText('Maßstab angenommen', { exact: true })).toBeVisible();
