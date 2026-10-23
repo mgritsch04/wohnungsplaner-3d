@@ -7,6 +7,9 @@ import { placementIssues } from '../model/placement';
 import { applyFurnishing, suggestFurnishing } from '../suggest/furnishing';
 import { buildDesignPrompt, EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, preselect, proposalTotal, realProducts, searchLinks, swapPick } from './design';
 import { summarizePlan } from './planSummary';
+import { designWishes, placementReport } from './designRun';
+import { polygonInside, polygonsOverlap, rectPoints } from '../model/zones';
+import { furnitureCorners } from '../editor2d/furnitureGeometry';
 
 /** Synthetic retailer products (no real product data). */
 function product(id: string, over: Partial<CatalogItem> = {}): CatalogItem {
@@ -187,5 +190,72 @@ describe('Einrichtungsvorschlag mit Claude für die ganze Wohnung (#350)', () =>
     const shelf = p.furniture.find((f) => f.catalogId === 'mx-shelf')!;
     expect(shelf.retailer).toBe('Möbelix Österreich');
     expect(shelf.productUrl).toBe('https://www.moebelix.at/p/mx-shelf');
+  });
+});
+
+describe('markierte Bereiche im Einrichtungsvorschlag (#416)', () => {
+  const withZones = () => {
+    const p = flatProject();
+    p.zones.push(
+      { id: 'zw', purpose: 'Arbeitsecke', points: rectPoints({ x: 2.6, y: 0 }, { x: 4.4, y: 1.6 }) },
+      { id: 'zf', purpose: 'frei lassen', points: rectPoints({ x: 0, y: 0 }, { x: 1.2, y: 1.2 }) },
+      { id: 'zs', purpose: 'Leseplatz', points: rectPoints({ x: 6.5, y: 3 }, { x: 8, y: 4 }) },
+    );
+    return p;
+  };
+
+  it('Plan-Zusammenfassung und Prompt nennen die Bereiche mit Zweck und Lage als verbindliche Vorgabe', () => {
+    const p = withZones();
+    const { plan } = keys(p);
+    expect(plan.text).toContain('Z1 „Arbeitsecke“');
+    expect(plan.text).toContain('Z2 „frei lassen“ (frei lassen)');
+    expect(plan.text).toContain('1,8 × 1,6 m');
+    const prompt = buildDesignPrompt(EMPTY_WISHES, plan, []);
+    expect(prompt).toContain('verbindliche Vorgabe');
+    expect(prompt).toContain('"zone":"');
+    // a request for the bedroom only lists the bedroom's area
+    const bedPlan = summarizePlan(p, { focusRoomId: p.rooms[1].id });
+    expect(bedPlan.listedZones).toEqual(['Z3']);
+    expect(buildDesignPrompt(EMPTY_WISHES, summarizePlan(flatProject()), [])).not.toContain('"zone"');
+  });
+
+  it('Antwort: Zone nur, wenn sie im selben Raum liegt; gleiche Möbel in verschiedenen Zonen bleiben getrennt; Aufstellung im Bereich', () => {
+    const p = withZones();
+    const { plan, living } = keys(p);
+    const r = parseDesignAnswer(
+      {
+        rooms: [
+          {
+            room: living,
+            items: [
+              { catalogId: 'generic-desk', zone: 'z1' },
+              { catalogId: 'generic-office-chair', zone: 'Z1' },
+              { catalogId: 'generic-floor-lamp', zone: 'Z3' },
+              { catalogId: 'generic-floor-lamp' },
+              { catalogId: 'generic-sofa-3' },
+            ],
+          },
+        ],
+      },
+      plan,
+      p.rooms.map((x) => x.id),
+      [],
+    );
+    const picks = r.rooms[0].picks;
+    expect(picks.map((x) => x.zone ?? null)).toEqual(['zw', 'zw', null, null]);
+    expect(picks[2].quantity).toBe(2);
+    const s = suggestFurnishing(p, [{ roomId: r.rooms[0].roomId, type: 'living', wishes: designWishes(r.rooms[0]) }]);
+    expect(s.rooms[0].notes).toEqual([]);
+    const desk = s.items.find((f) => f.catalogId === 'generic-desk')!;
+    expect(polygonInside(furnitureCorners(desk), p.zones[0].points)).toBe(true);
+    for (const f of s.items) expect(polygonsOverlap(furnitureCorners(f), p.zones[1].points)).toBe(false);
+  });
+
+  it('Nachprüfung meldet, in welchem Bereich ein Möbel steht und welcher Bereich leer blieb', () => {
+    const p = withZones();
+    const room = { roomId: p.rooms[0].id, type: 'living' as const, concept: '', picks: [{ catalogId: 'generic-sofa-3', quantity: 1, reason: '', placeholder: true, label: '', search: '', alternatives: [] }] };
+    const report = placementReport(p, room, 'living', []);
+    expect(report).toContain('Bereich Z1 „Arbeitsecke“ ist leer geblieben');
+    expect(report).not.toContain('Z2 „frei lassen“ ist leer');
   });
 });
