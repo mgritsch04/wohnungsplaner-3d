@@ -160,7 +160,8 @@ Seit 22.10. abends ebenfalls gemergt, 🧪 automatischer User-Test offen: #280 (
 Ebenfalls gemergt, 🧪 automatischer User-Test offen: #92 (PR #306) · #250 (PR #310) · #136 (PR #309) · #225 (PR #312) · #64/#81 (PR #314) · #238 (PR #313) · #222 (PR #315).
 Gemergt 23.10., 🧪 automatischer User-Test offen: #138 (PR #317) · #80 (PR #318) · #90 (PR #319) · #83/#84/#91 (PR #320) · #85 (PR #321) · #86 (PR #322) · #54 (PR #323, #324).
 In Progress: #229 (PR #296), #135.
-Ready-Liste leer; Folge-Ideen kommen als `idea-inbox`-Issues (gewendelte Treppen, Audio-Katalog, Regler für Möbel-Drehung u. a.).
+Ready-Liste leer. Neue Inbox-Ideen: #335 gewendelte Treppen/Podeste (Folge von #54), #336 Audio-Katalog (Folge von #138); weitere Kandidaten: Regler für Möbel-Drehung (Folge von #280), optional "Strahl an Möbeln vorbei" (#283), Panini-Weitwinkel (#263 Stufe 2, nur auf Gs Go).
+Abnahme 23.10.: #220 von G bestätigt; #85 wartet auf Gs Test (user-test); #258 und Begehen-Tastenhinweise (PR #333, #334) warten auf erneute automatische Prüfung.
 Ready (Planer-Reihenfolge, je ein Schema-Thread): #80 Wandaufbau · #138 Audio · #90 Heizkosten · #83/#84/#91 Notizen/Checkliste · #85 Schrankinnenaufteilung · #86 Fotos an Wänden · #54 Mehrgeschoss (groß, Opus, zuletzt).
 Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
 Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
