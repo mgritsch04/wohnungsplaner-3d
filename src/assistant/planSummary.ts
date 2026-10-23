@@ -10,12 +10,19 @@ import type { CatalogItem } from '../catalog/types';
 import { derivePlan } from '../model/derived';
 import type { Project } from '../model/schema';
 import { boundsOf } from '../model/vec';
+import { describeZone, isKeepFree, zoneLabels, zoneRoomId } from '../model/zones';
 import { guessRoomType, roomIdAt, ROOM_TYPES, type RoomType } from '../suggest/furnishing';
 
 export interface PlanSummary {
   text: string;
   /** R1 → room id */
   roomKeys: Record<string, string>;
+  /** Z1 → id of a marked area (#416) */
+  zoneKeys: Record<string, string>;
+  /** Room id → keys of the marked areas in it (#416). */
+  zonesByRoom: Record<string, string[]>;
+  /** Keys of the marked areas that appear in `text` (#416). */
+  listedZones: string[];
 }
 
 const m = (v: number) => v.toFixed(2).replace(/\.?0+$/, '');
@@ -41,7 +48,22 @@ export function summarizePlan(project: Project, opts: { roomTypes?: Record<strin
     furnitureByRoom.set(rid, list);
   }
 
+  // marked areas with their purpose (#416)
+  const zoneKey = zoneLabels(project.zones ?? []);
+  const zoneKeys: Record<string, string> = {};
+  const zonesByRoom: Record<string, string[]> = {};
+  const zoneLines = new Map<string | null, string[]>();
+  for (const z of project.zones ?? []) {
+    const key = zoneKey.get(z.id)!;
+    const rid = zoneRoomId(project, d, z);
+    zoneKeys[key] = z.id;
+    if (rid) zonesByRoom[rid] = [...(zonesByRoom[rid] ?? []), key];
+    const purpose = z.purpose.trim().replace(/\s+/g, ' ').slice(0, 200) || 'ohne Angabe';
+    zoneLines.set(rid, [...(zoneLines.get(rid) ?? []), `${key} „${purpose}“${isKeepFree(purpose) ? ' (frei lassen)' : ''}: ${describeZone(d, z, rid)}`]);
+  }
+
   const lines: string[] = [];
+  const listedZones: string[] = [];
   const focus = opts.focusRoomId ? project.rooms.find((r) => r.id === opts.focusRoomId) : undefined;
   for (const r of focus ? [focus] : project.rooms) {
     const g = d.rooms.get(r.id);
@@ -67,6 +89,9 @@ export function summarizePlan(project: Project, opts: { roomTypes?: Record<strin
     lines.push(`- ${parts.join('; ')}`);
     const furn = furnitureByRoom.get(r.id) ?? [];
     lines.push(`  Möbel: ${furn.length ? furn.join(', ') : 'keine'}`);
+    const zl = zoneLines.get(r.id) ?? [];
+    listedZones.push(...(zonesByRoom[r.id] ?? []));
+    if (zl.length) lines.push(`  Vom Bewohner markierte Bereiche: ${zl.join('; ')}`);
   }
   const loose = furnitureByRoom.get(null) ?? [];
   if (!focus && loose.length) lines.push(`- Außerhalb der Räume: ${loose.join(', ')}`);
@@ -74,7 +99,7 @@ export function summarizePlan(project: Project, opts: { roomTypes?: Record<strin
   const header = focus
     ? `Gewählter Raum (die Wohnung hat insgesamt ${project.rooms.length} Räume):`
     : `Wohnung mit ${project.rooms.length} Räumen:`;
-  return { text: `${header}\n${lines.join('\n')}`, roomKeys };
+  return { text: `${header}\n${lines.join('\n')}`, roomKeys, zoneKeys, zonesByRoom, listedZones };
 }
 
 /** Catalogue lines „id: Name, B×T×H cm, Kategorie“ – Claude may only propose these ids. */

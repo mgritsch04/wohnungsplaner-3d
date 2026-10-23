@@ -10,8 +10,9 @@ import type { CatalogItem } from '../catalog/types';
 import { findCatalogItem } from '../catalog/generic';
 import type { Project } from '../model/schema';
 import { derivePlan, type DerivedPlan } from '../model/derived';
-import { closestPointOnSegment } from '../model/vec';
-import { guessRoomType, roomIdAt, suggestedIn, suggestFurnishing, type RoomType } from '../suggest/furnishing';
+import { closestPointOnSegment, pointInPolygon } from '../model/vec';
+import { guessRoomType, roomIdAt, suggestedIn, suggestFurnishing, type RoomType, type WishItem } from '../suggest/furnishing';
+import { isKeepFree, zoneLabels, zoneRoomId } from '../model/zones';
 import type { Sample, SampleError } from './claude';
 import { buildDesignPrompt, parseDesignAnswer, PLACEHOLDERS, preselect, type DesignProposal, type DesignRoom, type DesignWishes, MAX_PRODUCTS } from './design';
 import { completeRoom } from './designGuide';
@@ -60,6 +61,9 @@ const isFatal = (e: unknown) => {
 
 const cm = (v: number) => Math.round(v * 100);
 
+/** Claude's picks of a room as the wish list of the placement, with their marked area (#416). */
+export const designWishes = (room: DesignRoom): WishItem[] => room.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity, ...(p.zone ? { zoneId: p.zone } : {}) }));
+
 /**
  * The planner's check of Claude's picks for one room (#350, `completeRoom`): misfits out, missing
  * essentials in as placeholders, a mattress for a bare bed frame. Changes `room` in place.
@@ -92,16 +96,26 @@ function roomHasWindow(project: Project, roomId: string): boolean {
  * (at a wall, hanging, free in the room), what found no place and why, what the planner changed.
  */
 export function placementReport(project: Project, room: DesignRoom, type: RoomType, catalog: CatalogItem[]): string {
-  const s = suggestFurnishing(project, [{ roomId: room.roomId, type, wishes: room.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) }], catalog, { replace: suggestedIn(project, [room.roomId]) });
+  const s = suggestFurnishing(project, [{ roomId: room.roomId, type, wishes: designWishes(room) }], catalog, { replace: suggestedIn(project, [room.roomId]) });
   const r = s.rooms[0];
   const d = derivePlan(project);
   const g = d.rooms.get(room.roomId);
   const atWall = (f: { x: number; y: number; depth: number }) => !!g && g.interior.some((a, i) => closestPointOnSegment(f, a, g.interior[(i + 1) % g.interior.length]).distance < f.depth / 2 + 0.06);
-  const lines = (r?.placed ?? []).map((f) => `- ${f.name} (${cm(f.width)}×${cm(f.depth)} cm): ${f.elevation > 0.6 ? `hängt an der Wand in ${cm(f.elevation)} cm Höhe` : f.elevation > 0.05 ? `steht auf einem Möbel` : atWall(f) ? 'an der Wand' : 'frei im Raum'}`);
+  // marked areas (#416): which zone each item stands in, and zones that stayed empty
+  const keys = zoneLabels(project.zones ?? []);
+  const zones = (project.zones ?? []).filter((z) => zoneRoomId(project, d, z) === room.roomId);
+  const inZone = (f: { x: number; y: number }) => zones.find((z) => pointInPolygon(f, z.points));
+  const lines = (r?.placed ?? []).map((f) => {
+    const z = inZone(f);
+    return `- ${f.name} (${cm(f.width)}×${cm(f.depth)} cm): ${f.elevation > 0.6 ? `hängt an der Wand in ${cm(f.elevation)} cm Höhe` : f.elevation > 0.05 ? `steht auf einem Möbel` : atWall(f) ? 'an der Wand' : 'frei im Raum'}${z ? `, im Bereich ${keys.get(z.id)}` : ''}`;
+  });
+  const empty = zones
+    .filter((z) => !isKeepFree(z.purpose) && !(r?.placed ?? []).some((f) => f.elevation < 0.05 && pointInPolygon(f, z.points)))
+    .map((z) => `- Bereich ${keys.get(z.id)} „${z.purpose || 'ohne Angabe'}“ ist leer geblieben – Möbel dafür mit "zone":"${keys.get(z.id)}" einplanen`);
   const missing = (r?.notes ?? []).map((n) => `- kein Platz: ${n.name} – ${n.why}`);
   const fixes = (room.fixes ?? []).map((f) => `- Planer hat ${f.kind === 'added' ? 'ergänzt' : 'weggelassen'}: ${f.name} (${f.why})`);
   const area = g ? `Raumfläche ${g.area.toFixed(1)} m², davon zugestellt ca. ${(((r?.placed ?? []).filter((f) => f.elevation < 0.05 && f.solid).reduce((a, f) => a + f.width * f.depth, 0) / Math.max(g.area, 0.1)) * 100).toFixed(0)} %.` : '';
-  return [area, 'Aufgestellt:', ...(lines.length ? lines : ['- nichts']), ...missing, ...fixes].filter(Boolean).join('\n');
+  return [area, 'Aufgestellt:', ...(lines.length ? lines : ['- nichts']), ...missing, ...empty, ...fixes].filter(Boolean).join('\n');
 }
 
 export async function runDesign(input: DesignRunInput): Promise<DesignRunResult> {
@@ -152,7 +166,7 @@ export async function runDesign(input: DesignRunInput): Promise<DesignRunResult>
     const rooms: DesignRoom[] = [];
     for (const r of first.rooms) {
       const review = placementReport(project, r, r.type ?? typeOf(r.roomId), catalog);
-      const prev = JSON.stringify({ room: Object.entries(plan.roomKeys).find(([, v]) => v === r.roomId)?.[0], type: r.type, brief: r.brief, items: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) });
+      const prev = JSON.stringify({ room: Object.entries(plan.roomKeys).find(([, v]) => v === r.roomId)?.[0], type: r.type, brief: r.brief, items: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity, ...(p.zone ? { zone: Object.entries(plan.zoneKeys).find(([, v]) => v === p.zone)?.[0] } : {}) })) });
       try {
         const again = parseDesignAnswer(
           await sample.json(buildDesignPrompt(w, plan, offer, undefined, room, faces, { ...extra, review: `Dein erster Vorschlag: ${prev}\n${review}` }), opts(`${label}, Nachprüfung`)),
