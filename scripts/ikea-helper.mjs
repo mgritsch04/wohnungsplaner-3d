@@ -33,7 +33,7 @@
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
  *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
- *   POST /claude { prompt, web? }       → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
+ *   POST /claude { prompt, web?, model? } → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
  *                                         (#350; `web`: Websuche + Seiten von ikea.com/moebelix.at lesen),
  *                                         bis zu 4 Anfragen gleichzeitig (WP_CLAUDE_PARALLEL); `/status` meldet `claude: true`, wenn verfügbar
  *
@@ -104,7 +104,8 @@ async function askClaude(body) {
     // the planner says what is asked and how many are left („Sofa – noch 7 von 12“); printable characters only
     const label = typeof body.label === 'string' ? body.label.replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '').slice(0, 120).trim() : '';
     console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''}${label ? `: ${label}` : ''} … (${claudeRunning} gleichzeitig)`);
-    const text = await runClaude(prompt, { web });
+    const model = typeof body.model === 'string' ? body.model : undefined;
+    const text = await runClaude(prompt, { web, model });
     // a product search without a hit is reported here too, not only in the planner
     if (label) console.log(web && /"products"\s*:\s*\[\s*\]/.test(text) ? `  NICHT GEFUNDEN: ${label} – kein passendes Produkt im Shop` : `  fertig: ${label}`);
     return [200, { text }];

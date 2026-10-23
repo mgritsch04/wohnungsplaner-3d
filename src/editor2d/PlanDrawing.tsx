@@ -52,6 +52,8 @@ interface Props {
    * furniture group has its own handle, #65). Default: every selected item.
    */
   rotateHandleFor?: string | null;
+  /** Furniture not drawn: replaced by the furnishing preview (#350). */
+  hidden?: string[];
 }
 
 const isSel = (s: Selection | null, type: Selection['type'], id: string) => s?.type === type && s.id === id;
@@ -65,7 +67,7 @@ function lighten(hex: string, amount: number): string {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, multi = [], hover, zoom, showDimensions, conflicts, rotateHandleFor }: Props) {
+export const PlanDrawing = memo(function PlanDrawing({ project, derived, selection, multi = [], hover, zoom, showDimensions, conflicts, rotateHandleFor, hidden }: Props) {
   const px = 1 / zoom; // one screen pixel in meters
   const fontSize = 12 * px;
 
@@ -163,7 +165,7 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
   });
 
   // floor-level items first, wall-mounted / elevated items last
-  const furniture = [...project.furniture].sort((a, b) => a.elevation + a.height * 0.001 - (b.elevation + b.height * 0.001));
+  const furniture = (hidden?.length ? project.furniture.filter((f) => !hidden.includes(f.id)) : [...project.furniture]).sort((a, b) => a.elevation + a.height * 0.001 - (b.elevation + b.height * 0.001));
 
   return (
     <g>

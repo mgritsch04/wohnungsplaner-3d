@@ -122,7 +122,16 @@ export function FurnishPanel() {
               <div key={r.roomId} className="furnish-result-room">
                 <strong>{r.roomName || 'Raum'}</strong>
                 <p className="small">{r.placed.length ? countNames(r.placed.map((f) => f.name)) : 'Nichts platziert.'}</p>
-                {r.missing.length > 0 && <p className="warning small">Kein freier Platz für: {countNames(r.missing)}</p>}
+                {r.missing.length > 0 &&
+                  (r.notes?.length ? (
+                    r.notes.map((n, i) => (
+                      <p key={i} className="warning small">
+                        Kein Platz für {n.name}: {n.why}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="warning small">Kein freier Platz für: {countNames(r.missing)}</p>
+                  ))}
               </div>
             ))}
             <p className="small">

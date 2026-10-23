@@ -263,6 +263,8 @@ export const FurnitureSchema = z.object({
   lumen: z.number().min(0).max(20000).optional(),
   /** Purchase phase (#363); absent = moving in. Optional: older files stay valid (no migration). */
   buyPhase: BuyPhaseSchema.optional(),
+  /** Placed by a furnishing suggestion (#137, #350): a new preview of the same rooms replaces it. Optional: older files stay valid. */
+  suggested: z.boolean().optional(),
 });
 
 /**

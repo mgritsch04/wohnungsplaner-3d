@@ -139,7 +139,8 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
           rooms: [
             {
               room: living,
-              type: 'living',
+              // type „other“: no planner essentials, so this test sees only Claude's picks
+              type: 'other',
               concept: 'Gaming-Ecke und Leseplatz.',
               items: [
                 { catalogId: 'e2e-mx-shelf', quantity: 1, reason: 'Platz für Bücher.' },
@@ -147,7 +148,7 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
                 { catalogId: 'erfunden-999', quantity: 1, reason: 'Gibt es nicht.' },
               ],
             },
-            { room: bed, type: 'bedroom', concept: 'Ruhig.', items: [{ catalogId: 'generic-plant', quantity: 1, reason: 'Grün.', label: 'Monstera groß', search: 'Monstera' }] },
+            { room: bed, type: 'other', concept: 'Ruhig.', items: [{ catalogId: 'generic-plant', quantity: 1, reason: 'Grün.', label: 'Monstera groß', search: 'Monstera' }] },
           ],
         };
       },
@@ -172,6 +173,7 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   await panel.getByLabel('Was du brauchst').fill('Stauraum');
   await panel.getByLabel('Was du dir wünschst').fill('Pflanzen');
   await panel.getByLabel('Stil').fill('gemütlich');
+  await panel.getByLabel('Qualität').selectOption('fast');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
 
   const proposal = panel.getByTestId('design-proposal');
@@ -265,7 +267,7 @@ async function installDesktopMock(page: Page) {
           rooms: [
             {
               room: living,
-              type: 'living',
+              type: 'other',
               items: [
                 { catalogId: 'generic-armchair', quantity: 1, reason: 'Zum Lesen.', label: 'Lesesessel aus Cord', search: 'Sessel Cord' },
                 { catalogId: 'generic-plant', quantity: 1, reason: 'Grün.', label: 'Monstera groß', search: 'Monstera' },

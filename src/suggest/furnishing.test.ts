@@ -48,7 +48,11 @@ describe('room type from name (#137)', () => {
     expect(guessRoomType('Badezimmer')).toBe('bath');
     expect(guessRoomType('Flur')).toBe('hall');
     expect(guessRoomType('Büro')).toBe('office');
-    expect(guessRoomType('Abstellraum')).toBe('other');
+    expect(guessRoomType('Abstellraum')).toBe('utility');
+    expect(guessRoomType('Balkon')).toBe('balcony');
+    expect(guessRoomType('Gang')).toBe('hall');
+    expect(guessRoomType('Waschküche')).toBe('utility');
+    expect(guessRoomType('Gästezimmer')).toBe('bedroom');
   });
 });
 
@@ -61,16 +65,16 @@ describe('furnishing suggestion (#137)', () => {
     expect(s.items.filter((f) => f.name === 'Tischlampe')).toHaveLength(2);
   });
 
-  it('bedroom: bed against the longest wall, nightstands beside it, lamps on them, wardrobe – all collision free', () => {
+  it('bedroom: bed against a closed wall (no window, no door, #350), nightstands beside it, lamps on them, wardrobe – all collision free', () => {
     const p = roomProject(4, 3.5, 'Schlafzimmer');
     const s = suggest(p, 'bedroom');
     expect(s.rooms[0].missing).toEqual([]);
     const names = s.items.map((f) => f.name);
     expect(names).toEqual(expect.arrayContaining(['Doppelbett 160×200', 'Nachttisch', 'Tischlampe', 'Kleiderschrank 150 cm']));
     const bed = s.items.find((f) => f.category === 'bed' && f.name.startsWith('Doppelbett'))!;
-    // back against a 4 m wall (north or south): headboard edge touches y≈0 or y≈3.5
-    const backY = bed.y - Math.cos(bed.rotation) * (bed.depth / 2);
-    expect(Math.min(Math.abs(backY), Math.abs(backY - 3.5))).toBeLessThan(0.03);
+    // north has the window, south the door: the headboard touches the west (x≈0) or east wall (x≈4)
+    const backX = bed.x + Math.sin(bed.rotation) * (bed.depth / 2);
+    expect(Math.min(Math.abs(backX), Math.abs(backX - 4))).toBeLessThan(0.03);
     const stands = s.items.filter((f) => f.name === 'Nachttisch');
     expect(stands).toHaveLength(2);
     for (const n of stands) expect(Math.abs(Math.hypot(n.x - bed.x, n.y - bed.y))).toBeLessThan(1.4);

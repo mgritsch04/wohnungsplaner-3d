@@ -1,7 +1,8 @@
 export const SHOP_FETCH: string[];
-export function claudeArgs(opts?: { web?: boolean; maxTurns?: number }): string[];
+export const MODELS: string[];
+export function claudeArgs(opts?: { web?: boolean; maxTurns?: number; model?: string }): string[];
 export function resultText(stdout: string): string;
-export function runClaude(prompt: string, opts?: { web?: boolean; maxTurns?: number; timeoutMs?: number; bin?: string; signal?: AbortSignal }): Promise<string>;
+export function runClaude(prompt: string, opts?: { web?: boolean; maxTurns?: number; model?: string; timeoutMs?: number; bin?: string; signal?: AbortSignal }): Promise<string>;
 export function claudeAvailable(bin?: string): Promise<boolean>;
 export const INSTALL_HELP: string;
 export type FoundClaude = { file: string; prefix: string[]; shell: boolean };

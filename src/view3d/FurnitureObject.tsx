@@ -11,6 +11,7 @@ import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 import { useUiStore } from '../store/uiStore';
 import { requestLampShadowUpdate } from './lampRegistry';
 import { supportsInterior } from '../model/interior';
+import { deskewAngle, fitModel, type ModelFit } from './modelFit';
 
 interface Props {
   item: Furniture;
@@ -190,6 +191,28 @@ function SelectionBox({ w, d, h }: { w: number; d: number; h: number }) {
   );
 }
 
+/** Footprint points (x, z) of a model, at most ~4000 vertices sampled (for `deskewAngle`). */
+function footprintPoints(root: THREE.Object3D): { x: number; z: number }[] {
+  root.updateMatrixWorld(true);
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+  });
+  const total = meshes.reduce((n, m) => n + (m.geometry.getAttribute('position')?.count ?? 0), 0);
+  const step = Math.max(1, Math.floor(total / 4000));
+  const v = new THREE.Vector3();
+  const out: { x: number; z: number }[] = [];
+  for (const m of meshes) {
+    const pos = m.geometry.getAttribute('position');
+    if (!pos) continue;
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      out.push({ x: v.x, z: v.z });
+    }
+  }
+  return out;
+}
+
 function GltfModel({ item, fallback, castShadow, receiveShadow }: { item: Furniture; fallback: ReactNode; castShadow: boolean; receiveShadow: boolean }) {
   const model = item.model.type === 'gltf' ? item.model : null;
   const { url: assetUrl, missing } = useAssetUrl(model?.assetId);
@@ -202,13 +225,27 @@ function LoadedGltf({ url, item, castShadow, receiveShadow }: { url: string; ite
   const gltf = useGLTF(url, DRACO_PATH);
   const plant = item.model.type === 'gltf' && item.model.fallbackShape === 'plant';
   const scene = useMemo(() => {
-    const s = gltf.scene.clone(true);
+    const model = gltf.scene.clone(true);
+    // straighten the model in its box first (#350): askew about the vertical, or width and depth swapped
+    const turned = new THREE.Group();
+    turned.add(model);
+    const s = new THREE.Group();
+    s.add(turned);
+    let fit: ModelFit | null = null;
+    if (!plant) {
+      const skew = deskewAngle(footprintPoints(model));
+      turned.rotation.y = skew;
+      turned.updateMatrixWorld(true);
+      fit = fitModel(new THREE.Box3().setFromObject(turned).getSize(new THREE.Vector3()), { width: item.width, depth: item.depth, height: item.height });
+      if (fit.turn) turned.rotation.y = skew + Math.PI / 2;
+      turned.updateMatrixWorld(true);
+    }
     const box = new THREE.Box3().setFromObject(s);
     const size = box.getSize(new THREE.Vector3());
     // scale the model to the stored real-world dimensions; a plant keeps its proportions:
     // width/depth are its pot (footprint, #269), the leaves spread as modelled
     if (plant) s.scale.setScalar(item.height / (size.y || 1));
-    else s.scale.set(item.width / (size.x || 1), item.height / (size.y || 1), item.depth / (size.z || 1));
+    else s.scale.set(item.width / (size.x || 1), (fit?.height ?? item.height) / (size.y || 1), item.depth / (size.z || 1));
     const box2 = new THREE.Box3().setFromObject(s);
     // a plant stands centred on its pot, wherever its leaves lean
     const c = ((plant && baseBox(s)) || box2).getCenter(new THREE.Vector3());

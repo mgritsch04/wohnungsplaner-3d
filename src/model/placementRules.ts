@@ -18,6 +18,7 @@ export const isRug = (f: Item) => f.category === 'textile' && f.height < 0.05;
 export const isTextile = (f: Item) => f.category === 'textile';
 const isSeat = (f: Item) => f.category === 'chair';
 const isTableLike = (f: Item) => f.category === 'table' || f.category === 'desk';
+const isBox = (f: Item) => shapeOf(f) === 'box' && f.category === 'storage' && f.height <= 0.45;
 const KITCHEN_INSERTS = new Set(['countertop', 'cooktop', 'hood']);
 const isKitchenInsert = (f: Item) => !!f.kitchen && KITCHEN_INSERTS.has(f.kitchen.type);
 
@@ -61,13 +62,15 @@ export function pairRule(a: Item, b: Item): PairRule {
   // only the seat: the backrest must stay out of the table (`seatBackDepth`, checked in placement.ts)
   if (seatAndTable(a, b)) return { allowed: true, reason: 'Stuhl unter Tisch' };
   if ((a.kitchen || b.kitchen) && (isKitchenInsert(a) || isKitchenInsert(b))) return { allowed: true, reason: 'Kücheneinbau' };
+  // storage box standing on a board of an open shelf (#350)
+  if ((isBox(a) && shapeOf(b) === 'shelf') || (isBox(b) && shapeOf(a) === 'shelf')) return { allowed: true, reason: 'Box im Regal' };
   return { allowed: false };
 }
 
 /** Categories that never stand on other furniture, however small (stools stay under tables). */
 const NOT_STACKABLE = new Set(['textile', 'chair', 'table', 'desk', 'sofa', 'bed', 'bathroom', 'kitchen', 'stairs']);
 /** Shapes that hang, stand on the floor or on the wall even when small. */
-const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'k-wall', 'k-hood', 'k-cooktop']);
+const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'wall-shelf', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop']);
 
 /**
  * Small items that are put ON furniture (table lamps, decor, boxes, small appliances,
@@ -86,7 +89,7 @@ export function isStackable(f: Pick<Furniture, 'category' | 'width' | 'depth' | 
 
 /** Categories and shapes of imported models that never offer a top to put things on. */
 const NO_SURFACE_CATEGORIES = new Set(['textile', 'chair', 'sofa', 'bed', 'lighting']);
-const NO_SURFACE_SHAPES = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'k-wall', 'k-hood', 'k-cooktop', 'sofa', 'bed', 'armchair', 'chair', 'stool', 'office-chair', 'wc', 'toilet', 'shower', 'bathtub']);
+const NO_SURFACE_SHAPES = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop', 'sofa', 'bed', 'armchair', 'chair', 'stool', 'office-chair', 'wc', 'toilet', 'shower', 'bathtub']);
 
 /** Furniture that offers a top surface for stackable items. */
 export function isSurface(f: Item & { width?: number; depth?: number }): boolean {

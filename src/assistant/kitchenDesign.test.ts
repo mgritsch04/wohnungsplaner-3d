@@ -153,7 +153,7 @@ describe('kitchen in the furnishing proposal (#350)', () => {
     expect(skipped).toBe(6);
 
     const key = kitchenShoppingList(proposal.rooms[0].kitchen!).find((x) => x.part.base === 'generic-k-base-60')!.key;
-    const found = foundToCatalog({ name: 'TEST Unterschrank', url: 'https://www.ikea.com/at/de/p/test-1', shop: 'IKEA', price: 99, width: 0.6, depth: 0.61, height: 0.8, why: '' }, findCatalogItem('generic-k-base-60')!);
+    const found = foundToCatalog({ name: 'TEST Unterschrank', url: 'https://www.ikea.com/at/de/p/test-1', shop: 'IKEA', price: 99, width: 0.6, depth: 0.61, height: 0.8, why: '', packSize: 1 }, findCatalogItem('generic-k-base-60')!);
     expect(found.kitchen?.type).toBe('base');
     const next = replaceKitchenWithFound(proposal, kitchenId(p), key, [found]);
     const swapped = next.rooms[0].kitchen!.runs[0].filter((s) => s.catalogId === found.id);

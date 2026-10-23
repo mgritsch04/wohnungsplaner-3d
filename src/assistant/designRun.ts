@@ -7,11 +7,14 @@
  * parts add up to the total.
  */
 import type { CatalogItem } from '../catalog/types';
+import { findCatalogItem } from '../catalog/generic';
 import type { Project } from '../model/schema';
-import { derivePlan } from '../model/derived';
-import { guessRoomType, type RoomType } from '../suggest/furnishing';
+import { derivePlan, type DerivedPlan } from '../model/derived';
+import { closestPointOnSegment } from '../model/vec';
+import { guessRoomType, roomIdAt, suggestedIn, suggestFurnishing, type RoomType } from '../suggest/furnishing';
 import type { Sample, SampleError } from './claude';
-import { buildDesignPrompt, parseDesignAnswer, preselect, type DesignProposal, type DesignWishes, MAX_PRODUCTS } from './design';
+import { buildDesignPrompt, parseDesignAnswer, PLACEHOLDERS, preselect, type DesignProposal, type DesignRoom, type DesignWishes, MAX_PRODUCTS } from './design';
+import { completeRoom } from './designGuide';
 import { hasKitchen, kitchenFaces } from './kitchenDesign';
 import { runPool } from './pool';
 import { summarizePlan } from './planSummary';
@@ -35,6 +38,8 @@ export interface DesignRunInput {
   roomTypes: Record<string, RoomType>;
   wishes: DesignWishes;
   products: CatalogItem[];
+  /** „Gefällt mir nicht“ (#350): what the user wants different, for a rerun of these rooms. */
+  feedback?: string;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
 }
@@ -53,54 +58,143 @@ const isFatal = (e: unknown) => {
   return code !== undefined && code !== 'invalid_json' && code !== 'empty_completion' && code !== 'upstream_error';
 };
 
+const cm = (v: number) => Math.round(v * 100);
+
+/**
+ * The planner's check of Claude's picks for one room (#350, `completeRoom`): misfits out, missing
+ * essentials in as placeholders, a mattress for a bare bed frame. Changes `room` in place.
+ */
+export function finishRoom(room: DesignRoom, project: Project, derived: DerivedPlan, type: RoomType, lookup: (id: string) => CatalogItem | undefined): void {
+  const g = derived.rooms.get(room.roomId);
+  const existing = project.furniture.filter((f) => roomIdAt(project, derived, f) === room.roomId);
+  const r = completeRoom({ type, picks: room.picks, existing, area: g?.area ?? 0, hasWindow: roomHasWindow(project, room.roomId), lookup });
+  room.picks = room.picks.filter((_, i) => !r.drop.includes(i));
+  for (const a of r.add) {
+    const c = findCatalogItem(a.catalogId);
+    if (!c) continue;
+    const same = room.picks.find((p) => p.catalogId === a.catalogId);
+    if (same) continue;
+    room.picks.push({ catalogId: a.catalogId, quantity: a.quantity, reason: a.why, placeholder: true, label: c.name, search: c.name, alternatives: [] });
+  }
+  room.fixes = [...(room.fixes ?? []), ...r.fixes];
+}
+
+function roomHasWindow(project: Project, roomId: string): boolean {
+  const room = project.rooms.find((r) => r.id === roomId);
+  if (!room) return false;
+  const nodes = new Set(room.nodeIds);
+  const walls = new Set(project.walls.filter((w) => nodes.has(w.a) && nodes.has(w.b)).map((w) => w.id));
+  return project.openings.some((o) => o.kind === 'window' && walls.has(o.wallId));
+}
+
+/**
+ * How the planner placed Claude's picks (#350, second round „gründlich“): what stands where
+ * (at a wall, hanging, free in the room), what found no place and why, what the planner changed.
+ */
+export function placementReport(project: Project, room: DesignRoom, type: RoomType, catalog: CatalogItem[]): string {
+  const s = suggestFurnishing(project, [{ roomId: room.roomId, type, wishes: room.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) }], catalog, { replace: suggestedIn(project, [room.roomId]) });
+  const r = s.rooms[0];
+  const d = derivePlan(project);
+  const g = d.rooms.get(room.roomId);
+  const atWall = (f: { x: number; y: number; depth: number }) => !!g && g.interior.some((a, i) => closestPointOnSegment(f, a, g.interior[(i + 1) % g.interior.length]).distance < f.depth / 2 + 0.06);
+  const lines = (r?.placed ?? []).map((f) => `- ${f.name} (${cm(f.width)}×${cm(f.depth)} cm): ${f.elevation > 0.6 ? `hängt an der Wand in ${cm(f.elevation)} cm Höhe` : f.elevation > 0.05 ? `steht auf einem Möbel` : atWall(f) ? 'an der Wand' : 'frei im Raum'}`);
+  const missing = (r?.notes ?? []).map((n) => `- kein Platz: ${n.name} – ${n.why}`);
+  const fixes = (room.fixes ?? []).map((f) => `- Planer hat ${f.kind === 'added' ? 'ergänzt' : 'weggelassen'}: ${f.name} (${f.why})`);
+  const area = g ? `Raumfläche ${g.area.toFixed(1)} m², davon zugestellt ca. ${(((r?.placed ?? []).filter((f) => f.elevation < 0.05 && f.solid).reduce((a, f) => a + f.width * f.depth, 0) / Math.max(g.area, 0.1)) * 100).toFixed(0)} %.` : '';
+  return [area, 'Aufgestellt:', ...(lines.length ? lines : ['- nichts']), ...missing, ...fixes].filter(Boolean).join('\n');
+}
+
 export async function runDesign(input: DesignRunInput): Promise<DesignRunResult> {
-  const { sample, project, roomIds, roomTypes, wishes, products, signal, onProgress } = input;
+  const { sample, roomIds, roomTypes, wishes, products, signal, onProgress, feedback } = input;
+  // furniture of an earlier proposal is replaced by this one (#350): Claude plans as if it were not there
+  const project: Project = { ...input.project, furniture: input.project.furniture.filter((f) => !f.suggested) };
   const typeOf = (id: string) => roomTypes[id] ?? guessRoomType(nameOf(project, id));
   const derived = derivePlan(project);
   // a kitchen room without kitchen run: Claude plans the run from its wall faces
   const facesOf = (id: string) => (typeOf(id) === 'kitchen' && !hasKitchen(project, id, derived) ? kitchenFaces(project, id, derived) : []);
   const kitchenRooms = roomIds.filter((id) => facesOf(id).length);
-  if (roomIds.length <= 1) {
-    const offer = preselect(
-      products,
-      roomIds.map(typeOf),
-      wishes.budget,
-      MAX_PRODUCTS,
-    );
-    const plan = summarizePlan(project, { roomTypes, focusRoomId: roomIds[0] ?? null });
-    onProgress?.(0, 1);
-    const label = `Einrichtung: ${roomIds.length ? nameOf(project, roomIds[0]) : 'Wohnung'}`;
-    const raw = await sample.json(buildDesignPrompt(wishes, plan, offer, undefined, undefined, roomIds[0] ? facesOf(roomIds[0]) : undefined), { signal, modelTier: 'complex', label });
-    onProgress?.(1, 1);
-    return { proposal: parseDesignAnswer(raw, plan, roomIds, offer, undefined, kitchenRooms), failedRooms: [], offered: offer };
+  const thorough = wishes.quality !== 'fast';
+  const opts = (label: string) => ({ signal, modelTier: 'complex' as const, label, ...(thorough ? { model: 'opus' as const } : {}) });
+  const single = roomIds.length <= 1;
+  const shares = single ? [wishes.budget] : budgetShares(roomIds.map((id) => derived.rooms.get(id)?.area ?? 0), wishes.budget);
+  const steps = thorough ? 2 : 1;
+  const total = Math.max(1, roomIds.length) * steps;
+  let done = 0;
+  onProgress?.(0, total);
+
+  /** One room: first answer, planner check, and in „gründlich“ a second round with the placement report. */
+  const designRoom = async (id: string | undefined, i: number): Promise<{ proposal: DesignProposal; offer: CatalogItem[] }> => {
+    const offer = single ? preselect(products, roomIds.map(typeOf), wishes.budget, MAX_PRODUCTS) : preselect(products, [typeOf(id!)], shares[i], MAX_PRODUCTS_PER_ROOM);
+    const plan = summarizePlan(project, { roomTypes, focusRoomId: id ?? null });
+    const others = roomIds
+      .filter((x) => x !== id)
+      .map((x) => `${nameOf(project, x)} (${typeOf(x)})`)
+      .join(', ');
+    const room = single ? undefined : { others, wholeBudget: wishes.budget };
+    const extra = { types: id ? [typeOf(id)] : roomIds.map(typeOf), ...(feedback ? { feedback } : {}) };
+    const faces = id ? facesOf(id) : undefined;
+    const label = `Einrichtung: ${id ? nameOf(project, id) : 'Wohnung'}${single ? '' : ` (${i + 1} von ${roomIds.length} Räumen)`}`;
+    const catalog = [...offer, ...PLACEHOLDERS];
+    const lookup = (c: string) => catalog.find((x) => x.id === c);
+    const finish = (p: DesignProposal) => {
+      for (const r of p.rooms) {
+        // the type the user chose wins over Claude's, then Claude's over the guess from the name
+        r.type = roomTypes[r.roomId] ?? r.type ?? typeOf(r.roomId);
+        finishRoom(r, project, derived, r.type, lookup);
+      }
+      return p;
+    };
+    const w = { ...wishes, budget: shares[i] };
+    const first = finish(parseDesignAnswer(await sample.json(buildDesignPrompt(w, plan, offer, undefined, room, faces, extra), opts(label)), plan, id ? [id] : roomIds, offer, undefined, kitchenRooms));
+    onProgress?.(++done, total);
+    if (!thorough) return { proposal: first, offer };
+    // second round: Claude sees how its picks were placed and improves the room (keeps the first answer if that fails)
+    const rooms: DesignRoom[] = [];
+    for (const r of first.rooms) {
+      const review = placementReport(project, r, r.type ?? typeOf(r.roomId), catalog);
+      const prev = JSON.stringify({ room: Object.entries(plan.roomKeys).find(([, v]) => v === r.roomId)?.[0], type: r.type, brief: r.brief, items: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) });
+      try {
+        const again = parseDesignAnswer(
+          await sample.json(buildDesignPrompt(w, plan, offer, undefined, room, faces, { ...extra, review: `Dein erster Vorschlag: ${prev}\n${review}` }), opts(`${label}, Nachprüfung`)),
+          plan,
+          [r.roomId],
+          offer,
+          undefined,
+          kitchenRooms,
+        );
+        const better = finish(again).rooms.find((x) => x.roomId === r.roomId);
+        rooms.push(better ? { ...better, kitchen: better.kitchen ?? r.kitchen, brief: better.brief ?? r.brief, reviewed: true } : r);
+      } catch (e) {
+        if (signal?.aborted || isFatal(e)) throw e;
+        rooms.push(r);
+      }
+    }
+    onProgress?.(++done, total);
+    return { proposal: { ...first, rooms }, offer };
+  };
+
+  if (single) {
+    const { proposal, offer } = await designRoom(roomIds[0], 0);
+    return { proposal, failedRooms: [], offered: offer };
   }
 
-  const shares = budgetShares(roomIds.map((id) => derived.rooms.get(id)?.area ?? 0), wishes.budget);
   const parts: DesignProposal[] = [];
   const offered = new Map<string, CatalogItem>();
   const failed: string[] = [];
-  let done = 0;
-  onProgress?.(0, roomIds.length);
   await runPool(
     roomIds,
     DESIGN_PARALLEL,
     async (id, i) => {
-      const offer = preselect(products, [typeOf(id)], shares[i], MAX_PRODUCTS_PER_ROOM);
-      const plan = summarizePlan(project, { roomTypes, focusRoomId: id });
-      const others = roomIds
-        .filter((x) => x !== id)
-        .map((x) => `${nameOf(project, x)} (${typeOf(x)})`)
-        .join(', ');
-      const prompt = buildDesignPrompt({ ...wishes, budget: shares[i] }, plan, offer, undefined, { others, wholeBudget: wishes.budget }, facesOf(id));
       try {
-        const raw = await sample.json(prompt, { signal, modelTier: 'complex', label: `Einrichtung: ${nameOf(project, id)} (${i + 1} von ${roomIds.length} Räumen)` });
-        parts.push(parseDesignAnswer(raw, plan, [id], offer, undefined, kitchenRooms));
+        const { proposal, offer } = await designRoom(id, i);
+        parts.push(proposal);
         for (const c of offer) offered.set(c.id, c);
       } catch (e) {
         if (signal?.aborted || isFatal(e)) throw e;
         failed.push(id);
+        done += steps;
+        onProgress?.(Math.min(done, total), total);
       }
-      onProgress?.(++done, roomIds.length);
     },
     () => !!signal?.aborted,
   );

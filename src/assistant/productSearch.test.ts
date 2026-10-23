@@ -143,6 +143,10 @@ describe('Claude im lokalen Planer über den Helfer (#350)', () => {
     const allowed = web[web.indexOf('--allowedTools') + 1];
     expect(allowed).toBe('WebSearch,WebFetch(domain:www.ikea.com),WebFetch(domain:www.moebelix.at),WebFetch(domain:moebelix.at)');
     expect(web[web.indexOf('--disallowedTools') + 1]).toContain('Bash');
+    // „gründlich“ (#350): opus by name, unknown names are ignored
+    const opus = claudeArgs({ model: 'opus' });
+    expect(opus[opus.indexOf('--model') + 1]).toBe('opus');
+    expect(claudeArgs({ model: 'rm -rf' })).not.toContain('--model');
     expect(resultText(JSON.stringify({ type: 'result', result: 'hallo', is_error: false }))).toBe('hallo');
     expect(resultText(JSON.stringify([{ type: 'system' }, { type: 'result', result: 'b' }]))).toBe('b');
     expect(() => resultText(JSON.stringify({ type: 'result', result: 'kaputt', is_error: true }))).toThrow('kaputt');

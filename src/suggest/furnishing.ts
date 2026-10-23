@@ -22,7 +22,7 @@ import { newId } from '../model/ids';
 import type { Furniture, Project } from '../model/schema';
 import { add, boundsOf, dist, dot, normalize, perp, pointInPolygon, polygonCentroid, rotate, scale, sub, type Vec2 } from '../model/vec';
 
-export type RoomType = 'living' | 'bedroom' | 'kids' | 'office' | 'dining' | 'kitchen' | 'bath' | 'hall' | 'other';
+export type RoomType = 'living' | 'bedroom' | 'kids' | 'office' | 'dining' | 'kitchen' | 'bath' | 'hall' | 'utility' | 'balcony' | 'other';
 
 export const ROOM_TYPES: { id: RoomType; label: string }[] = [
   { id: 'living', label: 'Wohnzimmer' },
@@ -33,6 +33,8 @@ export const ROOM_TYPES: { id: RoomType; label: string }[] = [
   { id: 'kitchen', label: 'Küche' },
   { id: 'bath', label: 'Bad' },
   { id: 'hall', label: 'Flur' },
+  { id: 'utility', label: 'Abstellraum' },
+  { id: 'balcony', label: 'Balkon' },
   { id: 'other', label: 'Sonstiges' },
 ];
 
@@ -42,9 +44,11 @@ const NAME_RULES: [RegExp, RoomType][] = [
   [/schlaf|gäste|gaeste/i, 'bedroom'],
   [/arbeit|büro|buero|office/i, 'office'],
   [/^ess|esszimmer|essbereich/i, 'dining'],
+  [/abstell|speisekammer|^speis$|vorrat|lager|kammer|waschküche|waschkueche|hauswirtschaft|technik/i, 'utility'],
   [/küche|kueche|kochen/i, 'kitchen'],
   [/bad|wc|dusch|toilette/i, 'bath'],
   [/flur|diele|gang|eingang|vorraum|garderobe/i, 'hall'],
+  [/balkon|terrasse|loggia|veranda/i, 'balcony'],
   [/wohn/i, 'living'],
 ];
 
@@ -69,6 +73,7 @@ const DEFAULT_WISHES: Record<RoomType, [string, number][]> = {
     ['generic-armchair', 1],
     ['generic-floor-lamp', 1],
     ['generic-shelf-80', 1],
+    ['generic-picture-large', 1],
   ],
   bedroom: [
     ['generic-bed-160', 1],
@@ -76,6 +81,7 @@ const DEFAULT_WISHES: Record<RoomType, [string, number][]> = {
     ['generic-table-lamp', 2],
     ['generic-wardrobe-150', 1],
     ['generic-dresser', 1],
+    ['generic-picture', 1],
   ],
   kids: [
     ['generic-bed-90', 1],
@@ -104,12 +110,26 @@ const DEFAULT_WISHES: Record<RoomType, [string, number][]> = {
   bath: [
     ['generic-toilet', 1],
     ['generic-washbasin', 1],
+    ['generic-bath-mirror', 1],
     ['generic-shower', 1],
     ['generic-washer', 1],
   ],
   hall: [
-    ['generic-dresser', 1],
-    ['generic-shelf-80', 1],
+    ['generic-shoe-cabinet', 1],
+    ['generic-coat-rack', 1],
+    ['generic-mirror', 1],
+    ['generic-picture', 1],
+  ],
+  utility: [
+    ['generic-utility-shelf', 2],
+    ['generic-broom-cabinet', 1],
+    ['generic-vacuum', 1],
+    ['generic-storage-box', 4],
+  ],
+  balcony: [
+    ['generic-balcony-table', 1],
+    ['generic-balcony-chair', 2],
+    ['generic-planter', 2],
   ],
   other: [],
 };
@@ -134,12 +154,16 @@ export interface RoomSuggestion {
   placed: Furniture[];
   /** Names of wished items that found no collision-free place (one entry per piece). */
   missing: string[];
+  /** Per missing piece: why there was no place and what helps (#350). */
+  notes?: { name: string; why: string }[];
 }
 
 export interface FurnishingSuggestion {
   rooms: RoomSuggestion[];
   /** All proposed items (= the rooms' `placed`), in placement order. */
   items: Furniture[];
+  /** Furniture of an earlier, applied suggestion that this one replaces (#350): hidden in the preview, removed when applied. */
+  replaces?: string[];
 }
 
 /** Which room an item stands in (by its centre). */
@@ -158,31 +182,66 @@ export function wishesForRoom(p: Project, d: DerivedPlan, roomId: string, type: 
 }
 
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
 // placement
 
-type Role = 'bed' | 'sofa' | 'tv-board' | 'table' | 'wall' | 'corner' | 'nightstand' | 'coffee-table' | 'seat' | 'rug' | 'tv' | 'table-lamp' | 'pendant';
+type Role =
+  | 'bed'
+  | 'sofa'
+  | 'tv-board'
+  | 'table'
+  | 'wall'
+  | 'corner'
+  | 'nightstand'
+  | 'coffee-table'
+  | 'armchair'
+  | 'seat'
+  | 'floor-lamp'
+  | 'rug'
+  | 'tv'
+  | 'table-lamp'
+  | 'pendant'
+  | 'mattress'
+  | 'box'
+  | 'curtain'
+  | 'mirror'
+  | 'coat-rack'
+  | 'wall-art';
 
-/** Placement order: anchors first, then what is placed relative to them. */
-const ROLE_ORDER: Role[] = ['bed', 'sofa', 'tv-board', 'table', 'wall', 'corner', 'nightstand', 'coffee-table', 'seat', 'rug', 'tv', 'table-lamp', 'pendant'];
+/** Placement order: anchors first, then what is placed relative to them; wall decor last (it goes above what stands there). */
+const ROLE_ORDER: Role[] = ['bed', 'nightstand', 'sofa', 'tv-board', 'table', 'corner', 'wall', 'coffee-table', 'armchair', 'seat', 'floor-lamp', 'rug', 'tv', 'table-lamp', 'pendant', 'mattress', 'box', 'curtain', 'mirror', 'coat-rack', 'wall-art'];
 
 const shapeOf = (f: Pick<Furniture, 'model'>) => (f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape);
-const CORNER_SHAPES = new Set(['wardrobe', 'shelf', 'shower', 'bathtub', 'floor-lamp', 'washer', 'plant', 'k-fridge']);
+const CORNER_SHAPES = new Set(['wardrobe', 'shelf', 'shower', 'bathtub', 'washer', 'plant', 'k-fridge', 'vacuum']);
+/** Rooms where a table is a work or side table against a wall, not a free-standing dining table (#350). */
+const WALL_TABLE_ROOMS = new Set<RoomType>(['bedroom', 'kids', 'office', 'hall', 'utility', 'bath']);
+/** Free floor in front of furniture standing at a wall: walking space (#350). Hall: 90 cm, elsewhere 60 cm. */
+const walkway = (type: RoomType) => (type === 'hall' ? 0.9 : type === 'bath' || type === 'utility' || type === 'balcony' ? 0.55 : 0.6);
 
-type RoleInput = Pick<CatalogItem, 'name' | 'category' | 'model'> & { tags?: string[]; catalogId?: string };
+type RoleInput = Pick<CatalogItem, 'name' | 'category' | 'model'> & { tags?: string[]; catalogId?: string; elevation?: number; height?: number };
 
 function roleOf(f: RoleInput): Role {
   // placed items carry no tags: take them from their generic catalogue entry
   const item: RoleInput = (f.catalogId && findCatalogItem(f.catalogId)) || f;
   const shape = shapeOf(item);
   const tags = item.tags ?? [];
+  if (shape === 'mattress') return 'mattress';
   if (item.category === 'bed') return shape === 'bed' ? 'bed' : 'nightstand';
   if (item.category === 'chair') return 'seat';
   if (shape === 'rug') return 'rug';
+  if (shape === 'curtain') return 'curtain';
+  if (shape === 'picture' || shape === 'wall-shelf') return 'wall-art';
+  if (shape === 'coat-rack') return 'coat-rack';
+  // a small mirror hangs (bath: above the washbasin); a tall one stands on the floor against a wall
+  if (shape === 'panel' && (item.elevation ?? 0) >= 0.8) return 'mirror';
+  if (shape === 'box' && item.category === 'storage' && (item.height ?? 1) <= 0.45) return 'box';
   if (shape === 'tv') return 'tv';
   if (shape === 'pendant') return 'pendant';
   if (shape === 'table-lamp') return 'table-lamp';
+  if (shape === 'floor-lamp') return 'floor-lamp';
   if (item.category === 'table') return tags.includes('couchtisch') || /couchtisch|beistelltisch/i.test(item.name) ? 'coffee-table' : 'table';
   if (item.category === 'storage' && (tags.includes('tv') || /tv|lowboard/i.test(item.name))) return 'tv-board';
+  if (shape === 'armchair') return 'armchair';
   if (shape === 'sofa' || shape === 'sofa-corner') return 'sofa';
   if (CORNER_SHAPES.has(shape)) return 'corner';
   return 'wall';
@@ -198,14 +257,25 @@ const mm = (v: number) => Math.round(v * 1000) / 1000;
 const WALL_GAP = 0.01;
 const STEP = 0.05;
 
+interface Span {
+  t0: number;
+  t1: number;
+  window: boolean;
+  /** Window: underside and top above the floor. */
+  bottom: number;
+  top: number;
+}
+
 interface Edge {
   a: Vec2;
   dir: Vec2;
   inward: Vec2;
   length: number;
+  /** Doors and windows in this wall stretch (positions along the edge). */
+  openings: Span[];
 }
 
-function roomEdges(poly: Vec2[]): Edge[] {
+function roomEdges(poly: Vec2[], d?: DerivedPlan): Edge[] {
   const out: Edge[] = [];
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i];
@@ -216,10 +286,33 @@ function roomEdges(poly: Vec2[]): Edge[] {
     let inward = perp(dir);
     const mid = add(scale(add(a, b), 0.5), scale(inward, 0.02));
     if (!pointInPolygon(mid, poly)) inward = scale(inward, -1);
-    out.push({ a, dir, inward, length });
+    const openings: Span[] = [];
+    if (d) {
+      for (const [wallId, list] of d.openings) {
+        const fp = d.footprints.get(wallId);
+        if (!fp) continue;
+        for (const r of list) {
+          const pa = add(fp.a, scale(fp.dir, r.s0));
+          const pb = add(fp.a, scale(fp.dir, r.s1));
+          // the opening lies in this edge's wall: its centre line is about half a wall thickness behind the edge
+          const off = (p: Vec2) => Math.abs(dot(sub(p, a), inward));
+          if (off(pa) > fp.thickness / 2 + 0.06 || off(pb) > fp.thickness / 2 + 0.06) continue;
+          const ta = dot(sub(pa, a), dir);
+          const tb = dot(sub(pb, a), dir);
+          const t0 = Math.min(ta, tb);
+          const t1 = Math.max(ta, tb);
+          if (t1 < 0 || t0 > length) continue;
+          openings.push({ t0: Math.max(0, t0), t1: Math.min(length, t1), window: r.opening.kind === 'window', bottom: r.bottom, top: r.top });
+        }
+      }
+    }
+    out.push({ a, dir, inward, length, openings });
   }
   return out;
 }
+
+const hasWindow = (e: Edge) => e.openings.some((o) => o.window);
+const hasDoor = (e: Edge) => e.openings.some((o) => !o.window);
 
 interface Zone {
   polygon: Vec2[];
@@ -253,38 +346,105 @@ interface Ctx {
   zones: Zone[];
 }
 
+/** Why poses of the current item were rejected (for the „no place“ note). */
+type Reject = 'outside' | 'opening' | 'walkway' | 'collision';
+
 interface RoomCtx extends Ctx {
   roomId: string;
+  type: RoomType;
   interior: Vec2[];
   edges: Edge[];
   centroid: Vec2;
+  rejects: Set<Reject>;
+  /** Living room with a dining place (#350): the half of the room the current piece's zone may use. */
+  zone?: Vec2[];
+}
+
+/** Pieces of the seating group and of the dining place: a living room with both is split into two zones (#350). */
+const LOUNGE_ROLES = new Set<Role>(['sofa', 'coffee-table', 'armchair', 'tv-board', 'tv', 'rug', 'floor-lamp']);
+const DINING_ROLES = new Set<Role>(['table', 'seat', 'pendant']);
+
+/** The part of `poly` on the side of the line through `p` where dot(x - p, n) <= 0 (Sutherland–Hodgman, one half-plane). */
+function clipHalf(poly: Vec2[], p: Vec2, n: Vec2): Vec2[] {
+  const out: Vec2[] = [];
+  const side = (x: Vec2) => dot(sub(x, p), n);
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const sa = side(a);
+    const sb = side(b);
+    if (sa <= 0) out.push(a);
+    if ((sa < 0 && sb > 0) || (sa > 0 && sb < 0)) out.push(add(a, scale(sub(b, a), sa / (sa - sb))));
+  }
+  return out;
+}
+
+/** The two halves of a room across its longest wall direction. */
+function roomHalves(interior: Vec2[], edges: Edge[]): [Vec2[], Vec2[]] | null {
+  const main = longestFirst(edges)[0];
+  if (!main) return null;
+  const ts = interior.map((q) => dot(sub(q, main.a), main.dir));
+  const lo = Math.min(...ts);
+  const hi = Math.max(...ts);
+  if (hi - lo < 4) return null;
+  const mid = add(main.a, scale(main.dir, (lo + hi) / 2));
+  return [clipHalf(interior, mid, main.dir), clipHalf(interior, mid, scale(main.dir, -1))];
 }
 
 const inRoom = (c: RoomCtx, f: Pick<Furniture, 'x' | 'y'>) => pointInPolygon({ x: f.x, y: f.y }, c.interior);
 const roomItems = (c: RoomCtx) => c.draft.furniture.filter((f) => inRoom(c, f));
 
+/** Whether the floor `need` metres in front of a floor item is still inside the room (walking space, #350). */
+function frontFree(c: RoomCtx, f: Furniture, need: number): boolean {
+  const fwd = frontOf(f);
+  const right = rightOf(f);
+  const front = add(f, scale(fwd, f.depth / 2 + need));
+  for (const s of [-0.45, 0, 0.45]) {
+    const p = add(front, scale(right, s * f.width));
+    if (!pointInPolygon(p, c.interior)) return false;
+  }
+  return true;
+}
+
 /** Whether `f` can stand there: inside the room, openings free, no placement issue for it or caused by it. */
-function fits(c: RoomCtx, f: Furniture): boolean {
+function fits(c: RoomCtx, f: Furniture, opts: { walkway?: number } = {}): boolean {
   const fc = furnitureCorners(f);
   const inset = fc.map((p) => add(p, scale(normalize(sub({ x: f.x, y: f.y }, p)), 0.003)));
-  if (!inset.every((p) => pointInPolygon(p, c.interior))) return false;
+  if (!inset.every((p) => pointInPolygon(p, c.interior)) || (c.zone && !inset.every((p) => pointInPolygon(p, c.zone!)))) {
+    c.rejects.add('outside');
+    return false;
+  }
   const rug = f.category === 'textile' && f.height < 0.05;
+  const curtain = shapeOf(f) === 'curtain';
   if (!rug) {
-    // a small lamp on a nightstand next to a window does not block the window (#346)
+    // a small lamp on a nightstand next to a window does not block the window (#346); a curtain belongs there
     const lamp = shapeOf(f) === 'table-lamp';
     for (const z of c.zones) {
-      if (lamp && z.window) continue;
+      if ((lamp || curtain) && z.window) continue;
       if (f.elevation >= z.z1 || f.elevation + f.height <= z.z0 + 0.02) continue;
-      if (footprintsOverlap(fc, z.polygon, 1e-3)) return false;
+      if (footprintsOverlap(fc, z.polygon, 1e-3)) {
+        c.rejects.add('opening');
+        return false;
+      }
     }
+  }
+  if (opts.walkway && !frontFree(c, f, opts.walkway)) {
+    c.rejects.add('walkway');
+    return false;
   }
   c.draft.furniture.push(f);
   try {
-    if (placementIssues(c.draft, c.derived, f, c.obstacles).length) return false;
+    if (placementIssues(c.draft, c.derived, f, c.obstacles).length) {
+      c.rejects.add('collision');
+      return false;
+    }
     // the new item must not take the space in front of doors/drawers of what is already there
     for (const o of c.draft.furniture) {
       if (o === f || frontClearance(o) <= 0 || dist(o, f) > 4) continue;
-      if (placementIssues(c.draft, c.derived, o, c.obstacles).some((i) => i.refId === f.id)) return false;
+      if (placementIssues(c.draft, c.derived, o, c.obstacles).some((i) => i.refId === f.id)) {
+        c.rejects.add('collision');
+        return false;
+      }
     }
     return true;
   } finally {
@@ -298,13 +458,13 @@ function withPose(item: CatalogItem, x: number, y: number, rotation: number, ele
   return f;
 }
 
-function firstFit(c: RoomCtx, poses: Iterable<Furniture>): Furniture | null {
-  for (const f of poses) if (fits(c, f)) return f;
+function firstFit(c: RoomCtx, poses: Iterable<Furniture>, opts?: { walkway?: number }): Furniture | null {
+  for (const f of poses) if (fits(c, f, opts)) return f;
   return null;
 }
 
 /** Poses with the back against a wall: walls in the given order, stations ordered by `stationOrder`. */
-function* wallPoses(item: CatalogItem, edges: Edge[], stationOrder: 'center' | 'corner' | ((e: Edge, t: number) => number)): Generator<Furniture> {
+function* wallPoses(item: CatalogItem, edges: Edge[], stationOrder: 'center' | 'corner' | ((e: Edge, t: number) => number), elevation?: number): Generator<Furniture> {
   for (const e of edges) {
     const lo = item.width / 2 + WALL_GAP;
     const hi = e.length - item.width / 2 - WALL_GAP;
@@ -318,12 +478,14 @@ function* wallPoses(item: CatalogItem, edges: Edge[], stationOrder: 'center' | '
     const rotation = rotationFacing(e.inward);
     for (const t of ts) {
       const c = add(add(e.a, scale(e.dir, t)), scale(e.inward, item.depth / 2 + WALL_GAP));
-      yield withPose(item, c.x, c.y, rotation);
+      yield withPose(item, c.x, c.y, rotation, elevation);
     }
   }
 }
 
 const longestFirst = (edges: Edge[]) => [...edges].sort((a, b) => b.length - a.length);
+/** Walls without windows (and doors) first, each group longest first: beds, sofas and wardrobes need a closed wall. */
+const closedFirst = (edges: Edge[]) => [...edges].sort((a, b) => Number(hasWindow(a)) + 0.5 * Number(hasDoor(a)) - (Number(hasWindow(b)) + 0.5 * Number(hasDoor(b))) || b.length - a.length);
 
 /** Free-standing poses near the room centre (grid, both orientations along the longest wall). */
 function* centerPoses(c: RoomCtx, item: CatalogItem, around: Vec2 = c.centroid): Generator<Furniture> {
@@ -339,40 +501,63 @@ function* centerPoses(c: RoomCtx, item: CatalogItem, around: Vec2 = c.centroid):
 }
 
 const findIn = (c: RoomCtx, pred: (f: Furniture) => boolean) => roomItems(c).filter(pred);
+/** A sized copy of a catalogue item (curtain to the window width, mattress to the bed). */
+const sized = (item: CatalogItem, width: number, depth = item.depth): CatalogItem => ({ ...item, width: mm(width), depth: mm(depth) });
+
+/** Back-centre poses of `item` on the wall behind `anchor` (picture above the sofa, mirror above the washbasin). */
+function* aboveAnchor(item: CatalogItem, anchors: Furniture[], elevation: (a: Furniture) => number): Generator<Furniture> {
+  for (const a of anchors) {
+    const back = sub(a, scale(frontOf(a), a.depth / 2));
+    const p = add(back, scale(frontOf(a), item.depth / 2 + 0.005));
+    yield withPose(item, p.x, p.y, a.rotation, elevation(a));
+  }
+}
 
 function placeItem(c: RoomCtx, item: CatalogItem, role: Role, companions: CatalogItem[]): Furniture | null {
   const edges = longestFirst(c.edges);
+  const walk = { walkway: walkway(c.type) };
   switch (role) {
     case 'bed': {
+      const order = closedFirst(c.edges);
       // keep room for the wished nightstands on both sides; without them if that does not fit
       const ns = companions.find((x) => roleOf(x) === 'nightstand');
       if (ns) {
         const extra = 2 * (ns.width + 0.03);
         const probe: CatalogItem = { ...item, width: item.width + extra };
-        for (const pose of wallPoses(probe, edges, 'center')) {
+        for (const pose of wallPoses(probe, order, 'center')) {
           if (!fits(c, pose)) continue;
           const bed = withPose(item, pose.x, pose.y, pose.rotation);
-          if (fits(c, bed)) return bed;
+          if (fits(c, bed, walk)) return bed;
         }
       }
-      return firstFit(c, wallPoses(item, edges, 'center'));
+      return firstFit(c, wallPoses(item, order, 'center'), walk);
     }
-    case 'sofa':
-      return firstFit(c, wallPoses(item, edges, 'center'));
+    case 'sofa': {
+      // in a split living room the sofa faces along the room, so the TV wall lies in the same half
+      const main = longestFirst(c.edges)[0];
+      const order = c.zone && main ? [...closedFirst(c.edges)].sort((a, b) => Math.abs(dot(b.dir, main.dir)) - Math.abs(dot(a.dir, main.dir))) : closedFirst(c.edges);
+      return firstFit(c, wallPoses(item, order, 'center'), walk);
+    }
     case 'corner':
-      return firstFit(c, wallPoses(item, edges, 'corner'));
-    case 'wall':
-      return firstFit(c, wallPoses(item, edges, 'center'));
+      return firstFit(c, wallPoses(item, c.type === 'utility' || c.type === 'bath' ? edges : closedFirst(c.edges), 'corner'), walk) ?? firstFit(c, wallPoses(item, edges, 'corner'));
+    case 'wall': {
+      // desks and work tables like the light of a window; everything else a closed wall
+      const desk = item.category === 'desk' || item.category === 'table';
+      const order = desk ? [...c.edges].sort((a, b) => Number(hasWindow(b)) - Number(hasWindow(a)) || b.length - a.length) : closedFirst(c.edges);
+      return firstFit(c, wallPoses(item, order, 'center'), walk);
+    }
     case 'tv-board': {
       const sofa = findIn(c, (f) => roleOf(f) === 'sofa')[0];
-      if (!sofa) return firstFit(c, wallPoses(item, edges, 'center'));
+      if (!sofa) return firstFit(c, wallPoses(item, edges, 'center'), walk);
       // opposite the sofa, centred on its axis
       const fwd = frontOf(sofa);
       const facing = [...c.edges].sort((a, b) => dot(a.inward, fwd) - dot(b.inward, fwd));
       const axis = (e: Edge, t: number) => Math.abs(dot(sub(add(e.a, scale(e.dir, t)), sofa), rightOf(sofa)));
-      return firstFit(c, wallPoses(item, facing, axis));
+      return firstFit(c, wallPoses(item, facing, axis), walk);
     }
     case 'table':
+      // bedroom, office … (#350): a table is a work or side table at a wall, never in the middle of the room
+      if (WALL_TABLE_ROOMS.has(c.type)) return placeItem(c, item, 'wall', companions);
       return firstFit(c, tablePoses(c, item));
     case 'nightstand': {
       const beds = findIn(c, (f) => roleOf(f) === 'bed');
@@ -399,17 +584,56 @@ function placeItem(c: RoomCtx, item: CatalogItem, role: Role, companions: Catalo
       };
       return firstFit(c, poses());
     }
+    case 'armchair': {
+      // seating group (#350): beside the coffee table, turned towards it; otherwise at a wall facing the room
+      const ct = findIn(c, (f) => roleOf(f) === 'coffee-table')[0];
+      const poses = function* () {
+        if (ct) {
+          for (const s of [1, -1]) {
+            for (const gap of [0.35, 0.45, 0.25]) {
+              const side = scale(rightOf(ct), s);
+              const p = add(ct, scale(side, ct.width / 2 + gap + item.depth / 2));
+              yield withPose(item, p.x, p.y, rotationFacing(scale(side, -1)));
+            }
+          }
+        }
+        yield* wallPoses(item, closedFirst(c.edges), 'corner');
+      };
+      return firstFit(c, poses());
+    }
     case 'seat':
       return firstFit(c, seatPoses(c, item));
+    case 'floor-lamp': {
+      // reading light beside the sofa or armchair, else a corner
+      const seats = findIn(c, (f) => roleOf(f) === 'sofa' || roleOf(f) === 'armchair' || roleOf(f) === 'bed');
+      const poses = function* () {
+        for (const s of seats) {
+          const back = sub(s, scale(frontOf(s), s.depth / 2));
+          for (const side of [1, -1]) {
+            const p = add(add(back, scale(rightOf(s), side * (s.width / 2 + item.width / 2 + 0.05))), scale(frontOf(s), item.depth / 2 + 0.02));
+            yield withPose(item, p.x, p.y, s.rotation);
+          }
+        }
+        yield* wallPoses(item, edges, 'corner');
+      };
+      return firstFit(c, poses());
+    }
     case 'rug': {
       const ct = findIn(c, (f) => roleOf(f) === 'coffee-table')[0];
       const sofa = findIn(c, (f) => roleOf(f) === 'sofa')[0];
       const bed = findIn(c, (f) => roleOf(f) === 'bed')[0];
+      const basin = findIn(c, (f) => shapeOf(f) === 'washbasin')[0];
+      const table = findIn(c, (f) => roleOf(f) === 'table')[0];
       const poses = function* () {
         if (ct && sofa) {
           // long side parallel to the sofa, under the coffee table
           for (const r of [sofa.rotation + Math.PI / 2, sofa.rotation]) yield withPose(item, ct.x, ct.y, r);
         }
+        if (basin) {
+          const p = add(basin, scale(frontOf(basin), basin.depth / 2 + item.depth / 2 + 0.02));
+          yield withPose(item, p.x, p.y, basin.rotation);
+        }
+        if (table && c.type === 'balcony') yield withPose(item, table.x, table.y, table.rotation);
         yield* centerPoses(c, item, bed ? add(bed, scale(frontOf(bed), bed.depth / 2)) : c.centroid);
       };
       return firstFit(c, poses());
@@ -438,18 +662,101 @@ function placeItem(c: RoomCtx, item: CatalogItem, role: Role, companions: Catalo
         if (!tables.length) yield* centerPoses(c, item);
       })());
     }
+    case 'mattress': {
+      // on the bed frame (#350): sized to it, lying on the slats
+      const beds = findIn(c, (f) => roleOf(f) === 'bed' && !findIn(c, (m) => roleOf(m) === 'mattress' && dist(m, f) < 0.2).length);
+      return firstFit(c, (function* () {
+        for (const b of beds) {
+          const m = sized(item, Math.min(item.width, b.width - 0.04), Math.min(item.depth, b.depth - 0.06));
+          const p = add(b, scale(frontOf(b), 0.02));
+          yield withPose(m, p.x, p.y, b.rotation, Math.min(0.25, Math.max(0.08, b.height - m.height - 0.05)));
+        }
+      })());
+    }
+    case 'box':
+      return firstFit(c, boxPoses(c, item));
+    case 'curtain':
+      return firstFit(c, curtainPoses(c, item));
+    case 'mirror': {
+      const basins = findIn(c, (f) => shapeOf(f) === 'washbasin');
+      return firstFit(c, (function* () {
+        yield* aboveAnchor(item, basins, (b) => Math.max(item.elevation ?? 0, b.elevation + b.height + 0.25));
+        yield* wallPoses(item, closedFirst(c.edges), 'center', item.elevation ?? 1.15);
+      })());
+    }
+    case 'coat-rack': {
+      // close to the entrance door
+      const doors = c.edges.flatMap((e) => e.openings.filter((o) => !o.window).map((o) => add(e.a, scale(e.dir, (o.t0 + o.t1) / 2))));
+      const near = (e: Edge, t: number) => (doors.length ? Math.min(...doors.map((d) => dist(add(e.a, scale(e.dir, t)), d))) : Math.abs(t - e.length / 2));
+      return firstFit(c, wallPoses(item, edges, near, item.elevation ?? 1.6));
+    }
+    case 'wall-art': {
+      // above the sofa, the bed, a sideboard or desk; otherwise centred on a free wall
+      const anchors = findIn(c, (f) => ['sofa', 'bed', 'tv-board'].includes(roleOf(f)) || ['dresser', 'cabinet', 'desk'].includes(shapeOf(f)) || f.category === 'desk')
+        .filter((a) => a.height < 1.3 && a.elevation < 0.1)
+        .sort((a, b) => ROLE_ORDER.indexOf(roleOf(a)) - ROLE_ORDER.indexOf(roleOf(b)) || b.width - a.width);
+      return firstFit(c, (function* () {
+        yield* aboveAnchor(item, anchors, (a) => Math.max(item.elevation ?? 1.35, a.elevation + a.height + (roleOf(a) === 'bed' ? 0.25 : 0.3)));
+        yield* wallPoses(item, closedFirst(c.edges), 'center', item.elevation ?? 1.4);
+      })());
+    }
   }
+}
+
+/** Curtain in front of every window of the room, a bit wider than the window, hanging from just under the ceiling. */
+function* curtainPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
+  const hung = findIn(c, (f) => roleOf(f) === 'curtain');
+  for (const e of c.edges) {
+    for (const o of e.openings) {
+      if (!o.window) continue;
+      const w = Math.min(e.length - 0.02, o.t1 - o.t0 + 0.3);
+      const mid = Math.min(Math.max((o.t0 + o.t1) / 2, w / 2 + 0.01), e.length - w / 2 - 0.01);
+      const p = add(add(e.a, scale(e.dir, mid)), scale(e.inward, item.depth / 2 + 0.06));
+      if (hung.some((h) => dist(h, p) < 0.3)) continue;
+      yield withPose(sized(item, w), p.x, p.y, rotationFacing(e.inward));
+    }
+  }
+}
+
+/** Storage boxes go onto the free boards of open shelves (#350), else on a low surface – never loose on the floor. */
+function* boxPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
+  const shelves = findIn(c, (f) => shapeOf(f) === 'shelf' && f.depth >= item.depth - 0.02 && f.width >= item.width + 0.04);
+  for (const s of shelves) {
+    // board heights as drawn by `ProceduralModel` ('shelf'): n = round(h / 0.36) boards; books stand on the even ones
+    const t = 0.018;
+    const n = Math.max(2, Math.round(s.height / 0.36));
+    const per = Math.max(1, Math.floor((s.width - 0.04) / (item.width + 0.02)));
+    for (let i = 1; i < n; i += 2) {
+      const y = s.elevation + Math.min(s.height - t, (i * (s.height - t)) / n) + t;
+      if ((s.height - t) / n - t < item.height + 0.02) continue;
+      for (let k = 0; k < per; k++) {
+        const x = -s.width / 2 + 0.02 + (k + 0.5) * ((s.width - 0.04) / per);
+        const p = add(add(s, scale(rightOf(s), x)), scale(frontOf(s), (s.depth - item.depth) / 2 - 0.005));
+        yield withPose(item, p.x, p.y, s.rotation, y);
+      }
+    }
+  }
+  const surfaces = findIn(c, (f) => isSurface(f) && f.category !== 'table' && f.category !== 'desk' && f.width >= item.width && f.depth >= item.depth);
+  for (const s of surfaces) yield withPose(item, s.x, s.y, s.rotation, s.elevation + s.height);
 }
 
 /** Table poses near the centre that leave room for chairs on the long sides (~60 cm). */
 function* tablePoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
   const round = shapeOf(item) === 'table-round';
-  const probe: CatalogItem = { ...item, width: item.width + (round ? 1.2 : 0.3), depth: item.depth + 1.2, category: 'table' };
-  for (const pose of centerPoses(c, item)) {
+  // balcony: two chairs at the ends are enough, the table stands along the balcony
+  const probe: CatalogItem =
+    c.type === 'balcony' ? { ...item, width: item.width + 1.0, category: 'table' } : { ...item, width: item.width + (round ? 1.2 : 0.3), depth: item.depth + 1.2, category: 'table' };
+  // living room with a seating group (#350): the dining place is its own zone, not squeezed against the sofa
+  const lounge = c.zone ? [] : findIn(c, (f) => roleOf(f) === 'sofa' || roleOf(f) === 'coffee-table');
+  const center = c.zone ? polygonCentroid(c.zone) : lounge.length ? add(c.centroid, scale(normalize(sub(c.centroid, lounge[0])), 1)) : c.centroid;
+  for (const pose of centerPoses(c, item, center)) {
+    if (lounge.some((l) => dist(l, pose) < 1.2 + (l.width + item.width) / 4)) continue;
     // the enlarged footprint must fit, too: walls, doors and other furniture leave room for chairs
     if (!fits(c, createFurnitureFromCatalog(probe, pose))) continue;
     yield pose;
   }
+  // small rooms (balcony, kitchen): a table at the wall still leaves room for chairs at its sides
+  if (c.type === 'balcony' || c.type === 'kitchen' || round) yield* wallPoses(item, closedFirst(c.edges), 'center');
 }
 
 /** Chairs around a table (long sides alternating, then the ends), an office chair at the desk. */
@@ -467,7 +774,8 @@ function* seatPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
     }
     if (shapeOf(t) === 'table-round') {
       const r = t.width / 2 + item.depth / 2 - under;
-      for (let k = 0; k < 8; k++) {
+      // opposite pairs first: two chairs sit face to face (balcony, #350)
+      for (const k of [1, 3, 0, 2, 4, 5, 6, 7]) {
         const dir = rotate({ x: 0, y: 1 }, t.rotation + (k < 4 ? (k * Math.PI) / 2 : Math.PI / 4 + ((k - 4) * Math.PI) / 2));
         const p = add(t, scale(dir, r));
         yield withPose(item, p.x, p.y, rotationFacing(scale(dir, -1)));
@@ -491,13 +799,44 @@ function* seatPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
   if (!hosts.length) yield* wallPoses(item, longestFirst(c.edges), 'corner');
 }
 
+const cmText = (v: number) => `${Math.round(v * 100)}`;
+
+/** Why an item found no place, with a way out (#350). */
+function missingReason(c: RoomCtx, item: CatalogItem, role: Role): string {
+  const b = boundsOf(c.interior);
+  const span = b ? Math.max(b.maxX - b.minX, b.maxY - b.minY) : 0;
+  const narrow = b ? Math.min(b.maxX - b.minX, b.maxY - b.minY) : 0;
+  const size = `${cmText(item.width)}×${cmText(item.depth)} cm`;
+  if (role === 'box') return 'kein Regal mit freiem Fach im Raum – erst ein Regal einplanen oder die Box weglassen';
+  if (role === 'mattress') return 'kein Bettgestell im Raum';
+  if (role === 'curtain') return 'kein freies Fenster im Raum';
+  if (Math.max(item.width, item.depth) > span || Math.min(item.width, item.depth) > narrow) return `zu groß für den Raum (${size}) – eine kleinere Alternative wählen`;
+  if (c.rejects.has('walkway') && !c.rejects.has('collision')) return `würde den Laufweg zustellen (${cmText(walkway(c.type))} cm frei vor dem Möbel nötig) – schmaleres Modell wählen oder weglassen`;
+  if (c.rejects.has('opening') && !c.rejects.has('collision')) return 'nur vor Türen oder Fenstern wäre Platz – weglassen oder kleiner wählen';
+  return `zwischen Wänden, Türen, Fenstern und den anderen Möbeln ist kein Platz mehr (${size}) – kleinere Alternative wählen oder ein anderes Möbel weglassen`;
+}
+
+export interface SuggestOptions {
+  /** Furniture of an earlier suggestion that this one replaces (#350): ignored while placing, removed when applied. */
+  replace?: string[];
+}
+
+/** Items of an earlier, applied suggestion standing in the given rooms (#350): a new preview replaces them. */
+export function suggestedIn(project: Project, roomIds: string[], d: DerivedPlan = derivePlan(project)): string[] {
+  const rooms = new Set(roomIds);
+  return project.furniture.filter((f) => f.suggested && !f.locked && rooms.has(roomIdAt(project, d, f) ?? '')).map((f) => f.id);
+}
+
 /**
  * Builds a suggestion for the requested rooms. Existing furniture stays and is respected;
  * items are placed one after another, so later items avoid the earlier proposed ones.
  */
-export function suggestFurnishing(project: Project, requests: RoomRequest[], catalog: CatalogItem[] = []): FurnishingSuggestion {
+export function suggestFurnishing(project: Project, requests: RoomRequest[], catalog: CatalogItem[] = [], opts: SuggestOptions = {}): FurnishingSuggestion {
   const derived = derivePlan(project);
-  const ctx: Ctx = { draft: structuredClone(project), derived, obstacles: buildPlacementObstacles(derived), zones: openingZones(derived) };
+  const replace = new Set(opts.replace ?? []);
+  const draft = structuredClone(project);
+  draft.furniture = draft.furniture.filter((f) => !replace.has(f.id));
+  const ctx: Ctx = { draft, derived, obstacles: buildPlacementObstacles(derived), zones: openingZones(derived) };
   const rooms: RoomSuggestion[] = [];
   for (const req of requests) {
     const room = project.rooms.find((r) => r.id === req.roomId);
@@ -510,27 +849,55 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
       for (let i = 0; i < w.quantity; i++) pieces.push({ item, role: roleOf(item) });
     }
     pieces.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.item.width * b.item.depth - a.item.width * a.item.depth);
-    const out: RoomSuggestion = { roomId: room.id, roomName: room.name, type: req.type, placed: [], missing: [] };
+    const out: RoomSuggestion = { roomId: room.id, roomName: room.name, type: req.type, placed: [], missing: [], notes: [] };
     rooms.push(out);
     if (!g) {
       out.missing.push(...pieces.map((p) => p.item.name));
+      out.notes!.push(...pieces.map((p) => ({ name: p.item.name, why: 'der Raum hat keine geschlossenen Wände' })));
       continue;
     }
-    const rc: RoomCtx = { ...ctx, roomId: room.id, interior: g.interior, edges: roomEdges(g.interior), centroid: polygonCentroid(g.interior) };
-    for (const { item, role } of pieces) {
-      const f = placeItem(rc, item, role, pieces.map((p) => p.item));
-      if (f) {
-        ctx.draft.furniture.push(f);
-        out.placed.push(f);
-      } else out.missing.push(item.name);
+    const rc: RoomCtx = { ...ctx, roomId: room.id, type: req.type, interior: g.interior, edges: roomEdges(g.interior, derived), centroid: polygonCentroid(g.interior), rejects: new Set() };
+    const companions = pieces.map((p) => p.item);
+    const base = ctx.draft.furniture.length;
+    const attempt = (zones: [Vec2[], Vec2[]] | null) => {
+      ctx.draft.furniture.length = base;
+      const placed: Furniture[] = [];
+      const notes: { name: string; why: string }[] = [];
+      for (const { item, role } of pieces) {
+        rc.rejects = new Set();
+        rc.zone = zones ? (LOUNGE_ROLES.has(role) ? zones[0] : DINING_ROLES.has(role) && shapeOf(item) !== 'office-chair' ? zones[1] : undefined) : undefined;
+        const f = placeItem(rc, item, role, companions);
+        rc.zone = undefined;
+        if (f) {
+          f.suggested = true;
+          ctx.draft.furniture.push(f);
+          placed.push(f);
+        } else notes.push({ name: item.name, why: missingReason(rc, item, role) });
+      }
+      return { placed, notes, items: ctx.draft.furniture.slice(base) };
+    };
+    // living room with seating group and dining table (#350): one half each, both ways round, plain as fallback
+    const halves = (req.type === 'living' || req.type === 'dining') && pieces.some((p) => p.role === 'sofa') && pieces.some((p) => p.role === 'table') ? roomHalves(g.interior, rc.edges) : null;
+    const tries = halves ? [halves, [halves[1], halves[0]] as [Vec2[], Vec2[]], null] : [null];
+    let best: ReturnType<typeof attempt> | null = null;
+    for (const z of tries) {
+      const r = attempt(z);
+      if (!best || r.notes.length < best.notes.length) best = r;
+      if (!r.notes.length) break;
     }
+    ctx.draft.furniture.length = base;
+    ctx.draft.furniture.push(...best!.items);
+    out.placed.push(...best!.placed);
+    out.notes!.push(...best!.notes);
+    out.missing.push(...best!.notes.map((n) => n.name));
   }
-  return { rooms, items: rooms.flatMap((r) => r.placed) };
+  return { rooms, items: rooms.flatMap((r) => r.placed), replaces: [...replace] };
 }
 
-/** Adds the proposed items to the project (call inside one `apply` → one undo step). Returns their ids. */
 export function applyFurnishing(d: Project, s: FurnishingSuggestion): string[] {
   // taking the same suggestion twice must not create a second item with the same id (#268)
+  const gone = new Set(s.replaces ?? []);
+  if (gone.size) d.furniture = d.furniture.filter((f) => !gone.has(f.id));
   const taken = new Set(d.furniture.map((f) => f.id));
   const ids: string[] = [];
   for (const f of s.items) {
