@@ -425,7 +425,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
           <CheckField
             label={o.kind === 'door' ? 'Tür geöffnet' : 'Fenster geöffnet'}
             checked={o.open}
-            title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Taste E (oder Klick) aufs Fadenkreuz-Ziel"
+            title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Taste F (oder Klick) aufs Fadenkreuz-Ziel"
             onChange={(v) => upd((x) => (x.open = v))}
           />
         </PanelGroup>

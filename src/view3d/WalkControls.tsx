@@ -211,7 +211,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     };
     /** F/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
-      if (carry.current) return hint('Erst ablegen (G), dann Tür/Fenster mit E bedienen');
+      if (carry.current) return hint('Erst ablegen (G), dann Tür/Fenster mit F bedienen');
       const sel = useUiStore.getState().selection;
       const id = targetOpening() ?? (sel?.type === 'opening' ? sel.id : null);
       if (id) toggleOpening(id);
