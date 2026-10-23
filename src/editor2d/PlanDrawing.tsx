@@ -134,6 +134,18 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
             <polygon points={pts(rect)} style={{ fill: paper, stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
             <line x1={mid0.x + off.x} y1={mid0.y + off.y} x2={mid1.x + off.x} y2={mid1.y + off.y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
             <line x1={mid0.x - off.x} y1={mid0.y - off.y} x2={mid1.x - off.x} y2={mid1.y - off.y} style={{ stroke }} strokeWidth={W.opening} vectorEffect="non-scaling-stroke" />
+            {o.shading && (
+              // window covering (#413): dashed line on the outer face; thicker the more it is closed
+              <line
+                data-testid="shading-symbol"
+                data-closed={o.shading.closed}
+                x1={mid0.x + off.x * 3} y1={mid0.y + off.y * 3} x2={mid1.x + off.x * 3} y2={mid1.y + off.y * 3}
+                style={{ stroke: '#0ea5e9' }}
+                strokeWidth={W.opening * (1 + o.shading.closed * 2)}
+                strokeDasharray={o.shading.type === 'venetian' ? '0.06 0.04' : o.shading.type === 'pleated' ? '0.12 0.03 0.03 0.03' : undefined}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
           </g>
         );
       }

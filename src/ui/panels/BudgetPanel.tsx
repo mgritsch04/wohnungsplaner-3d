@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useBudgetGroupStore, type BudgetGrouping } from '../budgetGroupStore';
 import { computeBudget, priceStatusLabel } from '../../budget/budget';
 import { exportShoppingCsv } from '../../budget/budgetActions';
-import { BUY_PHASE_LABEL, BUY_PHASES, buildingDevices, computePurchasePlan } from '../../budget/purchasePlan';
+import { BUY_PHASE_LABEL, BUY_PHASES, buildingDevices, computePurchasePlan, coveringItems } from '../../budget/purchasePlan';
 import { buildingFurniture } from '../../budget/rooms';
 import { furnitureOnAnyLevel, levelOfFurniture } from '../../model/levels';
 import { goToLevel } from '../levelActions';
@@ -32,7 +32,7 @@ export function BudgetPanel() {
   const plan = useMemo(() => {
     const p = useProjectStore.getState().project;
     const phaseOf = new Map(all.furniture.map((f) => [f.id, f.buyPhase ?? 'movein'] as const));
-    return computePurchasePlan(b.lines, (id) => phaseOf.get(id) ?? 'movein', buildingDevices(p), budgets);
+    return computePurchasePlan(b.lines, (id) => phaseOf.get(id) ?? 'movein', buildingDevices(p), budgets, coveringItems(p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b, all, devices, levels, budgets]);
   const group = useBudgetGroupStore((s) => s.grouping);
@@ -189,7 +189,8 @@ export function BudgetPanel() {
                   <select
                     value={ph.phase}
                     aria-label={`Phase für ${i.name}`}
-                    onChange={(e) => setPhase(i.type, i.id, e.target.value as BuyPhase)}
+                    disabled={i.type === 'covering'}
+                    onChange={(e) => i.type !== 'covering' && setPhase(i.type, i.id, e.target.value as BuyPhase)}
                   >
                     {BUY_PHASES.map((p) => (
                       <option key={p} value={p}>

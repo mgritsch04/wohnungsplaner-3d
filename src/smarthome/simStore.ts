@@ -47,7 +47,7 @@ interface SimStore {
   /** switch a lamp/plug by hand (starts the simulation if needed) */
   setEntity: (id: string, on: boolean) => void;
   /** dim an LED strip / lamp or recolour a strip by hand (starts the simulation if needed) */
-  setLevel: (id: string, level: { brightness?: number; color?: string }) => void;
+  setLevel: (id: string, level: { brightness?: number; color?: string; closed?: number; on?: boolean }) => void;
   /** set the simulated clock by hand; returns false while the simulation is stopped */
   setHour: (hour: number) => boolean;
   /** let a sensor report as if it detected something (starts the simulation if needed) */

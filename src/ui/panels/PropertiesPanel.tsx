@@ -20,6 +20,7 @@ import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
 import { runDeliveryCheck, useDeliveryStore } from '../../editor2d/deliveryStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
+import { CurtainStateSection, OpeningShadingSection } from './ShadingSection';
 import { InteriorSection } from './InteriorSection';
 import { PhotosSection } from '../../photos/PhotosSection';
 import { NotesSection } from '../../planning/NotesSection';
@@ -434,6 +435,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
           />
         </PanelGroup>
       )}
+      <OpeningShadingSection o={o} />
       <div className="btn-row padded">
         {o.kind === 'door' && (
           <button
@@ -518,6 +520,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           onChange={(v) => upd((x) => (x.category = v))}
         />
       </PanelGroup>
+      {(f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape) === 'curtain' && <CurtainStateSection f={f} />}
       {f.category === 'lighting' && (
         <PanelGroup groupKey="furniture.lamp" title="Lichtstrom">
           <NumberField

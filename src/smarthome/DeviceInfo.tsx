@@ -3,13 +3,14 @@ import { derivePlan } from '../model/derived';
 import type { Project, SmartDevice } from '../model/schema';
 import { useUiStore } from '../store/uiStore';
 import { AngleSlider, Badge, NumberField, SelectField, TextField } from '../ui/fields';
+import { closedLabel } from '../model/shading';
 import { deleteSelection, toggleOpening } from '../ui/actions';
 import { addAutomationFor, roomAt, setStripPoints, updateDevice } from './actions';
 import { defSizeText, SPEAKER_TYPES, speakerHints, type SpeakerType } from './audio';
 import { KIND_LABEL, productById } from './catalog';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { rulesOf, ruleSentence } from './rules';
-import { sensorParams } from './simulation';
+import { blindClosed, sensorParams } from './simulation';
 import { formatLength, STRIP_DIRECTIONS, stripColor, stripLengthM, stripPoints } from './strip';
 import { useSimStore } from './simStore';
 import css from './SmartHomePanel.module.css';
@@ -18,7 +19,8 @@ const isSensor = (d: SmartDevice) => d.kind === 'motion' || d.kind === 'presence
 const deg = (rad: number) => Math.round(((((rad * 180) / Math.PI) % 360) + 360) % 360);
 
 /** Status text of a device in the simulation (or its resting state while it is stopped). */
-export function statusLabel(d: SmartDevice, on: boolean, brightness?: number): string {
+export function statusLabel(d: SmartDevice, on: boolean, brightness?: number, closed?: number): string {
+  if (d.kind === 'blind') return closedLabel(closed ?? (on ? 1 : 0));
   if (d.kind === 'contact') return on ? 'offen' : 'zu';
   if (d.kind === 'light' || d.kind === 'strip') return on ? `an ${brightness ?? 100} %` : 'aus';
   if (d.kind === 'plug') return on ? 'an' : 'aus';
@@ -103,6 +105,7 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
     useUiStore.getState().setLeftTab('smarthome');
     sim.setStep('rules');
   };
+  const closedNow = d.kind === 'blind' ? (entities?.[d.id]?.closed ?? blindClosed(project, d)) : 0;
   const params = isSensor(d) ? sensorParams(d) : null;
   const assumed = (
     <Badge kind="warn" title="Kein Datenblattwert – Annahme, bitte prüfen">
@@ -127,7 +130,7 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
         </header>
         <div className="panel-section-body">
           {d.kind !== 'speaker' && <p className="small">
-            Status: <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness)}</Badge>
+            Status: <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness, d.kind === 'blind' ? closedNow : undefined)}</Badge>
             {!running && <span className="muted"> (Simulation aus)</span>}
           </p>}
           <div className="btn-row">
@@ -140,6 +143,19 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
               <button className="primary" onClick={() => sim.trigger(d.id)} data-testid="device-trigger" title="Meldet sofort „Bewegung“, als wäre jemand vorbeigegangen">
                 Auslösen (testen)
               </button>
+            )}
+            {d.kind === 'blind' && (
+              <>
+                <button className="primary" onClick={() => sim.setLevel(d.id, { closed: 0, on: false })} data-testid="blind-open">
+                  Öffnen
+                </button>
+                <button onClick={() => sim.setLevel(d.id, { closed: 0.5, on: false })} data-testid="blind-half">
+                  Halb
+                </button>
+                <button onClick={() => sim.setLevel(d.id, { closed: 1, on: true })} data-testid="blind-close">
+                  Schließen
+                </button>
+              </>
             )}
             {d.kind === 'contact' && d.openingId && (
               <button className="primary" onClick={() => toggleOpening(d.openingId!)} data-testid="device-toggle">
@@ -242,6 +258,18 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
             </>
           )}
           {d.kind === 'strip' && <StripSettings d={d} brightness={st.brightness ?? 100} entityColor={entities?.[d.id]?.color} />}
+          {d.kind === 'blind' && (
+            <SelectField
+              label="Steuert"
+              value={d.furnitureId ? `f:${d.furnitureId}` : d.openingId ? `o:${d.openingId}` : ''}
+              options={[
+                { value: '', label: '–' },
+                ...project.openings.filter((o) => o.kind === 'window').map((o, i) => ({ value: `o:${o.id}`, label: `Fenster ${i + 1}${o.shading ? '' : ' (noch ohne Behang)'}` })),
+                ...project.furniture.filter((f) => (f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape) === 'curtain').map((f) => ({ value: `f:${f.id}`, label: `Vorhang ${f.name}` })),
+              ]}
+              onChange={(v) => updateDevice(d.id, v.startsWith('f:') ? { furnitureId: v.slice(2), openingId: undefined } : { openingId: v.startsWith('o:') ? v.slice(2) : undefined, furnitureId: undefined })}
+            />
+          )}
           {d.kind === 'contact' && (
             <SelectField
               label="Fenster/Tür"
