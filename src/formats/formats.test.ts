@@ -162,6 +162,45 @@ describe('apartment-plan.json', () => {
     expect(o.swing).toBe(reversed ? 'right' : 'left');
   });
 
+  describe('door next to a doubled wall', () => {
+    const wall = (id: string, x: number, t: number) => ({ id, a: { x, y: 0 }, b: { x, y: 3 }, thickness: t, height: 2.6, status: 'estimated' as const, accepted: true });
+    const door = (id: string, x: number) => ({ id, kind: 'door' as const, center: { x, y: 1.5 }, width: 0.8, height: 2.1, sillHeight: 0, status: 'uncertain' as const, accepted: true });
+    const draft = (walls: ReturnType<typeof wall>[], openings: ReturnType<typeof door>[], mode: 'replace' | 'merge' = 'replace') =>
+      ({ source: 'pdf-vector', sourceName: 'synthetisch', scaleConfirmed: true, walls, openings, rooms: [], furniture: [], warnings: [], mode }) as Parameters<typeof applyDraft>[1];
+    const holesAt = (p: ReturnType<typeof createEmptyProject>, y: number) =>
+      p.walls.filter((w) => {
+        const [a, b] = [w.a, w.b].map((id) => p.nodes.find((n) => n.id === id)!);
+        return p.openings.some((o) => o.wallId === w.id && Math.abs(Math.min(a.y, b.y) + o.offset - y) < 0.05);
+      }).length;
+
+    it('opens a touching parallel wall (recognised lining) as a passage', () => {
+      const p = createEmptyProject();
+      const res = applyDraft(p, draft([wall('w1', 0, 0.12), wall('w2', 0.1, 0.08)], [door('o1', 0)]));
+      expect(p.walls).toHaveLength(2);
+      expect(holesAt(p, 1.5)).toBe(2);
+      expect(p.openings.map((o) => o.kind).sort()).toEqual(['door', 'passage']);
+      expect(res.warnings.some((w) => w.includes('anliegenden Wand'))).toBe(true);
+    });
+
+    it('re-import onto a slightly shifted plan leaves no wall in front of the door', () => {
+      const p = createEmptyProject();
+      applyDraft(p, draft([wall('w1', 0, 0.1)], [door('o1', 0)]));
+      // second run: the same wall 6 cm off, its door found nearer the old wall – skipped there as a duplicate
+      applyDraft(p, draft([wall('w2', 0.06, 0.1)], [door('o2', 0.02)], 'merge'));
+      expect(p.walls).toHaveLength(2);
+      expect(holesAt(p, 1.5)).toBe(2);
+    });
+
+    it('keeps walls further apart and windows untouched', () => {
+      const p = createEmptyProject();
+      applyDraft(p, draft([wall('w1', 0, 0.1), wall('w2', 0.3, 0.1)], [door('o1', 0)]));
+      expect(p.openings).toHaveLength(1);
+      const q = createEmptyProject();
+      applyDraft(q, draft([wall('w1', 0, 0.12), wall('w2', 0.1, 0.08)], [{ ...door('o1', 0), kind: 'window' as never, sillHeight: 0.9, height: 1.4 }]));
+      expect(q.openings).toHaveLength(1);
+    });
+  });
+
   it('round-trips project → plan → project with identical geometry', () => {
     const p = createSampleProject();
     const plan = JSON.parse(JSON.stringify(projectToFloorPlan(p, { includeFurniture: true })));
