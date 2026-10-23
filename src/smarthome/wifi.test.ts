@@ -3,7 +3,7 @@ import { derivePlan } from '../model/derived';
 import { createEmptyProject } from '../model/factory';
 import { addOpening, addRectRoom } from '../model/operations';
 import type { Project, SmartDevice } from '../model/schema';
-import { levelOf, roomWifi, wallLossDb, wifiGrid, freeLossDb, type WifiBand } from './wifi';
+import { levelOf, recommendBands, roomWifi, wallLossDb, wifiGrid, freeLossDb, type WifiBand } from './wifi';
 import { levelPaths } from './WifiOverlay2D';
 
 const router = (id: string, x: number, y: number): SmartDevice => ({ id, name: id, kind: 'router', x, y, elevation: 1.5, rotation: 0 });
@@ -73,5 +73,20 @@ describe('WLAN coverage (#253)', () => {
     p.devices = [router('r', 1, 1.5)];
     const paths = levelPaths(wifiGrid(p, derivePlan(p), '2.4')!);
     expect(paths.good.startsWith('M')).toBe(true);
+  });
+
+  it('recommends 5 GHz near the router and 2.4 GHz behind thick walls, with a reason', () => {
+    const rec = (p: Project, name: string) => recommendBands(p, derivePlan(p)).find((r) => r.roomId === p.rooms.find((x) => x.name === name)!.id)!;
+    const thin = row();
+    thin.devices = [router('r', 1, 1.5)];
+    expect(rec(thin, 'A').band).toBe('5');
+    expect(rec(thin, 'A').reason).toMatch(/Abstand/);
+    const thick = row(0.3);
+    thick.devices = [router('r', 1, 1.5)];
+    const far = rec(thick, 'C');
+    expect(far.band).toBe('2.4');
+    expect(far.dbm5).toBeLessThan(far.dbm24);
+    expect(far.wallDb5).toBeGreaterThan(far.wallDb24);
+    expect(far.reason).toMatch(/zu schwach/);
   });
 });

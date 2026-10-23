@@ -184,3 +184,56 @@ export function roomWifi(grid: WifiGrid | null, project: Project): RoomWifi[] {
   }
   return out;
 }
+
+/** A 5 GHz signal from this level on carries the higher speed; below it 2.4 GHz is the safer choice. */
+export const BAND5_MIN_DBM = -67;
+export const BAND_COLOR: Record<WifiBand, string> = { '2.4': '#8b5cf6', '5': '#0ea5e9' };
+
+export interface BandRecommendation {
+  roomId: string;
+  band: WifiBand;
+  dbm24: number;
+  dbm5: number;
+  /** Distance (m) and wall loss (dB) from the strongest router to a typical point of the room. */
+  dist: number;
+  wallDb24: number;
+  wallDb5: number;
+  reason: string;
+}
+
+/**
+ * Which band is better in each room? 5 GHz when it still gets at least BAND5_MIN_DBM there
+ * (more speed), otherwise 2.4 GHz (more range, less wall loss). The reason names distance and walls.
+ */
+export function recommendBands(project: Project, derived: DerivedPlan): BandRecommendation[] {
+  const g24 = wifiGrid(project, derived, '2.4');
+  const g5 = wifiGrid(project, derived, '5');
+  if (!g24 || !g5) return [];
+  const r24 = roomWifi(g24, project);
+  const r5 = roomWifi(g5, project);
+  const sources = wifiSources(project);
+  const barriers24 = barriersOf(project, derived, '2.4');
+  const barriers5 = barriersOf(project, derived, '5');
+  const out: BandRecommendation[] = [];
+  for (const a of r24) {
+    const b = r5.find((x) => x.roomId === a.roomId);
+    if (!b) continue;
+    // typical point: the room cell closest to the mean of the room's cells
+    const cells: { x: number; y: number }[] = [];
+    g24.room.forEach((id, k) => id === a.roomId && cells.push({ x: g24.minX + ((k % g24.cols) + 0.5) * g24.cell, y: g24.minY + (Math.floor(k / g24.cols) + 0.5) * g24.cell }));
+    const mx = cells.reduce((t, c) => t + c.x, 0) / cells.length;
+    const my = cells.reduce((t, c) => t + c.y, 0) / cells.length;
+    const pt = cells.reduce((best, c) => (Math.hypot(c.x - mx, c.y - my) < Math.hypot(best.x - mx, best.y - my) ? c : best));
+    const src = sources.reduce((best, s) => (Math.hypot(s.x - pt.x, s.y - pt.y) < Math.hypot(best.x - pt.x, best.y - pt.y) ? s : best));
+    const dist = Math.hypot(src.x - pt.x, src.y - pt.y);
+    const wallDb24 = crossingLossDb(src, pt, barriers24, '2.4');
+    const wallDb5 = crossingLossDb(src, pt, barriers5, '5');
+    const use5 = b.dbm >= BAND5_MIN_DBM;
+    const where = `${dist.toFixed(1).replace('.', ',')} m Abstand, Wände auf dem Weg ${Math.round(wallDb5)} dB bei 5 GHz (${Math.round(wallDb24)} dB bei 2,4 GHz)`;
+    const reason = use5
+      ? `5 GHz reicht hier (${Math.round(b.dbm)} dBm) und ist schneller. ${where}.`
+      : `5 GHz ist hier zu schwach (${Math.round(b.dbm)} dBm), 2,4 GHz kommt mit ${Math.round(a.dbm)} dBm besser an. ${where}.`;
+    out.push({ roomId: a.roomId, band: use5 ? '5' : '2.4', dbm24: a.dbm, dbm5: b.dbm, dist, wallDb24, wallDb5, reason });
+  }
+  return out;
+}

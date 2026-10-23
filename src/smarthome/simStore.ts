@@ -34,6 +34,8 @@ interface SimStore {
   /** WLAN coverage layer in the 2D plan (#253) and its band */
   wifiOn: boolean;
   wifiBand: WifiBand;
+  wifiRec: boolean;
+  setWifiRec: (on: boolean) => void;
   setWifi: (on: boolean) => void;
   setWifiBand: (b: WifiBand) => void;
   start: () => void;
@@ -112,6 +114,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
   setStep: (step) => set({ step }),
   wifiOn: false,
   wifiBand: '2.4',
+  wifiRec: false,
+  setWifiRec: (wifiRec) => set({ wifiRec }),
   setWifi: (wifiOn) => set({ wifiOn }),
   setWifiBand: (wifiBand) => set({ wifiBand }),
   start: () => {
