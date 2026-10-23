@@ -6,6 +6,7 @@ import { faceAtPoint, sameCycle } from '../../model/roomDetection';
 import type { Project } from '../../model/schema';
 import { degToRad, radToDeg, roundMm } from '../../model/units';
 import { add, closestPointOnSegment, dist, normalize, polygonCentroid, scale, sub, type Vec2 } from '../../model/vec';
+import { statedAreaSummary } from '../../model/statedArea';
 
 const distToSeg = (p: Vec2, a: Vec2, b: Vec2) => closestPointOnSegment(p, a, b).distance;
 import type { DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from '../../import/draft';
@@ -247,6 +248,7 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
       name: r.name,
       nodeIds: face.nodeIds,
       floorMaterialId: d.materials.some((m) => m.id === r.floorMaterialId) ? r.floorMaterialId : DEFAULT_FLOOR_MATERIAL_ID,
+      statedArea: r.statedArea && r.statedArea > 0 ? r.statedArea : undefined,
       provenance: { source: draft.source === 'json' ? 'imported-json' : 'detected', status: r.status },
     });
     roomsAdded++;
@@ -255,6 +257,12 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
       if (g && Math.abs(g.area - r.statedArea) / r.statedArea > 0.05) {
         warnings.push(`Raum „${r.name}“: berechnete Fläche ${g.area.toFixed(2)} m² weicht von angegebener ${r.statedArea.toFixed(2)} m² ab.`);
       }
+    }
+  }
+  {
+    const sum = statedAreaSummary(d.rooms, index().rooms);
+    if (sum && Math.abs(sum.diff) >= 0.5) {
+      warnings.push(`Summe der Raumflächen ${sum.computed.toFixed(2)} m² weicht um ${Math.abs(sum.diff).toFixed(2)} m² von der Summe laut Plan (${sum.stated.toFixed(2)} m²) ab.`);
     }
   }
   for (const f of draft.furniture) d.furniture.push(structuredClone(f));
