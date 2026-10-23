@@ -11,7 +11,7 @@ import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { FurnitureSymbol, PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
-import { fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { ICON_MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
 import { ZoomSlider } from '../ui/ZoomSlider';
 import { useWalkPose } from '../store/walkPoseStore';
 import { UnderlayImage } from './UnderlayImage';
@@ -905,7 +905,7 @@ export function Editor2D() {
           {tool === 'select' && <GroupOverlay project={project} selectedIds={selectedIds} groupId={groupSel} px={px} />}
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <FurnishPreviewOverlay px={px} />
-          <NarrowPassageOverlay project={project} derived={derived} px={px} />
+          {view.zoom >= ICON_MIN_ZOOM && <NarrowPassageOverlay project={project} derived={derived} px={px} />}
           <CheckFocusOverlay px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
@@ -913,9 +913,9 @@ export function Editor2D() {
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
           <WifiOverlay2D project={project} />
-          <Fixtures2D project={project} px={px} />
-          <DevicesOverlay2D project={project} px={px} />
-          <NotePins2D project={project} derived={derived} px={px} />
+          {view.zoom >= ICON_MIN_ZOOM && <Fixtures2D project={project} px={px} />}
+          {view.zoom >= ICON_MIN_ZOOM && <DevicesOverlay2D project={project} px={px} />}
+          {view.zoom >= ICON_MIN_ZOOM && <NotePins2D project={project} derived={derived} px={px} />}
 
           {/* node handles */}
           {(tool === 'select' || tool === 'wall') &&

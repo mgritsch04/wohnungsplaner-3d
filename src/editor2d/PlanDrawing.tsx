@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { DerivedPlan } from '../model/derived';
 import { clipFootprint } from '../model/geometry/walls';
 import type { Furniture, Project } from '../model/schema';
+import { ICON_MIN_ZOOM, roomLabelDetail } from './viewTransform';
 import { add, dist, normalize, perp, scale, sub, type Vec2 } from '../model/vec';
 import { formatArea, formatLength, radToDeg } from '../model/units';
 import { doorSymbol, openingRect } from './openingSymbols';
@@ -191,19 +192,25 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
           </g>
         ))}
       </g>
-      {showDimensions && <RoomDimensions project={project} derived={derived} px={px} fontSize={fontSize} />}
+      {showDimensions && zoom >= ICON_MIN_ZOOM && <RoomDimensions project={project} derived={derived} px={px} fontSize={fontSize} />}
       <g>
         {project.rooms.map((r) => {
           const g = derived.rooms.get(r.id);
           if (!g) return null;
+          const xs = g.interior.map((p) => p.x);
+          const ys = g.interior.map((p) => p.y);
+          const detail = roomLabelDetail(r.name, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), zoom);
+          if (detail === 'none') return null;
           return (
             <g key={r.id} pointerEvents="none">
               <text x={g.centroid.x} y={g.centroid.y - fontSize * 0.2} fontSize={fontSize * 1.15} textAnchor="middle" style={{ fill: C.text }} fontWeight={600}>
                 {r.name}
               </text>
-              <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" style={{ fill: C.textMuted }}>
-                {formatArea(g.area)}
-              </text>
+              {detail === 'full' && (
+                <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" style={{ fill: C.textMuted }}>
+                  {formatArea(g.area)}
+                </text>
+              )}
             </g>
           );
         })}
