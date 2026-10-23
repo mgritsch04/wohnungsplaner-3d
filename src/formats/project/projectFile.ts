@@ -31,6 +31,8 @@ export const PROJECT_MIGRATIONS: Record<number, Migration> = {
     levels: raw.levels ?? [{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }],
     activeLevelId: raw.activeLevelId ?? DEFAULT_LEVEL_ID,
   }),
+  // 6 → 7 (#336): own audio devices
+  6: (raw) => ({ ...raw, schemaVersion: 7, audioCatalog: raw.audioCatalog ?? [] }),
 };
 
 export function migrateProjectObject(raw: unknown): Record<string, unknown> {

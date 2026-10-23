@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 6;
+export const PROJECT_SCHEMA_VERSION = 7;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -314,6 +314,27 @@ export const SmartDeviceSchema = z.object({
    * `rotation` is the direction it fires at, `elevation` its height. Optional: no migration.
    */
   speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']).optional(),
+  /** kind `speaker` (#336): the own device (project.audioCatalog) this speaker is; its size and coverage feed the hints. */
+  audioDefId: z.string().optional(),
+});
+
+/**
+ * Own audio device (#336): entered by the user (name, size, type, coverage angle when known) –
+ * never an invented product. `source` says where the data came from ("eigene Eingabe", or a
+ * checked source with retrieval date); no price is stored.
+ */
+export const AudioDeviceDefSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']),
+  /** Outer size (m): width across the front, depth front to back, height. */
+  widthM: len(0.02, 3),
+  depthM: len(0.02, 3),
+  heightM: len(0.02, 3),
+  /** Horizontal coverage (degrees) when known. */
+  coverageDeg: z.number().min(10).max(360).optional(),
+  source: z.string().max(200).optional(),
+  note: z.string().max(200).optional(),
 });
 
 /**
@@ -612,6 +633,8 @@ export const ProjectSchema = z.object({
   /** Reference photos on walls (#86); schema 5. */
   photos: z.array(PhotoSchema).default([]),
   /** Storeys (#54, schema 6), sorted by elevation; the plan fields above belong to `activeLevelId`. */
+  /** Own audio devices (#336, schema 7); shared by all storeys. */
+  audioCatalog: z.array(AudioDeviceDefSchema).max(100).default([]),
   levels: z.array(LevelSchema).min(1).max(30).default([{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }]),
   activeLevelId: z.string().min(1).default(DEFAULT_LEVEL_ID),
 });
@@ -635,6 +658,7 @@ export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
+export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
 export type FixtureKind = z.infer<typeof FixtureKindSchema>;
 export type Fixture = z.infer<typeof FixtureSchema>;

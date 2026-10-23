@@ -6,7 +6,7 @@ import { useUiStore } from '../store/uiStore';
 import { Badge, NumberField, SelectField, TextField } from '../ui/fields';
 import { deleteSelection, toggleOpening } from '../ui/actions';
 import { addAutomationFor, roomAt, setStripPoints, updateDevice } from './actions';
-import { SPEAKER_TYPES, speakerHints, type SpeakerType } from './audio';
+import { defSizeText, SPEAKER_TYPES, speakerHints, type SpeakerType } from './audio';
 import { KIND_LABEL, productById } from './catalog';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { rulesOf, ruleSentence } from './rules';
@@ -182,6 +182,10 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
           {d.kind === 'speaker' && (
             <SelectField label="Art" value={d.speakerType ?? 'bookshelf'} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value, label: s.label }))} onChange={(v) => updateDevice(d.id, { speakerType: v as SpeakerType, elevation: SPEAKER_TYPES[v as SpeakerType].elevation })} />
           )}
+          {d.kind === 'speaker' && (() => {
+            const def = project.audioCatalog.find((x) => x.id === d.audioDefId);
+            return def && <p className="small muted" data-testid="speaker-own">Eigenes Gerät „{def.name}“: {defSizeText(def)}{def.coverageDeg ? `, Abstrahlwinkel ${Math.round(def.coverageDeg)}°` : ''}{def.source ? ` · Quelle: ${def.source}` : ''}</p>;
+          })()}
           {d.kind === 'speaker' && (
             <ul className="small" data-testid="speaker-hints">
               {speakerHints(project, derived, d).map((h, i) => (

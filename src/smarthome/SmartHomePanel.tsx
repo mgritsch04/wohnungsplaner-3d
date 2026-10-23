@@ -6,14 +6,14 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../ui/fields';
 import { downloadBlob, safeFileName } from '../ui/fileUtils';
-import { addAutomationFor, deleteAutomation, makeLightSmartWithFeedback, placeDevice, roomAt, unlinkedLights, updateAutomation } from './actions';
+import { addAudioDef, addAutomationFor, placeAudioDef, removeAudioDef, deleteAutomation, makeLightSmartWithFeedback, placeDevice, roomAt, unlinkedLights, updateAutomation } from './actions';
 import { DEVICE_PRODUCTS, KIND_LABEL } from './catalog';
 import { deviceOn, statusLabel } from './DeviceInfo';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
 import { ruleSentence } from './rules';
 import { formatSimHour, occludersOf, roomCoverage } from './simulation';
-import { parseWishes, SPEAKER_TYPES, suggestAudio } from './audio';
+import { defSizeText, parseWishes, SPEAKER_TYPES, suggestAudio } from './audio';
 import { suggestSmartHome } from './suggest';
 import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
 import { useFurnishStore } from '../suggest/furnishStore';
@@ -109,6 +109,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
     <>
       <SuggestSection project={project} room={room} />
       <AudioSection project={project} room={room} />
+      <AudioCatalogSection project={project} room={room} />
       <Section title="Gerät hinzufügen">
         <div className={css.kinds} role="group" aria-label="Geräteart">
           {KINDS.map((k) => (
@@ -281,6 +282,58 @@ function AudioSection({ project, room }: { project: Project; room: Project['room
           </div>
         </div>
       )}
+    </Section>
+  );
+}
+
+/** „Eigene Audio-Geräte“ (#336): own devices with size, type and coverage angle; no models or prices are suggested. */
+function AudioCatalogSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<keyof typeof SPEAKER_TYPES>('bookshelf');
+  const [w, setW] = useState(0.2);
+  const [dp, setDp] = useState(0.25);
+  const [h, setH] = useState(0.3);
+  const [cov, setCov] = useState(0);
+  const [source, setSource] = useState('');
+  const add = () => {
+    if (!name.trim()) {
+      useUiStore.getState().toast('Bitte dem Gerät einen Namen geben.', 'info');
+      return;
+    }
+    addAudioDef({ name: name.trim(), speakerType: type, widthM: w, depthM: dp, heightM: h, coverageDeg: cov >= 10 ? cov : undefined, source: source.trim() || 'eigene Eingabe' });
+    setName('');
+  };
+  const place = (id: string) => {
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const dev = placeAudioDef(id, room?.id ?? null);
+    if (dev) {
+      ui.setSelection({ type: 'device', id: dev });
+      ui.toast('Gerät platziert – Strg+Z macht es rückgängig. Ziehe es an die richtige Stelle.', 'success');
+    }
+  };
+  return (
+    <Section title="Eigene Audio-Geräte">
+      <p className="muted small">Lege deine eigenen Lautsprecher an (Maße von Hand eingeben, keine erfundenen Modelle oder Preise) und platziere sie im Raum. Die Hinweise nutzen dann die echte Größe und den Abstrahlwinkel.</p>
+      <ul className={css.list} data-testid="audio-catalog">
+        {project.audioCatalog.map((def) => (
+          <li key={def.id} className="small" data-testid="audio-def">
+            <strong>{def.name}</strong> ({SPEAKER_TYPES[def.speakerType].label}) · {defSizeText(def)}{def.coverageDeg ? ` · ${Math.round(def.coverageDeg)}°` : ''}{def.source ? ` · ${def.source}` : ''}
+            <span className="btn-row">
+              <button onClick={() => place(def.id)} disabled={!room} data-testid="audio-def-place">Platzieren</button>
+              <button onClick={() => removeAudioDef(def.id)} data-testid="audio-def-remove">Entfernen</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <TextField label="Name" value={name} onChange={setName} />
+      <SelectField label="Art" value={type} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value: value as keyof typeof SPEAKER_TYPES, label: s.label }))} onChange={setType} />
+      <NumberField label="Breite" unit="cm" factor={100} digits={1} min={2} max={300} value={w} onChange={setW} />
+      <NumberField label="Tiefe" unit="cm" factor={100} digits={1} min={2} max={300} value={dp} onChange={setDp} />
+      <NumberField label="Höhe" unit="cm" factor={100} digits={1} min={2} max={300} value={h} onChange={setH} />
+      <NumberField label="Abstrahlwinkel (0 = unbekannt)" unit="°" digits={0} min={0} max={360} value={cov} onChange={setCov} />
+      <TextField label="Quelle (optional)" value={source} onChange={setSource} placeholder="eigene Eingabe" />
+      <button className="primary block" onClick={add} data-testid="audio-def-add">Gerät anlegen</button>
     </Section>
   );
 }

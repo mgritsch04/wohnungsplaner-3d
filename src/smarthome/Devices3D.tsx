@@ -19,6 +19,12 @@ const SIZE: Record<SmartDevice['kind'], [number, number, number]> = {
   speaker: [0.2, 0.3, 0.2],
 };
 
+/** Box size [x = fire direction (depth), y = height, z = width]; an own audio device (#336) uses its entered size. */
+const ownSize = (d: SmartDevice, project: Project): [number, number, number] => {
+  const def = d.kind === 'speaker' ? project.audioCatalog.find((x) => x.id === d.audioDefId) : undefined;
+  return def ? [def.depthM, def.heightM, def.widthM] : SIZE[d.kind];
+};
+
 /**
  * Smart-home devices in 3D (#170, #233): housings at their mounting height that glow while
  * they report (motion, open contact, switched-on plug). A click selects the device
@@ -111,7 +117,7 @@ export function Devices3D({ project }: { project: Project }) {
         return (
           <group key={d.id} position={[d.x, d.elevation, d.y]} rotation={[0, -d.rotation, 0]}>
             <mesh userData={{ smartDevice: d.id }} onPointerDown={blockBehind} onClick={select(d.id)}>
-              <boxGeometry args={SIZE[d.kind]} />
+              <boxGeometry args={ownSize(d, project)} />
               <meshStandardMaterial color={on ? color : '#f8fafc'} emissive={sel ? '#2563eb' : color} emissiveIntensity={on ? 1.2 : sel ? 0.6 : 0.15} />
             </mesh>
             {(sel || (tabOpen && !walking)) && (
