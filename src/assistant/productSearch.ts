@@ -146,7 +146,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     `Suche für einen Wohnungsplaner echte Produkte bei ${retailer === 'ikea' ? 'IKEA Österreich' : retailer === 'moebelix' ? 'Möbelix Österreich' : 'IKEA Österreich oder Möbelix Österreich'}.`,
     '',
     `Gesucht für „${roomName}“: ${option.label}${option.reason ? ` – ${option.reason}` : ''}`,
-    `Platz eingeplant für ca. ${cm(item.width)}×${cm(item.depth)}×${cm(item.height)} cm (Breite×Tiefe×Höhe); ähnliche Größe bevorzugen.`,
+    `Platz eingeplant für ca. ${cm(item.width)}×${cm(item.depth)}×${cm(item.height)} cm (Breite×Tiefe×Höhe); Das ist ein Richtwert: Produkte mit bis zu 20 % Abweichung in jeder Richtung sind gut brauchbar, das passendste verfügbare Produkt zählt mehr als die genauen Maße.`,
     `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
     `Suchseiten: ${links.join(' , ')}`,
     how,
@@ -158,6 +158,8 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     ...(retailer === 'both' ? ['- Schau in BEIDEN Shops (IKEA und Möbelix). Gibt es in beiden passende Produkte, nimm mindestens eines von jedem Shop in die Liste.'] : []),
     '- Nur Angaben, die du auf der Produktseite gelesen hast: Name, Adresse der Produktseite, Preis in Euro, Breite/Tiefe/Höhe in cm. Nichts schätzen oder erfinden; fehlt eine Angabe, lass das Produkt weg.',
     '- Multipacks: Wird das Produkt nur als Packung/Set mit mehreren Stück verkauft (z. B. „3er-Set“, „4 Stück“, „Packung à 6“), gib „price“ als Preis der GANZEN Packung an und „pack_size“ als Stück pro Packung; Maße gelten pro Stück. Wird es einzeln verkauft, lass „pack_size“ weg (oder 1).',
+    '- Suchbegriffe: kurz und allgemein (Produktart plus höchstens ein Merkmal wie Material oder Farbe). Keine Maße, keine Modell-/Serienamen und keine Artikelnummern in den Suchbegriff; Modellnamen nur, wenn du sie auf einer Shopseite gelesen hast.',
+    '- Passt kein Produkt genau, nimm das passendste verfügbare und beginne „why“ mit „Alternative: …, weil …“ (was weicht ab: Maße, Farbe, Stil). Gib nur „nichts gefunden“ zurück, wenn die Produktart im Shop nicht vorkommt.',
     '- Keine Konten, keine Warenkörbe, nichts bestellen.',
     '',
     'Antworte zuletzt nur mit JSON in genau dieser Form:',
@@ -174,21 +176,40 @@ export interface RetryHint {
 function retryLines(r: RetryHint): string[] {
   return [
     `Das ist Versuch ${r.attempt}: Der vorige Versuch brachte nichts Verwertbares (${r.previous}).`,
-    '- Such mit anderen, allgemeineren Begriffen und über die Websuche; die Größe darf um bis zu 30 % abweichen.',
+    '- Dein bisheriger Suchbegriff war zu speziell. Nimm den Begriff dieses Versuchs (siehe oben) und such allgemeiner; die Größe darf um bis zu 30 % abweichen.',
     '- Lies die Angaben von der Produktseite (Abschnitt „Maße“ bzw. „Produktdetails“); ein sicheres Produkt ist besser als keines.',
-    ...(r.attempt >= SEARCH_ATTEMPTS ? ['- Letzter Versuch: nimm auch Produkte, die nur ungefähr passen (Typ stimmt, Größe ähnlich).'] : []),
+    ...(r.attempt >= SEARCH_ATTEMPTS
+      ? ['- Letzter Versuch: such nur nach der Produktart, nimm das nächstbeste Produkt dieser Kategorie mit passenden Maßen (Typ stimmt, Größe ähnlich) und nimm es auch, wenn Farbe, Stil oder Serie nicht stimmen.']
+      : []),
   ];
 }
 
-/** Search terms for a piece, best first: Claude's term, its description, the placeholder's name (without sizes). */
+/** Drops sizes, numbers and model-like words (CAPS, with digits) from a search term: shops rarely know them. */
+export function plainTerm(s: string): string {
+  return s
+    .replace(/\d+([.,]\d+)?\s*(×|x)\s*\d+([.,]\d+)?(\s*(×|x)\s*\d+([.,]\d+)?)?(\s*cm)?/gi, '')
+    .replace(/Ø\s*\d+|\d+([.,]\d+)?\s*(cm|mm|m|")/gi, '')
+    .split(/\s+/)
+    .filter((w) => w && !/\d/.test(w) && !(w.length > 2 && w === w.toUpperCase() && /[A-ZÄÖÜ]/.test(w)))
+    .join(' ')
+    .trim();
+}
+
+/**
+ * Search terms for a piece, one per attempt and each more general than the one before:
+ * 1 specific (Claude's term without sizes/models), 2 product type plus one more word (style, material),
+ * 3 only the product type (first word of the placeholder's name). Duplicates are skipped, so the list may be shorter.
+ */
 export function searchTerms(option: DesignOption, item: CatalogItem): string[] {
-  const plain = (s: string) => s.replace(/\d+([.,]\d+)?\s*(×|x)\s*\d+([.,]\d+)?(\s*cm)?/gi, '').replace(/Ø\s*\d+|\d+\s*(cm|")/gi, '').replace(/\s+/g, ' ').trim();
+  const type = plainTerm(item.name).split(' ')[0] ?? '';
+  const words = plainTerm(option.search || option.label).split(' ').filter(Boolean);
   const out: string[] = [];
-  for (const t of [option.search, option.label, plain(item.name), plain(option.search).split(' ').slice(0, 2).join(' ')]) {
-    const v = (t ?? '').trim().slice(0, MAX_FIELD);
+  for (const t of [words.join(' '), words.slice(0, 2).join(' '), type]) {
+    const v = t.trim().slice(0, MAX_FIELD);
     if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v);
   }
-  return out.slice(0, 4);
+  if (!out.length) out.push(plainTerm(item.name) || item.name);
+  return out.slice(0, SEARCH_ATTEMPTS);
 }
 
 export interface FoundProduct {

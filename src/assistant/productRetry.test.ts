@@ -79,22 +79,37 @@ describe('Produktsuche fasst automatisch nach (#350)', () => {
     expect(attempt).toHaveBeenCalledTimes(1);
   });
 
-  it('Suchbegriffe: Claudes Begriff, Beschreibung, Platzhaltername ohne Maße; Wiederholung nimmt den nächsten', () => {
-    const terms = searchTerms(OPTION, SOFA);
-    expect(terms[0]).toBe('Sofa 3-Sitzer grau');
-    expect(terms).toContain('Graues 3er-Sofa');
-    expect(new Set(terms.map((t) => t.toLowerCase())).size).toBe(terms.length);
+  it('Suchbegriffe werden stufenweise allgemeiner: speziell, Art + Merkmal, nur Produktart', () => {
+    const spec = { ...OPTION, label: 'Graues Samtsofa mit Holzbeinen', search: 'Sofa VIMLE 228x98 cm grau Samt' };
+    const terms = searchTerms(spec, SOFA);
+    expect(terms).toEqual(['Sofa grau Samt', 'Sofa grau', 'Sofa']);
     const bed = PLACEHOLDERS.find((c) => c.id === 'generic-bed-140')!;
-    expect(searchTerms({ ...OPTION, label: '', search: '' }, bed)[0]).toBe('Doppelbett');
-    const first = buildFindPrompt(OPTION, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R');
-    expect(first).toContain('q=Sofa%203-Sitzer%20grau');
+    expect(searchTerms({ ...OPTION, label: '', search: '' }, bed)).toEqual(['Doppelbett']);
+    expect(searchTerms({ ...OPTION, search: 'Sofa grau' }, SOFA)).toEqual(['Sofa grau', 'Sofa']);
+  });
+
+  it('Eskalation im Prompt: Versuch 1 speziell, 2 allgemeiner, 3 nur Produktart; Toleranz, keine Maße im Suchbegriff, Hinweis „Alternative“', () => {
+    const spec = { ...OPTION, search: 'Sofa VIMLE 228x98 cm grau Samt' };
+    const first = buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R');
+    expect(first).toContain('q=Sofa%20grau%20Samt');
+    expect(first).not.toContain('VIMLE');
     expect(first).not.toContain('Versuch');
-    const second = buildFindPrompt(OPTION, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R', { attempt: 2, previous: 'kein passendes Produkt im Shop gefunden' });
-    expect(second).toContain('q=Graues%203er-Sofa');
+    expect(first).toContain('20 %');
+    expect(first).toContain('Keine Maße, keine Modell-');
+    expect(first).toContain('Alternative: …, weil …');
+    const second = buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R', { attempt: 2, previous: 'kein passendes Produkt im Shop gefunden' });
+    expect(second).toContain('q=Sofa%20grau');
+    expect(second).not.toContain('q=Sofa%20grau%20Samt');
     expect(second).toContain('Versuch 2');
-    expect(second).toContain('kein passendes Produkt im Shop gefunden');
+    expect(second).toContain('zu speziell');
     expect(second).not.toContain('Letzter Versuch');
-    expect(buildFindPrompt(OPTION, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R', { attempt: 3, previous: 'x' })).toContain('Letzter Versuch');
+    const third = buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R', { attempt: 3, previous: 'x' });
+    expect(third).toContain('q=Sofa');
+    expect(third).not.toContain('q=Sofa%20grau');
+    expect(third).toContain('Letzter Versuch');
+    expect(third).toContain('nächstbeste Produkt');
+    // later rounds stay at the most general term
+    expect(buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R', { attempt: 5, previous: 'x' })).toContain('q=Sofa');
   });
 
   it('Fernseher, Waschmaschine & Co. werden nicht gesucht', () => {

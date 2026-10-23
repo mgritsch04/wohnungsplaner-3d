@@ -245,7 +245,7 @@ export function buildDesignPrompt(
     `- Nur catalogId aus A oder B. Je Raum höchstens ${MAX_PICKS} verschiedene Einträge.`,
     '- Achte auf Raumgröße, vorhandene Möbel, Türen und Fenster; lieber weniger, dafür passend. Vorhandene Möbel nicht doppelt kaufen.',
     '- Jeder Eintrag mit einer kurzen Begründung (1 Satz, Bezug auf die Wünsche).',
-    '- Für Platzhalter (B): "label" = kurze Beschreibung des gesuchten Produkts (Art, Material, Farbe, Stil), "search" = kurzer Suchbegriff für den Shop, "color" = Farbe als Hex-Code aus der Palette der Wohnung (so erscheint der Platzhalter im 3D-Plan). Keine Produktnamen, Artikelnummern oder Preise erfinden.',
+    '- Für Platzhalter (B): "label" = kurze Beschreibung des gesuchten Produkts (Art, Material, Farbe, Stil), "search" = kurzer, allgemeiner Suchbegriff für den Shop (Produktart plus höchstens ein Merkmal; keine Maße, keine Modell- oder Serienamen), "color" = Farbe als Hex-Code aus der Palette der Wohnung (so erscheint der Platzhalter im 3D-Plan). Keine Produktnamen, Artikelnummern oder Preise erfinden.',
     '- Licht und Deko gehören dazu: in Wohn-, Schlaf- und Arbeitsräumen mindestens zwei Lichtquellen (Steh-, Tisch- oder Pendelleuchte), Textilien (Teppich, Vorhang) und Wanddeko oder Pflanzen; im Flur ein Läufer statt eines großen Teppichs.',
     '- Größen zur Fläche: lieber ein kleineres Modell, das mit Laufwegen passt, als ein großes, das den Raum zustellt (ein Möbel ohne Platz kostet mehr als ein kleineres).',
     `- Für größere Möbel (Bett, Sofa, Schrank, Tisch, Schreibtisch, Regal …) bis zu ${MAX_ALTERNATIVES} Alternativen in "alternatives" (andere catalogId, gleiche Regeln, kurze Begründung, z. B. günstiger oder größer).`,
