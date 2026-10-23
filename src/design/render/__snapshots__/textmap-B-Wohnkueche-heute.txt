@@ -1,0 +1,26 @@
+Aufstellung in „Wohnküche“ (cm ab der Nordwest-Ecke wie in der Raumskizze; Mitte des Teils, Front = wohin seine Vorderseite zeigt):
+Teile:
+- room_b_wohnkueche-10 (Sofa 3-Sitzer), 210 × 90 cm, Mitte (213,382), Rücken an W3, Front nach N
+- room_b_wohnkueche-11 (Esstisch 4 Personen), 140 × 85 cm, Mitte (334,124), Front nach W
+- room_b_wohnkueche-12 (Zimmerpflanze groß), 50 × 50 cm, Mitte (26,260), an W4
+- room_b_wohnkueche-13 (Regal 80×190), 80 × 30 cm, Mitte (435,412), Rücken an W3, Front nach N
+- room_b_wohnkueche-14 (Regal 80×190), 80 × 30 cm, Mitte (355,16), Rücken an W1, Front nach S
+- room_b_wohnkueche-15 (Zimmerpflanze klein), 30 × 30 cm, Mitte (16,302), an W4
+- room_b_wohnkueche-16 (Zimmerpflanze klein), 30 × 30 cm, Mitte (16,342), an W4
+- room_b_wohnkueche-17 (Couchtisch), 110 × 60 cm, Mitte (213,262), Front nach N
+- room_b_wohnkueche-18 (Sessel), 80 × 82 cm, Mitte (92,262), Front nach O
+- room_b_wohnkueche-19 (Stuhl), 45 × 52 cm, Mitte (281,89), Front nach O
+- room_b_wohnkueche-20 (Stuhl), 45 × 52 cm, Mitte (387,89), Front nach W
+- room_b_wohnkueche-21 (Stuhl), 45 × 52 cm, Mitte (281,159), Front nach O
+- room_b_wohnkueche-22 (Stuhl), 45 × 52 cm, Mitte (387,159), Front nach W
+- room_b_wohnkueche-23 (Stehlampe), 35 × 35 cm, Mitte (341,408), an W3
+- room_b_wohnkueche-24 (Teppich 160×230), 160 × 230 cm, Teppich, Mitte (213,262)
+- room_b_wohnkueche-25 (Pendelleuchte), 40 × 40 cm, hängt über room_b_wohnkueche-11, Unterkante 190 cm, Mitte (334,124)
+- room_b_wohnkueche-26 (Vorhang 140×250), 170 × 6 cm, hängt an W1, Unterkante 75 cm, Mitte (194,9)
+- room_b_wohnkueche-27 (Wandregal 80 cm), 80 × 20 cm, hängt an W3 über room_b_wohnkueche-10, Unterkante 145 cm, Mitte (213,417)
+- room_b_wohnkueche-28 (Wandbild 100×70), 100 × 3 cm, hängt an W4 über room_b_wohnkueche-16, Unterkante 140 cm, Mitte (2,332)
+- Küchenzeile an W2: Kühlschrank 60, Hochschrank 60, Geschirrspüler 60, Spüle 80, Unterschrank 60, Backofen mit Kochfeld 60, Unterschrank 48, von (555,30) bis (558,404)
+Wege zwischen den Türen im eingerichteten Raum:
+- T1 → T2 („Balkon“ → „Schlafzimmer“): versperrt, kein Durchkommen
+- T1 → T3 („Balkon“ → „Vorraum“): versperrt, kein Durchkommen
+- T2 → T3 („Schlafzimmer“ → „Vorraum“): versperrt, kein Durchkommen

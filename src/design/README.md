@@ -11,6 +11,7 @@ Neuer Ablauf für den Claude-Einrichtungsvorschlag (mgritsch04/wohnungsplaner-3d
 | 2 Raumprogramm (Claude, je Raum) | `concept/` | `RoomProgram` | mgritsch04/wohnungsplaner-3d#439 |
 | 3 Aufstellen | `solver/` | `Layout` | mgritsch04/wohnungsplaner-3d#440 |
 | 4 Begehung | `review/` | `RoomReview`, `Review` | mgritsch04/wohnungsplaner-3d#441 |
+| 5 Kritik: Raumbild und Textkarte | `render/` | Bild (SVG, PNG) und Text des eingerichteten Raums | mgritsch04/wohnungsplaner-3d#442 |
 | 5 Kritik, 6 Produkte, Einbau | `src/assistant/` | `FlatResult` | mgritsch04/wohnungsplaner-3d#442 |
 | Benchmark, Vorher/Nachher | `scripts/`, `e2e/` | Bericht | mgritsch04/wohnungsplaner-3d#443 |
 
@@ -37,6 +38,20 @@ Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinate
 - Wege (B1–B3) misst `checkWalkways` aus Stufe 0, also dasselbe wie der Solver. Alles andere (Bewegungsflächen, Erreichbarkeit, Schwenkflächen) rechnet `review/` auf einem Raster von 5 cm (10 cm ab 45 m²).
 - Ohne `program` entfallen nur die Regeln, die Claudes Zonen brauchen (A5, E2, die Leseecke in D4, Farben E4, Raumteiler in C6/C8). `options` hält Ausnahmen, die der Nutzer bewusst wollte: neue Sanitärobjekte, Verdunkelung, erlaubte Doppelungen.
 - Tests: `review/rules*.test.ts` (je Regel ein gutes und ein schlechtes Beispiel mit `review/testkit.ts`), `review/heute.test.ts` (der Vorschlag des alten Ablaufs für A und B liefert die bekannten Mängel), `review/flats.test.ts` (alle sechs Testwohnungen leer, unter 100 ms je Raum).
+
+## Raumbild und Textkarte benutzen (`render/`)
+
+Für die Kritik (Stufe 5) sieht Claude den eingerichteten Raum von oben.
+
+- `roomPlanSvg({ analysis, layout?, existing?, program?, review?, roomNames?, catalog? }, { size?, labels?, legend? })` zeichnet den Raum als SVG und gibt `{ svg, width, height, ways }` zurück. Zu sehen sind:
+  - Wände mit denselben Kürzeln wie in der Raumskizze: W1 …, Türen T1 … mit dem Raum dahinter und dem Aufschlag, Fenster F1 …
+  - ein 50-cm-Raster mit Raumkoordinaten in cm am Rand und die Haupttür als Pfeil
+  - die Zonen des Programms und jedes Teil mit seiner Kennung aus dem Programm (ohne Programm mit dem Namen), seiner Vorderseite und einem Symbol wie im 2D-Plan; Hängendes und Teile auf anderen Teilen gestrichelt, Bestand schraffiert
+  - die Wege zwischen den Türen, wie sie im eingerichteten Raum laufen: grün frei, orange zu schmal, rot gestrichelt versperrt
+  - die Befunde der Begehung als Marken an ihrem Ort und die Punktzahl im Titel
+- `svgToPng(plan)` macht daraus im Browser ein PNG (`{ mediaType, data, width, height }`, `data` in Base64, höchstens 1568 px). Das geht an `sample` mit Bildern oder als Datei an den lokalen Helfer.
+- `roomTextMap(input)` schreibt dasselbe als Text, für die Kritik ohne Bild (zusammen mit `roomSketch`) und als Liste neben dem Bild. Er enthält Zonen, Teile mit Mitte, Wand und Blickrichtung, die Küchenzeile, nicht aufgestellte Teile, Wege und Befunde.
+- Beispiele: `render/__snapshots__/plan-*.svg` (auf GitHub direkt als Bild zu sehen) und `textmap-*.txt`.
 
 ## Konventionen
 
