@@ -2180,10 +2180,14 @@ code {
   stroke: var(--color-surface);
   font-weight: 600;
 }
-/* five tabs on the left (#137): slightly smaller labels so none is cut off */
+/* six tabs on the left (#137, #345): two rows of three, so no label is cut off at any desktop width */
+.panel.left .tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
 .panel.left .tabs button {
   font-size: var(--font-size-sm);
-  padding-inline: 0;
+  padding-inline: var(--space-1);
 }
 .color-auto {
   padding: 2px var(--space-2);

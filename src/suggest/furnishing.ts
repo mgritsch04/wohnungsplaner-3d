@@ -225,6 +225,7 @@ interface Zone {
   polygon: Vec2[];
   z0: number;
   z1: number;
+  window: boolean;
 }
 
 /** Areas that must stay free: in front of and behind every door/passage (walking) and directly in front of windows (above the sill). */
@@ -239,7 +240,7 @@ function openingZones(d: DerivedPlan): Zone[] {
       const pa = add(fp.a, scale(fp.dir, r.s0));
       const pb = add(fp.a, scale(fp.dir, r.s1));
       const n = scale(fp.normal, reach);
-      out.push({ polygon: [sub(pa, n), sub(pb, n), add(pb, n), add(pa, n)], z0: window ? r.bottom : 0, z1: r.top });
+      out.push({ polygon: [sub(pa, n), sub(pb, n), add(pb, n), add(pa, n)], z0: window ? r.bottom : 0, z1: r.top, window });
     }
   }
   return out;
@@ -269,7 +270,10 @@ function fits(c: RoomCtx, f: Furniture): boolean {
   if (!inset.every((p) => pointInPolygon(p, c.interior))) return false;
   const rug = f.category === 'textile' && f.height < 0.05;
   if (!rug) {
+    // a small lamp on a nightstand next to a window does not block the window (#346)
+    const lamp = shapeOf(f) === 'table-lamp';
     for (const z of c.zones) {
+      if (lamp && z.window) continue;
       if (f.elevation >= z.z1 || f.elevation + f.height <= z.z0 + 0.02) continue;
       if (footprintsOverlap(fc, z.polygon, 1e-3)) return false;
     }
