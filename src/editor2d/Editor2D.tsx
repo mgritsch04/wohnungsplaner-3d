@@ -27,6 +27,7 @@ import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { LowerLevelOverlay } from './LowerLevelOverlay';
 import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
+import { CheckFocusOverlay } from './CheckFocusOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
 import { NotePins2D } from '../planning/NotePins2D';
@@ -905,6 +906,7 @@ export function Editor2D() {
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <FurnishPreviewOverlay px={px} />
           <NarrowPassageOverlay project={project} derived={derived} px={px} />
+          <CheckFocusOverlay px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
           {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}

@@ -16,6 +16,7 @@ import { lastProjectId, loadProject, saveProject } from './persistence/projects'
 import { ToolsPanel } from './ui/panels/ToolsPanel';
 import { CatalogPanel } from './ui/panels/CatalogPanel';
 import { ImportPanel } from './ui/panels/ImportPanel';
+import { CheckPanel } from './ui/panels/CheckPanel';
 import { KitchenPanel } from './ui/panels/KitchenPanel';
 import { FurnishPanel } from './ui/panels/FurnishPanel';
 import { SmartHomePanel } from './smarthome/SmartHomePanel';
@@ -121,6 +122,7 @@ export default function App() {
                 ['kitchen', 'Küche'],
                 ['furnish', 'Einrichten'],
                 ['smarthome', 'Smart Home'],
+                ['check', 'Check'],
                 ['import', hasDraft ? 'Import •' : 'Import'],
               ] as const
             ).map(([id, label]) => (
@@ -134,6 +136,7 @@ export default function App() {
           {leftTab === 'kitchen' && <KitchenPanel />}
           {leftTab === 'furnish' && <FurnishPanel />}
           {leftTab === 'smarthome' && <SmartHomePanel />}
+          {leftTab === 'check' && <CheckPanel />}
           {leftTab === 'import' && <ImportPanel />}
         </aside>
         <main className={`workspace view-${viewMode}`}>

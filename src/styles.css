@@ -2327,3 +2327,15 @@ code {
 .level-list li.active {
   border-color: var(--color-accent);
 }
+
+/* Wohnungs-Check (#357) */
+.check-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+}
+.check-item[aria-pressed='true'] {
+  outline: 2px solid var(--color-accent, #2563eb);
+}
