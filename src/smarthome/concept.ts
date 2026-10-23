@@ -28,7 +28,7 @@ const DEFAULT_PHASE_WHY: Record<Phase, string> = {
   2: 'Smarte Lampen und Präsenz in den Wohnräumen.',
   3: 'Zusatzgeräte, wenn das Grundsystem läuft.',
 };
-const KIND_PHASE: Record<SmartDeviceKind, Phase> = { motion: 1, contact: 1, presence: 2, light: 2, strip: 2, speaker: 3, plug: 3, router: 1 };
+export const KIND_PHASE: Record<SmartDeviceKind, Phase> = { motion: 1, contact: 1, presence: 2, light: 2, strip: 2, speaker: 3, plug: 3, router: 1 };
 
 export const MAX_FIELD = 300;
 const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');

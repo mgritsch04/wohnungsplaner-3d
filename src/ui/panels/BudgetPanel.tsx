@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useBudgetGroupStore, type BudgetGrouping } from '../budgetGroupStore';
 import { computeBudget, priceStatusLabel } from '../../budget/budget';
 import { exportShoppingCsv } from '../../budget/budgetActions';
+import { BUY_PHASE_LABEL, BUY_PHASES, buildingDevices, computePurchasePlan } from '../../budget/purchasePlan';
 import { buildingFurniture } from '../../budget/rooms';
 import { furnitureOnAnyLevel, levelOfFurniture } from '../../model/levels';
 import { goToLevel } from '../levelActions';
@@ -9,6 +10,7 @@ import { formatEuro } from '../../model/units';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 import { Badge, Section } from '../fields';
+import type { BuyPhase } from '../../model/schema';
 
 export function BudgetPanel() {
   const furniture = useProjectStore((s) => s.project.furniture);
@@ -18,6 +20,8 @@ export function BudgetPanel() {
   const rooms = useProjectStore((s) => s.project.rooms);
   const levels = useProjectStore((s) => s.project.levels);
   const apply = useProjectStore((s) => s.apply);
+  const devices = useProjectStore((s) => s.project.devices);
+  const budgets = useProjectStore((s) => s.project.purchaseBudgets);
   // the whole building (#54): furniture of every storey
   const all = useMemo(
     () => buildingFurniture(useProjectStore.getState().project),
@@ -25,6 +29,12 @@ export function BudgetPanel() {
     [furniture, nodes, walls, openings, rooms, levels],
   );
   const b = useMemo(() => computeBudget(all.furniture, all.roomOf), [all]);
+  const plan = useMemo(() => {
+    const p = useProjectStore.getState().project;
+    const phaseOf = new Map(all.furniture.map((f) => [f.id, f.buyPhase ?? 'movein'] as const));
+    return computePurchasePlan(b.lines, (id) => phaseOf.get(id) ?? 'movein', buildingDevices(p), budgets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b, all, devices, levels, budgets]);
   const group = useBudgetGroupStore((s) => s.grouping);
   const setGroup = useBudgetGroupStore((s) => s.setGrouping);
 
@@ -129,8 +139,80 @@ export function BudgetPanel() {
           </div>
         ))}
       </Section>
+      <Section title="Kaufplan in Phasen">
+        <p className="muted small">Wann wird was gekauft? Phase pro Position wählen, optional ein Budget je Phase eintragen. Smart-Home-Geräte stehen zunächst in der Phase ihres Konzepts.</p>
+        <div className="budget-total">
+          <span>Gesamt aller Phasen</span>
+          <strong>{formatEuro(plan.total)}</strong>
+        </div>
+        {plan.phases.map((ph) => (
+          <div key={ph.phase} className="budget-group" data-testid={`kaufplan-${ph.phase}`}>
+            <div className="budget-group-head">
+              <span>{ph.label}</span>
+              <span>{formatEuro(ph.total)}</span>
+            </div>
+            <label className="small phase-budget">
+              Budget (€)
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={ph.budget ?? ''}
+                placeholder="kein Limit"
+                aria-label={`Budget ${ph.label}`}
+                onChange={(e) => {
+                  const v = e.target.value === '' ? undefined : Math.max(0, Number(e.target.value));
+                  apply((d) => {
+                    if (v === undefined || !Number.isFinite(v)) delete d.purchaseBudgets[ph.phase];
+                    else d.purchaseBudgets[ph.phase] = v;
+                  });
+                }}
+              />
+            </label>
+            {ph.over !== null && <Badge kind="error">Über Budget um {formatEuro(ph.over)}</Badge>}
+            {ph.missing > 0 && <p className="muted small">{ph.missing} Position(en) ohne Preis – nicht in der Summe.</p>}
+            <ul className="budget-lines">
+              {ph.items.length === 0 && <li className="muted small">Nichts in dieser Phase.</li>}
+              {ph.items.map((i) => (
+                <li key={i.id}>
+                  <span>
+                    {i.type === 'device' ? '📡 ' : ''}
+                    {i.name}
+                    {i.quantity > 1 ? ` × ${i.quantity}` : ''}
+                  </span>
+                  <select
+                    value={ph.phase}
+                    aria-label={`Phase für ${i.name}`}
+                    onChange={(e) => setPhase(i.type, i.id, e.target.value as BuyPhase)}
+                  >
+                    {BUY_PHASES.map((p) => (
+                      <option key={p} value={p}>
+                        {BUY_PHASE_LABEL[p]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="amount">{i.total !== null ? `${i.estimate && i.type === 'device' ? '≈ ' : ''}${formatEuro(i.total)}` : '—'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </Section>
     </div>
   );
+}
+
+/** Set the purchase phase of an item or device on any storey (#363). */
+function setPhase(type: 'furniture' | 'device', id: string, phase: BuyPhase) {
+  useProjectStore.getState().apply((d) => {
+    if (type === 'furniture') {
+      const f = furnitureOnAnyLevel(d, id);
+      if (f) f.buyPhase = phase;
+    } else {
+      const dev = [...d.devices, ...d.levels.flatMap((l) => l.plan?.devices ?? [])].find((x) => x.id === id);
+      if (dev) dev.buyPhase = phase;
+    }
+  });
 }
 
 /** Select an item of the list; on another storey (#54) that storey is shown first. */
