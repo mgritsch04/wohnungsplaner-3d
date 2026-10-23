@@ -353,3 +353,50 @@ test('LED-Streifen (#238): als Strecke platzieren, Länge, Farbe, Knick, Undo, b
   await expect.poll(async () => (await getProject(page)).devices.length).toBe(1);
   expect(errors).toEqual([]);
 });
+
+test('Smart Home (#359): Tagesablauf läuft, Auswertung zeigt Licht-Loch nach Entfernen eines Melders', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  const right = page.locator('.panel.right');
+  await left.getByRole('button', { name: 'Smart Home' }).click();
+  const panel = left.getByTestId('smarthome-panel');
+  const info = right.getByTestId('device-info');
+
+  // a motion sensor with a rule and a lamp in both rooms
+  for (const room of ['Wohnzimmer', 'Schlafzimmer']) {
+    await panel.getByLabel('Raum').selectOption({ label: room });
+    await panel.locator('[data-testid="device-kind"][data-kind="light"]').click();
+    await panel.getByTestId('device-add').click();
+    await panel.locator('[data-testid="device-kind"][data-kind="motion"]').click();
+    await panel.getByTestId('device-add').click();
+    await info.getByTestId('automation-add').click();
+    await panel.getByTestId('sh-step-devices').click();
+  }
+  await panel.getByTestId('sh-step-test').click();
+  await panel.getByTestId('day-run').click();
+  await expect(panel.getByTestId('day-summary')).toBeVisible();
+  await expect(panel.getByTestId('day-clock')).toBeVisible();
+  await expect(page.getByTestId('sim-person-2d')).toBeVisible();
+  await page.screenshot({ path: 'test-results/tagesablauf-1.png' });
+  await panel.getByTestId('day-play').click(); // stop
+  const withSensors = await panel.getByTestId('day-summary').innerText();
+
+  // remove the bedroom sensor: the evaluation must now show a light hole
+  await panel.getByTestId('sh-step-devices').click();
+  await panel.getByLabel('Raum').selectOption({ label: 'Schlafzimmer' });
+  await panel.getByTestId('device-row').filter({ hasText: 'Bewegungsmelder Wohnzimmer' }).click(); // a click on the selected row would deselect it
+  await panel.getByTestId('device-row').filter({ hasText: 'Bewegungsmelder Schlafzimmer' }).click();
+  await info.getByTestId('device-delete').click();
+  await panel.getByTestId('sh-step-test').click();
+  await panel.getByTestId('day-run').click();
+  await expect(panel.getByTestId('day-findings')).toContainText('Schlafzimmer');
+  await expect(panel.getByTestId('day-summary')).toContainText('Licht zu spät/nie');
+  expect(withSensors).not.toBe(await panel.getByTestId('day-summary').innerText());
+  await panel.getByTestId('day-findings').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/tagesablauf-2.png' });
+  await panel.getByTestId('day-clear').click();
+  await expect(panel.getByTestId('day-summary')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
