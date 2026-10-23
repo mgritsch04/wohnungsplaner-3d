@@ -66,6 +66,7 @@ export function rectRoom(w: number, d: number, opts: { doors?: DoorSpec[]; windo
         id: `T${doorNo}`,
         openingId: `op_t${doorNo}`,
         kind: dd.kind ?? 'door',
+        passable: true,
         t0,
         t1: dd.at + width / 2,
         toRoomId: doorNo === 1 ? null : `room_other${doorNo}`,
@@ -76,10 +77,10 @@ export function rectRoom(w: number, d: number, opts: { doors?: DoorSpec[]; windo
     for (const ww of ((opts.windows ?? []) as WindowSpec[]).filter((x) => x.wall === ws)) {
       const width = ww.width ?? 1.2;
       winNo++;
-      openings.push({ id: `F${winNo}`, openingId: `op_f${winNo}`, kind: 'window', t0: ww.at - width / 2, t1: ww.at + width / 2, toRoomId: null, sill: ww.sill ?? 0.9, top: 2.2 });
+      openings.push({ id: `F${winNo}`, openingId: `op_f${winNo}`, kind: 'window', passable: false, t0: ww.at - width / 2, t1: ww.at + width / 2, toRoomId: null, sill: ww.sill ?? 0.9, top: 2.2 });
     }
     openings.sort((p, q) => p.t0 - q.t0);
-    return { id: `W${i + 1}`, side: sideOf[i], a, b, dir: dirs[i], inward: inw[i], length: lens[i], openings, free: [{ t0: 0, t1: lens[i] }] };
+    return { id: `W${i + 1}`, side: sideOf[i], a, b, dir: dirs[i], inward: inw[i], length: lens[i], openings, free: [{ t0: 0, t1: lens[i] }], thickness: 0.12, height: 2.6, behind: [null] };
   });
   // numbering in wall order: doors T1… and windows F1… must follow the walls
   const doors = walls.flatMap((x) => x.openings.filter((o) => o.kind !== 'window'));
@@ -119,8 +120,12 @@ export function rectRoom(w: number, d: number, opts: { doors?: DoorSpec[]; windo
     passThrough: !!opts.passThrough,
     entrance: opts.entrance ?? true,
     mainDoor: doorList.length ? doorList[0].o.id : null,
+    entryView: doorList.length ? { door: doorList[0].o.id, at: entry(doorList[0].o, doorList[0].wall), dir: doorList[0].wall.inward, wall: null } : null,
+    typeFromName: 'other',
     existing: opts.existing ?? [],
     userZones: [],
+    fixtures: [],
+    notes: [],
   };
 }
 

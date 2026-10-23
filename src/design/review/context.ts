@@ -107,8 +107,9 @@ export class RoomCtx {
             t0: o.t0,
             t1: o.t1,
           });
-        } else
-          this.doors.push({ label: o.id, openingId: o.openingId, kind: o.kind, wall, mid, entry: point(mid, wall.inward, 0.5), width: o.t1 - o.t0, swing: o.swingsIn ? o.swing : undefined, toRoomId: o.toRoomId });
+        }
+        if (o.passable)
+          this.doors.push({ label: o.id, openingId: o.openingId, kind: o.kind === 'passage' ? 'passage' : 'door', wall, mid, entry: point(mid, wall.inward, 0.5), width: o.t1 - o.t0, swing: o.swingsIn ? o.swing : undefined, toRoomId: o.toRoomId });
       }
   }
 
