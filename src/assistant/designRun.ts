@@ -16,7 +16,7 @@ import { isKeepFree, zoneLabels, zoneRoomId } from '../model/zones';
 import type { Sample, SampleError } from './claude';
 import { buildDesignPrompt, parseDesignAnswer, PLACEHOLDERS, preselect, type DesignProposal, type DesignRoom, type DesignWishes, MAX_PRODUCTS } from './design';
 import { completeRoom } from './designGuide';
-import { hasKitchen, kitchenFaces } from './kitchenDesign';
+import { kitchenFaces, plannedKitchenRooms } from './kitchenDesign';
 import { runPool } from './pool';
 import { summarizePlan } from './planSummary';
 
@@ -126,9 +126,9 @@ export async function runDesign(input: DesignRunInput): Promise<DesignRunResult>
   const project: Project = { ...input.project, furniture: input.project.furniture.filter((f) => !f.suggested) };
   const typeOf = (id: string) => roomTypes[id] ?? guessRoomType(nameOf(project, id));
   const derived = derivePlan(project);
-  // a kitchen room without kitchen run: Claude plans the run from its wall faces
-  const facesOf = (id: string) => (typeOf(id) === 'kitchen' && !hasKitchen(project, id, derived) ? kitchenFaces(project, id, derived) : []);
-  const kitchenRooms = roomIds.filter((id) => facesOf(id).length);
+  // the flat's one kitchen without kitchen run (marked kitchen zone first): Claude plans the run from its wall faces
+  const kitchenRooms = plannedKitchenRooms(project, roomIds, typeOf, roomTypes, derived);
+  const facesOf = (id: string) => (kitchenRooms.includes(id) ? kitchenFaces(project, id, derived) : []);
   const thorough = wishes.quality !== 'fast';
   const opts = (label: string) => ({ signal, modelTier: 'complex' as const, label, ...(thorough ? { model: 'opus' as const } : {}) });
   const single = roomIds.length <= 1;
