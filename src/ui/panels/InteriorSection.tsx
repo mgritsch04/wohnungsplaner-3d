@@ -105,9 +105,9 @@ export function InteriorSection({ f, upd }: { f: Furniture; upd: (fn: (x: Furnit
                 {KIND_LABEL[p.kind]} {i + 1}
               </strong>
               <NumberField label="Spalte" value={p.column + 1} min={1} max={interior.columns} digits={0} onChange={(v) => set((x) => void (x.parts[i].column = Math.max(0, Math.min(x.columns - 1, Math.round(v) - 1))))} />
-              <NumberField label={p.kind === 'rod' ? 'Höhe der Stange' : 'Höhe von unten'} value={p.z} factor={100} unit="cm" min={0} max={f.height * 100} digits={1} onChange={(v) => set((x) => void (x.parts[i].z = v / 100))} />
+              <NumberField label={p.kind === 'rod' ? 'Höhe der Stange' : 'Höhe von unten'} value={p.z} factor={100} unit="cm" min={0} max={f.height * 100} digits={1} onChange={(v) => set((x) => void (x.parts[i].z = v))} />
               {p.kind === 'drawer' && (
-                <NumberField label="Höhe der Schublade" value={p.h ?? DEFAULT_DRAWER_HEIGHT} factor={100} unit="cm" min={1} max={f.height * 100} digits={1} onChange={(v) => set((x) => void (x.parts[i].h = v / 100))} />
+                <NumberField label="Höhe der Schublade" value={p.h ?? DEFAULT_DRAWER_HEIGHT} factor={100} unit="cm" min={1} max={f.height * 100} digits={1} onChange={(v) => set((x) => void (x.parts[i].h = v))} />
               )}
               <button className="link-btn" onClick={() => set((x) => void x.parts.splice(i, 1))}>
                 Entfernen
