@@ -1,0 +1,117 @@
+Wohnung mit 8 Räumen, zusammen 100,4 m². Die Wohnungstür führt in „Vorraum“.
+Räume:
+- Schlafzimmer: 18,1 m², 370 × 490 cm; Türen zu „Wohnzimmer“, „Vorraum“; 1 Fenster (N)
+- Wohnzimmer (Durchgangszimmer): 25,5 m², 485 × 590 cm; Türen zu „Arbeitszimmer“, „Küche“, „Vorraum“, „Schlafzimmer“; 3 Fenster (N)
+- Arbeitszimmer: 16,2 m², 330 × 490 cm; Türen zu „Wohnzimmer“; 2 Fenster (N, O)
+- Küche: 18,6 m², 530 × 350 cm; Türen zu „Wohnzimmer“, „Vorraum“; 2 Fenster (S)
+- Vorraum (Durchgangszimmer, Eingang): 9,7 m², 425 × 350 cm; Türen zu „Schlafzimmer“, „Wohnzimmer“, „Küche“, Wohnungstür, „Abstellraum“, „WC“, „Bad“; kein Fenster
+- Bad: 8,0 m², 230 × 350 cm; Türen zu „Vorraum“; 1 Fenster (S); vorhanden: Badewanne 170×75, Waschtisch 60 cm
+- WC: 2,1 m², 125 × 170 cm; Türen zu „Vorraum“; 1 Fenster (S); vorhanden: WC wandhängend
+- Abstellraum: 2,1 m², 125 × 170 cm; Türen zu „Vorraum“; kein Fenster
+Wege vom Eingang durch andere Räume: Vorraum → Wohnzimmer → Arbeitszimmer.
+
+Raum „Schlafzimmer“: 18,1 m², Innenmaß 370 × 490 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 370 cm von (0,0) nach (370,0), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=117–238 (120 cm), Brüstung 85 cm, Oberkante 285 cm. Frei: x=0–117, x=238–370.
+- W2 Ostwand, 490 cm von (370,0) nach (370,490), 15 cm dick; dahinter „Wohnzimmer“. Tür T1 bei y=43–153 (110 cm) zu „Wohnzimmer“, schlägt herein (Angel bei (370,43), Viertelkreis mit 110 cm Radius frei lassen). Frei: y=153–490.
+- W3 Südwand, 370 cm von (370,490) nach (0,490), 15 cm dick; dahinter „Vorraum“, „Bad“. Tür T2 bei x=263–353 (90 cm) zu „Vorraum“, schlägt herein (Angel bei (353,490), Viertelkreis mit 90 cm Radius frei lassen). Frei: x=0–263.
+- W4 Westwand, 490 cm von (0,490) nach (0,0), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+Ecken: E1 (370,0) Tür T1 42 cm daneben; E2 (370,490) Tür T2 17 cm daneben; E3 (0,490) frei; E4 (0,0) frei.
+Beim Hereinkommen durch T2 blickt man nach Norden auf W1 mit F1.
+Wege, die frei bleiben müssen (Breite je Weg; nicht genau diese Linie, aber ein Durchgang dieser Breite ohne großen Umweg):
+- T1 → T2 („Wohnzimmer“ → „Vorraum“): 4,3 m, 70 cm breit, über (333,98) → (308,448)
+
+Raum „Wohnzimmer“ (Durchgangszimmer): 25,5 m², Innenmaß 485 × 590 cm, 8 Wände, teils schräg, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 125 cm von (0,100) nach (125,100), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W2 schräge Wand, 117 cm von (125,100) nach (185,0), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei (146,65)–(177,13) (60 cm), Brüstung 85 cm, Oberkante 285 cm.
+- W3 Nordwand, 115 cm von (185,0) nach (300,0), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F2 bei x=192–293 (100 cm), Brüstung 85 cm, Oberkante 285 cm.
+- W4 schräge Wand, 117 cm von (300,0) nach (360,100), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F3 bei (308,13)–(339,65) (60 cm), Brüstung 85 cm, Oberkante 285 cm.
+- W5 Nordwand, 125 cm von (360,100) nach (485,100), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W6 Ostwand, 490 cm von (485,100) nach (485,590), 15 cm dick; dahinter „Arbeitszimmer“. Tür T1 bei y=142–253 (110 cm) zu „Arbeitszimmer“, schlägt nach außen auf. Frei: y=253–590.
+- W7 Südwand, 485 cm von (485,590) nach (0,590), 15 cm dick; dahinter „Küche“, „Vorraum“. Tür T2 bei x=368–458 (90 cm) zu „Küche“, schlägt nach außen auf; Tür T3 bei x=97–208 (110 cm) zu „Vorraum“, schlägt herein (Angel bei (208,590), Viertelkreis mit 110 cm Radius frei lassen). Frei: x=0–97, x=208–368.
+- W8 Westwand, 490 cm von (0,590) nach (0,100), 15 cm dick; dahinter „Schlafzimmer“. Tür T4 bei y=143–253 (110 cm) zu „Schlafzimmer“, schlägt nach außen auf. Frei: y=253–590.
+Ecken: E1 (125,100) springt in den Raum vor; E2 (185,0) Fenster F2 direkt daneben; E3 (300,0) Fenster F2 direkt daneben; E4 (360,100) springt in den Raum vor; E5 (485,100) Tür T1 42 cm daneben; E6 (485,590) Tür T2 28 cm daneben; E7 (0,590) frei; E8 (0,100) Tür T4 43 cm daneben.
+Beim Hereinkommen durch T3 blickt man nach Norden auf W2 mit F1.
+Wege, die frei bleiben müssen (90 cm breit; nicht genau diese Linie, aber ein Durchgang dieser Breite ohne großen Umweg):
+- T1 → T2 („Arbeitszimmer“ → „Küche“): 4,4 m, 90 cm breit, über (437,197) → (412,543)
+- T1 → T3 („Arbeitszimmer“ → „Vorraum“, Hauptweg): 5,4 m, 90 cm breit, über (437,197) → (153,543)
+- T1 → T4 („Arbeitszimmer“ → „Schlafzimmer“): 4,9 m, 90 cm breit, über (437,197) → (48,197)
+- T2 → T3 („Küche“ → „Vorraum“): 3,5 m, 90 cm breit, über (412,543) → (153,543)
+- T2 → T4 („Küche“ → „Schlafzimmer“): 6,0 m, 90 cm breit, über (412,543) → (48,197)
+- T3 → T4 („Vorraum“ → „Schlafzimmer“): 4,6 m, 90 cm breit, über (153,543) → (48,197)
+
+Raum „Arbeitszimmer“: 16,2 m², Innenmaß 330 × 490 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 330 cm von (0,0) nach (330,0), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=113–233 (120 cm), Brüstung 85 cm, Oberkante 285 cm. Frei: x=0–113, x=233–330.
+- W2 Ostwand, 490 cm von (330,0) nach (330,490), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F2 bei y=178–298 (120 cm), Brüstung 85 cm, Oberkante 285 cm. Frei: y=0–178, y=298–490.
+- W3 Südwand, 330 cm von (330,490) nach (0,490), 15 cm dick; dahinter „Küche“. Ohne Öffnung.
+- W4 Westwand, 490 cm von (0,490) nach (0,0), 15 cm dick; dahinter „Wohnzimmer“. Tür T1 bei y=43–153 (110 cm) zu „Wohnzimmer“, schlägt herein (Angel bei (0,43), Viertelkreis mit 110 cm Radius frei lassen). Frei: y=153–490.
+Ecken: E1 (330,0) frei; E2 (330,490) frei; E3 (0,490) frei; E4 (0,0) Tür T1 43 cm daneben.
+Beim Hereinkommen durch T1 blickt man nach Osten auf W2 mit F2.
+
+Raum „Küche“: 18,6 m², Innenmaß 530 × 350 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 530 cm von (0,0) nach (530,0), 15 cm dick; dahinter „Wohnzimmer“, „Arbeitszimmer“. Tür T1 bei x=67–158 (90 cm) zu „Wohnzimmer“, schlägt herein (Angel bei (158,0), Viertelkreis mit 90 cm Radius frei lassen). Frei: x=0–67, x=158–530.
+- W2 Ostwand, 350 cm von (530,0) nach (530,350), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W3 Südwand, 530 cm von (530,350) nach (0,350), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=352–472 (120 cm), Brüstung 85 cm, Oberkante 285 cm; Fenster F2 bei x=112–233 (120 cm), Brüstung 85 cm, Oberkante 285 cm. Frei: x=0–112, x=233–352.
+- W4 Westwand, 350 cm von (0,350) nach (0,0), 15 cm dick; dahinter „Vorraum“. Tür T2 bei y=227–317 (90 cm) zu „Vorraum“, schlägt herein (Angel bei (0,317), Viertelkreis mit 90 cm Radius frei lassen). Frei: y=0–227.
+Ecken: E1 (530,0) frei; E2 (530,350) frei; E3 (0,350) Tür T2 33 cm daneben; E4 (0,0) Tür T1 67 cm daneben.
+Beim Hereinkommen durch T2 blickt man nach Osten auf W2.
+Wege, die frei bleiben müssen (Breite je Weg; nicht genau diese Linie, aber ein Durchgang dieser Breite ohne großen Umweg):
+- T1 → T2 („Wohnzimmer“ → „Vorraum“): 3,3 m, 70 cm breit, über (113,42) → (42,272)
+
+Raum „Vorraum“ (mit der Wohnungstür, Durchgangszimmer): 9,7 m², Innenmaß 425 × 350 cm, L-förmig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 425 cm von (0,0) nach (425,0), 15 cm dick; dahinter „Schlafzimmer“, „Wohnzimmer“. Tür T1 bei x=17–107 (90 cm) zu „Schlafzimmer“, schlägt nach außen auf; Tür T2 bei x=237–348 (110 cm) zu „Wohnzimmer“, schlägt nach außen auf. Frei: x=107–237, x=348–425.
+- W2 Ostwand, 350 cm von (425,0) nach (425,350), 15 cm dick; dahinter „Küche“. Tür T3 bei y=227–317 (90 cm) zu „Küche“, schlägt nach außen auf. Frei: y=0–227.
+- W3 Südwand, 145 cm von (425,350) nach (280,350), 45 cm dick; dahinter außerhalb der Wohnung. Wohnungstür T4 bei x=303–403 (100 cm), schlägt herein (Angel bei (403,350), Viertelkreis mit 100 cm Radius frei lassen).
+- W4 Westwand, 185 cm von (280,350) nach (280,165), 15 cm dick; dahinter „Abstellraum“. Ohne Öffnung.
+- W5 Südwand, 280 cm von (280,165) nach (0,165), 15 cm dick; dahinter „Abstellraum“, „WC“. Tür T5 bei x=168–238 (70 cm) zu „Abstellraum“, schlägt herein (Angel bei (238,165), Viertelkreis mit 70 cm Radius frei lassen); Tür T6 bei x=27–97 (70 cm) zu „WC“, schlägt herein (Angel bei (97,165), Viertelkreis mit 70 cm Radius frei lassen). Frei: x=97–168.
+- W6 Westwand, 165 cm von (0,165) nach (0,0), 15 cm dick; dahinter „Bad“. Tür T7 bei y=42–122 (80 cm) zu „Bad“, schlägt nach außen auf.
+Ecken: E1 (425,0) Tür T2 77 cm daneben; E2 (425,350) Tür T4 22 cm daneben; E3 (280,350) Tür T4 22 cm daneben; E4 (280,165) springt in den Raum vor; E5 (0,165) Tür T6 27 cm daneben; E6 (0,0) Tür T1 17 cm daneben.
+Beim Hereinkommen durch T4 blickt man nach Norden auf W1 mit T1, T2.
+Wege, die frei bleiben müssen (90 cm breit; nicht genau diese Linie, aber ein Durchgang dieser Breite ohne großen Umweg):
+- T1 → T4 („Schlafzimmer“ → Wohnungstür, Hauptweg): 5,4 m, 90 cm breit, über (63,48) → (308,123) → (348,178) → (353,297)
+- T2 → T4 („Wohnzimmer“ → Wohnungstür, Hauptweg): 3,6 m, 90 cm breit, über (293,48) → (348,222) → (353,297)
+- T3 → T4 („Küche“ → Wohnungstür, Hauptweg): 1,4 m, 90 cm breit, über (373,272) → (353,297)
+- T4 → T5 (Wohnungstür → „Abstellraum“, Hauptweg): 4,0 m, 90 cm breit, über (353,297) → (323,138) → (288,113) → (203,113)
+- T4 → T6 (Wohnungstür → „WC“, Hauptweg): 5,4 m, 90 cm breit, über (353,297) → (323,138) → (288,113) → (63,113)
+- T4 → T7 (Wohnungstür → „Bad“, Hauptweg): 5,5 m, 90 cm breit, über (353,297) → (323,138) → (258,93) → (48,83)
+
+Raum „Bad“: 8,0 m², Innenmaß 230 × 350 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 230 cm von (0,0) nach (230,0), 15 cm dick; dahinter „Schlafzimmer“. Ohne Öffnung.
+- W2 Ostwand, 350 cm von (230,0) nach (230,350), 15 cm dick; dahinter „Vorraum“, „WC“. Tür T1 bei y=42–122 (80 cm) zu „Vorraum“, schlägt herein (Angel bei (230,122), Viertelkreis mit 80 cm Radius frei lassen). Frei: y=122–350.
+- W3 Südwand, 230 cm von (230,350) nach (0,350), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=63–153 (90 cm), Brüstung 120 cm, Oberkante 220 cm. Frei: x=0–63, x=153–230.
+- W4 Westwand, 350 cm von (0,350) nach (0,0), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+Ecken: E1 (230,0) Tür T1 42 cm daneben; E2 (230,350) frei; E3 (0,350) frei; E4 (0,0) frei.
+Beim Hereinkommen durch T1 blickt man nach Westen auf W4.
+Bestand (bleibt stehen, nicht neu planen): Badewanne 170×75 (170 × 75 cm) bei (85,312), Rücken an W3, Front nach N; Waschtisch 60 cm (60 × 46 cm) bei (23,72), Rücken an W4, Front nach O.
+
+Raum „WC“: 2,1 m², Innenmaß 125 × 170 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 125 cm von (0,0) nach (125,0), 15 cm dick; dahinter „Vorraum“. Tür T1 bei x=27–97 (70 cm) zu „Vorraum“, schlägt nach außen auf.
+- W2 Ostwand, 170 cm von (125,0) nach (125,170), 15 cm dick; dahinter „Abstellraum“. Ohne Öffnung.
+- W3 Südwand, 125 cm von (125,170) nach (0,170), 45 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=32–92 (60 cm), Brüstung 140 cm, Oberkante 220 cm.
+- W4 Westwand, 170 cm von (0,170) nach (0,0), 15 cm dick; dahinter „Bad“. Ohne Öffnung.
+Ecken: E1 (125,0) Tür T1 27 cm daneben; E2 (125,170) frei; E3 (0,170) frei; E4 (0,0) Tür T1 27 cm daneben.
+Beim Hereinkommen durch T1 blickt man nach Süden auf W3 mit F1.
+Bestand (bleibt stehen, nicht neu planen): WC wandhängend (37 × 54 cm) bei (62,143), Rücken an W3, Front nach N.
+
+Raum „Abstellraum“: 2,1 m², Innenmaß 125 × 170 cm, rechteckig, Raumhöhe 330 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 125 cm von (0,0) nach (125,0), 15 cm dick; dahinter „Vorraum“. Tür T1 bei x=28–98 (70 cm) zu „Vorraum“, schlägt nach außen auf.
+- W2 Ostwand, 170 cm von (125,0) nach (125,170), 15 cm dick; dahinter „Vorraum“. Ohne Öffnung.
+- W3 Südwand, 125 cm von (125,170) nach (0,170), 45 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W4 Westwand, 170 cm von (0,170) nach (0,0), 15 cm dick; dahinter „WC“. Ohne Öffnung.
+Ecken: E1 (125,0) Tür T1 27 cm daneben; E2 (125,170) frei; E3 (0,170) frei; E4 (0,0) Tür T1 28 cm daneben.
+Beim Hereinkommen durch T1 blickt man nach Süden auf W3.
