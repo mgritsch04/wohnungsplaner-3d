@@ -24,7 +24,7 @@ describe('procedural furniture models', () => {
       expect(size.x).toBeLessThanOrEqual(item.width + tol);
       expect(size.z).toBeLessThanOrEqual(item.depth + tol);
       // taps are not part of the stated height, nor is the handrail of a stair (its height is the rise, #54)
-      expect(bb.max.y).toBeLessThanOrEqual(item.height + (shape === 'k-sink' || shape === 'washbasin' ? 0.4 : shape === 'stairs' ? 1 : tol));
+      expect(bb.max.y).toBeLessThanOrEqual(item.height + (shape === 'k-sink' || shape === 'washbasin' ? 0.4 : shape.startsWith('stairs') ? 1 : tol));
       expect(bb.min.y).toBeGreaterThanOrEqual(-1e-6);
       // the model should fill most of its footprint (no mis-scaled parts)
       expect(size.x).toBeGreaterThan(item.width * 0.6);

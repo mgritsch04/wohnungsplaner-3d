@@ -141,3 +141,35 @@ test('Treppen (#54): aus dem Katalog mit Geschosshöhe, hinauf- und hinuntergehe
   await page.keyboard.up('KeyS');
   expect(errors).toEqual([]);
 });
+
+test('Gewendelte Treppen (#335): Wendeltreppe und U-Treppe mit Podest in 2D und 3D ohne Fehler', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  await page.getByRole('button', { name: 'Projekt', exact: true }).click();
+  await page.getByTestId('add-level-above').click();
+  await page.keyboard.press('PageDown');
+  await page.getByRole('button', { name: 'Katalog', exact: true }).click();
+  await page.getByPlaceholder(/Suchen/).fill('Wendeltreppe');
+  await page.getByText('Wendeltreppe Ø 160 cm, gegen den Uhrzeigersinn').first().click();
+  await page.getByPlaceholder(/Suchen/).fill('halbgewendelt mit Podest');
+  await page.getByText('Treppe halbgewendelt mit Podest (U), Rechtskurve').first().click();
+  await expect.poll(async () => (await getProject(page)).furniture.filter((f) => f.category === 'stairs').length).toBe(2);
+  await page.evaluate(() => {
+    const s = (window as unknown as WpWindow).__wp.useProjectStore.getState();
+    s.apply((d) => {
+      const [a, b] = d.furniture.filter((f) => f.category === 'stairs');
+      a.x = 1.2;
+      a.y = 1.5;
+      b.x = 3.5;
+      b.y = 1.6;
+      d.furniture = [a, b];
+    });
+  });
+  // 2D: the treads of the turning stairs are drawn as polygons
+  await expect.poll(() => page.locator('svg polygon').count()).toBeGreaterThan(10);
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: testInfo.outputPath('turning-stairs-3d.png') });
+  expect(errors).toEqual([]);
+});
