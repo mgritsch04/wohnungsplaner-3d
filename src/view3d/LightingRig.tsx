@@ -4,8 +4,10 @@ import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DerivedPlan } from '../model/derived';
 import type { Light, Project, QualityMode } from '../model/schema';
-import { add, pointInPolygon, scale } from '../model/vec';
-import { approachHour, kelvinToColor, lampLevel, lightingAt, type LightingState } from './lighting';
+import { useSimStore } from '../smarthome/simStore';
+import { blindOverrides } from '../smarthome/simulation';
+import { apartmentDaylight, facadeFactor, windowLights as computeWindowLights } from '../model/windowLight';
+import { approachHour, kelvinToColor, lampLevel, lightingAt, sunBearing, type LightingState } from './lighting';
 import { flushLampShadowUpdates, lampCount, registerShadowLamp, setLampLevel } from './lampRegistry';
 import { useUiStore } from '../store/uiStore';
 import { useSimLightOverrides } from '../smarthome/simStore';
@@ -18,6 +20,15 @@ import { setEnvironmentLighting } from './daylightEnvironment';
  */
 const BLEND_TAU = 0.05;
 const MAX_WINDOW_LIGHTS = 10;
+/**
+ * By day, the sky/environment fill reaches every room alike (no shadows), so it is kept low and most
+ * of the daylight comes from the fill lights at the windows (#420): rooms far from a window or behind
+ * drawn curtains stay darker. Shares of the full fill: with no daylight coming in / a well-lit flat.
+ */
+const DAY_FILL_MIN = 0.06;
+const DAY_FILL_MAX = 0.35;
+/** Brightness of a window fill light per m² of glass (before blinds/curtains and the facade factor). */
+const WINDOW_LIGHT_PER_M2 = 2.6;
 
 interface Props {
   project: Project;
@@ -27,6 +38,8 @@ interface Props {
   span: number;
   /** Skip the sky dome (e.g. in the section view). */
   showSky: boolean;
+  /** The outside view of the building (#92): sky light on the facades is not dimmed by the curtains. */
+  exterior?: boolean;
 }
 
 /**
@@ -36,7 +49,7 @@ interface Props {
  * applied imperatively in the render loop, so moving the slider does not rebuild the scene.
  * Planning mode uses fixed, bright daylight for readability.
  */
-export function LightingRig({ project, derived, quality, center, span, showSky }: Props) {
+export function LightingRig({ project, derived, quality, center, span, showSky, exterior = false }: Props) {
   const realism = quality === 'realism';
   const { scene, gl } = useThree();
   const sunRef = useRef<THREE.DirectionalLight>(null);
@@ -64,26 +77,23 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     cam.updateProjectionMatrix();
   }, [center.x, center.y, span, dist]);
 
-  // windows: a soft fill light just inside each window (daylight entering the room)
-  const windowLights = useMemo(() => {
-    const roomPolys = [...derived.rooms.values()].map((g) => g.interior);
-    const out: { pos: [number, number, number]; area: number }[] = [];
-    for (const [wallId, list] of derived.openings) {
-      const fp = derived.footprints.get(wallId);
-      if (!fp) continue;
-      for (const r of list) {
-        if (r.opening.kind !== 'window') continue;
-        const mid = add(fp.a, scale(fp.dir, (r.s0 + r.s1) / 2));
-        for (const s of [1, -1]) {
-          const inside = add(mid, scale(fp.normal, s * (fp.thickness / 2 + 0.6)));
-          if (roomPolys.some((poly) => pointInPolygon(inside, poly))) {
-            out.push({ pos: [inside.x, (r.bottom + r.top) / 2, inside.y], area: (r.s1 - r.s0) * (r.top - r.bottom) });
-          }
-        }
-      }
-    }
-    return out.sort((a, b) => b.area - a.area).slice(0, MAX_WINDOW_LIGHTS);
-  }, [derived]);
+  // windows (#420): a soft fill light just inside each window – daylight entering the room, dimmed by
+  // blinds and curtains (also while the smart-home simulation moves them)
+  const simState = useSimStore((s) => s.state);
+  const covers = useMemo(() => (simState ? blindOverrides(project, simState) : undefined), [project, simState]);
+  const windows = useMemo(() => computeWindowLights(project, derived, covers), [project, derived, covers]);
+  // sky and environment fill follow how much daylight the windows let in: drawn curtains darken the flat
+  const indoorDay = useMemo(() => (exterior ? 1 : apartmentDaylight(project, derived, windows)), [exterior, project, derived, windows]);
+  const windowLights = useMemo(
+    () =>
+      [...windows]
+        .sort((a, b) => b.glass * b.transmission - a.glass * a.transmission)
+        .slice(0, MAX_WINDOW_LIGHTS)
+        .map((w) => ({ pos: [w.inside.x, w.midHeight, w.inside.y] as [number, number, number], strength: Math.min(7, WINDOW_LIGHT_PER_M2 * w.glass) * w.transmission, bearing: w.bearing })),
+    [windows],
+  );
+  const windowKey = windowLights.map((w) => `${w.strength.toFixed(3)}:${w.bearing.toFixed(0)}`).join(',');
+  const north = project.settings.northDirection;
 
   // smart-home simulation (#170): simulated lamps follow their automation, also by day
   const sim = useSimLightOverrides(project);
@@ -108,17 +118,17 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     if (hemi) {
       hemi.color.set(realism ? st.skyColor : '#f4f6ff');
       hemi.groundColor.set(realism ? st.groundColor : '#b8a990');
-      hemi.intensity = realism ? 0.35 * st.ambientStrength : 1.0;
+      hemi.intensity = realism ? 0.35 * st.ambientStrength * dayFill(st, indoorDay) : 1.0;
     }
     if (ambientRef.current) ambientRef.current.intensity = realism ? 0.02 * st.ambientStrength : 0.15;
-    scene.environmentIntensity = realism ? 0.6 * st.ambientStrength : 0;
+    scene.environmentIntensity = realism ? 0.6 * st.ambientStrength * dayFill(st, indoorDay) : 0;
     // lamps (lamp furniture, placed lights) share one switch; rooms without lamps stay dark at night (#216)
     const lamps = realism ? lampLevel(lampMode, st) : 1;
     setLampLevel(lamps);
     // without any lamp, nothing lights reflections at night either: no glowing handles or window panes
     const lampShine = !realism || configured.length > 0 || lampCount() > 0 ? lamps : 0;
     setMetalEnvLevel(scene.environmentIntensity, lampShine);
-    if (realism) setEnvironmentLighting(st.hour, lampShine);
+    if (realism) setEnvironmentLighting(st.hour, lampShine, north);
     configured.forEach((l, i) => {
       const pl = configuredRefs.current[i];
       if (pl) pl.intensity = interiorIntensity(l) * (l.sim ? 1 : lamps);
@@ -126,7 +136,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     if (realism) {
       windowLights.forEach((w, i) => {
         const l = windowRefs.current[i];
-        if (l) l.intensity = st.daylight * Math.min(3, 0.9 * w.area);
+        if (l) l.intensity = st.daylight * w.strength * facadeFactor(w.bearing, sunBearing(st.hour), st.sunStrength);
       });
       const sky = skyRef.current;
       const uniforms = (sky?.material as THREE.ShaderMaterial | undefined)?.uniforms;
@@ -145,10 +155,10 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
     const goal = realism ? (preview.current ?? target) : 13;
     if (current.current === null) current.current = goal;
     current.current = approachHour(current.current, goal, dt, BLEND_TAU);
-    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowLights.length}|${configuredKey}|${lampCount()}`;
+    const key = `${current.current.toFixed(4)}|${realism}|${exposure}|${lampMode}|${windowKey}|${indoorDay.toFixed(3)}|${north}|${configuredKey}|${lampCount()}`;
     if (key === applied.current) return;
     applied.current = key;
-    apply(lightingAt(current.current));
+    apply(lightingAt(current.current, north));
   });
 
   // e2e/debug hook: the hour the lighting currently shows (may lag the setting while blending)
@@ -178,7 +188,7 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
       {realism && showSky && <Sky ref={skyRef as never} distance={450} turbidity={6} rayleigh={1.2} mieCoefficient={0.005} mieDirectionalG={0.85} />}
       {realism &&
         windowLights.map((w, i) => (
-          <pointLight key={`w${i}`} ref={(el) => void (windowRefs.current[i] = el)} position={w.pos} color="#dfe9ff" intensity={0} distance={7} decay={2} />
+          <pointLight key={`w${i}`} ref={(el) => void (windowRefs.current[i] = el)} position={w.pos} color="#dfe9ff" intensity={0} distance={6} decay={1.6} />
         ))}
       {configured.map((l, i) => (
         <InteriorLight key={l.id} light={l} shadow={realism} lightRef={(el) => void (configuredRefs.current[i] = el)} />
@@ -188,6 +198,12 @@ export function LightingRig({ project, derived, quality, center, span, showSky }
 }
 
 const interiorIntensity = (l: Light) => l.intensity * 1.5;
+
+/**
+ * Share of the sky/environment fill (#420): by day it follows how much daylight the windows let in
+ * (never quite 0 – light still bounces in through gaps and doors); at night it no longer matters.
+ */
+const dayFill = (st: LightingState, indoorDay: number) => 1 - st.daylight * (1 - (DAY_FILL_MIN + (DAY_FILL_MAX - DAY_FILL_MIN) * indoorDay));
 
 function InteriorLight({ light, shadow, lightRef }: { light: Light; shadow: boolean; lightRef: (el: THREE.PointLight | null) => void }) {
   return (

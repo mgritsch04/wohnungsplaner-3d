@@ -363,7 +363,7 @@ function SceneContent({
   return (
     <>
       <color attach="background" args={[quality === 'realism' ? '#dfe7ee' : '#eef1f4']} />
-      <LightingRig project={project} derived={derived} quality={quality} center={center} span={span} showSky={!(cutaway && cameraMode === 'orbit')} />
+      <LightingRig project={project} derived={derived} quality={quality} center={center} span={span} showSky={!(cutaway && cameraMode === 'orbit')} exterior={exteriorOn} />
       {quality === 'realism' && <EnvironmentLight stepHours={tier.envStepHours} size={tier.envSize} />}
       <FpsMeter />
       <AdaptiveQuality />
@@ -757,11 +757,11 @@ function EnvironmentLight({ stepHours, size }: { stepHours: number; size: number
   useFrame(() => {
     const s = state.current;
     if (!s) return;
-    const { hour, lamps } = environmentLighting();
-    const key = `${envKey(hour, lamps, stepHours)}|${size}`;
+    const { hour, lamps, north } = environmentLighting();
+    const key = `${envKey(hour, lamps, stepHours)}|${north}|${size}`;
     const now = performance.now();
     if (key === s.key || (s.tex && now - s.at < ENV_MIN_INTERVAL_MS)) return;
-    const env = createDaylightEnvironment(envHour(hour, stepHours), lamps);
+    const env = createDaylightEnvironment(envHour(hour, stepHours), lamps, north);
     const tex = s.pmrem.fromScene(env, 0.04, 0.1, 100, { size }).texture;
     env.dispose();
     s.tex?.dispose();
