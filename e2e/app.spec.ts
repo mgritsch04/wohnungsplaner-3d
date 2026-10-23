@@ -640,6 +640,29 @@ test('CAD plan with solid dark walls, coloured rooms (as strips) and a tile hatc
   expect(errors).toEqual([]);
 });
 
+test('kitchen warning list does not linger after the obstacle is removed (#220)', async ({ page }) => {
+  await freshStart(page);
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const s = await planToScreen(page, 1.0, -0.06);
+  await page.mouse.click(s.x, s.y);
+  expect((await getSelection(page))?.type).toBe('wall');
+  await page.locator('.panel.left').getByRole('button', { name: 'Küche' }).click();
+  const blocked = page.getByTestId('kitchen-run-blocked');
+  await page.getByRole('button', { name: 'Küchenzeile platzieren' }).click();
+  await expect(blocked).toContainText('Nicht gesetzt, weil sie hier nicht passen:');
+  // undo the placement and delete the lowboard: the old list must be gone
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = (window as any).__wp;
+    w.useProjectStore.getState().undo();
+    w.useProjectStore.getState().apply((d: { furniture: { name: string }[] }) => {
+      d.furniture = d.furniture.filter((f) => f.name !== 'TV-Lowboard');
+    });
+  });
+  await expect(blocked).toHaveCount(0);
+});
+
 test('plans a kitchen run along a selected wall', async ({ page }) => {
   await freshStart(page);
   await page.getByRole('button', { name: '2D', exact: true }).click();
