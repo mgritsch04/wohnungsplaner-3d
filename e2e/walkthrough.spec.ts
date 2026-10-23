@@ -1129,6 +1129,8 @@ test('walkthrough: mouse wheel zooms the field of view, Z resets it, leaving res
 
 test('walkthrough: "Gefühlt echt" uses a natural 62° view with scale hints – distance and height at the crosshair, door heights; it is saved (#256, #263)', async ({ page }) => {
   const errors = collectErrors(page);
+  // the crosshair text is off by default; this test turns it on before the app loads (#263)
+  await page.addInitScript(() => localStorage.setItem('wohnungsplaner-aim-hint', 'on'));
   await freshStart(page);
   await page.getByRole('button', { name: '3D', exact: true }).click();
   await page.getByRole('button', { name: 'Begehen' }).click();
