@@ -110,7 +110,7 @@ export async function fetchArticle(mods, get, a, { withModel }) {
   if (!entry) {
     // name known, dimensions missing (#269): the planner asks for them instead of dropping the product
     const draft = mods.pageToDraftEntry(page, model?.file);
-    return { article, entry: null, ...(draft ? { draft } : {}), model, page, reason: draft ? 'Maße fehlen auf der Seite – bitte im Planer eintragen' : 'Name fehlt auf der Seite' };
+    return { article, entry: null, ...(draft ? { draft } : {}), model, page, reason: draft ? 'Maße fehlen auf der Seite – bitte im Planer unter Katalog › IKEA bzw. Möbelix › „Maße fehlen“ eintragen' : 'Name fehlt auf der Seite' };
   }
   return { article, entry, model, page, note };
 }

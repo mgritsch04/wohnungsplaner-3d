@@ -240,7 +240,7 @@ addEventListener('message', async (e) => {
     const b = await r.json();
     ok = r.ok;
     text = ok
-      ? '„' + b.name + '“ ist im Planer (Katalog › ' + (b.list === 'Möbelix' ? 'Möbelix' : 'IKEA') + ')' + (b.model ? ' – mit 3D-Modell' : '') + (b.missingDims ? '. Die Maße fehlen auf der Seite – bitte dort eintragen.' : '.')
+      ? '„' + b.name + '“ ist im Planer (Katalog › ' + (b.list === 'Möbelix' ? 'Möbelix' : 'IKEA') + ')' + (b.model ? ' – mit 3D-Modell' : '') + (b.missingDims ? '. Die Maße fehlen auf der Seite – bitte im Planer unter Katalog › ' + (b.list === 'Möbelix' ? 'Möbelix' : 'IKEA') + ' › „Maße fehlen“ eintragen.' : '.')
       : b.error;
   } catch (err) {
     text = 'Fehler: ' + err;

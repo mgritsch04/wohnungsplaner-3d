@@ -258,6 +258,13 @@ test('Maße fehlen (#269): gesendete Pflanze ohne Maße wartet, Maße eintragen,
   await expect(left.getByTestId('ikea-card')).toHaveCount(0);
   await expect(draft.getByLabel('Höhe in cm')).toHaveValue('120');
 
+  // findable from elsewhere: tab label with count, and a hint in „Alle Möbel“ that jumps to the input
+  await expect(left.getByRole('button', { name: /IKEA \(1 ohne Maße\)/ })).toBeVisible();
+  await left.getByRole('button', { name: 'Alle Möbel' }).click();
+  await expect(left.getByTestId('missing-dims-hint')).toContainText('Maße fehlen bei 1 importierten Möbeln');
+  await left.getByTestId('missing-dims-hint').getByRole('button', { name: 'IKEA › Maße fehlen' }).click();
+  await expect(left.getByTestId('ikea-draft')).toBeVisible();
+
   await draft.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(draft).toContainText('Bitte Breite, Tiefe und Höhe eintragen');
 
