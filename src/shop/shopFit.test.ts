@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSampleProject } from '../model/sample';
-import { buildingSpans, fitCheck, formatCm, formatMeters } from './shopMode';
+import { buildingSpans, fitCheck, formatCm, formatMeters } from './shopFit';
 
 // Sample flat: living room 5 × 4 m (ceiling 2.6 m) with sofa, TV board, lamp; bedroom 3.5 × 4 m.
 describe('Laden-Modus (#361)', () => {
