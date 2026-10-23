@@ -320,10 +320,12 @@ export function furnishWithKitchens(
   const placed = kitchens.map((k) => ({ ...k, ...placeKitchen(project, k.roomId, k.kitchen, resolve) }));
   const draft: Project = { ...project, furniture: [...project.furniture, ...placed.flatMap((k) => k.items)] };
   const s = furnish(draft);
+  // the kitchen run belongs to the suggestion, too: a new preview of the room replaces it
+  for (const k of placed) for (const f of k.items) f.suggested = true;
   const rooms: RoomSuggestion[] = s.rooms.map((r) => {
     const k = placed.find((x) => x.roomId === r.roomId);
     return k ? { ...r, placed: [...k.items, ...r.placed], missing: [...k.missing, ...r.missing] } : r;
   });
   for (const k of placed) if (!rooms.some((r) => r.roomId === k.roomId)) rooms.push({ roomId: k.roomId, roomName: k.roomName, type: k.type, placed: k.items, missing: k.missing });
-  return { rooms, items: rooms.flatMap((r) => r.placed) };
+  return { ...s, rooms, items: rooms.flatMap((r) => r.placed) };
 }

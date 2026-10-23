@@ -155,7 +155,7 @@ export interface RoomSuggestion {
   /** Names of wished items that found no collision-free place (one entry per piece). */
   missing: string[];
   /** Per missing piece: why there was no place and what helps (#350). */
-  notes: { name: string; why: string }[];
+  notes?: { name: string; why: string }[];
 }
 
 export interface FurnishingSuggestion {
@@ -853,7 +853,7 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
     rooms.push(out);
     if (!g) {
       out.missing.push(...pieces.map((p) => p.item.name));
-      out.notes.push(...pieces.map((p) => ({ name: p.item.name, why: 'der Raum hat keine geschlossenen Wände' })));
+      out.notes!.push(...pieces.map((p) => ({ name: p.item.name, why: 'der Raum hat keine geschlossenen Wände' })));
       continue;
     }
     const rc: RoomCtx = { ...ctx, roomId: room.id, type: req.type, interior: g.interior, edges: roomEdges(g.interior, derived), centroid: polygonCentroid(g.interior), rejects: new Set() };
@@ -888,7 +888,7 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
     ctx.draft.furniture.length = base;
     ctx.draft.furniture.push(...best!.items);
     out.placed.push(...best!.placed);
-    out.notes.push(...best!.notes);
+    out.notes!.push(...best!.notes);
     out.missing.push(...best!.notes.map((n) => n.name));
   }
   return { rooms, items: rooms.flatMap((r) => r.placed), replaces: [...replace] };

@@ -605,7 +605,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
     case 'vacuum':
       // stick vacuum in its wall holder
       return [
-        box(-W * 0.5, 0, -D, W * 0.5, 0.06, D * 0.6, shade(color, 0.8)),
+        box(-W * 0.85, 0, -D, W * 0.85, 0.06, D * 0.6, shade(color, 0.8)),
         cyl(0, 0.06, 0, 0.015, h - 0.25, METAL, { metal: 0.8, rough: 0.3 }),
         rbox(-0.06, h - 0.3, -0.06, 0.06, h - 0.05, 0.08, 0.02, color),
         box(-W * 0.4, h - 0.12, -D, W * 0.4, h - 0.08, -D + 0.03, BLACK),
