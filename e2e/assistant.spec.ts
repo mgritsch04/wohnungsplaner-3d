@@ -113,7 +113,7 @@ const DESIGN_PRODUCTS = [
   { id: 'e2e-mx-shelf', name: 'TESTREGAL Möbelix', category: 'storage', width: 0.8, depth: 0.4, height: 1.8, model: { type: 'procedural', shape: 'shelf' }, retailer: 'Möbelix Österreich', productUrl: 'https://www.moebelix.at/p/testregal-e2e', price: { amount: 89.9, currency: 'EUR', status: 'confirmed' } },
 ].map((p) => ({ color: '#bbbbbb', approximate: true, solid: true, tags: [], source: 'imported', sourceName: 'e2e', ...p }));
 
-test('Einrichtungsvorschlag mit Claude (#350): echte Produkte, Gesamtpreis, Vorschau, Übernehmen, Undo', async ({ page }) => {
+test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + Platzhalter, Alternative tauschen, Übernehmen, Undo', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
@@ -123,12 +123,22 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte, Gesamtpreis, Vors
       json: async (input: string) => {
         w.__prompts.push(input);
         await new Promise((r) => setTimeout(r, 50));
+        const living = /(R\d+) „Wohnzimmer“/.exec(input)?.[1] ?? 'R1';
+        const bed = /(R\d+) „Schlafzimmer“/.exec(input)?.[1] ?? 'R2';
         return {
-          summary: 'Gemütliches Wohnzimmer mit viel Stauraum.',
-          items: [
-            { catalogId: 'e2e-ik-sofa', quantity: 1, reason: 'Großes Sofa für Gaming-Abende.' },
-            { catalogId: 'e2e-mx-shelf', quantity: 1, reason: 'Platz für Bücher.' },
-            { catalogId: 'erfunden-999', quantity: 1, reason: 'Gibt es nicht.' },
+          summary: 'Gemütlich und durchgängig hell, mit Platz für Gaming und Bücher.',
+          rooms: [
+            {
+              room: living,
+              type: 'living',
+              concept: 'Gaming-Ecke und Leseplatz.',
+              items: [
+                { catalogId: 'e2e-mx-shelf', quantity: 1, reason: 'Platz für Bücher.' },
+                { catalogId: 'generic-armchair', quantity: 1, reason: 'Zum Lesen.', label: 'Lesesessel aus Cord', search: 'Sessel Cord', alternatives: [{ catalogId: 'generic-floor-lamp', reason: 'Nur Licht statt Sessel.', label: 'Stehlampe Messing', search: 'Stehlampe Messing' }] },
+                { catalogId: 'erfunden-999', quantity: 1, reason: 'Gibt es nicht.' },
+              ],
+            },
+            { room: bed, type: 'bedroom', concept: 'Ruhig.', items: [{ catalogId: 'generic-plant', quantity: 1, reason: 'Grün.', label: 'Monstera groß', search: 'Monstera' }] },
           ],
         };
       },
@@ -139,41 +149,53 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte, Gesamtpreis, Vors
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Einrichten' }).click();
   const panel = page.getByTestId('design-panel');
-  await expect(panel.getByTestId('design-no-products')).toBeVisible();
+  await expect(panel.getByTestId('design-own-count')).toContainText('Platzhaltern und Suchlinks');
 
   await page.evaluate(async (items) => {
     const wp = (window as unknown as { __wp: { useCatalogStore: { getState: () => { addItems: (i: unknown[]) => Promise<number> } } } }).__wp;
     await wp.useCatalogStore.getState().addItems(items);
   }, DESIGN_PRODUCTS);
-  await expect(panel.getByTestId('design-no-products')).toHaveCount(0);
+  await expect(panel.getByTestId('design-own-count')).toContainText('2 eigene Produkte');
 
   const before = (await getProject(page)).furniture.length;
-  await panel.getByLabel('Raum').selectOption({ label: 'Wohnzimmer' });
+  await expect(panel.getByLabel('Umfang')).toHaveValue('__all');
   await panel.getByLabel('Interessen / Hobbys').fill('Gaming, Lesen');
   await panel.getByLabel('Was du brauchst').fill('Stauraum');
-  await panel.getByLabel('Was du dir wünschst').fill('großes Sofa');
+  await panel.getByLabel('Was du dir wünschst').fill('Pflanzen');
   await panel.getByLabel('Stil').fill('gemütlich');
-  await expect(panel).toContainText('2 Produkte aus deiner Auswahl');
-  await panel.getByRole('button', { name: 'Vorschlag erstellen' }).click();
+  await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
 
   const proposal = panel.getByTestId('design-proposal');
   await expect(proposal).toBeVisible();
   await expect(proposal).toContainText('Vorschlag von Claude');
-  await expect(panel.getByTestId('design-pick')).toHaveCount(2);
-  await expect(proposal).toContainText('TESTSOFA 3er');
-  await expect(proposal).toContainText('IKEA, 200×90×80 cm');
-  await expect(proposal).toContainText('Großes Sofa für Gaming-Abende.');
-  await expect(proposal.getByRole('link', { name: 'Produktseite' }).nth(1)).toHaveAttribute('href', 'https://www.moebelix.at/p/testregal-e2e');
-  await expect(panel.getByTestId('design-total')).toHaveText(/588,90/);
-  await expect(proposal).toContainText('nicht in deiner Auswahl – weggelassen');
+  await expect(panel.getByTestId('design-room')).toHaveCount(2);
+  await expect(panel.getByTestId('design-pick')).toHaveCount(3);
+  await expect(proposal).toContainText('TESTREGAL Möbelix');
+  await expect(proposal).toContainText('Möbelix, 80×40×180 cm');
+  await expect(proposal).toContainText('Lesesessel aus Cord');
+  await expect(proposal.getByRole('link', { name: 'bei IKEA suchen' }).first()).toHaveAttribute('href', 'https://www.ikea.com/at/de/search/?q=Sessel%20Cord');
+  await expect(proposal.getByRole('link', { name: 'Produktseite' })).toHaveAttribute('href', 'https://www.moebelix.at/p/testregal-e2e');
+  await expect(panel.getByTestId('design-total')).toHaveText(/89,90/);
+  await expect(proposal).toContainText('nicht in den Listen – weggelassen');
 
   const prompt = (await page.evaluate(() => (window as unknown as { __prompts: string[] }).__prompts))[0];
   expect(prompt).toContain('Interessen/Hobbys: Gaming, Lesen');
+  expect(prompt).toContain('„Schlafzimmer“');
   expect(prompt).toContain('e2e-mx-shelf: TESTREGAL Möbelix (Möbelix)');
   expect(prompt).not.toContain('Beispielwohnung');
   expect(prompt).not.toContain('https://');
 
-  await panel.getByRole('button', { name: 'Vorschau im Raum' }).click();
+  // alternative instead of the armchair, and back
+  await proposal.getByRole('button', { name: 'Alternativen (1)' }).click();
+  await expect(proposal.getByTestId('design-alternatives')).toContainText('Stehlampe Messing');
+  await proposal.getByRole('button', { name: 'Stattdessen nehmen' }).click();
+  await expect(proposal).toContainText('Stehlampe Messing');
+  await expect(proposal.getByTestId('design-alternatives')).toHaveCount(0);
+  await proposal.getByRole('button', { name: 'Alternativen (1)' }).click();
+  await proposal.getByRole('button', { name: 'Stattdessen nehmen' }).click();
+  await expect(panel.getByTestId('design-pick').nth(1)).toContainText('Lesesessel aus Cord');
+
+  await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
   await expect(page.getByTestId('furnish-preview')).toBeVisible();
   await expect(panel.getByTestId('design-preview')).toContainText('noch nicht übernommen');
   await expect(left.getByTestId('furnish-result')).toHaveCount(0);
@@ -182,14 +204,15 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte, Gesamtpreis, Vors
 
   await panel.getByRole('button', { name: 'Verwerfen' }).click();
   await expect(page.getByTestId('furnish-preview')).toHaveCount(0);
-  await panel.getByRole('button', { name: 'Vorschau im Raum' }).click();
+  await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
   await panel.getByRole('button', { name: 'Übernehmen' }).click();
-  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 2);
+  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 3);
   const p = (await getProject(page)) as Project;
   const d = derivePlan(p);
   const added = p.furniture.slice(before);
-  expect(added.map((f) => f.catalogId).sort()).toEqual(['e2e-ik-sofa', 'e2e-mx-shelf']);
+  expect(added.map((f) => f.catalogId).sort()).toEqual(['e2e-mx-shelf', 'generic-armchair', 'generic-plant']);
   expect(added.find((f) => f.catalogId === 'e2e-mx-shelf')?.productUrl).toBe('https://www.moebelix.at/p/testregal-e2e');
+  expect(added.find((f) => f.catalogId === 'generic-armchair')?.name).toBe('Lesesessel aus Cord (Platzhalter)');
   for (const f of added) expect(placementIssues(p, d, f).map((i) => `${f.name}: ${i.message}`)).toEqual([]);
 
   await page.locator('[data-testid="editor2d"] svg').click({ position: { x: 5, y: 5 } });

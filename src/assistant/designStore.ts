@@ -20,12 +20,11 @@ function loadWishes(): DesignWishes {
  */
 interface DesignStore {
   wishes: DesignWishes;
-  roomId: string | null;
+  /** Room id, or '__all' for the whole apartment (default). */
+  scope: string;
   asking: boolean;
   error: string | null;
   proposal: DesignProposal | null;
-  /** Room the proposal was made for. */
-  proposalRoomId: string | null;
   preview: FurnishingSuggestion | null;
   setWishes: (patch: Partial<DesignWishes>) => void;
   set: (patch: Partial<Omit<DesignStore, 'set' | 'setWishes'>>) => void;
@@ -33,11 +32,10 @@ interface DesignStore {
 
 export const useDesignStore = create<DesignStore>((set, get) => ({
   wishes: loadWishes(),
-  roomId: null,
+  scope: '__all',
   asking: false,
   error: null,
   proposal: null,
-  proposalRoomId: null,
   preview: null,
   setWishes: (patch) => {
     const wishes = { ...get().wishes, ...patch };

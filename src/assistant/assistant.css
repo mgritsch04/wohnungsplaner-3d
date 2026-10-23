@@ -39,3 +39,28 @@
   border-top: 1px dashed var(--color-border);
   padding-top: var(--space-1);
 }
+/* Einrichtungsvorschlag mit Claude (#350) */
+.design-room {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-1);
+}
+.design-room h5 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+}
+.design-pick p {
+  margin: 0;
+}
+.design-link {
+  margin-right: var(--space-1);
+  white-space: nowrap;
+}
+.design-alternatives {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-2);
+  border-left: 2px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
