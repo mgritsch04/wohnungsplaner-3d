@@ -22,7 +22,7 @@ import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
 import { isGlassDoor, type Underlay } from '../../model/schema';
 
-const FIXTURE_NAMES: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC' };
+const FIXTURE_NAMES: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC', 'generic-washer': 'Waschmaschine', 'generic-k-dishwasher': 'Geschirrspüler' };
 
 /** Run the best available local recognizer on the current underlay and open the review. */
 export async function runRecognition() {
@@ -106,6 +106,7 @@ export async function runRecognition() {
         note: f.note,
         accepted: false,
       }));
+      if (detectSanitary && !draft.fixtures.length) draft.warnings.push('Sanitärobjekte/Waschmaschine: Im Plan wurden keine passenden Symbole gefunden (nur in Vektor-PDFs möglich) – bitte von Hand platzieren.');
       if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – sind nicht vorausgewählt (Bestand, nicht im Budget). Bitte prüfen.`);
       // sockets, switches, LAN, water, radiators from their symbols (#222)
       draft.installations = (detectInstallationSymbols ? detectInstallations(world, draft.walls, rooms, draft.openings) : []).map((i) => {

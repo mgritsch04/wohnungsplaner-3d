@@ -247,7 +247,7 @@ function UnderlayControls() {
           Plänen.
         </p>
         <label className="row small">
-          <input type="checkbox" checked={recOptions.detectSanitary} onChange={(e) => setRecOptions({ detectSanitary: e.target.checked })} /> WC, Badewanne, Waschbecken aus Symbolen suchen
+          <input type="checkbox" checked={recOptions.detectSanitary} onChange={(e) => setRecOptions({ detectSanitary: e.target.checked })} /> WC, Badewanne, Waschbecken, Waschmaschine aus Symbolen suchen
         </label>
         <label className="row small">
           <input type="checkbox" checked={recOptions.detectInstallationSymbols} onChange={(e) => setRecOptions({ detectInstallationSymbols: e.target.checked })} /> Steckdosen, Schalter, Heizkörper aus Symbolen suchen
@@ -265,7 +265,7 @@ function UnderlayControls() {
 const STATUS_LABEL: Record<DraftStatus, string> = { confirmed: 'bestätigt', estimated: 'geschätzt', uncertain: 'unsicher' };
 const STATUS_KIND: Record<DraftStatus, 'ok' | 'warn' | 'error'> = { confirmed: 'ok', estimated: 'warn', uncertain: 'error' };
 
-const FIXTURE_LABELS: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC' };
+const FIXTURE_LABELS: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC', 'generic-washer': 'Waschmaschine', 'generic-k-dishwasher': 'Geschirrspüler' };
 
 function DraftReview() {
   const draft = useImportStore((s) => s.draft)!;

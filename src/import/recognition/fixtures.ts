@@ -14,7 +14,7 @@ export interface FixtureSegment {
   faint?: boolean;
 }
 
-export type FixtureKind = 'bathtub' | 'washbasin' | 'toilet';
+export type FixtureKind = 'bathtub' | 'washbasin' | 'toilet' | 'washer' | 'dishwasher';
 
 export interface FixtureCandidate {
   kind: FixtureKind;
@@ -39,10 +39,15 @@ const CATALOG = {
   bathtub: { id: 'generic-bathtub', w: 1.7, d: 0.75 },
   washbasin: { id: 'generic-washbasin', w: 0.6, d: 0.46 },
   toilet: { id: 'generic-toilet', w: 0.37, d: 0.54 },
+  washer: { id: 'generic-washer', w: 0.6, d: 0.6 },
+  dishwasher: { id: 'generic-k-dishwasher', w: 0.6, d: 0.6 },
 } as const;
 
 /** Symbol pieces are short; longer lines are walls, dimension lines or furniture outlines. */
 const MAX_PIECE = 1.5;
+/** A tub's long edge is one straight piece of 1.6–1.9 m. */
+const MAX_EDGE = 2.2;
+const KITCHEN_ROOM = /küche|kueche|kochen|essk/i;
 const JOIN_TOL = 0.03;
 const SANITARY_ROOM = /bad|wc|toilet|dusch|wasch|sanit/i;
 const WC_ROOM = /wc|toilet/i;
@@ -126,15 +131,23 @@ const near = (n: number, ref: number) => Math.abs(n - ref) / ref <= 0.25;
  * only raises or lowers the confidence. Everything here is a proposal for the review.
  */
 export function detectFixtures(segments: FixtureSegment[], walls: Wall[], rooms: { polygon: Vec2[]; name: string }[]): FixtureCandidate[] {
-  const symbolLines = segments.filter((s) => {
+  const onWall = (s: FixtureSegment) => {
+    const mid = { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
+    return walls.some((w) => closestPointOnSegment(mid, w.a, w.b).distance <= w.thickness / 2 + 0.03);
+  };
+  const candidates = segments.filter((s) => {
     if (s.areaFill || s.darkFill || s.faint) return false;
     const len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
-    if (len < 1e-4 || len > MAX_PIECE) return false;
-    const mid = { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
-    return !walls.some((w) => closestPointOnSegment(mid, w.a, w.b).distance <= w.thickness / 2 + 0.03);
+    return len >= 1e-4 && len <= MAX_EDGE;
   });
+  const symbolLines = candidates.filter((s) => Math.hypot(s.x2 - s.x1, s.y2 - s.y1) <= (s.curve ? MAX_PIECE : MAX_EDGE) && !onWall(s));
+  // a tub or WC stands flush against the wall: its back edge lies on the wall face and only closes the shape
+  const wallEdges = candidates.filter(onWall);
   const found: (FixtureCandidate & { area: number })[] = [];
-  for (const { segs } of components(symbolLines)) {
+  for (const comp of components(symbolLines)) {
+    const segs = [...comp.segs];
+    const touches = (p: Vec2) => segs.some((t) => Math.min(Math.hypot(t.x1 - p.x, t.y1 - p.y), Math.hypot(t.x2 - p.x, t.y2 - p.y)) <= JOIN_TOL);
+    for (const e of wallEdges) if (touches({ x: e.x1, y: e.y1 }) && touches({ x: e.x2, y: e.y2 })) segs.push(e);
     if (segs.length < 4) continue;
     const pts = segs.flatMap((s) => [
       { x: s.x1, y: s.y1 },
@@ -142,7 +155,7 @@ export function detectFixtures(segments: FixtureSegment[], walls: Wall[], rooms:
     ]);
     // closed: nearly every end has a partner
     const open = pts.filter((p, i) => !pts.some((q, j) => j !== i && Math.hypot(p.x - q.x, p.y - q.y) <= JOIN_TOL)).length;
-    if (open > 0.1 * pts.length) continue;
+    if (open > 0.15 * pts.length) continue;
     const total = segs.reduce((n, s) => n + Math.hypot(s.x2 - s.x1, s.y2 - s.y1), 0);
     const curved = segs.filter((s) => s.curve).reduce((n, s) => n + Math.hypot(s.x2 - s.x1, s.y2 - s.y1), 0);
     const box = orientedBox(pts);
@@ -176,8 +189,94 @@ export function detectFixtures(segments: FixtureSegment[], walls: Wall[], rooms:
       area: box.l * box.w,
     });
   }
+  found.push(...detectWashers(candidates, walls, rooms, found));
   // an inner outline (tub basin) lies inside a bigger symbol: keep only the outermost
   return found
     .filter((f) => !found.some((g) => g !== f && g.area > f.area && Math.hypot(g.center.x - f.center.x, g.center.y - f.center.y) < Math.max(g.width, g.depth) / 2))
     .map(({ area: _area, ...f }) => f);
+}
+
+/**
+ * Washing machine / dryer / dishwasher: a square outline (often dashed) with a circle (drum) in it.
+ * Circles come from curve pieces; the square is searched around each circle in the frame of the nearest
+ * wall, and must be covered on all four sides (dashes cover about half of a side).
+ */
+function detectWashers(segments: FixtureSegment[], walls: Wall[], rooms: { polygon: Vec2[]; name: string }[], found: { center: Vec2; area: number }[]): (FixtureCandidate & { area: number })[] {
+  const curves = segments.filter((s) => s.curve);
+  const lines = segments.filter((s) => !s.curve);
+  const out: (FixtureCandidate & { area: number })[] = [];
+  for (const { segs } of components(curves)) {
+    if (segs.length < 6) continue;
+    const pts = segs.flatMap((s) => [
+      { x: s.x1, y: s.y1 },
+      { x: s.x2, y: s.y2 },
+    ]);
+    const box = orientedBox(pts);
+    if (box.l < 0.25 || box.l > 0.65 || box.l / box.w > 1.25) continue;
+    const c = box.center;
+    if (found.some((f) => Math.hypot(f.center.x - c.x, f.center.y - c.y) < 0.4)) continue;
+    const room = rooms.find((r) => pointInPolygon(c, r.polygon));
+    if (rooms.length > 0 && !room) continue;
+    // frame: direction of the nearest wall, else the plan axes
+    let phi = 0;
+    let best = Infinity;
+    for (const w of walls) {
+      const d = closestPointOnSegment(c, w.a, w.b).distance;
+      if (d < best) {
+        best = d;
+        phi = Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x);
+      }
+    }
+    const cs = Math.cos(phi);
+    const sn = Math.sin(phi);
+    const local = lines
+      .filter((s) => Math.hypot((s.x1 + s.x2) / 2 - c.x, (s.y1 + s.y2) / 2 - c.y) < 0.75)
+      .map((s) => ({
+        a: { u: (s.x1 - c.x) * cs + (s.y1 - c.y) * sn, v: -(s.x1 - c.x) * sn + (s.y1 - c.y) * cs },
+        b: { u: (s.x2 - c.x) * cs + (s.y2 - c.y) * sn, v: -(s.x2 - c.x) * sn + (s.y2 - c.y) * cs },
+      }));
+    const TOL = 0.03;
+    let fit: { h: number; cover: number } | null = null;
+    for (let h = 0.25; h <= 0.5001; h += 0.01) {
+      const cover = [0, 0, 0, 0];
+      for (const { a, b } of local) {
+        const len = Math.hypot(b.u - a.u, b.v - a.v);
+        // vertical piece (u const) on side ±h, horizontal piece (v const) on side ±h
+        if (Math.abs(a.u - b.u) <= TOL && Math.abs(a.v) <= h + TOL && Math.abs(b.v) <= h + TOL) {
+          if (Math.abs(a.u - h) <= TOL) cover[0] += len;
+          else if (Math.abs(a.u + h) <= TOL) cover[1] += len;
+        } else if (Math.abs(a.v - b.v) <= TOL && Math.abs(a.u) <= h + TOL && Math.abs(b.u) <= h + TOL) {
+          if (Math.abs(a.v - h) <= TOL) cover[2] += len;
+          else if (Math.abs(a.v + h) <= TOL) cover[3] += len;
+        }
+      }
+      const min = Math.min(...cover) / (2 * h);
+      if (min >= 0.4 && (!fit || min > fit.cover)) fit = { h, cover: min };
+    }
+    if (!fit) continue;
+    const side = 2 * fit.h;
+    if (side < 0.5 || side > 0.9) continue;
+    const kitchen = !!room && KITCHEN_ROOM.test(room.name);
+    const cat = kitchen ? CATALOG.dishwasher : CATALOG.washer;
+    // front faces away from the wall: back (local -y) to the nearest wall
+    const wallDist = (theta: number) => {
+      const probe = { x: c.x + Math.sin(theta) * (side / 2 + 0.1), y: c.y - Math.cos(theta) * (side / 2 + 0.1) };
+      return Math.min(...walls.map((w) => closestPointOnSegment(probe, w.a, w.b).distance), Infinity);
+    };
+    const thetas = [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((t) => t + Math.round(phi / (Math.PI / 2)) * (Math.PI / 2));
+    let rotation = thetas.reduce((bestT, t) => (wallDist(t) < wallDist(bestT) ? t : bestT), thetas[0]);
+    rotation = Math.atan2(Math.sin(rotation), Math.cos(rotation));
+    out.push({
+      kind: kitchen ? 'dishwasher' : 'washer',
+      catalogId: cat.id,
+      center: c,
+      rotation,
+      width: near(side, cat.w) ? side : cat.w,
+      depth: near(side, cat.d) ? side : cat.d,
+      confidence: 0.45,
+      note: `Quadrat mit Kreis im Plan (${Math.round(side * 100)} × ${Math.round(side * 100)} cm)${room?.name ? ` in „${room.name}“` : ''} – Waschmaschine, Trockner oder Geschirrspüler? Art und Drehung prüfen`,
+      area: side * side,
+    });
+  }
+  return out;
 }
