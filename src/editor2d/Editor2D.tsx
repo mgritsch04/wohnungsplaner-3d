@@ -12,7 +12,8 @@ import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { FurnitureSymbol, PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
-import { ICON_MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { ICON_MIN_ZOOM, MAX_ZOOM, MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { isSplitChangeRecent, zoomForWidth } from '../ui/splitResize';
 import { ZoomSlider } from '../ui/ZoomSlider';
 import { useWalkPose } from '../store/walkPoseStore';
 import { UnderlayImage } from './UnderlayImage';
@@ -153,7 +154,17 @@ export function Editor2D() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setVp({ width: el.clientWidth, height: el.clientHeight }));
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      // divider moved: keep the visible part of the plan and zoom out (or back in) instead of cropping it
+      if (isSplitChangeRecent() && width !== lastWidth) {
+        const v = useUiStore.getState().view2d;
+        useUiStore.getState().setView2d({ ...v, zoom: zoomForWidth(v.zoom, lastWidth, width, MIN_ZOOM, MAX_ZOOM) });
+      }
+      lastWidth = width;
+      setVp({ width, height: el.clientHeight });
+    });
     ro.observe(el);
     setVp({ width: el.clientWidth, height: el.clientHeight });
     return () => ro.disconnect();
@@ -848,6 +859,7 @@ export function Editor2D() {
       ref={containerRef}
       className={`editor2d ${cursorClass}`}
       data-testid="editor2d"
+      data-zoom={view.zoom.toFixed(2)}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropGhost(null);

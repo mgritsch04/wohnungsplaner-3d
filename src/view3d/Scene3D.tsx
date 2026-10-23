@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
@@ -139,6 +139,7 @@ export function Scene3D() {
             if (e.button === 0 && cameraMode === 'orbit' && !compare && moved <= CLICK_THRESHOLD_PX) useUiStore.getState().setSelection(null);
           }}
         >
+          <RenderOnResize />
           <SceneContent project={project} frame={storeProject} compare={compare} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
@@ -183,6 +184,25 @@ export function Scene3D() {
       )}
     </div>
   );
+}
+
+/**
+ * After the canvas got a new size the drawing buffer is empty until the next frame (white flash while the
+ * divider is dragged, #368): draw once right away, in the same task as the resize.
+ */
+function RenderOnResize() {
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  const advance = useThree((s) => s.advance);
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    advance(performance.now());
+  }, [width, height, advance]);
+  return null;
 }
 
 function SceneContent({

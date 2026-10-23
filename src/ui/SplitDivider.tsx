@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { markSplitChange } from './splitResize';
 import { clampSplit, SPLIT_DEFAULT, SPLIT_KEY_STEP, SPLIT_MIN_PX } from './splitPreference';
 
 /**
@@ -17,12 +18,30 @@ export function SplitDivider({ ratio, onRatio }: { ratio: number; onRatio: (r: n
     e.currentTarget.setPointerCapture?.(e.pointerId);
     e.preventDefault();
   };
+  // at most one layout change per frame while dragging; the last position always wins
+  const pending = useRef<{ ratio: number; raf: number } | null>(null);
+  const apply = (r: number) => {
+    markSplitChange();
+    onRatio(r);
+  };
+  const flush = () => {
+    const p = pending.current;
+    if (!p) return;
+    cancelAnimationFrame(p.raf);
+    pending.current = null;
+    apply(p.ratio);
+  };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
-    onRatio(clampSplit((e.clientX - d.left) / d.width, d.width));
+    const ratio = clampSplit((e.clientX - d.left) / d.width, d.width);
+    if (pending.current) pending.current.ratio = ratio;
+    else pending.current = { ratio, raf: requestAnimationFrame(flush) };
   };
-  const end = () => (drag.current = null);
+  const end = () => {
+    flush();
+    drag.current = null;
+  };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const total = totalOf(e.currentTarget);
     let next: number | null = null;
@@ -33,7 +52,7 @@ export function SplitDivider({ ratio, onRatio }: { ratio: number; onRatio: (r: n
     else if (e.key === 'Enter') next = SPLIT_DEFAULT;
     if (next === null) return;
     e.preventDefault();
-    onRatio(clampSplit(next, total));
+    apply(clampSplit(next, total));
   };
 
   return (
@@ -52,7 +71,7 @@ export function SplitDivider({ ratio, onRatio }: { ratio: number; onRatio: (r: n
       onPointerMove={onPointerMove}
       onPointerUp={end}
       onPointerCancel={end}
-      onDoubleClick={() => onRatio(SPLIT_DEFAULT)}
+      onDoubleClick={() => apply(SPLIT_DEFAULT)}
       onKeyDown={onKeyDown}
     />
   );
