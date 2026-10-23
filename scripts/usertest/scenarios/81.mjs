@@ -221,6 +221,18 @@ export default {
           });
           return out;
         }, [t.water.id, t.waste.id]);
+        // Nahaufnahme: von der Raummitte aus auf Wasseranschluss und Abfluss schauen
+        const pr = await t.project();
+        const room = pr.rooms[0];
+        const pts = room.nodeIds.map((id) => pr.nodes.find((n) => n.id === id));
+        const cen = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
+        for (const [label, fx] of [['Wasseranschluss', t.water], ['Abwasseranschluss', t.waste]]) {
+          const f = (await fixtures(t)).find((q) => q.id === fx.id);
+          const l = Math.hypot(cen.x - f.x, cen.y - f.y) || 1;
+          await t.lookAt({ x: f.x + ((cen.x - f.x) / l) * 1.1, y: (f.elevation ?? 0.5) + 0.4, z: f.y + ((cen.y - f.y) / l) * 1.1 }, { x: f.x, y: f.elevation ?? 0.5, z: f.y });
+          await page.waitForTimeout(500);
+          await t.shot(`Nahaufnahme ${label}`);
+        }
         await page.getByRole('button', { name: 'Begehen' }).click();
         await page.waitForTimeout(1200);
         const walk = await in3d(t);
