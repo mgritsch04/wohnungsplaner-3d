@@ -7,7 +7,9 @@ import { useUiStore } from '../store/uiStore';
 import { applyFurnishing, guessRoomType, suggestFurnishing, type FurnishingSuggestion } from '../suggest/furnishing';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
-import { errorText, HIDE_CODES, loadSample, type Sample, type SampleError } from './claude';
+import { addIkeaArticles } from '../catalog/ikeaSelection';
+import { errorText, HIDE_CODES, loadMcp, loadSample, type McpRuntime, type Sample, type SampleError } from './claude';
+import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, parseFound, replaceWithFound, type FoundProduct } from './productSearch';
 import {
   buildDesignPrompt,
   MAX_FIELD,
@@ -32,6 +34,7 @@ import './assistant.css';
 
 const ALL = '__all';
 let controller: AbortController | null = null;
+let searchCtl: AbortController | null = null;
 
 const FIELDS: { key: 'interests' | 'needs' | 'wants' | 'colors'; label: string; placeholder: string }[] = [
   { key: 'interests', label: 'Interessen / Hobbys', placeholder: 'Gaming, Lesen, Yoga' },
@@ -67,6 +70,10 @@ export function DesignPanel() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [hidden, setHidden] = useState(false);
   const [openAlt, setOpenAlt] = useState<string | null>(null);
+  const [mcp, setMcp] = useState<McpRuntime | null>(null);
+  const [browser, setBrowser] = useState(false);
+  const [search, setSearch] = useState<{ done: number; total: number; current: string } | null>(null);
+  const [notFound, setNotFound] = useState<Set<string>>(new Set());
   const st = useDesignStore();
   const w = st.wishes;
   const project = useProjectStore((s) => s.project);
@@ -81,6 +88,13 @@ export function DesignPanel() {
   useEffect(() => {
     let live = true;
     void loadSample().then((s) => live && setSample(s));
+    void loadMcp().then(async (m) => {
+      const ok = await browserAvailable(m);
+      if (live) {
+        setMcp(m);
+        setBrowser(ok);
+      }
+    });
     return () => {
       live = false;
     };
@@ -119,6 +133,7 @@ export function DesignPanel() {
         offer,
       );
       clearPreview();
+      setNotFound(new Set());
       st.set({ asking: false, proposal, preview: null });
     } catch (e) {
       const code = (e as SampleError | undefined)?.code;
@@ -171,6 +186,76 @@ export function DesignPanel() {
     if (previewActive) useFurnishStore.getState().setPreview(null);
     st.set({ preview: null });
   };
+
+  // real products instead of placeholders (#350, stage 3): browser of the Claude desktop app, or Claude Code locally
+  const searchMode: 'browser' | 'web' | null = sample.kind === 'local' ? 'web' : browser && mcp ? 'browser' : null;
+
+  /** Found products → catalogue ids; locally IKEA pages are read again by the helper (exact data and 3D model). */
+  const toCatalog = async (found: FoundProduct[], placeholder: CatalogItem): Promise<{ id: string; why: string }[]> => {
+    const out: { id: string; why: string }[] = [];
+    const add: CatalogItem[] = [];
+    for (const f of found) {
+      if (searchMode === 'web' && f.shop === 'IKEA') {
+        const { outcomes } = await addIkeaArticles(f.url, { model: true }).catch(() => ({ outcomes: [] }));
+        const ok = outcomes.find((o) => o.ok && o.id);
+        if (ok?.id) {
+          out.push({ id: ok.id, why: f.why });
+          continue;
+        }
+      }
+      const item = foundToCatalog(f, placeholder);
+      add.push(item);
+      out.push({ id: item.id, why: f.why });
+    }
+    if (add.length) await useCatalogStore.getState().addItems(add);
+    return out;
+  };
+
+  const findReal = async (targets: { roomId: string; index: number }[]) => {
+    if (!searchMode || search || !targets.length) return;
+    clearPreview();
+    st.set({ preview: null });
+    const ctl = new AbortController();
+    searchCtl = ctl;
+    const missed = new Set(notFound);
+    try {
+      for (const [n, t] of targets.entries()) {
+        if (ctl.signal.aborted) break;
+        const current = useDesignStore.getState().proposal;
+        const pick = current?.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
+        const placeholder = pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
+        if (!current || !pick || !placeholder) continue;
+        setSearch({ done: n, total: targets.length, current: pick.label });
+        try {
+          const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
+          const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: ctl.signal, tools: browserTools(mcp!) } : { signal: ctl.signal, web: true });
+          const found = await toCatalog(parseFound(raw), placeholder);
+          const latest = useDesignStore.getState().proposal;
+          if (found.length && latest) st.set({ proposal: replaceWithFound(latest, t.roomId, t.index, found) });
+          else missed.add(`${t.roomId}:${t.index}`);
+        } catch (e) {
+          const code = (e as SampleError | undefined)?.code;
+          if (code === 'cancelled') break;
+          if (code === 'tools_unavailable' || (code && HIDE_CODES.includes(code))) {
+            setBrowser(false);
+            useUiStore.getState().toast('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC).', 'info');
+            break;
+          }
+          missed.add(`${t.roomId}:${t.index}`);
+          if (code === 'rate_limited') {
+            useUiStore.getState().toast(errorText(e), 'info');
+            break;
+          }
+        }
+      }
+    } finally {
+      if (searchCtl === ctl) searchCtl = null;
+      setNotFound(missed);
+      setSearch(null);
+    }
+  };
+
+  const placeholders = proposal ? proposal.rooms.flatMap((r) => r.picks.map((p, index) => ({ roomId: r.roomId, index, p })).filter((x) => x.p.placeholder)) : [];
 
   const swap = (roomId: string, index: number, alt: number) => {
     if (!proposal) return;
@@ -249,6 +334,12 @@ export function DesignPanel() {
                     return (
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
+                        {p.placeholder && notFound.has(key) && <p className="muted">Claude hat kein passendes Produkt mit vollständigen Angaben gefunden.</p>}
+                        {p.placeholder && searchMode && !search && (
+                          <button className="small" onClick={() => void findReal([{ roomId: r.roomId, index: i }])}>
+                            Echtes Produkt suchen
+                          </button>
+                        )}
                         {p.alternatives.length > 0 && (
                           <>
                             <button className="small" aria-expanded={openAlt === key} onClick={() => setOpenAlt(openAlt === key ? null : key)}>
@@ -259,7 +350,7 @@ export function DesignPanel() {
                                 {p.alternatives.map((a, k) => (
                                   <li key={a.catalogId}>
                                     <PickLine option={a} quantity={p.quantity} item={byId(a.catalogId)} retailer={w.retailer} />
-                                    <button className="small" onClick={() => swap(r.roomId, i, k)}>
+                                    <button className="small" disabled={!!search} onClick={() => swap(r.roomId, i, k)}>
                                       Stattdessen nehmen
                                     </button>
                                   </li>
@@ -274,6 +365,29 @@ export function DesignPanel() {
                 </ul>
               </div>
             ))}
+            {placeholders.length > 0 && (
+              <div className="design-search" data-testid="design-search">
+                {searchMode ? (
+                  search ? (
+                    <>
+                      <p>
+                        Claude sucht im Shop ({search.done + 1}/{search.total}): {search.current} …
+                      </p>
+                      <button onClick={() => searchCtl?.abort()}>Suche stoppen</button>
+                    </>
+                  ) : (
+                    <button className="primary" onClick={() => void findReal(placeholders.map(({ roomId, index }) => ({ roomId, index })))}>
+                      Echte Produkte suchen ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
+                    </button>
+                  )
+                ) : (
+                  <p className="muted small">
+                    Echte Produkte statt Platzhalter sucht Claude in der Claude-Desktop-App (eingebauter Browser) oder im lokalen Planer mit Claude Code und „npm run ikea-helper“.
+                  </p>
+                )}
+                {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}
+              </div>
+            )}
             <p>
               Eigene Produkte laut Produktseiten: <strong data-testid="design-total">{formatEuro(total.real)}</strong>
               {total.placeholder > 0 && (
@@ -288,7 +402,9 @@ export function DesignPanel() {
             {proposal.dropped > 0 && <p className="muted">{proposal.dropped === 1 ? 'Ein genannter Eintrag war' : `${proposal.dropped} genannte Einträge waren`} nicht in den Listen – weggelassen.</p>}
             {!previewActive ? (
               <div className="btn-row">
-                <button onClick={showPreview}>Vorschau im Plan</button>
+                <button disabled={!!search} onClick={showPreview}>
+                  Vorschau im Plan
+                </button>
               </div>
             ) : (
               st.preview && (
@@ -350,6 +466,13 @@ function PickLine({ option, quantity, item, retailer }: { option: DesignOption; 
           <span className="muted">
             ({retailerOf(item)}, {size}, {item.price ? formatEuro(item.price.amount) : 'Preis unbekannt'})
           </span>{' '}
+          {item.sourceName === FOUND_SOURCE && (
+            <>
+              <Badge kind="info" title="Von Claude auf der Produktseite gelesen – Maße und Preis bitte dort prüfen.">
+                von Claude gefunden
+              </Badge>{' '}
+            </>
+          )}
           {item.productUrl && (
             <a href={item.productUrl} target="_blank" rel="noreferrer noopener" className="design-link">
               Produktseite

@@ -220,3 +220,75 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before);
   expect(errors).toEqual([]);
 });
+
+test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter suchen (Browser der Desktop-App nachgebildet)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    const w = window as unknown as { claude: unknown; __browser: string[] };
+    w.__browser = [];
+    type Tool = { name: string; execute: (input: unknown) => Promise<unknown> };
+    const sample = {
+      json: async (input: string, options?: { tools?: Tool[] }) => {
+        await new Promise((r) => setTimeout(r, 30));
+        if (options?.tools) {
+          // product search: open the search page through the page function, then report what was "read"
+          const open = options.tools.find((t) => t.name === 'open_page')!;
+          await open.execute({ url: 'https://www.ikea.com/at/de/search/?q=Sessel%20Cord' });
+          await open.execute({ url: 'https://example.com/fremd' }).catch(() => w.__browser.push('fremd abgelehnt'));
+          return {
+            products: [
+              { name: 'TESTSESSEL Cord', url: 'https://www.ikea.com/at/de/p/testsessel-cord-00000001/', price: 149, width_cm: 78, depth_cm: 80, height_cm: 84, why: 'Weicher Cord, passt zum Stil.' },
+              { name: 'TESTSESSEL Möbelix', url: 'https://www.moebelix.at/p/testsessel-e2e', price: 199, width_cm: 80, depth_cm: 82, height_cm: 90, why: 'Etwas breiter.' },
+              { name: 'Erfunden', url: 'https://example.com/x', price: 1, width_cm: 50, depth_cm: 50, height_cm: 50 },
+            ],
+          };
+        }
+        const living = /(R\d+) „Wohnzimmer“/.exec(input)?.[1] ?? 'R1';
+        return { summary: 'Gemütlich.', rooms: [{ room: living, type: 'living', items: [{ catalogId: 'generic-armchair', quantity: 1, reason: 'Zum Lesen.', label: 'Lesesessel aus Cord', search: 'Sessel Cord' }] }] };
+      },
+    };
+    const mcp = {
+      listTools: async () => ({ servers: [{ server: 'host:claude_browser', authStatus: 'connected', tools: [] }] }),
+      callTool: async (_server: string, tool: string, input: { url?: string }) => {
+        w.__browser.push(`${tool}${input?.url ? ` ${input.url}` : ''}`);
+        return { content: [{ type: 'text', text: tool === 'get_page_text' ? 'TESTSESSEL Cord 149,– € …' : 'ok' }] };
+      },
+    };
+    w.claude = { use: async (name: string) => (name === 'sample' ? sample : name === 'mcp' ? mcp : null) };
+  });
+  await freshStart(page);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Einrichten' }).click();
+  const panel = page.getByTestId('design-panel');
+  await panel.getByLabel('Umfang').selectOption({ label: 'Wohnzimmer' });
+  await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
+  const proposal = panel.getByTestId('design-proposal');
+  await expect(proposal).toContainText('Lesesessel aus Cord');
+  await proposal.getByRole('button', { name: 'Echte Produkte suchen (1 Platzhalter)' }).click();
+
+  const pick = panel.getByTestId('design-pick').first();
+  await expect(pick).toContainText('TESTSESSEL Cord');
+  await expect(pick).toHaveAttribute('data-placeholder', 'no');
+  await expect(pick).toContainText('von Claude gefunden');
+  await expect(pick).toContainText('IKEA, 78×80×84 cm');
+  await expect(pick).toContainText('Weicher Cord, passt zum Stil.');
+  await expect(pick.getByRole('link', { name: 'Produktseite' })).toHaveAttribute('href', 'https://www.ikea.com/at/de/p/testsessel-cord-00000001/');
+  await pick.getByRole('button', { name: 'Alternativen (2)' }).click();
+  await expect(pick.getByTestId('design-alternatives')).toContainText('TESTSESSEL Möbelix');
+  await expect(pick.getByTestId('design-alternatives')).toContainText('Lesesessel aus Cord');
+  await expect(proposal).not.toContainText('Erfunden');
+  await expect(panel.getByTestId('design-total')).toHaveText(/149,00/);
+  const browser = await page.evaluate(() => (window as unknown as { __browser: string[] }).__browser);
+  expect(browser).toEqual(['navigate https://www.ikea.com/at/de/search/?q=Sessel%20Cord', 'get_page_text', 'fremd abgelehnt']);
+  await page.screenshot({ path: 'test-results/design-350-found.png' });
+
+  // the found product is in „Meine IKEA-Auswahl“ and is placed like any other
+  const before = (await getProject(page)).furniture.length;
+  await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
+  await panel.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 1);
+  const added = ((await getProject(page)) as Project).furniture.slice(before)[0];
+  expect(added).toMatchObject({ name: 'TESTSESSEL Cord', retailer: 'IKEA Österreich', productUrl: 'https://www.ikea.com/at/de/p/testsessel-cord-00000001/' });
+  expect(errors).toEqual([]);
+});
