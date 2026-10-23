@@ -70,6 +70,19 @@ export function jsonFromText(text: string): unknown {
 
 type Fetch = typeof fetch;
 
+/** Why Claude cannot be asked: no runtime and no helper ('helper'), or helper without the Claude Code CLI ('claude'). */
+export async function missingClaude(base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<'helper' | 'claude'> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const res = await f(`${base}/status`, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+    const body = (await res.json()) as { name?: unknown };
+    return res.ok && body.name === 'wohnungsplaner-ikea-helper' ? 'claude' : 'helper';
+  } catch {
+    return 'helper';
+  }
+}
+
 /** Claude through the local helper (`POST /claude`), when the helper reports Claude Code. */
 export async function localSample(base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<Sample | null> {
   try {

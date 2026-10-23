@@ -49,8 +49,17 @@ test('Claude fragen (#151): ohne Artefakt-Laufzeit ausgeblendet', async ({ page 
   await freshStart(page);
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Einrichten' }).click();
-  await expect(left.getByText('Einrichtungsvorschlag')).toBeVisible();
+  await expect(left.getByRole('heading', { name: 'Einrichtungsvorschlag', exact: true })).toBeVisible();
   await expect(page.getByTestId('assistant-panel')).toHaveCount(0);
+});
+
+test('Einrichtungsvorschlag mit Claude (#350): ohne Claude-Verbindung sichtbar mit Hinweis auf den Helfer', async ({ page }) => {
+  await freshStart(page);
+  await page.locator('.panel.left').getByRole('button', { name: 'Einrichten' }).click();
+  const panel = page.getByTestId('design-panel-unavailable');
+  await expect(panel).toContainText('Einrichtungsvorschlag mit Claude');
+  await expect(panel).toContainText('npm run ikea-helper');
+  await page.screenshot({ path: 'test-results/design-unavailable.png' });
 });
 
 test('Claude fragen (#151): Vorschläge, Vorschau, verwerfen, übernehmen in einem Undo-Schritt', async ({ page }) => {
