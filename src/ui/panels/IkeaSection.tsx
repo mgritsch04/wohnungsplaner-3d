@@ -56,7 +56,7 @@ function useShopHelper() {
               o.ok
                 ? `„${o.name}“ vom Lesezeichen übernommen${o.withModel ? ' (mit 3D-Modell)' : ''}${moebelix(o.id) ? ' – zu finden unter Katalog › Möbelix' : ''}.`
                 : o.pending
-                  ? `„${o.name}“: Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.`
+                  ? `„${o.name}“: Maße fehlen auf der Seite – bitte unter Katalog › ${o.draftShop === 'moebelix' ? 'Möbelix' : 'IKEA'} › „Maße fehlen“ eintragen.`
                   : `Lesezeichen: ${o.message}`,
               o.ok ? 'success' : 'info',
             );

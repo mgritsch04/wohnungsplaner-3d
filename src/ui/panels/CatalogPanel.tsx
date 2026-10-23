@@ -8,11 +8,15 @@ import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
 import { useDialogStore } from '../dialogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
+import { useIkeaDrafts } from '../../catalog/ikeaDrafts';
+import { isMoebelixDraft } from '../../catalog/ikeaSelection';
 import { IkeaSection, MoebelixSection } from './IkeaSection';
 import s from './IkeaSection.module.css';
 
 export function CatalogPanel() {
   const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix'>('catalog');
+  const drafts = useIkeaDrafts((st) => st.drafts);
+  const waiting = { ikea: drafts.filter((d) => !isMoebelixDraft(d.draft)).length, moebelix: drafts.filter((d) => isMoebelixDraft(d.draft)).length };
   return (
     <div className="panel-scroll catalog">
       <div className={`segmented ${s.views}`} role="group" aria-label="Katalog-Ansicht">
@@ -20,12 +24,19 @@ export function CatalogPanel() {
           Alle Möbel
         </button>
         <button className={view === 'ikea' ? 'active' : ''} aria-pressed={view === 'ikea'} onClick={() => setView('ikea')}>
-          IKEA
+          IKEA{waiting.ikea ? ` (${waiting.ikea} ohne Maße)` : ''}
         </button>
         <button className={view === 'moebelix' ? 'active' : ''} aria-pressed={view === 'moebelix'} onClick={() => setView('moebelix')}>
-          Möbelix
+          Möbelix{waiting.moebelix ? ` (${waiting.moebelix} ohne Maße)` : ''}
         </button>
       </div>
+      {view === 'catalog' && (waiting.ikea > 0 || waiting.moebelix > 0) && (
+        <p className={s.empty} data-testid="missing-dims-hint">
+          Maße fehlen bei {waiting.ikea + waiting.moebelix} importierten Möbeln. Eintragen unter{' '}
+          {waiting.ikea > 0 && <button onClick={() => setView('ikea')}>IKEA › Maße fehlen</button>}{' '}
+          {waiting.moebelix > 0 && <button onClick={() => setView('moebelix')}>Möbelix › Maße fehlen</button>}
+        </p>
+      )}
       {view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : <CatalogList />}
     </div>
   );

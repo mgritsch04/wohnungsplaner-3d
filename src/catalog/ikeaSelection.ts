@@ -40,6 +40,8 @@ export interface IkeaFetchOutcome {
   withModel?: boolean;
   /** dimensions missing on the page: waits under „Maße fehlen“ (#269) */
   pending?: boolean;
+  /** which Katalog tab holds the pending product */
+  draftShop?: 'ikea' | 'moebelix';
   message?: string;
 }
 
@@ -101,7 +103,15 @@ export async function addHelperProduct(hp: HelperProduct, withModel: boolean, de
   const article = hp.article;
   if (!hp.entry && hp.draft) {
     deps.addDraft?.({ article, draft: hp.draft, model: hp.model, ...(hp.image ? { image: hp.image } : {}), receivedAt: new Date().toISOString() });
-    return { article, ok: false, pending: true, name: hp.draft.name, message: 'Maße fehlen auf der Seite – bitte unter „Maße fehlen“ eintragen.' };
+    const draftShop = isMoebelixDraft(hp.draft) ? 'moebelix' : 'ikea';
+    return {
+      article,
+      ok: false,
+      pending: true,
+      draftShop,
+      name: hp.draft.name,
+      message: `Maße fehlen auf der Seite – bitte im Planer unter Katalog › ${draftShop === 'moebelix' ? 'Möbelix' : 'IKEA'} › „Maße fehlen“ eintragen.`,
+    };
   }
   if (!hp.entry) return { article, ok: false, message: hp.reason ?? 'keine Produktdaten' };
   try {
