@@ -1,7 +1,7 @@
 import type { SmartDeviceKind } from '../model/schema';
 
 /** Colour per device kind (2D, 3D, panel). */
-export const KIND_COLOR: Record<SmartDeviceKind, string> = { motion: '#7c3aed', presence: '#9333ea', contact: '#0891b2', light: '#ca8a04', plug: '#475569', router: '#0d9488', strip: '#db2777', speaker: '#2563eb' };
+export const KIND_COLOR: Record<SmartDeviceKind, string> = { motion: '#7c3aed', presence: '#9333ea', contact: '#0891b2', light: '#ca8a04', plug: '#475569', router: '#0d9488', strip: '#db2777', speaker: '#2563eb', blind: '#0ea5e9' };
 
 /** Symbol of a device kind in a 24×24 box, drawn with `currentColor` strokes (#233). */
 export function GlyphPaths({ kind }: { kind: SmartDeviceKind }) {
@@ -54,6 +54,13 @@ export function GlyphPaths({ kind }: { kind: SmartDeviceKind }) {
           <rect x={6} y={3.5} width={12} height={17} rx={2} />
           <circle cx={12} cy={15} r={2.8} />
           <circle cx={12} cy={7.5} r={1} />
+        </>
+      );
+    case 'blind':
+      return (
+        <>
+          <path d="M4.5 4h15M6 4v16M18 4v16" />
+          <path d="M8.5 8h7M8.5 11h7M8.5 14h7" />
         </>
       );
     case 'router':

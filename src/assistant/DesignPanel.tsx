@@ -17,9 +17,15 @@ import {
   foundToCatalog,
   ITEM_TIMEOUT_MS,
   MAX_AUTO_SEARCH,
+  NOT_SOLD_TEXT,
+  notSold,
   notFoundReason,
   openPlaceholders,
   searchErrorReason,
+  searchWithRetry,
+  SEARCH_ATTEMPTS,
+  type AttemptResult,
+  type RetryHint,
   parseFound,
   replaceKitchenWithFound,
   replaceWithFound,
@@ -61,10 +67,10 @@ let controller: AbortController | null = null;
 let searchCtl: AbortController | null = null;
 
 const FIELDS: { key: 'interests' | 'needs' | 'wants' | 'colors'; label: string; placeholder: string }[] = [
-  { key: 'interests', label: 'Interessen / Hobbys', placeholder: 'Gaming, Lesen, Yoga' },
-  { key: 'needs', label: 'Was du brauchst', placeholder: 'Schlafplatz, Arbeitsplatz, Stauraum' },
-  { key: 'wants', label: 'Was du dir wünschst', placeholder: 'großes Sofa, Pflanzenecke' },
-  { key: 'colors', label: 'Farben (optional)', placeholder: 'Holz hell, Grün' },
+  { key: 'interests', label: 'Interessen / Hobbys', placeholder: 'z. B. Gaming, Lesen, Yoga\nein Stichpunkt pro Zeile' },
+  { key: 'needs', label: 'Was du brauchst', placeholder: 'z. B. Schlafplatz für Gäste\nArbeitsplatz mit Monitor\nviel Stauraum' },
+  { key: 'wants', label: 'Was du dir wünschst', placeholder: 'z. B. großes Sofa\nPflanzenecke am Fenster' },
+  { key: 'colors', label: 'Farben (optional)', placeholder: 'z. B. Holz hell, Grün' },
 ];
 
 const cm = (v: number) => Math.round(v * 100);
@@ -314,10 +320,14 @@ export function DesignPanel() {
     const deadline = Date.now() + TOTAL_TIMEOUT_MS;
     const active = new Set<string>();
     let finished = 0;
+    let total = targets.length;
+    let attempts = SEARCH_ATTEMPTS;
     let halt = false;
     let late = false;
+    /** Pieces whose last attempt failed for a technical reason (time, helper, answer): tried once more at the end. */
+    const errored = new Set<string>();
     setNote(null);
-    const show = () => setSearch({ done: finished, total: targets.length, current: [...active].join(', ') });
+    const show = () => setSearch({ done: finished, total, current: [...active].join(', ') });
     const one = async (t: SearchTarget) => {
       const current = useDesignStore.getState().proposal;
       const room = current?.rooms.find((r) => r.roomId === t.roomId);
@@ -330,35 +340,53 @@ export function DesignPanel() {
       }
       active.add(pick.label);
       show();
-      // one piece may take at most ITEM_TIMEOUT_MS; the user's stop ends the whole search
-      const item = new AbortController();
-      const onStop = () => item.abort();
-      ctl.signal.addEventListener('abort', onStop);
-      let timedOut = false;
-      const timer = setTimeout(() => {
-        timedOut = true;
-        item.abort();
-      }, ITEM_TIMEOUT_MS);
-      try {
-        const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
-        const label = `Produktsuche: ${pick.label} (${searchLeft({ done: finished, total: targets.length })})`;
-        const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true, label });
-        const parsed = parseFound(raw);
-        const found = await toCatalog(parsed, placeholder);
-        const latest = useDesignStore.getState().proposal;
-        if (found.length && latest) {
+      // each attempt may take at most ITEM_TIMEOUT_MS; the user's stop ends the whole search
+      const attempt = async (retry: RetryHint | null): Promise<AttemptResult> => {
+        const item = new AbortController();
+        const onStop = () => item.abort();
+        ctl.signal.addEventListener('abort', onStop);
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          item.abort();
+        }, ITEM_TIMEOUT_MS);
+        try {
+          const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId), retry);
+          const label = `Produktsuche: ${pick.label}${retry ? ` (Versuch ${retry.attempt})` : ''} (${searchLeft({ done: finished, total })})`;
+          const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true, label });
+          const parsed = parseFound(raw);
+          const found = await toCatalog(parsed, placeholder);
+          const latest = useDesignStore.getState().proposal;
+          if (!found.length || !latest) return { ok: false, reason: notFoundReason(raw, parsed.length) };
           st.set({ proposal: t.kitchen ? replaceKitchenWithFound(latest, t.roomId, t.kitchen, found) : replaceWithFound(latest, t.roomId, t.index, found) });
+          return { ok: true };
+        } catch (e) {
+          if (timedOut && !ctl.signal.aborted) throw { code: 'timeout' } satisfies SampleError;
+          throw e;
+        } finally {
+          clearTimeout(timer);
+          ctl.signal.removeEventListener('abort', onStop);
+        }
+      };
+      try {
+        const r = await searchWithRetry(attempt, { attempts, ...(attempts === 1 ? { after: { attempt: SEARCH_ATTEMPTS + 1, previous: missed.get(targetKey(t))?.reason ?? 'technischer Fehler' } } : {}), signal: ctl.signal, stopped: () => halt || ctl.signal.aborted || Date.now() > deadline });
+        if (r.ok) {
           missed.delete(targetKey(t));
-        } else missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: notFoundReason(raw, parsed.length) });
+          errored.delete(targetKey(t));
+        } else {
+          missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: r.reason });
+          if (r.error) errored.add(targetKey(t));
+          else errored.delete(targetKey(t));
+        }
       } catch (e) {
         const code = (e as SampleError | undefined)?.code;
-        if (code === 'cancelled' && !timedOut) halt = true;
+        if (code === 'cancelled') halt = true;
         else if (code === 'tools_unavailable' || (code && HIDE_CODES.includes(code))) {
           halt = true;
           setBrowser(false);
           setNote('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC) – es bleiben Platzhalter mit Suchlink.');
         } else {
-          missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: timedOut ? `Zeitlimit von ${Math.round(ITEM_TIMEOUT_MS / 60_000)} Minuten überschritten` : searchErrorReason(e) });
+          missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: searchErrorReason(e) });
           if (code === 'rate_limited' && !halt) {
             halt = true;
             useUiStore.getState().toast(errorText(e), 'info');
@@ -366,22 +394,30 @@ export function DesignPanel() {
           }
         }
       } finally {
-        clearTimeout(timer);
-        ctl.signal.removeEventListener('abort', onStop);
         active.delete(pick.label);
         finished++;
         show();
       }
     };
+    const stop = () => {
+      if (!late && Date.now() > deadline) {
+        late = true;
+        setNote(`Die Suche wurde nach ${Math.round(TOTAL_TIMEOUT_MS / 60_000)} Minuten beendet; übrige Platzhalter kannst du mit „Nachsuchen“ erneut versuchen.`);
+      }
+      return halt || late || ctl.signal.aborted;
+    };
     try {
       // browser of the desktop app: one tab, so one piece at a time; local Claude Code: a few at once
-      await runPool(targets, searchMode === 'web' ? SEARCH_PARALLEL : 1, one, () => {
-        if (!late && Date.now() > deadline) {
-          late = true;
-          setNote('Die Suche wurde nach 20 Minuten beendet; übrige Platzhalter kannst du mit „Nachsuchen“ erneut versuchen.');
-        }
-        return halt || late || ctl.signal.aborted;
-      });
+      const parallel = searchMode === 'web' ? SEARCH_PARALLEL : 1;
+      await runPool(targets, parallel, one, stop);
+      // pieces that failed for a technical reason get one more attempt once the others are done (helper free again)
+      const again = targets.filter((t) => errored.has(targetKey(t)));
+      if (again.length && !stop()) {
+        total += again.length;
+        attempts = 1;
+        show();
+        await runPool(again, parallel, one, stop);
+      }
     } finally {
       if (searchCtl === ctl) searchCtl = null;
       setNotFound(missed);
@@ -439,7 +475,7 @@ export function DesignPanel() {
               <label key={f.key} className="field">
                 <span className="field-label">{f.label}</span>
                 <span className="field-input">
-                  <input type="text" value={w[f.key]} placeholder={f.placeholder} maxLength={MAX_FIELD} onChange={(e) => text(f.key, e.target.value)} />
+                  <textarea className="design-wish" rows={4} value={w[f.key]} placeholder={f.placeholder} maxLength={MAX_FIELD} onChange={(e) => text(f.key, e.target.value)} />
                 </span>
               </label>
             ))}
@@ -515,7 +551,12 @@ export function DesignPanel() {
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
                         {p.placeholder && notFound.has(key) && <p className="warning small" data-testid="design-notfound">Nicht gefunden: {notFound.get(key)!.reason} – bleibt Platzhalter, Suchlink siehe oben.</p>}
-                        {p.placeholder && searchMode && !search && (
+                        {p.placeholder && notSold(p.catalogId) && (
+                          <p className="muted small" data-testid="design-not-sold">
+                            {NOT_SOLD_TEXT}
+                          </p>
+                        )}
+                        {p.placeholder && !notSold(p.catalogId) && searchMode && !search && (
                           <button className="small" onClick={() => void findReal([{ roomId: r.roomId, index: i }])}>
                             {notFound.has(key) ? 'Nochmal suchen' : 'Echtes Produkt suchen'}
                           </button>
@@ -722,7 +763,7 @@ function PickLine({ option, quantity, item, retailer }: { option: DesignOption; 
             ({item.name}, {size}
             {item.price ? `, Richtwert ${formatEuro(item.price.amount)}` : ''})
           </span>{' '}
-          {searchLinks(option.search, retailer).map((l) => (
+          {(notSold(option.catalogId) ? [] : searchLinks(option.search, retailer)).map((l) => (
             <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="design-link">
               {l.label}
             </a>
@@ -806,7 +847,7 @@ function DislikeRow({
       <label className="field">
         <span className="field-label">Was soll anders werden?</span>
         <span className="field-input">
-          <input type="text" value={open} maxLength={MAX_FIELD} placeholder="z. B. weniger vollgestellt, Sofa zum Fenster, mehr Stauraum" onChange={(e) => onText(e.target.value)} />
+          <textarea className="design-wish" rows={3} value={open} maxLength={MAX_FIELD} placeholder="z. B. weniger vollgestellt, Sofa zum Fenster, mehr Stauraum" onChange={(e) => onText(e.target.value)} />
         </span>
       </label>
       <div className="btn-row">

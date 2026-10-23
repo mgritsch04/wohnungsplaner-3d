@@ -49,7 +49,7 @@ export function placementFor(
   if (!g) return at ? { x: r3(at.x), y: r3(at.y), rotation: 0 } : { x: 0, y: 0, rotation: 0 };
   const c = polygonCentroid(g.interior);
   // clicked point (#233): sensors look towards the room centre, contacts snap to the nearest window/door
-  if (at && kind !== 'contact') {
+  if (at && kind !== 'contact' && kind !== 'blind') {
     const look = dist(at, c) > 0.2 ? Math.atan2(c.y - at.y, c.x - at.x) : 0;
     return { x: r3(at.x), y: r3(at.y), rotation: kind === 'motion' || kind === 'presence' ? look : 0 };
   }
@@ -58,9 +58,9 @@ export function placementFor(
     const k = 0.08 / (dist(corner, c) || 1);
     return { x: r3(corner.x + (c.x - corner.x) * k), y: r3(corner.y + (c.y - corner.y) * k), rotation: Math.atan2(c.y - corner.y, c.x - corner.x) };
   }
-  if (kind === 'contact') {
+  if (kind === 'contact' || kind === 'blind') {
     const candidates = project.openings
-      .filter((o) => o.kind !== 'passage')
+      .filter((o) => (kind === 'blind' ? o.kind === 'window' : o.kind !== 'passage'))
       .map((o) => ({ o, p: openingPoint(project, o.id) }))
       .filter((x): x is { o: (typeof x)['o']; p: Vec2 } => !!x.p)
       .sort((a, b) => dist(a.p, at ?? c) - dist(b.p, at ?? c));
@@ -97,6 +97,14 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
       dev.elevation = Math.max(1, d.settings.defaultWallHeight - 0.15);
     }
     if (kind === 'speaker') dev.speakerType = 'bookshelf';
+    if (kind === 'blind') {
+      const o = d.openings.find((x) => x.id === dev.openingId);
+      if (o) {
+        dev.elevation = Math.min(2.8, o.sillHeight + o.height + 0.1);
+        // the drive turns a covering motor-driven: mark the covering so the planner shows it
+        if (o.shading) o.shading.motor = true;
+      }
+    }
     if (kind === 'strip') {
       // a 1 m strip centred on the spot; the user pulls the ends to the right length
       dev.points = [{ x: r3(pos.x - 0.5), y: pos.y }, { x: r3(pos.x + 0.5), y: pos.y }];

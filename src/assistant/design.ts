@@ -116,6 +116,16 @@ export function searchLinks(term: string, retailer: RetailerChoice): { label: st
 
 const cm = (v: number) => Math.round(v * 100);
 const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
+/** Free text with line breaks kept (one wish per line), blank lines and extra spaces dropped. */
+export const clipLines = (v: unknown, max: number) =>
+  typeof v === 'string'
+    ? v
+        .split(/\r?\n/)
+        .map((l) => l.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(0, max)
+    : '';
 const dims = (c: CatalogItem) => `${cm(c.width)}×${cm(c.depth)}×${cm(c.height)} cm`;
 
 /** „id: Name (Händler), B×T×H cm, Kategorie, Preis“ – Claude may only propose these ids. */
@@ -166,7 +176,7 @@ export function buildDesignPrompt(
   kitchen?: KitchenFace[],
   extra: PromptExtra = {},
 ): string {
-  const field = (label: string, v: string) => `${label}: ${clip(v, MAX_FIELD) || '(keine Angabe)'}`;
+  const field = (label: string, v: string) => `${label}: ${clipLines(v, MAX_FIELD).replace(/\n/g, '\n  ') || '(keine Angabe)'}`;
   const shops = w.retailer === 'ikea' ? 'IKEA' : w.retailer === 'moebelix' ? 'Möbelix' : 'IKEA oder Möbelix';
   const types = [...new Set(extra.types ?? [])];
   return [
@@ -200,7 +210,7 @@ export function buildDesignPrompt(
     `3. Vor der Antwort selbst prüfen und korrigieren: ${CHECKLIST.join('; ')}.`,
     '',
     ...types.flatMap((t) => [`Leitlinien für ${ROOM_TYPES.find((x) => x.id === t)?.label ?? t}:`, ...guidePrompt(t), '']),
-    ...(extra.feedback ? [`Rückmeldung zum letzten Vorschlag für diesen Raum (unbedingt berücksichtigen, anders machen): ${clip(extra.feedback, MAX_FIELD)}`, ''] : []),
+    ...(extra.feedback ? [`Rückmeldung zum letzten Vorschlag für diesen Raum (unbedingt berücksichtigen, anders machen): ${clipLines(extra.feedback, MAX_FIELD).replace(/\n/g, ' ')}`, ''] : []),
     ...(extra.review ? ['Zweite Runde – so hat der Planer deinen ersten Vorschlag aufgestellt; prüfe ihn mit der Prüfliste und liefere den verbesserten, vollständigen Vorschlag für den Raum (gleiches Format):', clip(extra.review, 4000), ''] : []),
     'Regeln:',
     `- Nur catalogId aus A oder B. Je Raum höchstens ${MAX_PICKS} verschiedene Einträge.`,

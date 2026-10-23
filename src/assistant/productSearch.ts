@@ -14,7 +14,7 @@ import { normalizePackSize } from '../catalog/packSize';
 import { MOEBELIX_AT } from '../catalog/providers/registry';
 import type { CatalogItem } from '../catalog/types';
 import type { McpRuntime, SampleTool } from './claude';
-import { MAX_ALTERNATIVES, MAX_FIELD, searchLinks, type DesignOption, type DesignProposal, type DesignWishes, type RetailerChoice } from './design';
+import { MAX_ALTERNATIVES, MAX_FIELD, clipLines, searchLinks, type DesignOption, type DesignProposal, type DesignWishes, type RetailerChoice } from './design';
 import { kitchenShoppingList, setKitchenProduct } from './kitchenDesign';
 
 export const BROWSER = 'host:claude_browser';
@@ -22,10 +22,27 @@ export const IKEA_RETAILER = 'IKEA Österreich';
 export const FOUND_SOURCE = 'Claude-Suche';
 export const MAX_FOUND = 3;
 const MAX_PAGE_TEXT = 9000;
-/** Limits of the one-step search: placeholders searched per run, time per piece and per run. */
+/**
+ * Limits of the one-step search: placeholders searched per run, time per attempt and per run.
+ * One attempt may take up to 5 minutes (web search plus 1–3 product pages; the local helper itself
+ * allows 8) – the former 3 minutes cut off many searches that were about to finish.
+ */
 export const MAX_AUTO_SEARCH = 12;
-export const ITEM_TIMEOUT_MS = 180_000;
-export const TOTAL_TIMEOUT_MS = 20 * 60_000;
+export const ITEM_TIMEOUT_MS = 5 * 60_000;
+export const TOTAL_TIMEOUT_MS = 30 * 60_000;
+/** Attempts per piece before „nicht gefunden“: the first plus two with other search terms. */
+export const SEARCH_ATTEMPTS = 3;
+/** Waiting time when the local helper is busy with other requests, and how often to wait at most. */
+export const BUSY_WAIT_MS = 20_000;
+export const MAX_BUSY_WAITS = 15;
+
+/**
+ * Placeholders IKEA and Möbelix do not sell (electronics, household appliances outside the kitchen,
+ * sanitary objects): not searched, shown as „nicht im Sortiment – selbst mitbringen“.
+ */
+export const NOT_SOLD = new Set(['generic-tv', 'generic-vacuum', 'generic-washer', 'generic-toilet', 'generic-bathtub', 'generic-shower']);
+export const notSold = (catalogId: string) => NOT_SOLD.has(catalogId);
+export const NOT_SOLD_TEXT = 'nicht im Sortiment von IKEA/Möbelix – selbst mitbringen';
 
 export interface SearchTarget {
   roomId: string;
@@ -38,7 +55,7 @@ export interface SearchTarget {
 /** Placeholders still to search: picks and kitchen parts (one search per distinct kitchen module). */
 export function openPlaceholders(p: DesignProposal): (SearchTarget & { catalogId: string })[] {
   return p.rooms.flatMap((r) => [
-    ...r.picks.flatMap((pick, index) => (pick.placeholder ? [{ roomId: r.roomId, index, catalogId: pick.catalogId }] : [])),
+    ...r.picks.flatMap((pick, index) => (pick.placeholder && !notSold(pick.catalogId) ? [{ roomId: r.roomId, index, catalogId: pick.catalogId }] : [])),
     ...(r.kitchen ? kitchenShoppingList(r.kitchen).filter((x) => x.part.catalogId === x.part.base).map((x) => ({ roomId: r.roomId, index: -1, kitchen: x.key, catalogId: x.part.base })) : []),
   ]);
 }
@@ -117,20 +134,24 @@ export async function browserAvailable(mcp: McpRuntime | null): Promise<boolean>
 const cm = (v: number) => Math.round(v * 100);
 
 /** Request for one placeholder: find up to three fitting real products and read their data from the product pages. */
-export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes: DesignWishes, retailer: RetailerChoice, mode: 'browser' | 'web', roomName: string): string {
-  const links = searchLinks(option.search, retailer).map((l) => l.url);
+export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes: DesignWishes, retailer: RetailerChoice, mode: 'browser' | 'web', roomName: string, retry?: RetryHint | null): string {
+  const terms = searchTerms(option, item);
+  const term = retry ? (terms[retry.attempt - 1] ?? terms[terms.length - 1]) : terms[0];
+  const links = searchLinks(term, retailer).map((l) => l.url);
   const how =
     mode === 'browser'
       ? 'Nutze die Werkzeuge: open_page mit einer Suchseite unten, dann page_links für die Produktadressen, dann open_page auf 1–3 Produktseiten, um Maße und Preis zu lesen.'
-      : 'Nutze die Websuche (z. B. „site:ikea.com/at“ bzw. „site:moebelix.at“) oder ruf die Suchseiten unten ab, dann die Produktseiten, um Maße und Preis zu lesen. Nur Seiten von www.ikea.com/at und www.moebelix.at abrufen.';
+      : 'Such zuerst mit der Websuche (z. B. „site:ikea.com/at …“ bzw. „site:moebelix.at …“) – die Suchseiten der Shops werden per JavaScript geladen und liefern beim Abruf oft keine Produkte. Dann die Produktseiten abrufen, um Maße und Preis zu lesen. Nur Seiten von www.ikea.com/at und www.moebelix.at abrufen.';
   return [
     `Suche für einen Wohnungsplaner echte Produkte bei ${retailer === 'ikea' ? 'IKEA Österreich' : retailer === 'moebelix' ? 'Möbelix Österreich' : 'IKEA Österreich oder Möbelix Österreich'}.`,
     '',
     `Gesucht für „${roomName}“: ${option.label}${option.reason ? ` – ${option.reason}` : ''}`,
     `Platz eingeplant für ca. ${cm(item.width)}×${cm(item.depth)}×${cm(item.height)} cm (Breite×Tiefe×Höhe); ähnliche Größe bevorzugen.`,
-    `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${wishes.colors.slice(0, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
+    `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
     `Suchseiten: ${links.join(' , ')}`,
     how,
+    ...(terms.length > 1 ? [`Findest du mit „${term}“ nichts, probier andere Begriffe: ${terms.filter((t) => t !== term).map((t) => `„${t}“`).join(', ')}.`] : []),
+    ...(retry ? ['', ...retryLines(retry)] : []),
     '',
     'Regeln:',
     `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst.`,
@@ -142,6 +163,32 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     'Antworte zuletzt nur mit JSON in genau dieser Form:',
     '{"products":[{"name":"…","url":"https://…","price":199.99,"pack_size":1,"width_cm":200,"depth_cm":90,"height_cm":80,"why":"1 kurzer Satz"}]}',
   ].join('\n');
+}
+
+/** Why the search is asked again: number of this attempt (2, 3 …) and what went wrong before. */
+export interface RetryHint {
+  attempt: number;
+  previous: string;
+}
+
+function retryLines(r: RetryHint): string[] {
+  return [
+    `Das ist Versuch ${r.attempt}: Der vorige Versuch brachte nichts Verwertbares (${r.previous}).`,
+    '- Such mit anderen, allgemeineren Begriffen und über die Websuche; die Größe darf um bis zu 30 % abweichen.',
+    '- Lies die Angaben von der Produktseite (Abschnitt „Maße“ bzw. „Produktdetails“); ein sicheres Produkt ist besser als keines.',
+    ...(r.attempt >= SEARCH_ATTEMPTS ? ['- Letzter Versuch: nimm auch Produkte, die nur ungefähr passen (Typ stimmt, Größe ähnlich).'] : []),
+  ];
+}
+
+/** Search terms for a piece, best first: Claude's term, its description, the placeholder's name (without sizes). */
+export function searchTerms(option: DesignOption, item: CatalogItem): string[] {
+  const plain = (s: string) => s.replace(/\d+([.,]\d+)?\s*(×|x)\s*\d+([.,]\d+)?(\s*cm)?/gi, '').replace(/Ø\s*\d+|\d+\s*(cm|")/gi, '').replace(/\s+/g, ' ').trim();
+  const out: string[] = [];
+  for (const t of [option.search, option.label, plain(item.name), plain(option.search).split(' ').slice(0, 2).join(' ')]) {
+    const v = (t ?? '').trim().slice(0, MAX_FIELD);
+    if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v);
+  }
+  return out.slice(0, 4);
 }
 
 export interface FoundProduct {
@@ -194,9 +241,79 @@ export function notFoundReason(raw: unknown, usable: number): string {
 export function searchErrorReason(e: unknown): string {
   const code = (e as { code?: string } | undefined)?.code;
   if (code === 'invalid_json' || code === 'empty_completion') return 'Antwort von Claude war nicht lesbar';
-  if (code === 'rate_limited') return 'Claude-Kontingent erreicht bzw. Helfer ausgelastet';
+  if (code === 'rate_limited') return 'Claude-Kontingent erreicht';
+  if (code === 'busy') return 'Helfer war mit anderen Anfragen ausgelastet';
   const msg = (e as { message?: unknown } | undefined)?.message;
   return `Suche fehlgeschlagen${typeof msg === 'string' && msg ? ` (${msg.slice(0, 120)})` : ''}`;
+}
+
+/** What happened to one attempt: products taken over, or the reason why not. */
+export type AttemptResult = { ok: true } | { ok: false; reason: string };
+
+/** Outcome of a whole search for one piece. `error` = the last attempt failed (time, helper, answer), not „nothing in the shop“. */
+export type SearchOutcome = { ok: true; attempts: number } | { ok: false; attempts: number; reason: string; error: boolean };
+
+/** Errors that end the whole search instead of being retried: the user's stop, Claude not usable, real quota limit. */
+export function stopsSearch(e: unknown): boolean {
+  const code = (e as { code?: string } | undefined)?.code;
+  return code === 'cancelled' || code === 'rate_limited' || code === 'tools_unavailable' || code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared' || code === 'capability_disabled' || code === 'capability_removed' || code === 'session_expired' || code === 'refused';
+}
+
+const pause = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (signal?.aborted) return resolve();
+    const t = setTimeout(done, ms);
+    function done() {
+      clearTimeout(t);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    }
+    signal?.addEventListener('abort', done);
+  });
+
+/**
+ * Searches one piece until something usable comes back (#350): nothing usable, a time-out
+ * (`{ code: 'timeout' }`), an unreadable answer or a helper error lead to another attempt with
+ * other search terms (`RetryHint`); a busy helper (`{ code: 'busy' }`) is waited for without
+ * using up an attempt. The user's stop, a quota limit and „Claude not available here“ are thrown.
+ */
+export async function searchWithRetry(
+  attempt: (retry: RetryHint | null) => Promise<AttemptResult>,
+  {
+    attempts = SEARCH_ATTEMPTS,
+    after,
+    busyWaitMs = BUSY_WAIT_MS,
+    maxBusyWaits = MAX_BUSY_WAITS,
+    stopped = () => false,
+    signal,
+  }: { attempts?: number; /** Earlier attempts (another round) and why they failed: the first attempt here is already a retry. */ after?: RetryHint; busyWaitMs?: number; maxBusyWaits?: number; stopped?: () => boolean; signal?: AbortSignal } = {},
+): Promise<SearchOutcome> {
+  const offset = after ? after.attempt - 1 : 0;
+  let retry: RetryHint | null = after ?? null;
+  let last: { reason: string; error: boolean } = { reason: 'kein passendes Produkt im Shop gefunden', error: false };
+  let waits = 0;
+  let n = 0;
+  while (n < attempts) {
+    if (n > 0 && (stopped() || signal?.aborted)) break;
+    try {
+      const r = await attempt(retry);
+      n++;
+      if (r.ok) return { ok: true, attempts: n };
+      last = { reason: r.reason, error: false };
+    } catch (e) {
+      if ((e as { code?: string } | undefined)?.code === 'busy' && waits < maxBusyWaits && !signal?.aborted) {
+        waits++;
+        await pause(busyWaitMs, signal);
+        continue;
+      }
+      if (stopsSearch(e)) throw e;
+      n++;
+      last = { reason: (e as { code?: string } | undefined)?.code === 'timeout' ? `Zeitlimit von ${Math.round(ITEM_TIMEOUT_MS / 60_000)} Minuten überschritten` : searchErrorReason(e), error: true };
+    }
+    retry = { attempt: offset + n + 1, previous: last.reason };
+  }
+  const tries = offset + n;
+  return { ok: false, attempts: tries, ...last, reason: tries > 1 ? `${last.reason} – nach ${tries} Versuchen` : last.reason };
 }
 
 /** Stable catalogue id per product page. */

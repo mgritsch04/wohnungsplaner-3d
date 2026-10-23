@@ -93,11 +93,15 @@ void claudeAvailable().then((ok) => {
 const CLAUDE_PARALLEL = Math.max(1, Number(process.env.WP_CLAUDE_PARALLEL) || 4);
 let claudeRunning = 0;
 
-async function askClaude(body) {
+/** Claude Code reports a usage/rate limit of the account (not just a busy helper). */
+const QUOTA_RE = /usage limit|rate limit|limit reached|too many requests|kontingent/i;
+
+async function askClaude(body, signal) {
   if (!claudeReady) return [503, { error: `Claude Code ist auf diesem Rechner nicht verfügbar. ${INSTALL_HELP}` }];
   const prompt = typeof body?.prompt === 'string' ? body.prompt : '';
   if (!prompt || prompt.length > 200_000) return [400, { error: 'Leere oder zu lange Anfrage.' }];
-  if (claudeRunning >= CLAUDE_PARALLEL) return [429, { error: 'Claude arbeitet noch an anderen Anfragen.' }];
+  // busy: the planner waits and asks again (not the same as a quota limit)
+  if (claudeRunning >= CLAUDE_PARALLEL) return [429, { error: 'Claude arbeitet noch an anderen Anfragen.', busy: true }];
   claudeRunning++;
   try {
     const web = body.web === true;
@@ -105,13 +109,15 @@ async function askClaude(body) {
     const label = typeof body.label === 'string' ? body.label.replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '').slice(0, 120).trim() : '';
     console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''}${label ? `: ${label}` : ''} … (${claudeRunning} gleichzeitig)`);
     const model = typeof body.model === 'string' ? body.model : undefined;
-    const text = await runClaude(prompt, { web, model });
+    // the planner gave up (time limit, stop): end Claude Code too, so it does not block a place for minutes
+    const text = await runClaude(prompt, { web, model, signal });
     // a product search without a hit is reported here too, not only in the planner
     if (label) console.log(web && /"products"\s*:\s*\[\s*\]/.test(text) ? `  NICHT GEFUNDEN: ${label} – kein passendes Produkt im Shop` : `  fertig: ${label}`);
     return [200, { text }];
   } catch (e) {
-    console.log(`  Fehler bei der Claude-Anfrage: ${e instanceof Error ? e.message : String(e)}`);
-    return [502, { error: e instanceof Error ? e.message : String(e) }];
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log(`  ${signal?.aborted ? 'Abgebrochen' : 'Fehler bei der Claude-Anfrage'}: ${msg}`);
+    return [QUOTA_RE.test(msg) ? 429 : 502, { error: msg }];
   } finally {
     claudeRunning--;
   }
@@ -293,7 +299,11 @@ const server = createServer(async (req, res) => {
       return json(status, body);
     }
     if (req.method === 'POST' && url.pathname === '/claude') {
-      const [status, body] = await askClaude(JSON.parse(await readBody(req)));
+      const gone = new AbortController();
+      res.on('close', () => {
+        if (!res.writableEnded) gone.abort();
+      });
+      const [status, body] = await askClaude(JSON.parse(await readBody(req)), gone.signal);
       return json(status, body);
     }
     if (req.method === 'POST' && url.pathname === '/inbox/ack') {

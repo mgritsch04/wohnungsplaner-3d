@@ -12,6 +12,7 @@ const SIZE: Record<SmartDevice['kind'], [number, number, number]> = {
   motion: [0.1, 0.1, 0.05],
   presence: [0.1, 0.1, 0.05],
   contact: [0.04, 0.12, 0.03],
+  blind: [0.12, 0.06, 0.05],
   plug: [0.09, 0.09, 0.06],
   light: [0.12, 0.02, 0.12],
   router: [0.16, 0.04, 0.12],

@@ -14,6 +14,11 @@ export function ruleSentence(project: Pick<Project, 'devices'>, a: Automation): 
         : `Wenn ${name(tr.deviceId)} Bewegung meldet${cond}`;
   const targets = a.action.deviceIds.map(name);
   const what = targets.length ? targets.join(', ') : '(noch kein Gerät gewählt)';
+  const allBlinds = a.action.deviceIds.length > 0 && a.action.deviceIds.every((id) => project.devices.find((d) => d.id === id)?.kind === 'blind');
+  if (allBlinds) {
+    const pct = a.action.brightness ?? 100;
+    return { when, then: `dann ${what} ${!a.action.on ? 'auf' : pct >= 100 ? 'zu' : `${Math.round(pct)} % zu`}` };
+  }
   const level = a.action.on && a.action.brightness !== undefined && a.action.brightness < 100 ? ` (${Math.round(a.action.brightness)} %)` : '';
   const off = tr.type === 'motion' && a.action.on && a.offAfterS ? `, aus nach ${formatDuration(a.offAfterS)} ohne Bewegung` : '';
   return { when, then: `dann ${what} ${a.action.on ? 'an' : 'aus'}${level}${off}` };

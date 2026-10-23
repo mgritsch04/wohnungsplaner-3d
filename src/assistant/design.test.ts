@@ -77,6 +77,13 @@ describe('Einrichtungsvorschlag mit Claude für die ganze Wohnung (#350)', () =>
     expect(preselect(all, ['living'], 0, 2)).toHaveLength(2);
   });
 
+  it('Prompt: Zeilenumbrüche in den Wünschen bleiben erhalten, Leerzeilen fallen weg', () => {
+    const p = flatProject();
+    const { plan } = keys(p);
+    const prompt = buildDesignPrompt({ ...EMPTY_WISHES, needs: 'Schlafplatz für Gäste\n\n  Arbeitsplatz  mit Monitor\nviel Stauraum' }, plan, realProducts(PRODUCTS));
+    expect(prompt).toContain('Braucht: Schlafplatz für Gäste\n  Arbeitsplatz mit Monitor\n  viel Stauraum');
+  });
+
   it('Prompt: ganze Wohnung, Wünsche, eigene Produkte und Platzhalter, aber keine Links und kein Projektname', () => {
     const p = flatProject();
     const { plan } = keys(p);

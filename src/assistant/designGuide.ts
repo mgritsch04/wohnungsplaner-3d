@@ -256,8 +256,8 @@ export function completeRoom(input: CompleteInput): CompleteResult {
     add.push({ catalogId: e.add, quantity: e.quantity ?? 1, why });
     fixes.push({ kind: 'added', name: item.name, why });
   }
-  // a bed frame from a retailer comes without mattress: the 3D model shows the bare slats
-  const beds = input.picks.filter((_, i) => !drop.includes(i)).map((p) => ({ p, c: input.lookup(p.catalogId) })).filter((x) => x.c && x.c.category === 'bed' && shapeOf(x.c) === 'bed' && x.c.model.type === 'gltf' && !MATTRESS_IN_NAME.test(x.c.name));
+  // a bed frame from a retailer comes without mattress: the 3D model shows the bare slats (also while the .glb is not attached yet: imported products start procedural, the model comes later)
+  const beds = input.picks.filter((_, i) => !drop.includes(i)).map((p) => ({ p, c: input.lookup(p.catalogId) })).filter((x) => x.c && x.c.category === 'bed' && shapeOf(x.c) === 'bed' && (x.c.model.type === 'gltf' || !x.c.id.startsWith('generic-')) && !MATTRESS_IN_NAME.test(x.c.name));
   const mattresses = kept.filter((f) => shapeOf(f) === 'mattress' || /matratze/i.test(f.name)).length;
   const frames = beds.reduce((n, b) => n + b.p.quantity, 0);
   if (frames > mattresses) {

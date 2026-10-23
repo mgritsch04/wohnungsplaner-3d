@@ -105,6 +105,15 @@
 .design-dislike {
   margin: var(--space-1) 0;
 }
+/* Freitext-Wünsche: mehrzeilig, wächst mit dem Inhalt, vertikal vergrößerbar. */
+.design-wish {
+  width: 100%;
+  min-height: 4.5em;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
+  field-sizing: content;
+}
 
 /* Plan per Textanweisung ändern (#415) */
 .plan-edit-list {
