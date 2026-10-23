@@ -17,6 +17,7 @@ import { isIkeaItem, isMoebelixItem } from '../catalog/ikeaSelection';
 import type { CatalogItem } from '../catalog/types';
 import { ROOM_TYPES, WISH_CATALOG, type RoomType } from '../suggest/furnishing';
 import { MAX_QUANTITY } from './answer';
+import { KITCHEN_JSON_HINT, kitchenPromptPart, kitchenTotal, parseKitchen, resolveWith, type DesignKitchen, type KitchenFace } from './kitchenDesign';
 import type { PlanSummary } from './planSummary';
 
 export type RetailerChoice = 'both' | 'ikea' | 'moebelix';
@@ -119,7 +120,11 @@ export interface RoomContext {
   wholeBudget: number;
 }
 
-export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS, room?: RoomContext): string {
+/**
+ * `kitchen`: wall faces of the (one) kitchen room without kitchen run in this request – Claude
+ * then plans the kitchen run too (#350).
+ */
+export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS, room?: RoomContext, kitchen?: KitchenFace[]): string {
   const field = (label: string, v: string) => `${label}: ${clip(v, MAX_FIELD) || '(keine Angabe)'}`;
   const shops = w.retailer === 'ikea' ? 'IKEA' : w.retailer === 'moebelix' ? 'Möbelix' : 'IKEA oder Möbelix';
   return [
@@ -146,17 +151,18 @@ export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: 
     `B) Platzhalter – typische Größen für alles, was in A fehlt; dazu beschreibst du das gesuchte Produkt und gibst einen Suchbegriff für ${shops} an (Format „id: Art, Breite×Tiefe×Höhe, Kategorie, Richtwert“):`,
     summarizePlaceholders(placeholders),
     '',
+    ...(kitchen?.length ? [...kitchenPromptPart(kitchen), ''] : []),
     'Regeln:',
     `- Nur catalogId aus A oder B. Je Raum höchstens ${MAX_PICKS} verschiedene Einträge.`,
     '- Achte auf Raumgröße, vorhandene Möbel, Türen und Fenster; lieber weniger, dafür passend. Vorhandene Möbel nicht doppelt kaufen.',
     '- Jeder Eintrag mit einer kurzen Begründung (1 Satz, Bezug auf die Wünsche).',
     '- Für Platzhalter (B): "label" = kurze Beschreibung des gesuchten Produkts (Art, Material, Farbe, Stil), "search" = kurzer Suchbegriff für den Shop. Keine Produktnamen, Artikelnummern oder Preise erfinden.',
     `- Für größere Möbel (Bett, Sofa, Schrank, Tisch, Schreibtisch, Regal …) bis zu ${MAX_ALTERNATIVES} Alternativen in "alternatives" (andere catalogId, gleiche Regeln, kurze Begründung, z. B. günstiger oder größer).`,
-    '- Die App stellt die Möbel selbst kollisionsfrei auf; keine Positionen angeben. Küchenzeilen und Bad-Einbauten nicht planen.',
+    `- Die App stellt die Möbel selbst kollisionsfrei auf; keine Positionen angeben. Bad-Einbauten nicht planen; ${kitchen?.length ? 'die Küchenzeile nur im Feld "kitchen"' : 'keine Küchenzeilen planen'}.`,
     `- "type" je Raum: einer von ${ROOM_TYPES.map((t) => t.id).join(', ')}.`,
     '',
     'Antworte nur mit JSON in genau dieser Form:',
-    '{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"living","concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern","alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]}]}',
+    `{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"${kitchen?.length ? 'kitchen' : 'living'}","concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern","alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]${kitchen?.length ? `,${KITCHEN_JSON_HINT}` : ''}}]}`,
   ].join('\n');
 }
 
@@ -182,6 +188,8 @@ export interface DesignRoom {
   type: RoomType | null;
   concept: string;
   picks: DesignPick[];
+  /** Kitchen run Claude planned for a kitchen room without one (#350). */
+  kitchen?: DesignKitchen;
 }
 
 export interface DesignProposal {
@@ -195,14 +203,14 @@ const OptionSchema = z.object({ catalogId: z.unknown(), reason: z.unknown().opti
 const ItemSchema = OptionSchema.extend({ quantity: z.unknown().optional(), alternatives: z.array(OptionSchema).optional().catch([]) });
 const DesignSchema = z.object({
   summary: z.unknown().optional(),
-  rooms: z.array(z.object({ room: z.unknown().optional(), type: z.unknown().optional(), concept: z.unknown().optional(), items: z.array(ItemSchema).catch([]) })).catch([]),
+  rooms: z.array(z.object({ room: z.unknown().optional(), type: z.unknown().optional(), concept: z.unknown().optional(), items: z.array(ItemSchema).catch([]), kitchen: z.unknown().optional() })).catch([]),
 });
 
 /**
  * Checks Claude's answer: only rooms of `roomIds` (keys of the plan summary), only offered
- * ids, quantities clamped; throws when nothing usable is left.
+ * ids, quantities clamped; a kitchen run only for `kitchenRooms`; throws when nothing usable is left.
  */
-export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: string[], products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS): DesignProposal {
+export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: string[], products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS, kitchenRooms: string[] = []): DesignProposal {
   const parsed = DesignSchema.safeParse(raw);
   if (!parsed.success) throw new Error('Antwort hat nicht die erwartete Form.');
   const real = new Set(products.map((c) => c.id));
@@ -229,6 +237,11 @@ export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: stri
       room = { roomId, type, concept: clip(r.concept, 300), picks: [] };
       rooms.push(room);
     }
+    if (r.kitchen !== undefined && !room.kitchen) {
+      const k = kitchenRooms.includes(roomId) ? parseKitchen(r.kitchen) : { kitchen: null, dropped: 1 };
+      dropped += k.dropped;
+      if (k.kitchen) room.kitchen = k.kitchen;
+    }
     for (const it of r.items) {
       const opt = option(it);
       if (!opt) {
@@ -248,7 +261,7 @@ export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: stri
       }
     }
   }
-  const usable = rooms.filter((r) => r.picks.length);
+  const usable = rooms.filter((r) => r.picks.length || r.kitchen);
   if (!usable.length) throw new Error('Keine verwertbaren Möbel.');
   return { summary: clip(parsed.data.summary, 800), rooms: usable, dropped };
 }
@@ -281,5 +294,12 @@ export function proposalTotal(proposal: DesignProposal, catalog: CatalogItem[]):
       else if (p.placeholder) placeholder += c.price.amount * p.quantity;
       else real += c.price.amount * p.quantity;
     }
+  const resolve = resolveWith(catalog);
+  for (const r of proposal.rooms) {
+    if (!r.kitchen) continue;
+    const k = kitchenTotal(r.kitchen, resolve);
+    real += k.real;
+    placeholder += k.placeholder;
+  }
   return { real, placeholder, unpriced };
 }

@@ -101,10 +101,15 @@ async function askClaude(body) {
   claudeRunning++;
   try {
     const web = body.web === true;
-    console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''} …`);
+    // the planner says what is asked and how many are left („Sofa – noch 7 von 12“); printable characters only
+    const label = typeof body.label === 'string' ? body.label.replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '').slice(0, 120).trim() : '';
+    console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''}${label ? `: ${label}` : ''} … (${claudeRunning} gleichzeitig)`);
     const text = await runClaude(prompt, { web });
+    // a product search without a hit is reported here too, not only in the planner
+    if (label) console.log(web && /"products"\s*:\s*\[\s*\]/.test(text) ? `  NICHT GEFUNDEN: ${label} – kein passendes Produkt im Shop` : `  fertig: ${label}`);
     return [200, { text }];
   } catch (e) {
+    console.log(`  Fehler bei der Claude-Anfrage: ${e instanceof Error ? e.message : String(e)}`);
     return [502, { error: e instanceof Error ? e.message : String(e) }];
   } finally {
     claudeRunning--;

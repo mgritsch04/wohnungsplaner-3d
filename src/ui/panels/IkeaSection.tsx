@@ -92,7 +92,7 @@ export function IkeaSection() {
     setOutcomes([]);
     const res = await addIkeaArticles(text, {
       model: withModel,
-      onProgress: (done, total, current) => setProgress(current ? `Hole ${done + 1} von ${total}: ${current} …` : null),
+      onProgress: (done, total, current) => setProgress(current ? `Hole ${done + 1} von ${total}: ${current} … (noch ${total - done} offen)` : null),
     });
     setProgress(null);
     setOutcomes(res.outcomes);

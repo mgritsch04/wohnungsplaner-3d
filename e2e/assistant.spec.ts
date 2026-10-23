@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { getProject } from './fixtures';
 import { derivePlan } from '../src/model/derived';
-import { placementIssues } from '../src/model/placement';
+import { buildPlacementObstacles, furnitureConflicts, placementIssues } from '../src/model/placement';
 import type { Project } from '../src/model/schema';
 
 async function freshStart(page: Page) {
@@ -298,7 +298,7 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
   // one step: the real product is found without a second click; the progress is shown meanwhile
-  await expect(panel.getByTestId('design-search')).toContainText(/Suche .* 1\/2/);
+  await expect(panel.getByTestId('design-search-progress')).toContainText('noch 2 von 2 offen');
   await expect(panel.getByRole('button', { name: 'Suche stoppen' })).toBeVisible();
   await page.screenshot({ path: 'test-results/design-350-progress.png' });
   const pick = panel.getByTestId('design-pick').first();
@@ -319,6 +319,8 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await expect(plant.getByTestId('design-notfound')).toBeVisible();
   await expect(plant.getByRole('link', { name: 'bei IKEA suchen' })).toBeVisible();
   await expect(proposal.getByRole('button', { name: 'Nachsuchen (1 Platzhalter)' })).toBeVisible();
+  // what was not found, and why, is listed
+  await expect(panel.getByTestId('design-notfound-list')).toContainText('Monstera groß (Wohnzimmer): kein passendes Produkt im Shop gefunden');
   const browser = await page.evaluate(() => (window as unknown as { __browser: string[] }).__browser);
   expect(browser).toEqual(['navigate https://www.ikea.com/at/de/search/?q=Sessel%20Cord', 'get_page_text', 'fremd abgelehnt']);
   await page.screenshot({ path: 'test-results/design-350-found.png' });
@@ -368,5 +370,87 @@ test('Einrichtungsvorschlag mit Claude (#350): Schalter „Erst Vorschlag, dann 
   await page.reload();
   await page.locator('.panel.left').getByRole('button', { name: 'Einrichten' }).click();
   await expect(page.getByTestId('design-panel').getByLabel('Ablauf')).toHaveValue('later');
+  expect(errors).toEqual([]);
+});
+
+test('Einrichtungsvorschlag mit Claude (#350): Küche bekommt eine Küchenzeile an einer freien Wand, mit Arbeitsplatte', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    const w = window as unknown as { claude: unknown; __prompts: string[] };
+    w.__prompts = [];
+    const sample = {
+      json: async (input: string) => {
+        w.__prompts.push(input);
+        await new Promise((r) => setTimeout(r, 50));
+        const key = /(R\d+) „Küche“/.exec(input)?.[1] ?? 'R1';
+        return {
+          summary: 'Helle Küche.',
+          rooms: [
+            {
+              room: key,
+              type: 'kitchen',
+              concept: 'Zeile mit Spüle und Backofen.',
+              items: [],
+              kitchen: {
+                fronts: 'weiß matt, Arbeitsplatte Eiche',
+                frontColor: '#ffffff',
+                reason: 'Schlicht und hell.',
+                runs: [
+                  [
+                    { catalogId: 'generic-k-tall-60', search: 'Hochschrank weiß' },
+                    { catalogId: 'generic-k-sink-80', search: 'Spülenschrank 80 weiß' },
+                    { catalogId: 'generic-k-dishwasher', search: 'Geschirrspüler vollintegriert' },
+                    { catalogId: 'generic-k-oven', search: 'Einbaubackofen', above: [{ catalogId: 'generic-k-cooktop', search: 'Induktionskochfeld' }, { catalogId: 'generic-k-hood-60', search: 'Dunstabzug 60' }] },
+                    { catalogId: 'generic-k-base-60', search: 'Unterschrank weiß', above: [{ catalogId: 'generic-k-wall-60', search: 'Oberschrank weiß' }] },
+                  ],
+                ],
+              },
+            },
+          ],
+        };
+      },
+    };
+    w.claude = { use: async (name: string) => (name === 'sample' ? sample : null) };
+  });
+  await freshStart(page);
+  await page.evaluate(() => {
+    const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: Project) => void) => void } } } }).__wp;
+    wp.useProjectStore.getState().apply((d) => {
+      const r = d.rooms.find((x) => x.name === 'Schlafzimmer');
+      if (r) r.name = 'Küche';
+      // an empty kitchen: the bedroom furniture of the sample (right of x = 5 m) goes
+      d.furniture = d.furniture.filter((f) => f.x < 5);
+    });
+  });
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Einrichten' }).click();
+  const panel = page.getByTestId('design-panel');
+  await panel.getByLabel('Umfang').selectOption({ label: 'Küche' });
+  await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
+  const kitchen = panel.getByTestId('design-kitchen');
+  await expect(kitchen).toBeVisible();
+  await expect(kitchen).toContainText('weiß matt, Arbeitsplatte Eiche');
+  await expect(kitchen.getByTestId('design-kitchen-part')).toHaveCount(8);
+  await expect(kitchen.getByTestId('design-kitchen-part').first()).toContainText('Hochschrank');
+  await expect(kitchen.getByRole('link', { name: 'bei IKEA suchen' }).first()).toBeVisible();
+  await kitchen.screenshot({ path: 'test-results/design-350-kitchen-list.png' });
+  const prompts = await page.evaluate(() => (window as unknown as { __prompts: string[] }).__prompts);
+  expect(prompts[0]).toContain('Plane die Küchenzeile im Feld "kitchen"');
+  expect(prompts[0]).toMatch(/Wand 1: nutzbar \d+ cm/);
+
+  const before = (await getProject(page)).furniture.length;
+  await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
+  await expect(panel.getByTestId('design-preview')).toContainText('Möbel kollisionsfrei aufgestellt');
+  await page.screenshot({ path: 'test-results/design-350-kitchen.png' });
+  await panel.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 9);
+  const p = (await getProject(page)) as Project;
+  const d = derivePlan(p);
+  const added = p.furniture.slice(before);
+  expect(added.filter((f) => f.kitchen?.type === 'countertop')).toHaveLength(1);
+  expect(added.filter((f) => f.kitchen && f.kitchen.type !== 'countertop').every((f) => f.kitchen!.frontColor === '#ffffff')).toBe(true);
+  const conflicts = furnitureConflicts(p, d, buildPlacementObstacles(d));
+  expect(added.flatMap((f) => (conflicts.get(f.id)?.issues ?? []).map((i) => `${f.name}: ${i.message}`))).toEqual([]);
   expect(errors).toEqual([]);
 });

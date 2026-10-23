@@ -15,6 +15,7 @@ import { MOEBELIX_AT } from '../catalog/providers/registry';
 import type { CatalogItem } from '../catalog/types';
 import type { McpRuntime, SampleTool } from './claude';
 import { MAX_ALTERNATIVES, MAX_FIELD, searchLinks, type DesignOption, type DesignProposal, type DesignWishes, type RetailerChoice } from './design';
+import { kitchenShoppingList, setKitchenProduct } from './kitchenDesign';
 
 export const BROWSER = 'host:claude_browser';
 export const IKEA_RETAILER = 'IKEA Österreich';
@@ -28,15 +29,32 @@ export const TOTAL_TIMEOUT_MS = 20 * 60_000;
 
 export interface SearchTarget {
   roomId: string;
+  /** Pick of the room, or -1 for a kitchen part. */
   index: number;
+  /** Kitchen part (`partKey`): every module of the kitchen with this key gets the found product. */
+  kitchen?: string;
+}
+
+/** Placeholders still to search: picks and kitchen parts (one search per distinct kitchen module). */
+export function openPlaceholders(p: DesignProposal): (SearchTarget & { catalogId: string })[] {
+  return p.rooms.flatMap((r) => [
+    ...r.picks.flatMap((pick, index) => (pick.placeholder ? [{ roomId: r.roomId, index, catalogId: pick.catalogId }] : [])),
+    ...(r.kitchen ? kitchenShoppingList(r.kitchen).filter((x) => x.part.catalogId === x.part.base).map((x) => ({ roomId: r.roomId, index: -1, kitchen: x.key, catalogId: x.part.base })) : []),
+  ]);
 }
 
 /** Placeholders to search, biggest pieces first (they shape the room); the rest stay placeholders. */
 export function searchTargets(p: DesignProposal, size: (catalogId: string) => number, max = MAX_AUTO_SEARCH): { targets: SearchTarget[]; skipped: number } {
-  const all = p.rooms.flatMap((r) => r.picks.map((pick, index) => ({ roomId: r.roomId, index, pick })).filter((x) => x.pick.placeholder));
-  const ordered = [...all].sort((a, b) => size(b.pick.catalogId) - size(a.pick.catalogId));
+  const all = openPlaceholders(p);
+  const ordered = [...all].sort((a, b) => size(b.catalogId) - size(a.catalogId));
   const take = ordered.slice(0, max);
-  return { targets: take.map(({ roomId, index }) => ({ roomId, index })), skipped: all.length - take.length };
+  return { targets: take.map(({ catalogId: _id, ...t }) => t), skipped: all.length - take.length };
+}
+
+/** „noch 7 von 12 offen“: pieces not finished yet (the ones being searched right now included). */
+export function searchLeft(s: { done: number; total: number }): string {
+  const left = Math.max(0, s.total - s.done);
+  return left === 0 ? `alle ${s.total} fertig` : `noch ${left} von ${s.total} offen`;
 }
 
 /** Product or search pages Claude may open: IKEA Austria and Möbelix only. */
@@ -163,6 +181,24 @@ export function parseFound(raw: unknown): FoundProduct[] {
   return out;
 }
 
+/** Why nothing usable came back: no hit at all, or hits without complete data from the product page. */
+export function notFoundReason(raw: unknown, usable: number): string {
+  const list = Array.isArray(raw) ? raw : (raw as { products?: unknown } | null)?.products;
+  const hits = Array.isArray(list) ? list.length : 0;
+  if (usable > 0) return 'Produkt konnte nicht übernommen werden';
+  if (!hits) return 'kein passendes Produkt im Shop gefunden';
+  return `${hits === 1 ? '1 Treffer' : `${hits} Treffer`} ohne vollständige Angaben (Produktseite, Maße oder Preis fehlten bzw. unplausibel)`;
+}
+
+/** Reason for a failed search request (the user's stop is handled separately). */
+export function searchErrorReason(e: unknown): string {
+  const code = (e as { code?: string } | undefined)?.code;
+  if (code === 'invalid_json' || code === 'empty_completion') return 'Antwort von Claude war nicht lesbar';
+  if (code === 'rate_limited') return 'Claude-Kontingent erreicht bzw. Helfer ausgelastet';
+  const msg = (e as { message?: unknown } | undefined)?.message;
+  return `Suche fehlgeschlagen${typeof msg === 'string' && msg ? ` (${msg.slice(0, 120)})` : ''}`;
+}
+
 /** Stable catalogue id per product page. */
 export function foundId(url: string): string {
   let h = 0;
@@ -187,6 +223,8 @@ export function foundToCatalog(f: FoundProduct, placeholder: CatalogItem, today 
     productUrl: f.url,
     approximate: true,
     solid: placeholder.solid,
+    // a kitchen module keeps its role (base, sink, oven …), so it can be placed in the kitchen run
+    ...(placeholder.kitchen ? { kitchen: { ...placeholder.kitchen } } : {}),
     tags: [...placeholder.tags],
     source: 'imported',
     sourceName: FOUND_SOURCE,
@@ -211,4 +249,10 @@ export function replaceWithFound(p: DesignProposal, roomId: string, index: numbe
       return { ...r, picks };
     }),
   };
+}
+
+/** The kitchen part `key` in room `roomId` becomes the first found product (all modules with that key). */
+export function replaceKitchenWithFound(p: DesignProposal, roomId: string, key: string, found: { id: string }[]): DesignProposal {
+  if (!found.length) return p;
+  return { ...p, rooms: p.rooms.map((r) => (r.roomId === roomId && r.kitchen ? { ...r, kitchen: setKitchenProduct(r.kitchen, key, found[0].id) } : r)) };
 }

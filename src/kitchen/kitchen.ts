@@ -1,4 +1,5 @@
 import { findCatalogItem } from '../catalog/generic';
+import type { CatalogItem } from '../catalog/types';
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import { furnitureCorners, footprintsOverlap } from '../editor2d/furnitureGeometry';
 import { derivePlan, type DerivedPlan } from '../model/derived';
@@ -24,6 +25,8 @@ export interface RunModule {
   catalogId: string;
   /** Optional width override in meters. */
   width?: number;
+  /** Catalogue entry when it is not a generic module (e.g. a product Claude found, #350). */
+  item?: CatalogItem;
 }
 
 export interface PlaceRunInput {
@@ -133,7 +136,7 @@ export function layoutKitchenRun(d: Project, input: PlaceRunInput, derived: Deri
   const slots: RunSlot[] = [];
   let along = range.s0 + input.start;
   for (const m of input.modules) {
-    const item = findCatalogItem(m.catalogId);
+    const item = m.item ?? findCatalogItem(m.catalogId);
     if (!item) continue;
     const width = m.width ?? item.width;
     const center = add(add(fp.a, scale(fp.dir, along + width / 2)), scale(normal, fp.thickness / 2 + item.depth / 2 + 0.002));
