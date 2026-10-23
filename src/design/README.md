@@ -16,6 +16,19 @@ Neuer Ablauf für den Claude-Einrichtungsvorschlag (mgritsch04/wohnungsplaner-3d
 
 Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinaten und Himmelsrichtungen für Claude), `score.ts` (Punkte der Begehung), `fixtures/` (Testwohnungen und aufgezeichnete Claude-Antworten).
 
+## Stufe 0 benutzen (`analysis/`)
+
+- `analyzeFlat(project)` liefert je Raum:
+  - Wände W1 … im Uhrzeigersinn, über T-Stöße zusammengefasst, mit Dicke, Höhe und dem, was dahinter liegt
+  - Öffnungen mit Ziel-Raum, Aufschlag und Schwenkfläche
+  - Ecken, Wege zwischen den Türen, Durchgangszimmer, Haupttür und Blick beim Eintreten
+  - Bestand, Anschlüsse (Heizkörper, Wasser …) und markierte Bereiche
+- `roomSketch(ctx, room)` und `flatSketch(ctx)` schreiben das als Text für Claude. Beispiele: `analysis/__snapshots__/sketch-*.txt`.
+- `checkWalkways(room, hindernisse)` misst die Wege im eingerichteten Raum nach (B1–B3): Passt noch ein Weg der verlangten Breite, wie breit höchstens, wie lang?
+  - Hindernisse sind die Grundflächen aller Teile, durch die man nicht gehen kann, der Bestand eingeschlossen.
+  - Teppiche, Vorhänge und Hängendes zählen nicht.
+- Ein Raum mit mehr als vier Türen (Gang, Vorraum) bekommt Wege von der Haupttür zu jeder anderen Tür. Bleiben die frei, erreicht jede Tür jede andere.
+
 ## Konventionen
 
 - **Intern** Plankoordinaten in Metern wie im Modell: x nach Osten, y nach Süden, Norden ist oben im 2D-Plan. Drehung wie `Furniture.rotation`; die Vorderseite eines Möbels ist lokal +y (`rotationFacing`, `frontOf` in `suggest/roomGeometry.ts`).

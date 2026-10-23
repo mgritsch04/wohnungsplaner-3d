@@ -1,0 +1,40 @@
+Wohnung mit 3 Räumen, zusammen 27,6 m². Die Wohnungstür führt in „Vorraum“.
+Räume:
+- Zimmer: 19,8 m², 439 × 450 cm; Türen zu „Vorraum“; 2 Fenster (N)
+- Vorraum (Durchgangszimmer, Eingang): 4,3 m², 179 × 239 cm; Türen zu Wohnungstür, „Bad“, „Zimmer“; kein Fenster
+- Bad: 3,6 m², 179 × 199 cm; Türen zu „Vorraum“; kein Fenster; vorhanden: Dusche 90×90, WC wandhängend, Waschtisch 60 cm
+
+Raum „Zimmer“: 19,8 m², Innenmaß 439 × 450 cm, rechteckig, Raumhöhe 260 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 439 cm von (0,0) nach (439,0), 30 cm dick; dahinter außerhalb der Wohnung. Fenster F1 bei x=45–165 (120 cm), Brüstung 90 cm, Oberkante 230 cm; Fenster F2 bei x=255–375 (120 cm), Brüstung 90 cm, Oberkante 230 cm. Frei: x=165–255, x=375–439.
+- W2 Ostwand, 450 cm von (439,0) nach (439,450), 12 cm dick; dahinter „Vorraum“, „Bad“. Tür T1 bei y=100–190 (90 cm) zu „Vorraum“, schlägt herein (Angel bei (439,100), Viertelkreis mit 90 cm Radius frei lassen). Frei: y=0–100, y=190–450.
+- W3 Südwand, 439 cm von (439,450) nach (0,450), 30 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W4 Westwand, 450 cm von (0,450) nach (0,0), 30 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+Ecken: E1 (439,0) frei; E2 (439,450) frei; E3 (0,450) frei; E4 (0,0) frei.
+Beim Hereinkommen durch T1 blickt man nach Westen auf W4.
+
+Raum „Vorraum“ (mit der Wohnungstür, Durchgangszimmer): 4,3 m², Innenmaß 179 × 239 cm, rechteckig, Raumhöhe 260 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 179 cm von (0,0) nach (179,0), 30 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W2 Ostwand, 239 cm von (179,0) nach (179,239), 30 cm dick; dahinter außerhalb der Wohnung. Wohnungstür T1 bei y=65–165 (100 cm), schlägt herein (Angel bei (179,65), Viertelkreis mit 100 cm Radius frei lassen). Frei: y=0–65, y=165–239.
+- W3 Südwand, 179 cm von (179,239) nach (0,239), 12 cm dick; dahinter „Bad“. Tür T2 bei x=14–94 (80 cm) zu „Bad“, schlägt nach außen auf. Frei: x=94–179.
+- W4 Westwand, 239 cm von (0,239) nach (0,0), 12 cm dick; dahinter „Zimmer“. Tür T3 bei y=100–190 (90 cm) zu „Zimmer“, schlägt nach außen auf. Frei: y=0–100.
+Ecken: E1 (179,0) Tür T1 65 cm daneben; E2 (179,239) Tür T1 74 cm daneben; E3 (0,239) Tür T2 14 cm daneben; E4 (0,0) frei.
+Beim Hereinkommen durch T1 blickt man nach Westen auf W4 mit T3.
+Wege, die frei bleiben müssen (90 cm breit; nicht genau diese Linie, aber ein Durchgang dieser Breite ohne großen Umweg):
+- T1 → T2 (Wohnungstür → „Bad“, Hauptweg): 2,1 m, 90 cm breit, über (128,118) → (53,188)
+- T1 → T3 (Wohnungstür → „Zimmer“, Hauptweg): 1,8 m, 90 cm breit, über (128,118) → (48,148)
+- T2 → T3 („Bad“ → „Zimmer“): 1,4 m, 90 cm breit, über (53,188) → (48,148)
+
+Raum „Bad“: 3,6 m², Innenmaß 179 × 199 cm, rechteckig, Raumhöhe 260 cm.
+Koordinaten in cm: x von West nach Ost, y von Nord nach Süd, (0,0) = Nordwest-Ecke des Raums, Norden ist oben im Plan.
+Wände im Uhrzeigersinn:
+- W1 Nordwand, 179 cm von (0,0) nach (179,0), 12 cm dick; dahinter „Vorraum“. Tür T1 bei x=14–94 (80 cm) zu „Vorraum“, schlägt herein (Angel bei (94,0), Viertelkreis mit 80 cm Radius frei lassen). Frei: x=94–179.
+- W2 Ostwand, 199 cm von (179,0) nach (179,199), 30 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W3 Südwand, 179 cm von (179,199) nach (0,199), 30 cm dick; dahinter außerhalb der Wohnung. Ohne Öffnung.
+- W4 Westwand, 199 cm von (0,199) nach (0,0), 12 cm dick; dahinter „Zimmer“. Ohne Öffnung.
+Ecken: E1 (179,0) Tür T1 85 cm daneben; E2 (179,199) frei; E3 (0,199) frei; E4 (0,0) Tür T1 14 cm daneben.
+Beim Hereinkommen durch T1 blickt man nach Süden auf W3.
+Bestand (bleibt stehen, nicht neu planen): Dusche 90×90 (90 × 90 cm) bei (134,154), Rücken an W3, Front nach N; WC wandhängend (37 × 54 cm) bei (27,154), Rücken an W4, Front nach O; Waschtisch 60 cm (60 × 46 cm) bei (156,54), Rücken an W2, Front nach W.

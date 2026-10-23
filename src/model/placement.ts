@@ -422,7 +422,7 @@ function describeOpening(p: Project, d: DerivedPlan, openingId: string): string 
 /** Quarter-circle door swing as a polygon (hinge plus arc points) on the swing side (#267). */
 const SWING_STEPS = 8;
 const swingCache = new WeakMap<DerivedPlan, { polygon: Vec2[]; openingId: string; z1: number }[]>();
-function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z1: number }[] {
+export function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z1: number }[] {
   const cached = swingCache.get(d);
   if (cached) return cached;
   const out: { polygon: Vec2[]; openingId: string; z1: number }[] = [];
