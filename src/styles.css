@@ -1422,7 +1422,8 @@ code {
 .underlay-toggle {
   position: absolute;
   right: 12px;
-  bottom: 12px;
+  /* above the zoom slider (bottom-right), not behind it */
+  bottom: 52px;
   z-index: 3;
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-md);
