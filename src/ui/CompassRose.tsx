@@ -1,18 +1,18 @@
 import { compassName, compassOf } from '../model/daylight';
 
-/** Little compass: the N arrow shows where north lies in the plan (plan up = `north` degrees; #380). */
+// Static rose (north arrow pointing up) as an <img>, so it is not picked up as a plan <svg>; rotated by CSS.
+const ROSE_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='-30 -30 60 60'><circle r='27' fill='white' fill-opacity='.9' stroke='#888'/>" +
+  "<polygon points='0,-14 6,10 0,5 -6,10' fill='#d33'/><text y='-16' font-size='11' font-weight='bold' text-anchor='middle' font-family='sans-serif' fill='#333'>N</text></svg>";
+const ROSE_SRC = `data:image/svg+xml;utf8,${encodeURIComponent(ROSE_SVG)}`;
+
+/** Little compass: the red arrow shows where north lies in the plan (plan up = `north` degrees; #380). */
 export function CompassRose({ north, size = 56, testId }: { north: number; size?: number; testId?: string }) {
   const label = `Norden liegt im Plan ${northSideLabel(north)}`;
   return (
-    <svg className="compass-rose" width={size} height={size} viewBox="-30 -30 60 60" role="img" aria-label={label} data-testid={testId}>
-      <title>{label}</title>
-      <circle r="27" fill="var(--panel-bg, #fff)" fillOpacity="0.85" stroke="currentColor" strokeOpacity="0.4" />
-      <g transform={`rotate(${-north})`}>
-        <polygon points="0,-22 6,2 0,-3 -6,2" fill="#d33" />
-        <polygon points="0,22 5,0 0,3 -5,0" fill="currentColor" fillOpacity="0.35" />
-        <text y="-24.5" fontSize="10" fontWeight="700" textAnchor="middle" fill="currentColor" transform="translate(0,0)">N</text>
-      </g>
-    </svg>
+    <span className="compass-rose" style={{ width: size, height: size }} data-testid={testId} role="img" aria-label={label} title={label}>
+      <img src={ROSE_SRC} alt="" width={size} height={size} style={{ transform: `rotate(${-north}deg)` }} draggable={false} />
+    </span>
   );
 }
 
