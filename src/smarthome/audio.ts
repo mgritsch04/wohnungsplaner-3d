@@ -7,7 +7,7 @@
  */
 import { derivePlan, type DerivedPlan } from '../model/derived';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
-import type { Furniture, Project, SmartDevice } from '../model/schema';
+import type { AudioDeviceDef, Furniture, Project, SmartDevice } from '../model/schema';
 import { dist, normalize, perp, pointInPolygon, polygonCentroid, sub, type Vec2 } from '../model/vec';
 import { guessRoomType, type RoomType } from '../suggest/furnishing';
 import type { DeviceProposal, SmartHomeSuggestion } from './suggest';
@@ -214,6 +214,15 @@ export function suggestAudio(project: Project, roomIds?: string[], wishes: Audio
   return { items, coverage: [], cost: { min: 0, max: 0, unknown: items.length }, later };
 }
 
+/** Smallest signed difference of two angles (rad), in (-π, π]. */
+const angleDiff = (a: number, b: number) => {
+  const d = (a - b) % (2 * Math.PI);
+  return d > Math.PI ? d - 2 * Math.PI : d <= -Math.PI ? d + 2 * Math.PI : d;
+};
+
+/** Size line of an own device, e.g. „20 × 25 × 30 cm“ (width × depth × height). */
+export const defSizeText = (def: AudioDeviceDef) => `${[def.widthM, def.depthM, def.heightM].map((m) => String(Math.round(m * 1000) / 10).replace('.', ',')).join(' × ')} cm`;
+
 export interface SpeakerHint {
   ok: boolean;
   text: string;
@@ -228,8 +237,10 @@ export function speakerHints(project: Project, derived: DerivedPlan, d: SmartDev
   const g = room && derived.rooms.get(room.id);
   if (!room || !g) return [{ ok: false, text: 'Der Lautsprecher steht außerhalb der Räume.' }];
   const spec = SPEAKER_TYPES[d.speakerType ?? 'bookshelf'];
+  const def = project.audioCatalog.find((x) => x.id === d.audioDefId);
   const hints: SpeakerHint[] = [];
-  const wall = nearestEdge(d, g.interior).distance;
+  // own device: the wall distance is measured from the housing, not from its centre (#336)
+  const wall = Math.max(0, nearestEdge(d, g.interior).distance - (def ? def.depthM / 2 : 0));
   const fmt = (m: number) => `${m.toFixed(2).replace('.', ',')} m`;
   if (d.speakerType === 'subwoofer') hints.push({ ok: true, text: `Abstand zur Wand ${fmt(wall)} – ${spec.note}.` });
   else hints.push(wall >= spec.minWallM ? { ok: true, text: `Abstand zur Wand ${fmt(wall)} (Faustregel ab ${fmt(spec.minWallM)}).` } : { ok: false, text: `Nur ${fmt(wall)} bis zur Wand – Faustregel ab ${fmt(spec.minWallM)}, sonst wird der Bass dröhnig.` });
@@ -239,6 +250,10 @@ export function speakerHints(project: Project, derived: DerivedPlan, d: SmartDev
   if (listener) {
     const l = dist(d, listener);
     hints.push({ ok: l >= 0.5, text: `${fmt(l)} bis „${listener.name}“ (Hörplatz). ${spec.note}.` });
+    if (def?.coverageDeg && def.coverageDeg < 360 && d.speakerType !== 'subwoofer') {
+      const off = Math.abs(angleDiff(Math.atan2(listener.y - d.y, listener.x - d.x), d.rotation)) * (180 / Math.PI);
+      hints.push(off <= def.coverageDeg / 2 ? { ok: true, text: `Der Hörplatz liegt im Abstrahlwinkel (${Math.round(def.coverageDeg)}°, ${Math.round(off)}° von der Mitte).` } : { ok: false, text: `Der Hörplatz liegt ${Math.round(off)}° neben der Blickrichtung – außerhalb des Abstrahlwinkels von ${Math.round(def.coverageDeg)}° (halb: ${Math.round(def.coverageDeg / 2)}°). Box drehen.` });
+    }
     const mate = project.devices.find((o) => o.id !== d.id && o.kind === 'speaker' && o.speakerType === d.speakerType && inRoom(o, g.interior));
     if (mate && (d.speakerType === 'bookshelf' || d.speakerType === 'desk')) {
       const gap = dist(d, mate);

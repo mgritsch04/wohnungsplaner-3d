@@ -8,6 +8,8 @@ import { ProjectSchema, type Project } from '../model/schema';
 import { pointInPolygon } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { nearestEdge, parseWishes, speakerHints, suggestAudio } from './audio';
+import { migrateProjectObject } from '../formats/project/projectFile';
+import { addAudioDef, placeAudioDef, removeAudioDef, updateAudioDef } from './actions';
 import { applySmartHomeSuggestion } from './suggestStore';
 
 const T = 0.12;
@@ -85,5 +87,40 @@ describe('audio setup (#138)', () => {
     expect(h.some((x) => /Stereo-Dreieck|Faustregel: etwa/.test(x.text))).toBe(true);
     expect(sofa).toBeTruthy();
     expect(nearestEdge({ x: 1, y: 1 }, [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }]).distance).toBeCloseTo(1);
+  });
+
+  it('own devices (#336): create, place, hints use size and coverage angle, remove keeps the speaker', () => {
+    const st = useProjectStore.getState;
+    const room = st().project.rooms.find((r) => r.name === 'Wohnzimmer')!;
+    const id = addAudioDef({ name: 'Mein Regalbox', speakerType: 'bookshelf', widthM: 0.2, depthM: 0.3, heightM: 0.35, coverageDeg: 60, source: 'eigene Eingabe' });
+    expect(st().project.audioCatalog).toHaveLength(1);
+    const dev = placeAudioDef(id, room.id)!;
+    const d = st().project.devices.find((x) => x.id === dev)!;
+    expect(d).toMatchObject({ kind: 'speaker', audioDefId: id, speakerType: 'bookshelf', name: 'Mein Regalbox' });
+    expect(ProjectSchema.safeParse(st().project).success).toBe(true);
+    // wall distance is measured from the housing (depth 0.3 → 0.15 m off the centre)
+    st().apply((p) => {
+      const x = p.devices.find((y) => y.id === dev)!;
+      x.x = 1;
+      x.y = 0.5;
+      x.rotation = Math.PI; // facing away from the sofa (sofa is at y = 4)
+    });
+    const hints = speakerHints(st().project, derivePlan(st().project), st().project.devices.find((x) => x.id === dev)!);
+    expect(hints.some((h) => !h.ok && /Abstrahlwinkels von 60°/.test(h.text))).toBe(true);
+    st().apply((p) => { p.devices.find((y) => y.id === dev)!.rotation = Math.PI / 2; });
+    const ok = speakerHints(st().project, derivePlan(st().project), st().project.devices.find((x) => x.id === dev)!);
+    expect(ok.some((h) => h.ok && /im Abstrahlwinkel/.test(h.text))).toBe(true);
+    updateAudioDef(id, { coverageDeg: undefined });
+    expect(speakerHints(st().project, derivePlan(st().project), st().project.devices.find((x) => x.id === dev)!).some((h) => /Abstrahlwinkel/.test(h.text))).toBe(false);
+    removeAudioDef(id);
+    expect(st().project.audioCatalog).toHaveLength(0);
+    expect(st().project.devices.find((x) => x.id === dev)).toMatchObject({ audioDefId: undefined, speakerType: 'bookshelf' });
+    st().undo();
+    expect(st().project.audioCatalog).toHaveLength(1);
+  });
+
+  it('schema 7 migration adds an empty audio catalog', () => {
+    const { audioCatalog: _a, ...v6 } = { ...JSON.parse(JSON.stringify(flat())), schemaVersion: 6 };
+    expect(migrateProjectObject(v6)).toMatchObject({ schemaVersion: 7, audioCatalog: [] });
   });
 });

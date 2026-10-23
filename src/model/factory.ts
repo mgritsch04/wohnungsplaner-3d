@@ -31,6 +31,7 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     notes: [],
     tasks: [],
     photos: [],
+    audioCatalog: [],
     levels: [{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }],
     activeLevelId: DEFAULT_LEVEL_ID,
   };

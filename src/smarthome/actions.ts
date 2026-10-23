@@ -1,17 +1,19 @@
 import { derivePlan, type DerivedPlan } from '../model/derived';
 import { newId } from '../model/ids';
-import type { Automation, Project, SmartDevice, SmartDeviceKind } from '../model/schema';
+import type { AudioDeviceDef, Automation, Project, SmartDevice, SmartDeviceKind } from '../model/schema';
 import { dist, pointInPolygon, polygonCentroid, type Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useSimStore } from './simStore';
 import { sightOccluders } from '../model/visibility';
 import { DEFAULT_ELEVATION, KIND_LABEL, productById } from './catalog';
+import { SPEAKER_TYPES } from './audio';
 import { formatLength, snapToEdges, stripLengthM } from './strip';
 
 /** Editing operations for smart-home devices and automations (#170); each is one undo step. */
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
+const SPEAKER_ELEVATION = Object.fromEntries(Object.entries(SPEAKER_TYPES).map(([k, v]) => [k, v.elevation])) as Record<keyof typeof SPEAKER_TYPES, number>;
 
 export function roomAt(project: Project, derived: DerivedPlan, p: Vec2): string | null {
   for (const r of project.rooms) {
@@ -255,4 +257,44 @@ export function updateAutomation(id: string, fn: (a: Automation) => void) {
 
 export function deleteAutomation(id: string) {
   useProjectStore.getState().apply((d) => void (d.automations = d.automations.filter((x) => x.id !== id)));
+}
+
+/** Own audio devices (#336): create, change, delete – each one undo step; no product data is invented. */
+export function addAudioDef(def: Omit<AudioDeviceDef, 'id'>): string {
+  const id = newId('audio');
+  useProjectStore.getState().apply((d) => {
+    d.audioCatalog.push({ id, ...def });
+  });
+  return id;
+}
+
+export function updateAudioDef(id: string, patch: Partial<Omit<AudioDeviceDef, 'id'>>) {
+  useProjectStore.getState().apply((d) => {
+    const def = d.audioCatalog.find((x) => x.id === id);
+    if (def) Object.assign(def, patch);
+  });
+}
+
+/** Deleting an own device keeps the placed speakers (they lose the link and stay generic). */
+export function removeAudioDef(id: string) {
+  useProjectStore.getState().apply((d) => {
+    d.audioCatalog = d.audioCatalog.filter((x) => x.id !== id);
+    for (const dev of d.devices) if (dev.audioDefId === id) dev.audioDefId = undefined;
+  });
+}
+
+/** Place an own device in a room (like any speaker) with its type and elevation; returns the device id. */
+export function placeAudioDef(defId: string, roomId: string | null, at?: Vec2): string | null {
+  const def = useProjectStore.getState().project.audioCatalog.find((x) => x.id === defId);
+  if (!def) return null;
+  const id = addDevice('speaker', undefined, roomId, at);
+  useProjectStore.getState().apply((d) => {
+    const dev = d.devices.find((x) => x.id === id);
+    if (!dev) return;
+    dev.audioDefId = defId;
+    dev.speakerType = def.speakerType;
+    dev.name = def.name;
+    dev.elevation = SPEAKER_ELEVATION[def.speakerType];
+  });
+  return id;
 }
