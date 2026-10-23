@@ -51,3 +51,21 @@ export function pinchView(start: View2D, vp: Viewport, startMid: Vec2, startDist
   const w = screenToWorld(startMid, start, vp);
   return { cx: w.x - (mid.x - vp.width / 2) / zoom, cy: w.y - (mid.y - vp.height / 2) / zoom, zoom };
 }
+
+/** Below this zoom (px per meter) icons, pins and dimensions are hidden so the floor plan stays readable (#382). */
+export const ICON_MIN_ZOOM = 30;
+
+export type RoomLabel = 'full' | 'name' | 'none';
+
+/**
+ * Level of detail of a room label (#382): labels keep their screen size, so when zooming out they
+ * would cover the plan. The area line goes first, then the name, once the room is too small in
+ * pixels to hold them.
+ */
+export function roomLabelDetail(name: string, bboxW: number, bboxH: number, zoom: number): RoomLabel {
+  const wPx = bboxW * zoom;
+  const hPx = bboxH * zoom;
+  const nameW = Math.max(1, name.length) * 7.6 * 1.15 + 8;
+  if (wPx < nameW || hPx < 24) return 'none';
+  return wPx < 70 || hPx < 64 ? 'name' : 'full';
+}
