@@ -576,6 +576,16 @@ export const MarkSchema = z.object({
   photoAssetId: z.string().optional(),
 });
 
+/**
+ * Area marked in the 2D plan with its purpose (#416), e.g. „Arbeitsecke“, „Essbereich“, „frei lassen“.
+ * Binding for the Claude furnishing proposal: furniture of the zone stands inside it, the rest stays out.
+ */
+export const ZoneSchema = z.object({
+  id: z.string().min(1),
+  purpose: z.string().max(200).default(''),
+  points: z.array(Vec2Schema).min(3).max(60),
+});
+
 /** Short note pinned to a room or a piece of furniture (#83); shown as a pin in the 2D plan. */
 export const NoteSchema = z.object({
   id: z.string().min(1),
@@ -637,6 +647,8 @@ export const LevelPlanSchema = z.object({
   photos: z.array(PhotoSchema).default([]),
   /** Mieter-Paket marks (#362) of this storey. */
   marks: z.array(MarkSchema).default([]),
+  /** Marked areas with a purpose (#416) of this storey. */
+  zones: z.array(ZoneSchema).default([]),
   underlay: UnderlaySchema.nullable().default(null),
 });
 
@@ -679,6 +691,8 @@ export const ProjectSchema = z.object({
   automations: z.array(AutomationSchema).default([]),
   /** Mieter-Paket marks (#362); projects saved before lack the field. */
   marks: z.array(MarkSchema).default([]),
+  /** Marked areas with a purpose for the furnishing proposal (#416); projects saved before lack the field. */
+  zones: z.array(ZoneSchema).default([]),
   /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
   fixtures: z.array(FixtureSchema).default([]),
   /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
@@ -723,6 +737,7 @@ export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
 export type MarkKind = z.infer<typeof MarkKindSchema>;
 export type Mark = z.infer<typeof MarkSchema>;
+export type PlanZone = z.infer<typeof ZoneSchema>;
 export type FixtureKind = z.infer<typeof FixtureKindSchema>;
 export type Fixture = z.infer<typeof FixtureSchema>;
 export type Circuit = z.infer<typeof CircuitSchema>;

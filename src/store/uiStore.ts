@@ -8,7 +8,7 @@ export interface Selection {
   id: string;
 }
 
-export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'mark' | 'calibrate';
+export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'mark' | 'zone' | 'calibrate';
 export type ViewMode = '2d' | '3d' | 'split';
 export type CameraMode = 'orbit' | 'walk';
 export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'check' | 'import';
