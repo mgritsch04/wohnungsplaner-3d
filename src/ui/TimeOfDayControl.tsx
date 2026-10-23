@@ -1,13 +1,17 @@
 import { useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import { useSimStore } from '../smarthome/simStore';
 import { TIME_PRESETS } from '../view3d/lighting';
+import { InfoHint } from './InfoHint';
 import { useGraphicsTier, useGraphicsTierStore, type GraphicsTierPref } from '../view3d/graphicsTier';
 
 const fmt = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`;
 
 function setTimeOfDay(h: number) {
   const v = Math.max(0, Math.min(24, h));
+  // a running smart-home simulation owns the clock (#282): the user's time moves it instead
+  if (useSimStore.getState().setHour(v)) return;
   if (v !== useProjectStore.getState().project.settings.timeOfDay) {
     useProjectStore.getState().apply((d) => void (d.settings.timeOfDay = v));
   }
@@ -87,7 +91,7 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
     if (!dragging.current) return;
     dragging.current = false;
     const v = useUiStore.getState().timePreview;
-    if (v !== null) setTimeOfDay(v);
+    if (v !== null && !useSimStore.getState().running) setTimeOfDay(v);
     useUiStore.getState().setTimePreview(null);
   };
   return (
@@ -109,8 +113,8 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
         onBlur={commit}
         onChange={(e) => {
           const v = Number(e.target.value);
-          // pointer drag: preview only; keyboard: write directly (one step per key press)
-          if (dragging.current) useUiStore.getState().setTimePreview(v);
+          // pointer drag: preview only (while simulating: the sim clock); keyboard: write directly (one step per key press)
+          if (dragging.current && !useSimStore.getState().running) useUiStore.getState().setTimePreview(v);
           else setTimeOfDay(v);
         }}
       />
@@ -118,6 +122,7 @@ export function TimeOfDayControl({ compact = false }: { compact?: boolean }) {
         <>
           <TimePresetSelect />
           <LampsSelect />
+          <InfoHint id="lamps" />
         </>
       )}
     </div>

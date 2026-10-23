@@ -15,6 +15,7 @@ import { normalizeAngle } from './units';
 import { frontClearance, isRug, isStackable, isSurface, pairRule, seatAndTable, seatBackDepth } from './placementRules';
 import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
 import { clipFootprint } from './geometry/walls';
+import { coveredConnections, fixtureCenterZ, fixtureCorners, FIXTURE_LABEL } from './fixtures';
 
 export interface Obstacle {
   polygon: Vec2[];
@@ -339,7 +340,7 @@ export interface CollisionRegion {
 }
 
 export interface PlacementIssue {
-  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance';
+  kind: 'wall' | 'door-leaf' | 'door-swing' | 'outside' | 'overlap' | 'clearance' | 'connection';
   message: string;
   /** Short reason why the item is marked, e.g. „ragt in die Wand“, „überlappt mit „Sofa““ (#16). */
   short: string;
@@ -418,7 +419,8 @@ function describeOpening(p: Project, d: DerivedPlan, openingId: string): string 
   return `${label} ${Math.round(o.width * 100)} cm${room?.name ? ` (${room.name})` : ''}`;
 }
 
-/** Quarter-circle door swing approximated by its bounding square on the swing side. */
+/** Quarter-circle door swing as a polygon (hinge plus arc points) on the swing side (#267). */
+const SWING_STEPS = 8;
 const swingCache = new WeakMap<DerivedPlan, { polygon: Vec2[]; openingId: string; z1: number }[]>();
 function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z1: number }[] {
   const cached = swingCache.get(d);
@@ -431,9 +433,12 @@ function doorSwingAreas(d: DerivedPlan): { polygon: Vec2[]; openingId: string; z
       if (r.opening.kind !== 'door') continue;
       const ds = doorSymbol(fp, r);
       const n = normalize(sub(ds.openTip, ds.hinge));
-      const r0 = ds.hinge;
-      const r1 = ds.closedTip;
-      out.push({ polygon: [r0, r1, add(r1, scale(n, ds.radius)), add(r0, scale(n, ds.radius))], openingId: r.opening.id, z1: r.top });
+      const u = normalize(sub(ds.closedTip, ds.hinge));
+      const arc = Array.from({ length: SWING_STEPS + 1 }, (_, k) => {
+        const a = (k / SWING_STEPS) * (Math.PI / 2);
+        return add(ds.hinge, add(scale(u, ds.radius * Math.cos(a)), scale(n, ds.radius * Math.sin(a))));
+      });
+      out.push({ polygon: [ds.hinge, ...arc], openingId: r.opening.id, z1: r.top });
     }
   }
   swingCache.set(d, out);
@@ -515,6 +520,18 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
       const culprit = { polygon: oc, z0: o.elevation, z1: o.elevation + o.height };
       issues.push({ kind: 'overlap', message: `Überschneidet sich mit „${o.name}“.`, short: `überlappt mit „${o.name}“`, refId: o.id, region: intersection(item, fc, culprit), culprit });
     }
+  }
+  // water / waste-water connections must stay reachable (#81)
+  for (const f of coveredConnections(p, item)) {
+    const culprit = { polygon: fixtureCorners(f), z0: 0, z1: fixtureCenterZ(f) + 0.05 };
+    issues.push({
+      kind: 'connection',
+      message: `Steht vor einem ${FIXTURE_LABEL[f.kind]} – der Anschluss bleibt so nicht erreichbar.`,
+      short: `steht vor einem ${FIXTURE_LABEL[f.kind]}`,
+      refId: f.id,
+      region: culprit,
+      culprit,
+    });
   }
   // doors/drawers need free space in front of the item
   const need = frontClearance(item);

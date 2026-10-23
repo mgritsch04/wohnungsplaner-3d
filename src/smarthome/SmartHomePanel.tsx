@@ -6,13 +6,21 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { Badge, CheckField, NumberField, Section, SelectField, TextField } from '../ui/fields';
 import { downloadBlob, safeFileName } from '../ui/fileUtils';
-import { addAutomationFor, deleteAutomation, placeDevice, roomAt, updateAutomation } from './actions';
+import { addAudioDef, addAutomationFor, placeAudioDef, removeAudioDef, deleteAutomation, makeLightSmartWithFeedback, placeDevice, roomAt, unlinkedLights, updateAutomation } from './actions';
 import { DEVICE_PRODUCTS, KIND_LABEL } from './catalog';
 import { deviceOn, statusLabel } from './DeviceInfo';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { automationsYaml } from './haYaml';
 import { ruleSentence } from './rules';
 import { formatSimHour, occludersOf, roomCoverage } from './simulation';
+import { defSizeText, parseWishes, SPEAKER_TYPES, suggestAudio } from './audio';
+import { suggestSmartHome } from './suggest';
+import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
+import { useFurnishStore } from '../suggest/furnishStore';
+import { WifiSection } from './WifiPanel';
+import { DayRoutineSection } from './DayRoutineSection';
+import { useDayStore } from './dayReplay';
+import { ConceptSection } from './ConceptPanel';
 import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
 
@@ -86,6 +94,8 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
   const setPlacing = useSimStore((s) => s.setPlacing);
   const products = DEVICE_PRODUCTS.filter((p) => p.kind === kind);
   const product = productId === GENERIC ? undefined : productId;
+  const [existingLight, setExistingLight] = useState('');
+  const freeLights = unlinkedLights(project);
   const onKind = (k: SmartDeviceKind) => {
     setKind(k);
     setProductId(DEVICE_PRODUCTS.find((p) => p.kind === k)?.id ?? GENERIC);
@@ -100,6 +110,10 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
 
   return (
     <>
+      <ConceptSection project={project} />
+      <SuggestSection project={project} room={room} />
+      <AudioSection project={project} room={room} />
+      <AudioCatalogSection project={project} room={room} />
       <Section title="Gerät hinzufügen">
         <div className={css.kinds} role="group" aria-label="Geräteart">
           {KINDS.map((k) => (
@@ -120,23 +134,211 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
             if (placing) setPlacing({ kind, productId: v === GENERIC ? undefined : v });
           }}
         />
+        {kind === 'light' && freeLights.length > 0 && (
+          <SelectField
+            label="Vorhandenes Licht nutzen"
+            value={existingLight}
+            options={[
+              { value: '', label: 'Nein, neues Licht anlegen' },
+              ...freeLights.map((l) => ({ value: l.id, label: `${l.name} (${project.rooms.find((r) => r.id === roomAt(project, derived, l))?.name ?? 'außerhalb'})` })),
+            ]}
+            onChange={setExistingLight}
+          />
+        )}
         <RoomSelect project={project} room={room} setRoomId={setRoomId} />
         <div className="btn-row">
-          <button className="primary" onClick={() => placeDevice(kind, product, room?.id ?? null)} disabled={!room} data-testid="device-add">
-            In „{room?.name ?? '–'}“ platzieren
-          </button>
+          {kind === 'light' && existingLight && freeLights.some((l) => l.id === existingLight) ? (
+            <button className="primary" onClick={() => { makeLightSmartWithFeedback(existingLight, product); setExistingLight(''); }} data-testid="device-add-existing">
+              Vorhandenes Licht smart machen
+            </button>
+          ) : (
+            <button className="primary" onClick={() => placeDevice(kind, product, room?.id ?? null)} disabled={!room} data-testid="device-add">
+              In „{room?.name ?? '–'}“ platzieren
+            </button>
+          )}
           <button onClick={clickToPlace} aria-pressed={!!placing} data-testid="device-place-click">
             {placing ? 'Abbrechen' : 'Im Plan klicken'}
           </button>
         </div>
         {placing && (
           <p className={`small ${css.hint}`} data-testid="device-placing-hint">
-            Klicke im 2D-Plan dorthin, wo {KIND_LABEL[placing.kind]} hin soll. Esc bricht ab.
+            {placing.kind === 'strip' ? 'Klicke im 2D-Plan zuerst den Anfang, dann das Ende des LED-Streifens. An Schrank und Wand rastet er ein. Esc bricht ab.' : `Klicke im 2D-Plan dorthin, wo ${KIND_LABEL[placing.kind]} hin soll. Esc bricht ab.`}
           </p>
         )}
       </Section>
       <DeviceList project={project} derived={derived} />
+      <WifiSection project={project} />
     </>
+  );
+}
+
+/** „Smart Home vorschlagen“ (#225): basic equipment for one room or the whole flat as a preview in the plan. */
+function SuggestSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const preview = useSmartSuggestStore((s) => s.preview);
+  const setPreview = useSmartSuggestStore((s) => s.setPreview);
+  const roomTypes = useFurnishStore((s) => s.roomTypes);
+  const [scope, setScope] = useState<'room' | 'all'>('room');
+  const roomName = (id: string) => project.rooms.find((r) => r.id === id)?.name ?? '';
+  const propose = () => {
+    const ids = scope === 'room' && room ? [room.id] : undefined;
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const s = suggestSmartHome(project, ids, roomTypes);
+    setPreview(s);
+    if (!s.items.length) ui.toast('Nichts mehr vorzuschlagen – die Räume sind schon ausgestattet.', 'info');
+  };
+  const price = (c: { min: number; max: number }) => (c.min === c.max ? `${c.min.toFixed(2)} €` : `${c.min.toFixed(0)}–${c.max.toFixed(0)} €`);
+  return (
+    <Section title="Smart Home vorschlagen">
+      <p className="muted small">Grundausstattung nach Raumart: Melder dort, wo sie laut Datenblatt den Raum abdecken, Kontakte an Fenstern und Außentüren, vorhandene Lampen smart. Erst Vorschau, dann übernehmen oder verwerfen.</p>
+      <SelectField
+        label="Für"
+        value={scope}
+        options={[
+          { value: 'room', label: `Nur „${room?.name ?? '–'}“` },
+          { value: 'all', label: 'Ganze Wohnung' },
+        ]}
+        onChange={(v) => setScope(v as 'room' | 'all')}
+      />
+      <button className="primary block" onClick={propose} disabled={!room} data-testid="sh-suggest">
+        Vorschlag zeigen
+      </button>
+      {preview && !preview.concept && preview.items.length > 0 && (
+        <div data-testid="sh-suggest-result">
+          <ul className={css.list}>
+            {preview.items.map((it) => (
+              <li key={it.key} className="small" data-testid="sh-suggest-item" data-kind={it.kind}>
+                <strong>{it.name}</strong> – {it.reason}
+              </li>
+            ))}
+          </ul>
+          {preview.coverage.map((c) => (
+            <p key={c.roomId} className="small" data-testid="sh-suggest-coverage">
+              {roomName(c.roomId)}: {Math.round(c.before * 100)} % → {Math.round(c.after * 100)} % erfasst
+            </p>
+          ))}
+          <p className="small" data-testid="sh-suggest-cost">
+            Kosten (Schätzung, Preise vor dem Kauf prüfen): {price(preview.cost)}
+            {preview.cost.unknown > 0 && ` + ${preview.cost.unknown} Gerät(e) ohne Preisangabe`}
+          </p>
+          {preview.later.map((l) => (
+            <p key={l.roomId} className="muted small">
+              {roomName(l.roomId)}: {l.text}
+            </p>
+          ))}
+          <div className="btn-row">
+            <button className="primary" onClick={() => applySmartHomeSuggestion(preview)} data-testid="sh-suggest-apply">
+              Übernehmen
+            </button>
+            <button onClick={() => setPreview(null)} data-testid="sh-suggest-discard">
+              Verwerfen
+            </button>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** „Audio-Setup vorschlagen“ (#138): speaker types per room as a preview; wishes in plain text make a new proposal, the old one stays until one is applied. */
+function AudioSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const preview = useSmartSuggestStore((s) => s.preview);
+  const setPreview = useSmartSuggestStore((s) => s.setPreview);
+  const roomTypes = useFurnishStore((s) => s.roomTypes);
+  const [wish, setWish] = useState('');
+  const [scope, setScope] = useState<'room' | 'all'>('room');
+  const audio = preview?.items.some((i) => i.kind === 'speaker') ? preview : null;
+  const propose = () => {
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const s = suggestAudio(project, scope === 'room' && room ? [room.id] : undefined, parseWishes(wish), roomTypes);
+    if (!s.items.length) {
+      ui.toast(s.later[0]?.text ?? 'Kein Audio-Vorschlag möglich: Sofa, Bett oder Schreibtisch fehlen im Raum.', 'info');
+      return;
+    }
+    setPreview(s);
+  };
+  const roomName = (id: string) => project.rooms.find((r) => r.id === id)?.name ?? '';
+  return (
+    <Section title="Audio-Setup vorschlagen">
+      <p className="muted small">Lautsprecher-Arten (keine Modelle, keine Preise) je Raum mit Platz und Abstand: Wohnzimmer zum Sofa, Schlafzimmer am Bett, Arbeitszimmer am Schreibtisch. Wünsche wie „kompakter“, „Design nicht gut“ oder „mit Subwoofer“ geben einen neuen Vorschlag; der alte bleibt, bis du einen übernimmst.</p>
+      <SelectField label="Bereich" value={scope} options={[{ value: 'room', label: `Nur „${room?.name ?? '–'}“` }, { value: 'all', label: 'Ganze Wohnung' }]} onChange={(v) => setScope(v as 'room' | 'all')} />
+      <TextField label="Wunsch (optional)" value={wish} onChange={setWish} />
+      <button className="primary block" onClick={propose} disabled={!room} data-testid="audio-suggest">
+        {audio ? 'Neuer Vorschlag mit Wunsch' : 'Vorschlag zeigen'}
+      </button>
+      {audio && (
+        <div data-testid="audio-result">
+          <ul className={css.list}>
+            {audio.items.map((it) => (
+              <li key={it.key} className="small" data-testid="audio-item" data-type={it.speakerType}>
+                <strong>{it.name}</strong> ({it.speakerType ? SPEAKER_TYPES[it.speakerType].label : ''}) – {it.reason}
+              </li>
+            ))}
+          </ul>
+          {audio.later.map((l) => (
+            <p key={l.roomId} className="muted small">{roomName(l.roomId)}: {l.text}</p>
+          ))}
+          <p className="small" data-testid="audio-cost">Preis: offen – erst ein echtes Produkt wählen, dann Preis und Quelle prüfen.</p>
+          <div className="btn-row">
+            <button className="primary" onClick={() => applySmartHomeSuggestion(audio)} data-testid="audio-apply">Übernehmen</button>
+            <button onClick={() => setPreview(null)} data-testid="audio-discard">Verwerfen</button>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** „Eigene Audio-Geräte“ (#336): own devices with size, type and coverage angle; no models or prices are suggested. */
+function AudioCatalogSection({ project, room }: { project: Project; room: Project['rooms'][number] | undefined }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<keyof typeof SPEAKER_TYPES>('bookshelf');
+  const [w, setW] = useState(0.2);
+  const [dp, setDp] = useState(0.25);
+  const [h, setH] = useState(0.3);
+  const [cov, setCov] = useState(0);
+  const [source, setSource] = useState('');
+  const add = () => {
+    if (!name.trim()) {
+      useUiStore.getState().toast('Bitte dem Gerät einen Namen geben.', 'info');
+      return;
+    }
+    addAudioDef({ name: name.trim(), speakerType: type, widthM: w, depthM: dp, heightM: h, coverageDeg: cov >= 10 ? cov : undefined, source: source.trim() || 'eigene Eingabe' });
+    setName('');
+  };
+  const place = (id: string) => {
+    const ui = useUiStore.getState();
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+    const dev = placeAudioDef(id, room?.id ?? null);
+    if (dev) {
+      ui.setSelection({ type: 'device', id: dev });
+      ui.toast('Gerät platziert – Strg+Z macht es rückgängig. Ziehe es an die richtige Stelle.', 'success');
+    }
+  };
+  return (
+    <Section title="Eigene Audio-Geräte">
+      <p className="muted small">Lege deine eigenen Lautsprecher an (Maße von Hand eingeben, keine erfundenen Modelle oder Preise) und platziere sie im Raum. Die Hinweise nutzen dann die echte Größe und den Abstrahlwinkel.</p>
+      <ul className={css.list} data-testid="audio-catalog">
+        {project.audioCatalog.map((def) => (
+          <li key={def.id} className="small" data-testid="audio-def">
+            <strong>{def.name}</strong> ({SPEAKER_TYPES[def.speakerType].label}) · {defSizeText(def)}{def.coverageDeg ? ` · ${Math.round(def.coverageDeg)}°` : ''}{def.source ? ` · ${def.source}` : ''}
+            <span className="btn-row">
+              <button onClick={() => place(def.id)} disabled={!room} data-testid="audio-def-place">Platzieren</button>
+              <button onClick={() => removeAudioDef(def.id)} data-testid="audio-def-remove">Entfernen</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <TextField label="Name" value={name} onChange={setName} />
+      <SelectField label="Art" value={type} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value: value as keyof typeof SPEAKER_TYPES, label: s.label }))} onChange={setType} />
+      <NumberField label="Breite" unit="cm" factor={100} digits={1} min={2} max={300} value={w} onChange={setW} />
+      <NumberField label="Tiefe" unit="cm" factor={100} digits={1} min={2} max={300} value={dp} onChange={setDp} />
+      <NumberField label="Höhe" unit="cm" factor={100} digits={1} min={2} max={300} value={h} onChange={setH} />
+      <NumberField label="Abstrahlwinkel (0 = unbekannt)" unit="°" digits={0} min={0} max={360} value={cov} onChange={setCov} />
+      <TextField label="Quelle (optional)" value={source} onChange={setSource} placeholder="eigene Eingabe" />
+      <button className="primary block" onClick={add} data-testid="audio-def-add">Gerät anlegen</button>
+    </Section>
   );
 }
 
@@ -234,7 +436,7 @@ function RulesStep({ project }: { project: Project }) {
 
 function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
   const derived = useMemo(() => derivePlan(project), [project]);
-  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug');
+  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip');
   const roomName = (d: SmartDevice) => project.rooms.find((r) => r.id === roomAt(project, derived, d))?.name;
   const s = ruleSentence(project, a);
   return (
@@ -257,6 +459,13 @@ function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
           onChange={(v) => updateAutomation(a.id, (x) => void (x.action.deviceIds = v ? [...x.action.deviceIds, t.id] : x.action.deviceIds.filter((id) => id !== t.id)))}
         />
       ))}
+      {a.action.deviceIds.some((id) => project.devices.find((d) => d.id === id)?.kind === 'strip') && (
+        <label className="small">
+          Farbe der LED-Streifen
+          <input type="color" value={a.action.color ?? '#ffb46b'} aria-label="Farbe der LED-Streifen" data-testid="automation-color" onChange={(e) => updateAutomation(a.id, (x) => void (x.action.color = e.target.value))} />
+          {a.action.color && <button className="small" onClick={() => updateAutomation(a.id, (x) => void delete x.action.color)}>zurücksetzen</button>}
+        </label>
+      )}
       <NumberField label="Helligkeit" unit="%" digits={0} value={a.action.brightness ?? 100} min={1} max={100} onChange={(v) => updateAutomation(a.id, (x) => void (x.action.brightness = v))} />
       {a.trigger.type === 'motion' && (
         <NumberField label="Aus nach" unit="s" digits={0} value={a.offAfterS ?? 0} min={0} max={7200} onChange={(v) => updateAutomation(a.id, (x) => void (x.offAfterS = v))} title="Sekunden ohne Bewegung, bis das Licht wieder ausgeht" />
@@ -269,7 +478,7 @@ function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
 }
 
 function TestStep({ project, derived, room, setRoomId }: RoomProps) {
-  const { running, speed, state, start, stop, setSpeed, setPerson } = useSimStore();
+  const { running, speed, state, start, stop, setSpeed, setPerson, setHour } = useSimStore();
   const placePerson = () => {
     const g = room && derived.rooms.get(room.id);
     if (g) setPerson(polygonCentroid(g.interior));
@@ -284,7 +493,15 @@ function TestStep({ project, derived, room, setRoomId }: RoomProps) {
               Simulation stoppen
             </button>
           ) : (
-            <button className="primary" onClick={start} disabled={!project.devices.length} data-testid="sim-start">
+            <button
+              className="primary"
+              onClick={() => {
+                useDayStore.getState().clear();
+                start();
+              }}
+              disabled={!project.devices.length}
+              data-testid="sim-start"
+            >
               Simulation starten
             </button>
           )}
@@ -295,11 +512,26 @@ function TestStep({ project, derived, room, setRoomId }: RoomProps) {
         </button>
         <SelectField label="Tempo" value={String(speed)} options={SPEEDS.map((s) => ({ value: String(s), label: s === 1 ? 'Echtzeit' : `${s}× schneller` }))} onChange={(v) => setSpeed(Number(v))} />
         {state && (
-          <p className="small" data-testid="sim-clock">
-            Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
-          </p>
+          <>
+            <p className="small" data-testid="sim-clock">
+              Simulierte Uhrzeit {formatSimHour(state.hour)} · {Math.round(state.t)} s simuliert
+            </p>
+            <label className="small">
+              Simulierte Uhrzeit
+              <input type="range" min={0} max={24} step={0.25} value={state.hour} aria-label="Simulierte Uhrzeit" data-testid="sim-hour" onChange={(e) => setHour(Number(e.target.value))} />
+            </label>
+            <div className="btn-row">
+              <button onClick={() => setHour(12)} data-testid="sim-day">
+                Tag (12:00)
+              </button>
+              <button onClick={() => setHour(22)} data-testid="sim-night">
+                Nacht (22:00)
+              </button>
+            </div>
+          </>
         )}
       </Section>
+      <DayRoutineSection hasDevices={project.devices.length > 0} />
       {state && state.events.length > 0 && (
         <Section title="Protokoll">
           <ol className={css.log} data-testid="sim-log">

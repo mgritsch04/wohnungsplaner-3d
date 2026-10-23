@@ -1,7 +1,8 @@
-import { PROJECT_FORMAT, PROJECT_SCHEMA_VERSION, ProjectSchema, type Project } from '../../model/schema';
+import { DEFAULT_LEVEL_ID, DEFAULT_LEVEL_NAME, PROJECT_FORMAT, PROJECT_SCHEMA_VERSION, ProjectSchema, type Project } from '../../model/schema';
 import type { z } from 'zod';
 import { newId } from '../../model/ids';
 import { validateModel } from '../../model/validation';
+import { normalizeLevels, projectOnLevel } from '../../model/levels';
 import { FileFormatError, formatZodError } from '../zodErrors';
 
 /**
@@ -17,6 +18,21 @@ type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 export const PROJECT_MIGRATIONS: Record<number, Migration> = {
   // 1 → 2 (#170): simulated smart-home devices and automations
   1: (raw) => ({ ...raw, schemaVersion: 2, devices: raw.devices ?? [], automations: raw.automations ?? [] }),
+  // 2 → 3 (#80): optional wall assembly (Wall.assembly) – nothing to convert
+  2: (raw) => ({ ...raw, schemaVersion: 3 }),
+  // 3 → 4 (#83, #84, #91): notes and tasks (room task lists + moving checklist)
+  3: (raw) => ({ ...raw, schemaVersion: 4, notes: raw.notes ?? [], tasks: raw.tasks ?? [] }),
+  // 4 → 5 (#86): reference photos on walls
+  4: (raw) => ({ ...raw, schemaVersion: 5, photos: raw.photos ?? [] }),
+  // 5 → 6 (#54): storeys – the existing plan becomes the only (and active) storey
+  5: (raw) => ({
+    ...raw,
+    schemaVersion: 6,
+    levels: raw.levels ?? [{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }],
+    activeLevelId: raw.activeLevelId ?? DEFAULT_LEVEL_ID,
+  }),
+  // 6 → 7 (#336): own audio devices
+  6: (raw) => ({ ...raw, schemaVersion: 7, audioCatalog: raw.audioCatalog ?? [] }),
 };
 
 export function migrateProjectObject(raw: unknown): Record<string, unknown> {
@@ -114,7 +130,12 @@ export function parseProject(raw: unknown): ParsedProject {
   if (!res.success) throw new FileFormatError('Das Projekt ist ungültig.', formatZodError(res.error));
   const project = res.data;
   repaired.push(...repairDuplicateFurniture(project));
-  const issues = validateModel(project);
+  repaired.push(...normalizeLevels(project));
+  // every storey is checked (#54); messages of other storeys name the storey
+  const issues = project.levels.flatMap((l) => {
+    const list = validateModel(projectOnLevel(project, l.id));
+    return l.id === project.activeLevelId ? list : list.map((i) => ({ ...i, message: `${l.name}: ${i.message}` }));
+  });
   const errors = issues.filter((i) => i.severity === 'error');
   if (errors.length) throw new FileFormatError('Das Projekt enthält inkonsistente Daten.', errors.map((e) => e.message));
   return { project, warnings: [...repaired, ...issues.map((i) => i.message)], ...(repaired.length ? { repaired } : {}) };

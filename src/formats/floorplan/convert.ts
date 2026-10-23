@@ -1,5 +1,6 @@
 import { derivePlan } from '../../model/derived';
 import { newId } from '../../model/ids';
+import { FIXTURE_ELEVATION, RADIATOR_DEFAULT, snapFixtureToWall } from '../../model/fixtures';
 import { addOpening, closestWall, insertWall } from '../../model/operations';
 import { faceAtPoint, sameCycle } from '../../model/roomDetection';
 import type { Project } from '../../model/schema';
@@ -10,6 +11,8 @@ const distToSeg = (p: Vec2, a: Vec2, b: Vec2) => closestPointOnSegment(p, a, b).
 import type { DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from '../../import/draft';
 import { FileFormatError, formatZodError } from '../zodErrors';
 import { FLOORPLAN_FORMAT, FLOORPLAN_VERSION, FloorPlanSchema, type FloorPlanFile } from './schema';
+import { createFurnitureFromCatalog } from '../../catalog/instantiate';
+import { findCatalogItem } from '../../catalog/generic';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
 import { buildIndex } from '../../model/graph';
 
@@ -149,6 +152,7 @@ export function floorPlanToDraft(fp: FloorPlanFile, sourceName: string): Reconst
     approximate: true,
     solid: true,
     locked: false,
+    existing: false,
   }));
 
   return {
@@ -170,6 +174,8 @@ export interface ApplyResult {
   wallsAdded: number;
   openingsAdded: number;
   roomsAdded: number;
+  fixturesAdded: number;
+  installationsAdded: number;
 }
 
 /** Insert the ACCEPTED draft elements into the project draft (mutates `d`). */
@@ -205,6 +211,12 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     const wdir = normalize(sub(wb, wa));
     const hinge = o.hingeSide && o.hingeSide.x * wdir.x + o.hingeSide.y * wdir.y > 0 ? 'end' : 'start';
     const swing = o.swingSide && o.swingSide.x * -wdir.y + o.swingSide.y * wdir.x < 0 ? 'right' : 'left';
+    // a second opening on a spot another one already covers is a recognition duplicate (#373)
+    const covered = d.openings.some((x) => x.wallId === hit.wall.id && Math.abs(x.offset - hit.s) < 0.35 * (x.width + o.width));
+    if (covered) {
+      warnings.push(`${o.kind === 'window' ? 'Fenster' : 'Tür'} bei (${o.center.x.toFixed(2)}, ${o.center.y.toFixed(2)}) überdeckt eine bestehende Öffnung und wurde nicht doppelt gesetzt.`);
+      continue;
+    }
     const id = addOpening(d, hit.wall.id, o.kind, hit.s, {
       width: o.width,
       height: o.height,
@@ -246,7 +258,29 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     }
   }
   for (const f of draft.furniture) d.furniture.push(structuredClone(f));
-  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded };
+  let fixturesAdded = 0;
+  for (const x of draft.fixtures ?? []) {
+    const item = x.accepted ? findCatalogItem(x.catalogId) : undefined;
+    if (!item) continue;
+    // fitted objects: from the generic catalog (no invented products), measured size, no price
+    const f = createFurnitureFromCatalog({ ...item, width: x.width, depth: x.depth, price: undefined }, { x: x.center.x, y: x.center.y, rotation: x.rotation });
+    d.furniture.push({ ...f, existing: true });
+    fixturesAdded++;
+  }
+  // installation points go on the nearest wall of the result (#222)
+  let installationsAdded = 0;
+  for (const x of draft.installations ?? []) {
+    if (!x.accepted) continue;
+    const base = { kind: x.kind, elevation: x.elevation ?? FIXTURE_ELEVATION[x.kind], count: 1, ...(x.kind === 'radiator' ? { width: x.width ?? RADIATOR_DEFAULT.width, height: RADIATOR_DEFAULT.height } : {}) };
+    const snap = snapFixtureToWall(d, base, x.center);
+    if (!snap) {
+      warnings.push(`Anschluss (${x.kind}) bei (${x.center.x.toFixed(2)}, ${x.center.y.toFixed(2)}) liegt an keiner Wand und wurde nicht übernommen.`);
+      continue;
+    }
+    d.fixtures.push({ id: newId('fix'), ...base, x: snap.x, y: snap.y, rotation: snap.rotation, ...(x.fixtureNote ? { note: x.fixtureNote } : {}) });
+    installationsAdded++;
+  }
+  return { warnings, wallsAdded: d.walls.length - before, openingsAdded, roomsAdded, fixturesAdded, installationsAdded };
 }
 
 /** Export the project's architecture (and optionally furniture) as apartment-plan.json. */

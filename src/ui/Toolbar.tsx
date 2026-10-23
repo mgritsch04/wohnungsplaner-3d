@@ -15,7 +15,7 @@ import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } f
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
 import { usePhoneLayout } from './phoneLayout';
-import { IconCutaway, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
+import { IconCutaway, IconExterior, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
 
 /**
  * Button that shows only an icon (#103). The name is the `aria-label` (screen readers, tests),
@@ -86,6 +86,8 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
   const setWalkSit = useUiStore((s) => s.setWalkSit);
   const cutaway = usePerformanceStore((s) => s.cutaway);
   const setCutaway = usePerformanceStore((s) => s.setCutaway);
+  const exterior = usePerformanceStore((s) => s.exterior);
+  const setExterior = usePerformanceStore((s) => s.setExterior);
   const resetCamera = usePerformanceStore((s) => s.resetCamera);
   const openModal = useDialogStore((s) => s.openModal);
   const [menu, setMenu] = useState<'file' | 'more' | null>(null);
@@ -191,6 +193,9 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
             <>
               <IconButton label="Schnitt" text="Schnitt" tip="Schnitt in 1,20 m Höhe – Blick in die Räume" pressed={cutaway} onClick={() => setCutaway(!cutaway)}>
                 <IconCutaway />
+              </IconButton>
+              <IconButton label="Außen" tip="Außen: Blick von außen auf das Gebäude mit Fassade, Fenstern und Eingang; mit der Maus drehen" pressed={exterior} onClick={() => setExterior(!exterior)}>
+                <IconExterior />
               </IconButton>
               <IconButton label="Kamera zurücksetzen" onClick={resetCamera}>
                 <IconResetCamera />

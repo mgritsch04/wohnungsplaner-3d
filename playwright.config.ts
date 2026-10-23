@@ -10,10 +10,15 @@ const port = Number(process.env.PW_PORT ?? 4173);
 export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
-  fullyParallel: false,
+  // Every test builds its own page/context and temp dirs, so single tests can be spread over workers and CI shards.
+  fullyParallel: true,
+  // Shared CI runners render software WebGL slowly; under load a browser process occasionally dies (e.g. "Failed to find
+  // browser context" in the test after a realism test). A retry gets a fresh browser; passed retries show up as "flaky".
+  retries: process.env.CI ? 2 : 0,
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${port}`,
+    trace: 'on-first-retry',
     viewport: { width: 1440, height: 900 },
     launchOptions: {
       executablePath: existsSync(localChromium) ? localChromium : undefined,

@@ -5,6 +5,7 @@ import { hasLeaf } from '../model/operations';
 import type { Project } from '../model/schema';
 import { formatEuro } from '../model/units';
 import { KIND_LABEL } from '../smarthome/catalog';
+import { fixtureLabel } from '../model/fixtures';
 import { useUiStore, type Selection } from '../store/uiStore';
 
 /**
@@ -151,7 +152,7 @@ export function objectMenuModel(p: Project, d: DerivedPlan, target: Selection, c
       const details = [KIND_LABEL[dev.kind]];
       if (ctx.deviceStatus) details.push(`Status: ${ctx.deviceStatus.label}`);
       const actions: ObjectAction[] = [];
-      if (dev.kind === 'light' || dev.kind === 'plug') actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Ausschalten' : 'Einschalten' });
+      if (dev.kind === 'light' || dev.kind === 'plug' || dev.kind === 'strip') actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Ausschalten' : 'Einschalten' });
       if (dev.kind === 'motion' || dev.kind === 'presence') actions.push({ id: 'trigger-device', label: 'Auslösen (testen)', hint: 'Meldet sofort „Bewegung“' });
       if (dev.kind === 'contact' && dev.openingId) actions.push({ id: 'toggle-device', label: ctx.deviceStatus?.on ? 'Schließen' : 'Öffnen' });
       actions.push(del, properties);
@@ -180,6 +181,13 @@ export function objectMenuModel(p: Project, d: DerivedPlan, target: Selection, c
     case 'node': {
       if (!p.nodes.some((n) => n.id === target.id)) return null;
       return { title: 'Ecke', details: [`${p.walls.filter((w) => w.a === target.id || w.b === target.id).length} Wände angeschlossen`], actions: [del, properties] };
+    }
+    case 'fixture': {
+      const f = p.fixtures.find((x) => x.id === target.id);
+      if (!f) return null;
+      const details = [`Höhe ${cm(f.elevation)} cm`];
+      if (f.note) details.push(f.note);
+      return { title: fixtureLabel(f), details, actions: [del, properties] };
     }
   }
 }

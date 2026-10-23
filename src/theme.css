@@ -169,6 +169,7 @@
   --control-radius: var(--radius-md);
   --focus-ring: 0 0 0 3px var(--color-focus-ring-soft);
   --transition-fast: 0.12s ease;
+  --motion-dur: 0.18s; /* Oberflächen-Animationen (Issue 101); 0s = aus, Überschreibungen am Dateiende */
 }
 
 /*
@@ -375,4 +376,18 @@
     --color-plan-text-muted: #4b5563;
     --color-plan-group: #6d28d9;
   }
+}
+
+/* Dauer der Oberflächen-Animationen (Issue 101): 0 = aus. Browser-Wunsch „Bewegung reduzieren“ oder
+   Schalter „Animationen: Aus“; „An“ erzwingt die Übergänge. Siehe src/ui/motionPreference.ts. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-dur: 0s;
+  }
+}
+:root[data-motion='on'] {
+  --motion-dur: 0.18s;
+}
+:root[data-motion='off'] {
+  --motion-dur: 0s;
 }

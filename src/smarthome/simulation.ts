@@ -1,7 +1,7 @@
 import type { DerivedPlan } from '../model/derived';
 import type { Automation, Project, SmartDevice } from '../model/schema';
 import { sightOccluders, type Segment } from '../model/visibility';
-import { LEAF_OPEN_ANGLE, leafPolygon } from '../model/geometry/leaves';
+import { LEAF_OPEN_ANGLE, leafDirection, leafPolygon } from '../model/geometry/leaves';
 import { furnitureCorners } from '../editor2d/furnitureGeometry';
 import { boundsOf, pointInPolygon, type Vec2 } from '../model/vec';
 import { sunElevationDeg } from '../view3d/lighting';
@@ -22,6 +22,8 @@ export interface EntityState {
   on: boolean;
   /** lights: 1..100 % */
   brightness?: number;
+  /** LED strips (#238): colour (#rrggbb) set by a rule; unset = the strip's planned colour */
+  color?: string;
   /** sensors: simulated second of the last detection */
   lastSeen?: number;
 }
@@ -50,6 +52,8 @@ export interface SimInput {
   moving: boolean;
   /** sensors triggered by hand ("Auslösen" in the device info) */
   triggered?: ReadonlySet<string>;
+  /** points where a door is moving right now (#281); every sensor that sees one reports motion */
+  doorMotion?: readonly Vec2[];
 }
 
 export interface SensorParams {
@@ -136,12 +140,38 @@ export function inDetectionArea(d: SmartDevice, params: SensorParams, p: Vec2, o
   });
 }
 
+/**
+ * Points of a moving door that a sensor can see (#281): the middle of the opening and the
+ * free edge of the leaf at the start, half way and at the end of its swing (the leaf itself
+ * may stand in the way of the first ones when it swings towards the sensor). The sight line is checked against the
+ * current occluders; the middle lies on the wall line, so a closed leaf does not hide it.
+ */
+export function doorMotionPoints(derived: DerivedPlan, openingId: string): Vec2[] {
+  const pts: Vec2[] = [];
+  for (const l of derived.leaves.get(openingId) ?? []) {
+    if (l.kind !== 'door') continue;
+    const mid = (angle: number, k: number) => {
+      const dir = leafDirection(l, angle);
+      return { x: l.hinge.x + dir.x * l.width * k, y: l.hinge.y + dir.y * l.width * k };
+    };
+    pts.push(mid(0, 0.5), mid(0, 1), mid(LEAF_OPEN_ANGLE / 2, 1), mid(LEAF_OPEN_ANGLE, 1));
+  }
+  return pts;
+}
+
 export const isDark = (hour: number) => sunElevationDeg(hour) < 0;
+
+/** Clock set by hand: the simulation continues from `hour`; pending time triggers are not replayed. */
+export function withHour(state: SimState, hour: number, text = `Uhrzeit von Hand auf ${fmtHour(hour)} gestellt`): SimState {
+  const h = ((hour % 24) + 24) % 24;
+  return { ...state, hour: h, events: [...state.events, { t: state.t, hour: h, text }].slice(-MAX_EVENTS) };
+}
 
 export function initialState(project: Project, hour = project.settings.timeOfDay): SimState {
   const entities: Record<string, EntityState> = {};
   for (const d of project.devices) {
-    if (d.kind === 'light') {
+    if (d.kind === 'strip') entities[d.id] = { on: false, brightness: 100 };
+    else if (d.kind === 'light') {
       const l = project.lights.find((x) => x.id === d.lightId);
       entities[d.id] = { on: l?.on ?? false, brightness: 100 };
     } else if (d.kind === 'contact') {
@@ -171,14 +201,18 @@ export function step(project: Project, occluders: Occluder[], prev: SimState, dt
   const log = (text: string) => events.push({ t, hour, text });
   const rising = new Set<string>();
   const falling = new Set<string>();
+  const doorOnly = new Set<string>();
 
   for (const d of project.devices) {
     const e = (entities[d.id] ??= { on: false });
     const was = e.on;
     if (isSensor(d)) {
       const params = sensorParams(d);
-      const sees = !!input.triggered?.has(d.id) || (!!input.person && (d.kind === 'presence' || input.moving) && inDetectionArea(d, params, input.person, occluders));
-      if (sees) {
+      const byHand = !!input.triggered?.has(d.id);
+      const byPerson = !!input.person && (d.kind === 'presence' || input.moving) && inDetectionArea(d, params, input.person, occluders);
+      const byDoor = !byHand && !byPerson && !!input.doorMotion?.some((p) => inDetectionArea(d, params, p, occluders));
+      if (byHand || byPerson || byDoor) {
+        if (byDoor && !e.on) doorOnly.add(d.id);
         e.lastSeen = t;
         e.on = true;
       } else if (e.on && t - (e.lastSeen ?? 0) >= params.holdS) e.on = false;
@@ -187,18 +221,20 @@ export function step(project: Project, occluders: Occluder[], prev: SimState, dt
     }
     if (e.on !== was) {
       (e.on ? rising : falling).add(d.id);
-      if (d.kind !== 'light' && d.kind !== 'plug') log(`${d.name}: ${d.kind === 'contact' ? (e.on ? 'offen' : 'geschlossen') : e.on ? 'Bewegung erkannt' : 'keine Bewegung mehr'}`);
+      if (d.kind !== 'light' && d.kind !== 'plug') log(`${d.name}: ${d.kind === 'contact' ? (e.on ? 'offen' : 'geschlossen') : e.on ? `Bewegung erkannt${doorOnly.has(d.id) ? ' (Tür)' : ''}` : 'keine Bewegung mehr'}`);
     }
   }
 
   const act = (a: Automation, on: boolean) => {
     for (const id of a.action.deviceIds) {
       const d = devices.get(id);
-      if (!d || (d.kind !== 'light' && d.kind !== 'plug')) continue;
+      if (!d || (d.kind !== 'light' && d.kind !== 'plug' && d.kind !== 'strip')) continue;
       const e = (entities[id] ??= { on: false });
-      if (e.on === on && (!on || e.brightness === (a.action.brightness ?? 100))) continue;
+      const color = d.kind === 'strip' && on ? a.action.color : undefined;
+      if (e.on === on && (!on || (e.brightness === (a.action.brightness ?? 100) && (color === undefined || e.color === color)))) continue;
       e.on = on;
       if (on) e.brightness = a.action.brightness ?? 100;
+      if (color) e.color = color;
       log(`${a.name}: ${d.name} ${on ? 'an' : 'aus'}`);
     }
   };

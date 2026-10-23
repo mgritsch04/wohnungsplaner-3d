@@ -153,3 +153,17 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 - „IKEA-Küchenplanung“ steht nur noch einmal (eine Zeile, Blocked); #14 war bereits geschlossen, die Aufgabe für dich ist jetzt #27.
 - Frühere Inbox-Notizen: „Möbelix-Seiten mit echten Quelltexten testen“ → User-Test #8; „Anleitung PAX-JSON“ → Zeile „IKEA-Import pflegen“ (#10); „Mehrfachauswahl“ und „schräge Wände“ bewertet (als Ready bewertet).
 - Aufgaben für dich als `user-task`-Issues: #27 (IKEA-Küche), #28 (Smart-Home-Entscheidungen), #29 (Gamepad), #30 (Routine einrichten).
+
+## Nachtrag 2026-10-22 (Planer-Thread; Tabelle oben endet am 18.10., Status hier maßgeblich für die genannten Nummern)
+Gemergt, Status 🧪 automatischer User-Test offen: #263 (Gefühlt echt, Stufe 1; Panini/Stufe 2 nur auf Gs Go) · #269 · #219 · #273 (Stufe 1–2; Bildpaket Stufe 3 auf Halt bis Gs Urteil, Branch `claude/moebelix-bildpaket-273` nicht löschen) · #278 · #282 · #283 (Strahl an Möbeln vorbei nicht umgesetzt) · #257 · #255 · #258 · #281 · #267 · #285 · #217 (❌ → erneut testen).
+Seit 22.10. abends ebenfalls gemergt, 🧪 automatischer User-Test offen: #280 (PR #290) · #253 (PR #300) · #101 (PR #301) · #69/#93 (PR #302) · #79 (PR #303) · #304 Quelltext-Import (PR #305, Zeile 19).
+Ebenfalls gemergt, 🧪 automatischer User-Test offen: #92 (PR #306) · #250 (PR #310) · #136 (PR #309) · #225 (PR #312) · #64/#81 (PR #314) · #238 (PR #313) · #222 (PR #315).
+Gemergt 23.10., 🧪 automatischer User-Test offen: #138 (PR #317) · #80 (PR #318) · #90 (PR #319) · #83/#84/#91 (PR #320) · #85 (PR #321) · #86 (PR #322) · #54 (PR #323, #324).
+In Progress: #229 (PR #296), #135.
+Ready-Liste leer. Neue Inbox-Ideen: #335 gewendelte Treppen/Podeste (Folge von #54), #336 Audio-Katalog (Folge von #138); weitere Kandidaten: Regler für Möbel-Drehung (Folge von #280), optional "Strahl an Möbeln vorbei" (#283), Panini-Weitwinkel (#263 Stufe 2, nur auf Gs Go).
+Abnahme 23.10.: #220 von G bestätigt; #85 wartet auf Gs Test (user-test); #258 und Begehen-Tastenhinweise (PR #333, #334) warten auf erneute automatische Prüfung.
+Ready (Planer-Reihenfolge, je ein Schema-Thread): #80 Wandaufbau · #138 Audio · #90 Heizkosten · #83/#84/#91 Notizen/Checkliste · #85 Schrankinnenaufteilung · #86 Fotos an Wänden · #54 Mehrgeschoss (groß, Opus, zuletzt).
+Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
+Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
+
+**Nachtrag 23.10. (Planer):** Gemergt seit dem letzten Eintrag: #335 gewendelte Treppen (PR #339), #336 Audio-Geräte im Katalog (PR #338), Drehregler für Möbel und Plan-Hintergrund (#340, PR #342; 🧪 automatischer User-Test offen), e2e-Aufteilung (#341, PR #343; 🧪 automatischer User-Test offen), Reiter links zweizeilig und Tischlampe neben Fenster (PR #348, Refs #345/#346). Neu: #350 Einrichtungsvorschlag mit echten Möbelix-/IKEA-Möbeln über Claude (Label `planned`, noch nicht bewertet; Nachfolger von #137).

@@ -2,11 +2,17 @@ import { memo } from 'react';
 import type { DerivedPlan } from '../model/derived';
 import { clipFootprint } from '../model/geometry/walls';
 import type { Furniture, Project } from '../model/schema';
+import { ICON_MIN_ZOOM, roomLabelDetail } from './viewTransform';
 import { add, dist, normalize, perp, scale, sub, type Vec2 } from '../model/vec';
 import { formatArea, formatLength, radToDeg } from '../model/units';
-import type { Selection } from '../store/uiStore';
 import { doorSymbol, openingRect } from './openingSymbols';
 import { markKindInfo, markLabels } from '../model/marks';
+import { useUiStore, type Selection } from '../store/uiStore';
+import { supportsInterior } from '../model/interior';
+import { stairLayout } from '../model/stairLayout';
+import { stepCount } from '../model/stairs';
+import { polygonCentroid } from '../model/vec';
+import { interiorPlanDetails } from './interiorPlan';
 import { materialById, DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 
 const pts = (poly: Vec2[]) => poly.map((p) => `${p.x},${p.y}`).join(' ');
@@ -188,19 +194,25 @@ export const PlanDrawing = memo(function PlanDrawing({ project, derived, selecti
         ))}
       </g>
       <MarksLayer marks={project.marks} px={px} />
-      {showDimensions && <RoomDimensions project={project} derived={derived} px={px} fontSize={fontSize} />}
+      {showDimensions && zoom >= ICON_MIN_ZOOM && <RoomDimensions project={project} derived={derived} px={px} fontSize={fontSize} />}
       <g>
         {project.rooms.map((r) => {
           const g = derived.rooms.get(r.id);
           if (!g) return null;
+          const xs = g.interior.map((p) => p.x);
+          const ys = g.interior.map((p) => p.y);
+          const detail = roomLabelDetail(r.name, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), zoom);
+          if (detail === 'none') return null;
           return (
             <g key={r.id} pointerEvents="none">
               <text x={g.centroid.x} y={g.centroid.y - fontSize * 0.2} fontSize={fontSize * 1.15} textAnchor="middle" style={{ fill: C.text }} fontWeight={600}>
                 {r.name}
               </text>
-              <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" style={{ fill: C.textMuted }}>
-                {formatArea(g.area)}
-              </text>
+              {detail === 'full' && (
+                <text x={g.centroid.x} y={g.centroid.y + fontSize * 1.1} fontSize={fontSize} textAnchor="middle" style={{ fill: C.textMuted }}>
+                  {formatArea(g.area)}
+                </text>
+              )}
             </g>
           );
         })}
@@ -297,7 +309,22 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
   const rect = (x: number, y: number, rw: number, rh: number, k: string, rx = 0) => (
     <rect key={k} x={x} y={y} width={rw} height={rh} rx={rx} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />
   );
-  switch (shape) {
+  const open = useUiStore((st) => st.interiorOpen.includes(f.id)) && !!f.interior && supportsInterior(shape);
+  // a cabinet shown open (#85) draws its inner layout instead of the closed-door cross
+  const openDetails = open ? interiorPlanDetails(f) : [];
+  openDetails.forEach((x, i) => {
+    const dash = x.dashed ? '4 3' : undefined;
+    details.push(
+      x.type === 'line' ? (
+        <line key={`i${i}`} x1={x.x1} y1={x.y1} x2={x.x2} y2={x.y2} style={{ stroke }} strokeWidth={W.furnitureDetail} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <rect key={`i${i}`} x={x.x} y={x.y} width={x.w} height={x.h} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+      ),
+    );
+  });
+  switch (open ? 'open' : shape) {
+    case 'open':
+      break;
     case 'sofa':
     case 'armchair':
       details.push(rect(-w / 2, -d / 2, w, d * 0.25, 'back'));
@@ -346,11 +373,42 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
     case 'toilet':
       details.push(<ellipse key="seat" cx={0} cy={d * 0.12} rx={w * 0.4} ry={d * 0.32} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
       break;
+    case 'stairs': {
+      // treads across the flight and the walking line with an arrow pointing up the stairs (to local −y, #54)
+      const n = stepCount(f.height);
+      for (let i = 1; i < n; i++) details.push(line(-w / 2, d / 2 - (i * d) / n, w / 2, d / 2 - (i * d) / n, `t${i}`));
+      details.push(line(0, d / 2 - d / n / 2, 0, -d / 2 + d / n / 2, 'walk'));
+      const ah = Math.min(0.2, w * 0.3);
+      details.push(line(0, -d / 2 + d / n / 2, -ah, -d / 2 + d / n / 2 + ah, 'a1'));
+      details.push(line(0, -d / 2 + d / n / 2, ah, -d / 2 + d / n / 2 + ah, 'a2'));
+      details.push(<circle key="start" cx={0} cy={d / 2 - d / n / 2} r={Math.min(0.05, w * 0.1)} style={{ fill: stroke }} />);
+      break;
+    }
     case 'shower':
       details.push(line(-w / 2, -d / 2, w / 2, d / 2, 's1'));
       details.push(line(-w / 2, d / 2, w / 2, -d / 2, 's2'));
       break;
     default:
+      if (shape.startsWith('stairs-')) {
+        // turning stairs (#335): the treads of the shared layout and the walking line through them, arrow at the top
+        const layout = stairLayout(shape, w, d, f.height);
+        if (layout) {
+          layout.treads.forEach((t, i) =>
+            details.push(<polygon key={`t${i}`} points={t.poly.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />),
+          );
+          const walk = layout.treads.map((t) => polygonCentroid(t.poly));
+          if (walk.length >= 2) {
+            details.push(<polyline key="walk" points={walk.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" style={{ stroke }} strokeWidth={W.furnitureDetail} vectorEffect="non-scaling-stroke" />);
+            const a = walk[walk.length - 2];
+            const b = walk[walk.length - 1];
+            const ang = Math.atan2(b.y - a.y, b.x - a.x);
+            const ah = Math.min(0.2, w * 0.15);
+            for (const side of [-1, 1]) details.push(line(b.x, b.y, b.x - Math.cos(ang + side * 0.5) * ah, b.y - Math.sin(ang + side * 0.5) * ah, `ah${side}`));
+            details.push(<circle key="start" cx={walk[0].x} cy={walk[0].y} r={Math.min(0.05, w * 0.05)} style={{ fill: stroke }} />);
+          }
+          break;
+        }
+      }
       // front indicator (local +y is the front)
       details.push(line(-w / 2 + Math.min(0.04, w * 0.1), d / 2 - Math.min(0.04, d * 0.15), w / 2 - Math.min(0.04, w * 0.1), d / 2 - Math.min(0.04, d * 0.15), 'front'));
   }

@@ -2,13 +2,15 @@ import { useMemo } from 'react';
 import { derivePlan } from '../model/derived';
 import type { Project, SmartDevice } from '../model/schema';
 import { useUiStore } from '../store/uiStore';
-import { Badge, NumberField, SelectField, TextField } from '../ui/fields';
+import { AngleSlider, Badge, NumberField, SelectField, TextField } from '../ui/fields';
 import { deleteSelection, toggleOpening } from '../ui/actions';
-import { addAutomationFor, roomAt, updateDevice } from './actions';
+import { addAutomationFor, roomAt, setStripPoints, updateDevice } from './actions';
+import { defSizeText, SPEAKER_TYPES, speakerHints, type SpeakerType } from './audio';
 import { KIND_LABEL, productById } from './catalog';
 import { DeviceGlyph, KIND_COLOR } from './glyphs';
 import { rulesOf, ruleSentence } from './rules';
 import { sensorParams } from './simulation';
+import { formatLength, STRIP_DIRECTIONS, stripColor, stripLengthM, stripPoints } from './strip';
 import { useSimStore } from './simStore';
 import css from './SmartHomePanel.module.css';
 
@@ -18,8 +20,9 @@ const deg = (rad: number) => Math.round(((((rad * 180) / Math.PI) % 360) + 360) 
 /** Status text of a device in the simulation (or its resting state while it is stopped). */
 export function statusLabel(d: SmartDevice, on: boolean, brightness?: number): string {
   if (d.kind === 'contact') return on ? 'offen' : 'zu';
-  if (d.kind === 'light') return on ? `an ${brightness ?? 100} %` : 'aus';
+  if (d.kind === 'light' || d.kind === 'strip') return on ? `an ${brightness ?? 100} %` : 'aus';
   if (d.kind === 'plug') return on ? 'an' : 'aus';
+  if (d.kind === 'router') return 'sendet';
   return on ? 'Bewegung' : 'ruhig';
 }
 
@@ -29,6 +32,56 @@ export function deviceOn(project: Project, d: SmartDevice, entities: Record<stri
   if (e) return e;
   if (d.kind === 'contact') return { on: project.openings.find((o) => o.id === d.openingId)?.open ?? false };
   return { on: false };
+}
+
+/** Settings of an LED strip (#238): direction, colour or colour temperature, brightness in the simulation, bends. */
+function StripSettings({ d, brightness, entityColor }: { d: SmartDevice; brightness: number; entityColor?: string }) {
+  const pts = stripPoints(d);
+  const color = stripColor(d, { color: entityColor });
+  const sim = useSimStore.getState();
+  const addSection = () => {
+    // continue the last section with a 90° turn, 0.5 m long (then pull it into place)
+    const a = pts[pts.length - 2], b = pts[pts.length - 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+    setStripPoints(d.id, [...pts, { x: Math.round((b.x + nx * 0.5) * 1000) / 1000, y: Math.round((b.y + ny * 0.5) * 1000) / 1000 }]);
+  };
+  return (
+    <>
+      <SelectField
+        label="Leuchtrichtung"
+        value={d.direction ?? 'down'}
+        options={Object.entries(STRIP_DIRECTIONS).map(([value, label]) => ({ value, label }))}
+        onChange={(direction) => updateDevice(d.id, { direction: direction as NonNullable<SmartDevice['direction']> })}
+      />
+      <label className="small">
+        Farbe (RGB)
+        <input type="color" value={color} aria-label="Farbe des LED-Streifens" data-testid="strip-color" onChange={(e) => { updateDevice(d.id, { color: e.target.value, kelvin: undefined }); if (sim.state?.entities[d.id]) sim.setLevel(d.id, { color: e.target.value }); }} />
+      </label>
+      <NumberField
+        label="oder Farbtemperatur"
+        unit="K"
+        digits={0}
+        value={d.kelvin ?? 2700}
+        min={1500}
+        max={10000}
+        onChange={(kelvin) => { updateDevice(d.id, { kelvin, color: undefined }); if (sim.state?.entities[d.id]?.color) sim.setLevel(d.id, { color: stripColor({ kelvin }) }); }}
+        title="Warmweiß ca. 2700 K, Kaltweiß ca. 6500 K"
+      />
+      <label className="small">
+        Helligkeit {Math.round(brightness)} %
+        <input type="range" min={1} max={100} step={1} value={brightness} aria-label="Helligkeit des LED-Streifens" data-testid="strip-brightness" onChange={(e) => sim.setLevel(d.id, { brightness: Number(e.target.value) })} />
+      </label>
+      <div className="btn-row">
+        <button onClick={addSection} disabled={pts.length >= 12} data-testid="strip-add-section">
+          Knick anfügen
+        </button>
+        <button onClick={() => setStripPoints(d.id, pts.slice(0, -1))} disabled={pts.length <= 2} data-testid="strip-remove-section">
+          Letzten Abschnitt entfernen
+        </button>
+      </div>
+    </>
+  );
 }
 
 /**
@@ -73,12 +126,12 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
           </div>
         </header>
         <div className="panel-section-body">
-          <p className="small">
+          {d.kind !== 'speaker' && <p className="small">
             Status: <Badge kind={st.on ? 'ok' : 'muted'}>{statusLabel(d, st.on, st.brightness)}</Badge>
             {!running && <span className="muted"> (Simulation aus)</span>}
-          </p>
+          </p>}
           <div className="btn-row">
-            {(d.kind === 'light' || d.kind === 'plug') && (
+            {(d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip') && (
               <button className="primary" onClick={() => sim.setEntity(d.id, !st.on)} data-testid="device-toggle">
                 {st.on ? 'Ausschalten' : 'Einschalten'}
               </button>
@@ -94,7 +147,26 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
               </button>
             )}
           </div>
-          <p className="muted small">Verschieben: im 2D-Plan ziehen{isSensor(d) ? ', Blickrichtung mit dem blauen Griff' : ''}.</p>
+          {d.kind === 'speaker' && (
+            <SelectField label="Art" value={d.speakerType ?? 'bookshelf'} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value, label: s.label }))} onChange={(v) => updateDevice(d.id, { speakerType: v as SpeakerType, elevation: SPEAKER_TYPES[v as SpeakerType].elevation })} />
+          )}
+          {d.kind === 'speaker' && (() => {
+            const def = project.audioCatalog.find((x) => x.id === d.audioDefId);
+            return def && <p className="small muted" data-testid="speaker-own">Eigenes Gerät „{def.name}“: {defSizeText(def)}{def.coverageDeg ? `, Abstrahlwinkel ${Math.round(def.coverageDeg)}°` : ''}{def.source ? ` · Quelle: ${def.source}` : ''}</p>;
+          })()}
+          {d.kind === 'speaker' && (
+            <ul className="small" data-testid="speaker-hints">
+              {speakerHints(project, derived, d).map((h, i) => (
+                <li key={i} data-ok={h.ok}>{h.ok ? '✓' : '⚠'} {h.text}</li>
+              ))}
+            </ul>
+          )}
+          {d.kind === 'strip' && (
+            <p className="small" data-testid="strip-length">
+              Länge: <strong>{formatLength(stripLengthM(stripPoints(d)))}</strong> ({stripPoints(d).length - 1} {stripPoints(d).length === 2 ? 'Abschnitt' : 'Abschnitte'})
+            </p>
+          )}
+          <p className="muted small">{d.kind === 'strip' ? 'Verschieben: Strich im 2D-Plan ziehen, Enden und Knicke an den blauen Punkten.' : 'Verschieben: im 2D-Plan ziehen'}{d.kind === 'strip' ? '' : isSensor(d) ? ', Blickrichtung mit Regler, Zahlenfeld oder blauem Griff' : ''}{d.kind === 'strip' ? '' : '.'}</p>
         </div>
       </section>
 
@@ -161,8 +233,15 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
                 {params.assumed.hold && assumed}
               </div>
               <NumberField label="Blickrichtung" unit="°" digits={0} value={deg(d.rotation)} min={0} max={360} onChange={(v) => updateDevice(d.id, { rotation: (v * Math.PI) / 180 })} />
+              <AngleSlider
+                label="Blickrichtung (Regler)"
+                testId="device-rotation-slider"
+                value={deg(d.rotation)}
+                onChange={(v) => updateDevice(d.id, { rotation: (v * Math.PI) / 180 })}
+              />
             </>
           )}
+          {d.kind === 'strip' && <StripSettings d={d} brightness={st.brightness ?? 100} entityColor={entities?.[d.id]?.color} />}
           {d.kind === 'contact' && (
             <SelectField
               label="Fenster/Tür"

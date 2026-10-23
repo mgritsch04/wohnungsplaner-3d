@@ -184,3 +184,27 @@ describe('light partition walls (#37)', () => {
     expect(partition!.thickness).toBeCloseTo(8, 0);
   });
 });
+
+describe('short wall piece beside a door (#267)', () => {
+  // bottom wall: long piece 0–370, door gap 370–460, 20 cm piece between jamb and right wall (460–480 inside, 500 outside)
+  const withStub = (): VectorSegment[] => [
+    S(0, 0, 500, 0), S(20, 20, 480, 20),
+    S(0, 0, 0, 400), S(20, 20, 20, 380),
+    S(500, 0, 500, 400), S(480, 20, 480, 380),
+    S(0, 400, 370, 400), S(20, 380, 370, 380),
+    S(460, 400, 500, 400), S(460, 380, 480, 380),
+  ];
+  it('keeps the piece as wall, so the opening is the real 90 cm gap', () => {
+    const out = detectVectorWalls(withStub(), mpp, { oblique: false });
+    const o = out.openings.find((x) => Math.abs(x.center.y - 390) < 10);
+    expect(o).toBeDefined();
+    expect(o!.width).toBeGreaterThan(85);
+    expect(o!.width).toBeLessThan(95);
+    expect(o!.center.x).toBeGreaterThan(405);
+    expect(o!.center.x).toBeLessThan(425);
+  });
+  it('a short pair of lines without a door gap stays a symbol', () => {
+    const segs = [...room(), S(100, 400, 120, 400), S(100, 380, 120, 380)];
+    expect(detectVectorWalls(segs, mpp, { oblique: false }).walls.length).toBe(detectVectorWalls(room(), mpp, { oblique: false }).walls.length);
+  });
+});

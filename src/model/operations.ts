@@ -328,6 +328,7 @@ export function deleteWalls(d: Project, wallIds: string[]) {
   const set = new Set(wallIds);
   d.walls = d.walls.filter((w) => !set.has(w.id));
   d.openings = d.openings.filter((o) => !set.has(o.wallId));
+  d.photos = d.photos.filter((ph) => !set.has(ph.wallId));
   removeBrokenRooms(d);
   removeOrphanNodes(d);
 }
@@ -343,6 +344,13 @@ export function deleteNode(d: Project, nodeId: string) {
 /** Delete a room record (walls stay). */
 export function deleteRoom(d: Project, roomId: string) {
   d.rooms = d.rooms.filter((r) => r.id !== roomId);
+  dropPlanningOf(d, 'room', roomId);
+}
+
+/** Notes pinned to a removed room/furniture and the room's tasks go with it (#83, #84). */
+function dropPlanningOf(d: Project, type: 'room' | 'furniture', id: string) {
+  d.notes = d.notes.filter((n) => !(n.target.type === type && n.target.id === id));
+  if (type === 'room') d.tasks = d.tasks.filter((t) => t.roomId !== id);
 }
 
 /** Delete a room together with walls that are not shared with any other room. */
@@ -489,6 +497,7 @@ export function duplicateFurniture(d: Project, id: string, offset: Vec2 = { x: 0
 export function deleteFurniture(d: Project, ids: string[]) {
   const set = new Set(ids);
   d.furniture = d.furniture.filter((f) => !set.has(f.id));
+  for (const id of set) dropPlanningOf(d, 'furniture', id);
   // a group left with a single item dissolves (#65)
   pruneGroups(d);
 }
@@ -529,6 +538,7 @@ export function mergeNodes(d: Project, from: string, to: string) {
     return true;
   });
   d.openings = d.openings.filter((o) => !removed.has(o.wallId));
+  d.photos = d.photos.filter((ph) => !removed.has(ph.wallId));
   for (const r of d.rooms) {
     r.nodeIds = r.nodeIds.map((id) => (id === from ? to : id)).filter((id, i, arr) => id !== arr[(i + 1) % arr.length]);
   }

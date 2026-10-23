@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { MarkKind } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 
-export type SelectionType = 'wall' | 'node' | 'room' | 'opening' | 'furniture' | 'light' | 'device';
+export type SelectionType = 'wall' | 'node' | 'room' | 'opening' | 'furniture' | 'light' | 'device' | 'fixture';
 export interface Selection {
   type: SelectionType;
   id: string;
@@ -11,8 +11,9 @@ export interface Selection {
 export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'mark' | 'calibrate';
 export type ViewMode = '2d' | '3d' | 'split';
 export type CameraMode = 'orbit' | 'walk';
-export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'import';
+export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'check' | 'import';
 export type RightTab = 'properties' | 'budget' | 'project';
+export type OtherLevels = 'below' | 'all' | 'none';
 
 export interface View2D {
   /** World point shown in the center of the canvas. */
@@ -64,8 +65,14 @@ interface UiStore {
   walkDuck: boolean;
   /** Seated in the walkthrough (#78) – eyes at the seated eye height of settings.bodyHeight. */
   walkSit: boolean;
+  /** Cabinets shown open (#85): their inner layout is drawn in 3D and 2D. */
+  interiorOpen: string[];
+  toggleInteriorOpen: (id: string) => void;
   /** Where the reference figure stands (#263); null = default spot. Placed with P while walking. */
   refFigurePos: Vec2 | null;
+  /** Other storeys shown in 3D (#54): the ones below the active storey, all, or none. */
+  otherLevels: OtherLevels;
+  setOtherLevels: (v: OtherLevels) => void;
   toasts: Toast[];
   setSelection: (s: Selection | null) => void;
   /** Shift+click: add/remove a furniture item to/from the selection. */
@@ -118,6 +125,10 @@ export const useUiStore = create<UiStore>((set, get) => ({
   walkDuck: false,
   walkSit: false,
   refFigurePos: null,
+  interiorOpen: [],
+  toggleInteriorOpen: (id) => set((s) => ({ interiorOpen: s.interiorOpen.includes(id) ? s.interiorOpen.filter((x) => x !== id) : [...s.interiorOpen, id] })),
+  otherLevels: 'below',
+  setOtherLevels: (otherLevels) => set({ otherLevels }),
   toasts: [],
   setSelection: (selection) => set({ selection, multi: [], rightTab: selection ? 'properties' : get().rightTab }),
   toggleFurnitureSelection: (id) => {

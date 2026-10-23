@@ -1,7 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { stairLayout } from '../model/stairLayout';
+import { stepCount } from '../model/stairs';
+import { polygonArea, type Vec2 } from '../model/vec';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type { FurnitureFinish, ModelRef, QualityMode, TableBase } from '../model/schema';
+import type { FurnitureFinish, Interior, ModelRef, QualityMode, TableBase } from '../model/schema';
+import { BOARD, columnWidth, DEFAULT_DRAWER_HEIGHT, innerHeight } from '../model/interior';
 import { getColorMaterial, type DetailKind } from './materials3d';
 import { kelvinToColor } from './lighting';
 import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
@@ -148,6 +152,60 @@ export function buildParts(shape: string, w: number, d: number, h: number, color
   return parts.map((p) => (own.has(p.color.toLowerCase()) && !p.emissive && (p.opacity ?? 1) === 1 ? { ...p, ...surface } : p));
 }
 
+/**
+ * A cabinet with its fronts removed and the planned inner layout (#85): carcass, dividers,
+ * shelves, rods with a few hangers and drawers pulled out a little. Spans the whole cabinet
+ * height (no plinth), so the inner floor lies one board above the ground, as `interior.ts` assumes.
+ */
+export function openCabinetParts(w: number, d: number, h: number, color: string, interior: Interior, accent?: string): Part[] {
+  const W = w / 2;
+  const D = d / 2;
+  const t = BOARD;
+  const front = accent ?? color;
+  const wood = shade(color, 0.96);
+  const parts: Part[] = [
+    box(-W, 0, -D, -W + t, h, D, wood),
+    box(W - t, 0, -D, W, h, D, wood),
+    box(-W + t, 0, -D, W - t, t, D, wood),
+    box(-W + t, h - t, -D, W - t, h, D, wood),
+    box(-W + t, t, -D, W - t, h - t, -D + 0.01, shade(color, 0.88)),
+  ];
+  const n = interior.columns;
+  const cw = columnWidth({ width: w, depth: d, height: h }, n);
+  const x0 = (c: number) => -W + t + c * (cw + t);
+  for (let c = 1; c < n; c++) parts.push(box(x0(c) - t, t, -D, x0(c), h - t, D - 0.02, wood));
+  const pull = Math.min(0.3, d * 0.5);
+  const top = innerHeight({ width: w, depth: d, height: h });
+  for (const p of interior.parts) {
+    if (p.column >= n) continue;
+    const a = x0(p.column);
+    const b = a + cw;
+    const z = t + p.z;
+    if (p.kind === 'shelf') parts.push(box(a, z, -D + 0.01, b, z + t, D - 0.02, wood));
+    else if (p.kind === 'rod') {
+      parts.push({ geo: CYL, p: [(a + b) / 2, t + p.z, 0], s: [0.03, cw, 0.03], r: [0, 0, Math.PI / 2], color: METAL, metal: 0.85, rough: 0.3 });
+      const hangers = Math.max(2, Math.floor(cw / 0.07));
+      for (let k = 0; k < hangers; k++) {
+        const hx = a + 0.03 + ((k + 0.5) * (cw - 0.06)) / hangers;
+        parts.push(box(hx - 0.004, t + p.z - Math.min(1.2, p.z - 0.05), -0.12, hx + 0.004, t + p.z - 0.03, 0.12, k % 3 === 0 ? '#5b6b8a' : k % 3 === 1 ? '#c9b79c' : '#7a4f4f', { rough: 0.9 }));
+      }
+    } else {
+      const dh = Math.min(p.h ?? DEFAULT_DRAWER_HEIGHT, top - p.z);
+      const fz = D - 0.02 + pull; // front panel position when pulled out
+      parts.push(rbox(a + 0.003, z + 0.003, fz, b - 0.003, z + dh - 0.003, fz + t, 0.003, front, { rough: 0.5 }));
+      parts.push(rbox((a + b) / 2 - 0.06, z + dh / 2 - 0.006, fz + t, (a + b) / 2 + 0.06, z + dh / 2 + 0.006, fz + t + 0.02, 0.004, METAL, { metal: 0.85, rough: 0.3 }));
+      const bd = Math.max(0.1, d - 0.08);
+      const zb = fz - bd;
+      const inner = shade(color, 0.9);
+      parts.push(box(a + 0.02, z + 0.01, zb, b - 0.02, z + 0.025, fz, inner));
+      parts.push(box(a + 0.02, z + 0.01, zb, a + 0.032, z + dh - 0.04, fz, inner));
+      parts.push(box(b - 0.032, z + 0.01, zb, b - 0.02, z + dh - 0.04, fz, inner));
+      parts.push(box(a + 0.02, z + 0.01, zb, b - 0.02, z + dh - 0.04, zb + 0.012, inner));
+    }
+  }
+  return parts;
+}
+
 /** Product details beyond the main colour (#273): frame/leg colour and the kind of table base. */
 export interface ProceduralLook {
   /** colour of legs, frame or base; default: a shade of the main colour (tables) or the shape's own */
@@ -207,7 +265,43 @@ function tableBase(base: TableBase, W: number, D: number, top: number, c: string
   }
 }
 
+/** Prisms over a plan polygon (cached by outline); plan y becomes the model's z. */
+const prismCache = new Map<string, THREE.BufferGeometry>();
+function prism(poly: Vec2[], height: number): THREE.BufferGeometry {
+  const key = poly.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(';') + `|${height.toFixed(3)}`;
+  let g = prismCache.get(key);
+  if (!g) {
+    const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, -p.y)));
+    g = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false }).rotateX(-Math.PI / 2);
+    prismCache.set(key, g);
+    if (prismCache.size > 2000) {
+      const first = prismCache.keys().next().value!;
+      prismCache.get(first)?.dispose();
+      prismCache.delete(first);
+    }
+  }
+  return g;
+}
+
+/** Turning stairs (#335): one block per tread of the shared stair layout, landings solid down to the floor. */
+function turningStairParts(shape: string, w: number, d: number, h: number, color: string, grain: Partial<Part>): Part[] {
+  const layout = stairLayout(shape, w, d, h);
+  if (!layout) return [];
+  const rise = layout.treads.length > 0 ? layout.treads[0].top : h;
+  const parts: Part[] = [];
+  for (const t of layout.treads) {
+    const y0 = polygonArea(t.poly) > 0.5 ? 0 : Math.max(0, t.top - rise * 2.2);
+    parts.push({ geo: prism(t.poly, t.top - 0.03 - y0), p: [0, y0, 0], s: [1, 1, 1], color: shade(color, 0.92) });
+    parts.push({ geo: prism(t.poly, 0.03), p: [0, t.top - 0.03, 0], s: [1, 1, 1], color, ...grain });
+  }
+  if (shape.startsWith('stairs-spiral')) {
+    parts.push(cyl(0, 0, 0, 0.05, h + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+  }
+  return parts;
+}
+
 function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, look: ProceduralLook = {}): Part[] {
+  if (shape.startsWith('stairs-')) return turningStairParts(shape, w, d, h, color, { detail: 'woodgrain', detailRepeat: 1 });
   const W = w / 2;
   const D = d / 2;
   const front = accent ?? color;
@@ -492,6 +586,25 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       ];
     case 'bathtub':
       return [rbox(-W, 0, -D, W, h, D, 0.06, '#ffffff', { rough: 0.12 }), rbox(-W + 0.07, h - 0.4, -D + 0.07, W - 0.07, h + 0.001, D - 0.07, 0.12, '#e7eef2', { rough: 0.1 })];
+    case 'stairs': {
+      // straight flight (#54): rises from the front (+z) to the back (−z), one block per step, a rail on the right
+      const n = stepCount(h);
+      const rise = h / n;
+      const run = d / n;
+      const parts: Part[] = [];
+      for (let i = 0; i < n; i++) {
+        const z1 = D - i * run;
+        const top = (i + 1) * rise;
+        parts.push(box(-W, Math.max(0, top - rise * 2.2), z1 - run, W, top - 0.03, z1, shade(color, 0.92)));
+        parts.push(box(-W, top - 0.03, z1 - run - 0.02, W, top, z1, color, grain));
+      }
+      const len = Math.hypot(d, h);
+      const tilt = Math.atan2(h, d);
+      parts.push({ geo: BOX, p: [W - 0.03, h / 2 + 0.9, 0], s: [0.04, 0.04, len], r: [tilt, 0, 0], color: METAL, metal: 0.8, rough: 0.3 });
+      parts.push(cyl(W - 0.03, rise, D - run / 2, 0.02, rise + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+      parts.push(cyl(W - 0.03, h, -D + run / 2, 0.02, h + 0.9, METAL, { metal: 0.8, rough: 0.3 }));
+      return parts;
+    }
     case 'shower':
       return [
         rbox(-W, 0, -D, W, 0.05, D, 0.01, '#ffffff', { rough: 0.2 }),
@@ -516,6 +629,7 @@ export const ProceduralModel = memo(function ProceduralModel({
   accent,
   finish,
   look,
+  interior,
   quality,
   castShadow,
 }: {
@@ -527,14 +641,19 @@ export const ProceduralModel = memo(function ProceduralModel({
   accent?: string;
   finish?: FurnitureFinish;
   look?: ProceduralLook;
+  /** Cabinet shown open with this inner layout (#85). */
+  interior?: Interior;
   quality: QualityMode;
   castShadow: boolean;
 }) {
   const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
   const photo = usePhotoTexture(texture);
   const parts = useMemo(
-    () => buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
-    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight],
+    () =>
+      interior
+        ? openCabinetParts(width, depth, height, color, interior, accent)
+        : buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
+    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight, interior],
   );
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
   const materials = useMemo(

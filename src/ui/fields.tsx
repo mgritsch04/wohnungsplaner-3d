@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useProjectStore } from '../store/projectStore';
 import { usePanelGroupOpen, usePanelGroupStore } from './panelGroupStore';
 
 interface NumberFieldProps {
@@ -89,6 +90,32 @@ export function NumberField({ label, value, onChange, factor = 1, unit, min, max
         {unit && <span className="field-unit">{unit}</span>}
       </span>
     </label>
+  );
+}
+
+/**
+ * Slider 0–360° for an angle (degrees). One drag is one undo step: the project store runs a transaction
+ * from pointer down to release, so `onChange` may use the normal (collision-checked) actions.
+ */
+export function AngleSlider({ value, onChange, label, testId, disabled }: { value: number; onChange: (deg: number) => void; label: string; testId?: string; disabled?: boolean }) {
+  const st = () => useProjectStore.getState();
+  const end = () => st().commitTransaction();
+  return (
+    <input
+      type="range"
+      min={0}
+      max={360}
+      step={1}
+      value={((Math.round(value) % 360) + 360) % 360}
+      disabled={disabled}
+      aria-label={label}
+      data-testid={testId}
+      onPointerDown={() => st().beginTransaction()}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onBlur={end}
+      onChange={(e) => onChange(Number(e.target.value))}
+    />
   );
 }
 

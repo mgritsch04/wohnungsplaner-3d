@@ -1,5 +1,7 @@
 import { createFurnitureFromCatalog } from '../catalog/instantiate';
+import { defaultStairHeight, isStair } from '../model/stairs';
 import { deleteDevice } from '../smarthome/actions';
+import { deleteFixture } from '../installation/actions';
 import type { CatalogItem } from '../catalog/types';
 import { createEmptyProject } from '../model/factory';
 import { derivePlan } from '../model/derived';
@@ -63,6 +65,8 @@ export async function deleteSelection() {
     });
   } else if (sel.type === 'device') {
     deleteDevice(sel.id);
+  } else if (sel.type === 'fixture') {
+    deleteFixture(sel.id);
   }
   ui().setSelection(null);
 }
@@ -180,6 +184,8 @@ export function addCatalogItem(item: CatalogItem) {
     if (!inRoom && derived.rooms.size > 0) at = [...derived.rooms.values()][0].centroid;
   }
   const f = createFurnitureFromCatalog(item, { x: roundMm(at.x), y: roundMm(at.y) });
+  // a stair leads up to the storey above (#54)
+  if (isStair(f)) f.height = defaultStairHeight(p);
   store().apply((d) => {
     d.furniture.push(f);
   });
@@ -199,6 +205,7 @@ export function dropCatalogItemAt(item: CatalogItem, at: { x: number; y: number 
     return false;
   }
   const f = createFurnitureFromCatalog(item, at);
+  if (isStair(f)) f.height = defaultStairHeight(store().project);
   let placed = false;
   store().apply((d) => {
     placed = placeDroppedFurniture(d, derived, f, at, altKey);
@@ -300,6 +307,20 @@ export async function importProjectFile() {
   } catch (e) {
     reportError(e, 'Import fehlgeschlagen');
   }
+}
+
+/**
+ * Show or hide the imported plan background (#258; P key, switch in the 2D view). Same
+ * `underlay.visible` as the checkbox in the Import panel; one undo step. Returns the new
+ * state, or null if there is no background or a drag is in progress.
+ */
+export function toggleUnderlayVisible(): boolean | null {
+  const u = store().project.underlay;
+  if (!u || store().txBase) return null;
+  store().apply((d) => {
+    if (d.underlay) d.underlay.visible = !u.visible;
+  });
+  return !u.visible;
 }
 
 /**

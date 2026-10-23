@@ -4,17 +4,26 @@ import type { Project } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
-import { placeDevice, roomAt, syncLight } from './actions';
+import { sightOccluders } from '../model/visibility';
+import { placeDevice, placeStrip, roomAt, syncLight } from './actions';
 import { deviceOn } from './DeviceInfo';
 import { GlyphPaths, KIND_COLOR } from './glyphs';
+import { formatLength, snapToEdges, stripColor, stripLengthM, stripPoints } from './strip';
 import { detectionPolygon, occludersOf, sensorParams } from './simulation';
 import { useSelectedDeviceId, useSimStore } from './simStore';
+import { deviceOfProposal } from './suggest';
+import { useSmartSuggestStore } from './suggestStore';
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 /** big enough to catch every click of the plan while placing */
 const CATCH = 1e4;
 
-type Drag = { kind: 'move'; id: string; dx: number; dy: number; moved: boolean } | { kind: 'rotate'; id: string } | { kind: 'person' };
+type Drag =
+  | { kind: 'move'; id: string; dx: number; dy: number; moved: boolean }
+  | { kind: 'rotate'; id: string }
+  | { kind: 'person' }
+  | { kind: 'strip-move'; id: string; from: Vec2; orig: Vec2[]; moved: boolean }
+  | { kind: 'strip-point'; id: string; index: number };
 
 /**
  * Smart-home devices in the 2D plan (#170, #233): symbol and name per device, status colour,
@@ -30,16 +39,32 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
   const selectedId = useSelectedDeviceId();
   const tabOpen = useUiStore((s) => s.leftTab === 'smarthome');
   const [hoverAt, setHoverAt] = useState<Vec2 | null>(null);
-  const occluders = useMemo(() => (project.devices.length ? occludersOf(project, derivePlan(project)) : []), [project]);
+  const preview = useSmartSuggestStore((s) => s.preview);
+  /** LED strip being placed: start point after the first click (#238) */
+  const [stripStart, setStripStart] = useState<Vec2 | null>(null);
+  const wallFaces = useMemo(() => (project.devices.some((d) => d.kind === 'strip') || placing ? sightOccluders(project, derivePlan(project)) : []), [project, placing]);
+  const snap = (p: Vec2) => {
+    const q = snapToEdges(p, project, wallFaces);
+    return { x: r3(q.x), y: r3(q.y) };
+  };
+  const occluders = useMemo(() => (project.devices.length || preview ? occludersOf(project, derivePlan(project)) : []), [project, preview]);
+
+  useEffect(() => {
+    if (!placing) setStripStart(null);
+  }, [placing]);
 
   useEffect(() => {
     if (!placing) return;
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && setPlacing(null);
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setStripStart(null);
+      setPlacing(null);
+    };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [placing, setPlacing]);
 
-  if (!project.devices.length && !person && !placing) return null;
+  if (!project.devices.length && !person && !placing && !preview) return null;
 
   const toWorld = (e: React.PointerEvent): Vec2 | null => {
     const m = ref.current?.getScreenCTM();
@@ -64,6 +89,23 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
     if (!d || !w) return;
     e.stopPropagation();
     if (d.kind === 'person') return setPerson(w);
+    if (d.kind === 'strip-move' || d.kind === 'strip-point') {
+      if (d.kind === 'strip-move' && !d.moved) {
+        if (Math.hypot(w.x - d.from.x, w.y - d.from.y) < 4 * px) return;
+        d.moved = true;
+      }
+      st().updateTransient((p) => {
+        const dev = p.devices.find((x) => x.id === d.id);
+        if (!dev) return;
+        const pts = stripPoints(dev).map((q) => ({ ...q }));
+        if (d.kind === 'strip-move') pts.forEach((q, i) => ((q.x = r3(d.orig[i].x + w.x - d.from.x)), (q.y = r3(d.orig[i].y + w.y - d.from.y))));
+        else pts[d.index] = snap(w);
+        dev.points = pts;
+        dev.x = pts[0].x;
+        dev.y = pts[0].y;
+      });
+      return;
+    }
     if (d.kind === 'move' && !d.moved) {
       // a click without movement only selects (and adds no undo step)
       const dev = st().project.devices.find((x) => x.id === d.id);
@@ -93,6 +135,17 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
     e.stopPropagation();
     const w = toWorld(e);
     if (!w) return;
+    if (placing.kind === 'strip') {
+      // two clicks: start, then end (a bend is added later in the device info)
+      const q = snap(w);
+      if (!stripStart) return setStripStart(q);
+      if (Math.hypot(q.x - stripStart.x, q.y - stripStart.y) < 0.05) return;
+      placeStrip([stripStart, q]);
+      setStripStart(null);
+      setPlacing(null);
+      setHoverAt(null);
+      return;
+    }
     const p = st().project;
     placeDevice(placing.kind, placing.productId, roomAt(p, derivePlan(p), w), w);
     setPlacing(null);
@@ -110,6 +163,50 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
         const params = sensor ? sensorParams(d) : null;
         const handle = { x: d.x + Math.cos(d.rotation) * 44 * px, y: d.y + Math.sin(d.rotation) * 44 * px };
         const s = (1.3 * r) / 24;
+        if (d.kind === 'strip') {
+          const pts = stripPoints(d);
+          const line = pts.map((q) => `${q.x} ${q.y}`).join(' ');
+          const col = stripColor(d, state?.entities[d.id]);
+          const mid = pts[Math.floor((pts.length - 1) / 2)];
+          const next = pts[Math.floor((pts.length - 1) / 2) + 1];
+          const lab = { x: (mid.x + next.x) / 2, y: (mid.y + next.y) / 2 };
+          return (
+            <g key={d.id} data-testid="device-2d" data-device={d.name} data-device-id={d.id} data-on={on} data-selected={sel} data-kind="strip" data-color={col} data-length={stripLengthM(pts).toFixed(2)}>
+              {on && <polyline points={line} fill="none" stroke={col} strokeOpacity={0.3} strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+              {sel && <polyline points={line} fill="none" stroke="#2563eb" strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+              <polyline points={line} fill="none" stroke={on ? col : '#ffffff'} strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+              <polyline points={line} fill="none" stroke={on ? '#ffffff' : KIND_COLOR.strip} strokeOpacity={on ? 0.55 : 1} strokeWidth={on ? 1.5 : 2} strokeDasharray={on ? undefined : '1 6'} strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+              <polyline
+                points={line}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={16}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  const w = toWorld(e);
+                  if (w) begin(e, { kind: 'strip-move', id: d.id, from: w, orig: pts, moved: false });
+                }}
+                {...handlers}
+                data-testid="device-hit"
+              >
+                <title>{d.name}</title>
+              </polyline>
+              {flash?.id === d.id && <circle key={flash.at} cx={lab.x} cy={lab.y} r={r} fill="none" stroke={KIND_COLOR.strip} strokeWidth={3} vectorEffect="non-scaling-stroke" pointerEvents="none" data-testid="device-flash"><animate attributeName="r" values={`${r};${r * 3.2}`} dur="0.8s" repeatCount={3} /><animate attributeName="stroke-opacity" values="0.9;0" dur="0.8s" repeatCount={3} /></circle>}
+              {sel &&
+                pts.map((q, i) => (
+                  <circle key={i} cx={q.x} cy={q.y} r={6 * px} fill="#2563eb" stroke="#ffffff" strokeWidth={1.5} vectorEffect="non-scaling-stroke" style={{ cursor: 'grab' }} onPointerDown={(e) => begin(e, { kind: 'strip-point', id: d.id, index: i })} {...handlers} data-testid="strip-point" />
+                ))}
+              {(tabOpen || sel) && (
+                <text x={lab.x} y={lab.y - 10 * px} fontSize={11 * px} fontWeight={sel ? 700 : 500} textAnchor="middle" fill={sel ? '#1d4ed8' : '#334155'} stroke="#ffffff" strokeWidth={3 * px} paintOrder="stroke" pointerEvents="none" data-testid="strip-label">
+                  {d.name} · {formatLength(stripLengthM(pts))}
+                </text>
+              )}
+            </g>
+          );
+        }
         return (
           <g key={d.id} data-testid="device-2d" data-device={d.name} data-device-id={d.id} data-on={on} data-selected={sel}>
             {params && (
@@ -170,6 +267,36 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
           </g>
         );
       })}
+      {preview && (
+        <g pointerEvents="none" data-testid="smarthome-preview">
+          {preview.items.map((it) => {
+            const d = deviceOfProposal(it);
+            const color = KIND_COLOR[d.kind];
+            const sensor = d.kind === 'motion' || d.kind === 'presence';
+            const s = (1.3 * r) / 24;
+            return (
+              <g key={it.key} data-testid="device-preview" data-kind={d.kind} data-device={d.name}>
+                {sensor && (
+                  <path
+                    d={`M ${detectionPolygon(d, sensorParams(d), occluders).map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}
+                    fill={color}
+                    fillOpacity={0.14}
+                    stroke={color}
+                    strokeOpacity={0.6}
+                    strokeDasharray="4 3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                <circle cx={d.x} cy={d.y} r={r} fill="#ffffff" fillOpacity={0.85} stroke={color} strokeWidth={2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+                <g transform={`translate(${d.x - 12 * s} ${d.y - 12 * s}) scale(${s})`} fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <GlyphPaths kind={d.kind} />
+                </g>
+                <title>{`${d.name} (Vorschau)`}</title>
+              </g>
+            );
+          })}
+        </g>
+      )}
       {person && (
         <g style={{ cursor: 'grab' }} onPointerDown={(e) => begin(e, { kind: 'person' })} {...handlers} data-testid="sim-person-2d">
           <circle cx={person.x} cy={person.y} r={0.25} fill="#f97316" fillOpacity={0.25} stroke="#f97316" strokeWidth={2} vectorEffect="non-scaling-stroke" />
@@ -190,7 +317,20 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
             onPointerMove={(e) => setHoverAt(toWorld(e))}
             onPointerLeave={() => setHoverAt(null)}
           />
-          {hoverAt && (
+          {placing.kind === 'strip' && stripStart && (
+            <g pointerEvents="none" opacity={0.8}>
+              <circle cx={stripStart.x} cy={stripStart.y} r={5 * px} fill="#2563eb" />
+              {hoverAt && (
+                <>
+                  <line x1={stripStart.x} y1={stripStart.y} x2={snap(hoverAt).x} y2={snap(hoverAt).y} stroke={KIND_COLOR.strip} strokeWidth={5} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                  <text x={snap(hoverAt).x} y={snap(hoverAt).y - 10 * px} fontSize={11 * px} textAnchor="middle" fill="#9d174d" stroke="#ffffff" strokeWidth={3 * px} paintOrder="stroke">
+                    {formatLength(Math.hypot(snap(hoverAt).x - stripStart.x, snap(hoverAt).y - stripStart.y))}
+                  </text>
+                </>
+              )}
+            </g>
+          )}
+          {hoverAt && !(placing.kind === 'strip' && stripStart) && (
             <g pointerEvents="none" opacity={0.7}>
               <circle cx={hoverAt.x} cy={hoverAt.y} r={r} fill="#ffffff" stroke={KIND_COLOR[placing.kind]} strokeWidth={2} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
               <g transform={`translate(${hoverAt.x - (12 * 1.3 * r) / 24} ${hoverAt.y - (12 * 1.3 * r) / 24}) scale(${(1.3 * r) / 24})`} fill="none" stroke={KIND_COLOR[placing.kind]} strokeWidth={2.2} strokeLinecap="round">

@@ -33,6 +33,12 @@ interface Props {
   /** Camera height above the floor (m). */
   eyeHeight?: number;
   onLockChange: (locked: boolean) => void;
+  /** Height of the ground under the walker (stairs, #54), relative to the active storey's floor. */
+  groundAt?: (p: Vec2) => number;
+  /** Height to the storey above / from the storey below (m); null = there is none. */
+  levelRise?: { up: number | null; down: number | null };
+  /** Climbed past half a stair: make the storey above (1) or below (−1) the active one. */
+  onChangeLevel?: (dir: 1 | -1) => boolean;
 }
 
 /**
@@ -50,6 +56,16 @@ export const BASE_LOOK_SENSITIVITY = 0.0022;
 
 /** Furniture under the crosshair can be picked up to this distance (m). */
 const PICK_RANGE = 6;
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file', 'image']);
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyO', 'KeyG', 'KeyC', 'KeyX', 'KeyF', 'KeyP', 'KeyZ']);
+/** Focus is in a field that takes typed text (#283): text, number, search … inputs, textareas, contenteditable. */
+const isTextEntry = (t: HTMLElement | null): boolean =>
+  !!t && (t.tagName === 'TEXTAREA' || t.isContentEditable || (t.tagName === 'INPUT' && !NON_TEXT_INPUTS.has((t as HTMLInputElement).type)));
+/** Hand the keyboard back to the scene: leave a focused field, slider, checkbox, select or button (#283). */
+const blurFocus = () => {
+  const a = document.activeElement as HTMLElement | null;
+  if (a && a !== document.body && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(a.tagName)) a.blur();
+};
 /** A carried item stays this far in front of the eyes (m, horizontal). */
 const CENTER = new THREE.Vector2(0, 0);
 /** Farthest floor point the reference figure is placed at with P (m) (#263). */
@@ -67,7 +83,7 @@ export function openingIdOf(o: THREE.Object3D | null): string | null {
   return null;
 }
 
-export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange }: Props) {
+export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivity = BASE_LOOK_SENSITIVITY, eyeHeight = EYE_HEIGHT, onLockChange, groundAt, levelRise, onChangeLevel }: Props) {
   const { camera, gl, scene } = useThree();
   // furniture carried with G (#39): moves with the gaze, same collision rules as dragging
   const carryId = useUiStore((s) => s.walkCarry);
@@ -113,6 +129,15 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
   }, [sitEye]);
   const eyeRef = useRef(eyeHeight);
   const eyeNow = useRef<number | null>(null);
+  // stairs (#54): the ground under the walker, smoothed; a storey change shifts it by the storey height
+  const stairs = useRef({ groundAt, levelRise, onChangeLevel });
+  const groundNow = useRef(0);
+  const levelSwitching = useRef(false);
+  useEffect(() => {
+    stairs.current = { groundAt, levelRise, onChangeLevel };
+    // the new storey's ground function has arrived
+    levelSwitching.current = false;
+  }, [groundAt, levelRise, onChangeLevel]);
   useEffect(() => {
     eyeRef.current = eyeHeight;
   }, [eyeHeight]);
@@ -151,6 +176,9 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     };
   }, [startX, startY, camera]);
 
+  // starting the walkthrough takes the keyboard away from whatever panel control was used last (#283)
+  useEffect(() => blurFocus(), []);
+
   useEffect(() => {
     const el = gl.domElement;
     const pressed = keys.current;
@@ -167,6 +195,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       }
       return null;
     };
+    /** Short feedback when a key does nothing (#283); not repeated more often than every 2 s. */
+    let lastHint = -Infinity;
+    const hint = (text: string) => {
+      if (performance.now() - lastHint < 2000) return;
+      lastHint = performance.now();
+      useUiStore.getState().toast(text, 'info');
+    };
     /** Furniture under the crosshair. */
     const target = (at?: THREE.Vector2): string | null => furnitureIdOf(aimed(at));
     /** Door/window under the crosshair (#21). */
@@ -174,12 +209,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       const o = aimed(at);
       return furnitureIdOf(o) ? null : openingIdOf(o);
     };
-    /** E/O: open/close the door/window in sight, else the selected one. */
+    /** F/O: open/close the door/window in sight, else the selected one. */
     const toggleAimedOpening = () => {
-      if (carry.current) return;
+      if (carry.current) return hint('Erst ablegen (G), dann Tür/Fenster mit F bedienen');
       const sel = useUiStore.getState().selection;
       const id = targetOpening() ?? (sel?.type === 'opening' ? sel.id : null);
       if (id) toggleOpening(id);
+      else hint('Keine Tür/kein Fenster im Fadenkreuz (max. 6 m)');
     };
     const startCarry = (id: string) => {
       const f = useProjectStore.getState().project.furniture.find((x) => x.id === id);
@@ -211,10 +247,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       if (id) return useUiStore.getState().setSelection({ type: 'furniture', id });
       // a door or window in sight is opened or closed (#21)
       const opening = targetOpening(at);
-      if (opening) toggleOpening(opening);
+      if (opening) return toggleOpening(opening);
+      // a click into the void clears the selection (#257)
+      useUiStore.getState().setSelection(null);
     };
     /**
-     * F / right-click (#235): context menu of the object in sight (or under `client` without
+     * Right-click (#235): context menu of the object in sight (or under `client` without
      * pointer lock), else the carried item or the selection. Frees the mouse so the menu can be used.
      */
     const openMenu = (client?: { x: number; y: number }) => {
@@ -227,7 +265,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         raycaster.far = PICK_RANGE;
         t = firstPickTarget(raycaster, scene) ?? ui.selection;
       }
-      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (F).', 'info');
+      if (!t) return ui.toast('Nichts im Fadenkreuz – auf ein Möbel, eine Tür oder ein Fenster zielen (Rechtsklick).', 'info');
       if (document.pointerLockElement === el) document.exitPointerLock?.();
       clear();
       const c = client ?? paneCenter('3d');
@@ -249,7 +287,12 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     walkCommands.toggleCarry = toggleCarry;
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      // only text entry swallows the walking keys (#283); checkboxes, sliders and buttons do not
+      if (isTextEntry(t)) {
+        if (e.code === 'Escape') t.blur();
+        else if (WALK_KEYS.has(e.code) && !e.ctrlKey && !e.metaKey && !e.altKey) hint('Eingabefeld aktiv – Esc drücken oder in die Ansicht klicken');
+        return;
+      }
       if (e.code === 'KeyG' && !e.repeat && !e.ctrlKey && !e.metaKey) {
         toggleCarry();
         return;
@@ -270,18 +313,13 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
         setFov(base.current);
         return;
       }
-      if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // context menu at the crosshair (#235)
-        openMenu();
-        return;
-      }
       if (e.code === 'KeyP' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // place the reference figure where the crosshair meets the floor (#263) and show it
         placeRefFigure();
         return;
       }
-      if ((e.code === 'KeyE' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // E (#107) or O: open/close the door or window in sight
+      if ((e.code === 'KeyF' || e.code === 'KeyO') && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // F (#257) or O: open/close the door or window in sight
         toggleAimedOpening();
         return;
       }
@@ -333,6 +371,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     // without pointer lock (refused, e.g. in an embedded page): a short click picks under the mouse
     let downAt: { x: number; y: number } | null = null;
     const onDown = (e: MouseEvent) => {
+      blurFocus();
       if (performance.now() - lastTouch < 1000) return;
       if (e.button === 2) {
         // right button: context menu (#235) – at the crosshair, or under the free mouse
@@ -515,7 +554,21 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
     // head bob (#263) from the distance walked in the previous frame
     const bobY = useProjectStore.getState().project.settings.walkHeadBob ? stepBob(bob, moved.current, dt) : 0;
     moved.current = 0;
-    camera.position.y = eyeNow.current + bobY;
+    const st = stairs.current;
+    const goalGround = st.groundAt ? st.groundAt({ x: camera.position.x, y: camera.position.z }) : 0;
+    groundNow.current += (goalGround - groundNow.current) * (1 - Math.exp(-dt / 0.06));
+    if (Math.abs(goalGround - groundNow.current) < 0.001) groundNow.current = goalGround;
+    // past half a stair the storey above (or below) becomes the active one; the eyes stay where they are
+    if (!levelSwitching.current && st.onChangeLevel && st.levelRise) {
+      const { up, down } = st.levelRise;
+      const dir = up !== null && goalGround > up / 2 ? 1 : down !== null && goalGround < -down / 2 ? -1 : 0;
+      if (dir !== 0 && st.onChangeLevel(dir)) {
+        levelSwitching.current = true;
+        groundNow.current -= dir === 1 ? up! : -down!;
+      }
+    }
+    const ground = groundNow.current;
+    camera.position.y = ground + eyeNow.current + bobY;
     useWalkPose.getState().setPose({ x: camera.position.x, y: camera.position.z, yaw: yaw.current });
     const c = carry.current;
     if (c) {
@@ -569,7 +622,7 @@ export function WalkControls({ derived, furniture, start, speed = 1.4, sensitivi
       p = resolveCollisions(p, collidersRef.current);
     }
     moved.current = Math.hypot(p.x - camera.position.x, p.y - camera.position.z);
-    camera.position.set(p.x, eyeNow.current + bobY, p.y);
+    camera.position.set(p.x, ground + eyeNow.current + bobY, p.y);
   });
 
   return null;

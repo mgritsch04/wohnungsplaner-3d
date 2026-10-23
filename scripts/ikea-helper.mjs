@@ -3,13 +3,14 @@
  * Lokaler IKEA-Helfer für den Wohnungsplaner (Katalog › Abschnitt „IKEA“).
  *
  *   npm run ikea-helper            (oder: node scripts/ikea-helper.mjs [--port 4791])
+ *   npm run ikea-helper -- --check  prüft nur, ob Claude Code gefunden und angemeldet ist
  *
  * Läuft nur auf diesem Rechner (127.0.0.1) und beantwortet nur Anfragen der lokal
  * geöffneten Planer-App (Herkunft localhost/127.0.0.1). Pro eingefügter Artikelnummer
  * bzw. Produkt-URL ruft er wie `scripts/ikea-products.mjs` genau EINE öffentliche
  * Produktseite von IKEA Österreich ab (höchstens eine Anfrage alle 1,5 s) und auf
- * Wunsch das dort deklarierte 3D-Modell. Keine Suche, keine Konten, keine internen
- * IKEA-Schnittstellen. Ergebnisse werden in `ikea-import/auswahl/` zwischengespeichert
+ * Wunsch das dort deklarierte 3D-Modell. Keine Konten, keine internen IKEA-Schnittstellen;
+ * gesucht wird nur von Claude über `POST /claude` (siehe unten, #350). Ergebnisse werden in `ikea-import/auswahl/` zwischengespeichert
  * (Produktdaten 24 h, Modelle dauerhaft), damit dieselbe Seite nicht erneut abgerufen wird.
  *
  * Lesezeichen „An Planer senden“ (#221): Auf einer Produktseite von ikea.com oder moebelix.at,
@@ -32,6 +33,9 @@
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
  *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
+ *   POST /claude { prompt, web? }       → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
+ *                                         (#350; `web`: Websuche + Seiten von ikea.com/moebelix.at lesen),
+ *                                         eine Anfrage zur Zeit; `/status` meldet `claude: true`, wenn verfügbar
  *
  * 3D-Modelle und Bilder sind urheberrechtlich geschützt: nur privat nutzen.
  */
@@ -40,13 +44,19 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fetchArticle, fetchIkeaModel, fetchProductImage, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
+import { checkClaude, claudeAvailable, INSTALL_HELP, runClaude } from './lib/claude-cli.mjs';
 
 const args = process.argv.slice(2);
+if (args.includes('--check')) {
+  const { ok, lines } = await checkClaude();
+  for (const l of lines) console.log(l);
+  process.exit(ok ? 0 : 1);
+}
 const portArg = args.indexOf('--port');
 const PORT = Number(portArg >= 0 ? args[portArg + 1] : process.env.IKEA_HELPER_PORT) || 4791;
 const CACHE = resolve(process.env.IKEA_HELPER_CACHE || join('ikea-import', 'auswahl'));
 const ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
-const VERSION = 2;
+const VERSION = 3;
 const MAX_BODY = 3 * 1024 * 1024;
 /** Shops whose product pages the bookmarklet may send (the page the user has open, one per click). */
 const SHOP_ORIGINS = ['https://www.ikea.com', 'https://www.moebelix.at'];
@@ -72,6 +82,32 @@ const saveInbox = () => writeFileSync(INBOX_FILE, JSON.stringify(inbox, null, 2)
 const tokenOk = (t) => typeof t === 'string' && t.length === TOKEN.length && timingSafeEqual(Buffer.from(t), Buffer.from(TOKEN));
 const mods = await loadIkeaModules();
 const get = politeFetcher();
+
+/** Claude Code on this computer (#350): checked once at start; one request at a time. */
+let claudeReady = false;
+void claudeAvailable().then((ok) => {
+  claudeReady = ok;
+  console.log(ok ? 'Claude Code gefunden – „Claude fragen“ und „Einrichten lassen“ funktionieren auch im lokalen Planer.' : `${INSTALL_HELP} Bis dahin gibt es Claude-Funktionen nur im App-Artefakt.`);
+});
+let claudeBusy = false;
+
+async function askClaude(body) {
+  if (!claudeReady) return [503, { error: `Claude Code ist auf diesem Rechner nicht verfügbar. ${INSTALL_HELP}` }];
+  const prompt = typeof body?.prompt === 'string' ? body.prompt : '';
+  if (!prompt || prompt.length > 200_000) return [400, { error: 'Leere oder zu lange Anfrage.' }];
+  if (claudeBusy) return [429, { error: 'Claude arbeitet noch an der vorigen Anfrage.' }];
+  claudeBusy = true;
+  try {
+    const web = body.web === true;
+    console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''} …`);
+    const text = await runClaude(prompt, { web });
+    return [200, { text }];
+  } catch (e) {
+    return [502, { error: e instanceof Error ? e.message : String(e) }];
+  } finally {
+    claudeBusy = false;
+  }
+}
 
 const keyOf = (a) => `${a.combination ? 's' : ''}${a.digits}`;
 
@@ -248,6 +284,10 @@ const server = createServer(async (req, res) => {
       const [status, body] = await receivePage(JSON.parse(await readBody(req)));
       return json(status, body);
     }
+    if (req.method === 'POST' && url.pathname === '/claude') {
+      const [status, body] = await askClaude(JSON.parse(await readBody(req)));
+      return json(status, body);
+    }
     if (req.method === 'POST' && url.pathname === '/inbox/ack') {
       const ids = new Set((JSON.parse(await readBody(req))?.ids ?? []).map(String));
       inbox = inbox.filter((i) => !ids.has(i.id));
@@ -257,7 +297,7 @@ const server = createServer(async (req, res) => {
     if (req.method !== 'GET') return json(405, { error: 'Nur GET.' });
     if (url.pathname === '/bookmarklet') return json(200, { token: TOKEN });
     if (url.pathname === '/inbox') return json(200, { items: inbox });
-    if (url.pathname === '/status') return json(200, { ok: true, name: 'wohnungsplaner-ikea-helper', version: VERSION });
+    if (url.pathname === '/status') return json(200, { ok: true, name: 'wohnungsplaner-ikea-helper', version: VERSION, claude: claudeReady });
     if (url.pathname === '/product') {
       const [status, body] = await product(url.searchParams);
       return json(status, body);

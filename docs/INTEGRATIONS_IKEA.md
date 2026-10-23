@@ -4,6 +4,14 @@ _Stand: 2026-10-16 (2. Untersuchungsrunde ergänzt)._  Kennzeichnung: `VERIFIED`
 
 > **Runde 3 (2026-10-16):** `www.ikea.com` ist inzwischen erreichbar. Echte Produktseiten wurden geprüft – Ergebnisse, Planer-Analyse und Möbelix-Blocker stehen in [`PLANNER_IMPORT_RESEARCH.md`](PLANNER_IMPORT_RESEARCH.md). Wichtigste Korrekturen: Die 3D-Modelle sind als schema.org-`3DModel` deklariert; das unten erwähnte `pip-xr-viewer-model` kommt auf den geprüften Seiten nicht vor (veraltet).
 
+## Einrichtungsvorschlag mit Claude: Produktsuche (#350, 2026-10-23)
+
+Auf Gs Entscheidung (Option A) sucht Claude für Platzhalter des Einrichtungsvorschlags selbst echte Produkte – so, wie ein Mensch im Shop sucht:
+
+* **Im App-Artefakt in der Claude-Desktop-App:** Claude öffnet über den eingebauten Browser der App (`host:claude_browser`, Werkzeuge `navigate`, `get_page_text`, `read_page`) die Such- und Produktseiten von `www.ikea.com/at` und `www.moebelix.at`. Die Seite lässt nur diese beiden Adressen zu (`src/assistant/productSearch.ts`). Außerhalb der Desktop-App gibt es die Suche nicht.
+* **Im lokalen Planer (`npm run dev`):** Der lokale Helfer (`npm run ikea-helper`) reicht die Anfrage an die Claude-Code-Kommandozeile auf demselben Rechner weiter (`POST /claude`, `scripts/lib/claude-cli.mjs`): nur Websuche und Abruf von Seiten dieser zwei Shops, Shell/Dateien schreiben gesperrt, leerer Arbeitsordner, eine Anfrage zur Zeit. Gefundene IKEA-Seiten liest danach der Helfer wie bisher selbst (genaue Maße, Preis, 3D-Modell).
+* Kein Schlüssel im Browser, keine Konten, keine Warenkörbe, keine internen Schnittstellen, keine Umgehung von Bot-Schutz. Was Claude meldet, prüft die App (Shop-Adresse, plausible Maße und Preis); Produkte ohne vollständige Angaben werden weggelassen. Gefundene Produkte landen in „Meine IKEA-/Möbelix-Auswahl“ mit Hinweis „von Claude gefunden“.
+
 ## IKEA-Auswahl im Planer mit lokalem Helfer (2026-10-17)
 Katalog › Unterreiter **„IKEA“**: Links von ikea.com/at oder Artikelnummern einfügen, **„Holen“** drücken; das Produkt landet mit Bild, Maßen, Preis (mit Abrufdatum) und – wenn gewünscht – dem echten 3D-Modell in **„Meine IKEA-Auswahl“** und lässt sich per Klick („In den Raum“) oder Ziehen platzieren. Die Auswahl bleibt lokal gespeichert.
 

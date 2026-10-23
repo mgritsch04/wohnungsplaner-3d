@@ -303,7 +303,30 @@ kbd {
   position: relative;
 }
 .view-split .pane-2d {
-  border-right: 1px solid var(--color-border);
+  flex: 0 0 var(--split, 50%);
+}
+.view-split .pane-3d {
+  flex: 1 1 0;
+}
+/* Trennlinie 2D|3D: schmale Linie, größere Greifzone per ::before */
+.split-divider {
+  flex: 0 0 1px;
+  position: relative;
+  z-index: 5;
+  background: var(--color-border);
+  cursor: col-resize;
+  touch-action: none;
+}
+.split-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
+}
+.split-divider:hover,
+.split-divider:focus-visible {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  outline: none;
 }
 
 /* ---------- toolbar ---------- */
@@ -1007,6 +1030,39 @@ dl.stats dd {
   flex: 1;
 }
 
+/* ---------- sanfte Übergänge (Issue 101) ----------
+   Dauer --motion-dur siehe theme.css; 0 = keine Animation. */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes ui-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.modal-backdrop {
+  animation: ui-fade-in var(--motion-dur) ease-out;
+}
+.modal {
+  animation: ui-pop-in var(--motion-dur) ease-out;
+}
+.toast {
+  animation: ui-slide-in var(--motion-dur) ease-out;
+}
+.floating-dialog,
+.length-input {
+  animation: ui-fade-in var(--motion-dur) ease-out;
+}
+
 /* ---------- modals & toasts ---------- */
 .modal-backdrop {
   position: fixed;
@@ -1206,8 +1262,11 @@ dl.stats dd {
     flex-direction: column;
   }
   .view-split .pane-2d {
-    border-right: none;
+    flex: 1 1 0;
     border-bottom: 1px solid var(--color-border);
+  }
+  .split-divider {
+    display: none;
   }
   .panel.left,
   .panel.right {
@@ -1386,6 +1445,15 @@ code {
   border-radius: var(--radius-pill);
   line-height: 1;
 }
+.underlay-toggle {
+  position: absolute;
+  right: 12px;
+  /* above the zoom slider (bottom-right), not behind it */
+  bottom: 52px;
+  z-index: 3;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+}
 .walk-duck {
   position: absolute;
   top: 12px;
@@ -1424,6 +1492,15 @@ code {
   border-radius: var(--radius-pill);
   font-size: var(--font-size-sm);
   white-space: nowrap;
+}
+.exterior-label {
+  background: var(--color-overlay);
+  color: var(--color-on-overlay);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  pointer-events: none;
 }
 .multi-note {
   margin: var(--space-3) var(--space-5) 0;
@@ -1988,7 +2065,7 @@ code {
     gap: var(--space-2);
   }
   .project-name {
-    width: 132px !important;
+    width: 110px !important;
   }
   .save-state:not(.save-error) .save-dot {
     display: inline-block;
@@ -2002,7 +2079,7 @@ code {
     white-space: nowrap;
   }
   .time-control.compact input[type='range'] {
-    width: 72px;
+    width: 48px;
   }
   .time-control.compact .time-label {
     min-width: 0;
@@ -2205,10 +2282,14 @@ code {
   stroke: var(--color-surface);
   font-weight: 600;
 }
-/* five tabs on the left (#137): slightly smaller labels so none is cut off */
+/* six tabs on the left (#137, #345): two rows of three, so no label is cut off at any desktop width */
+.panel.left .tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
 .panel.left .tabs button {
   font-size: var(--font-size-sm);
-  padding-inline: 0;
+  padding-inline: var(--space-1);
 }
 .color-auto {
   padding: 2px var(--space-2);
@@ -2218,3 +2299,100 @@ code {
 .color-auto[aria-pressed='true'] {
   border-color: var(--color-accent);
 }
+
+/* Info-Symbole mit kurzer Erklärung (#79) */
+.info-hint {
+  display: inline;
+}
+.info-hint-btn {
+  padding: 0 var(--space-1);
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: inherit;
+  line-height: 1;
+}
+.info-hint-btn:hover,
+.info-hint-btn[aria-expanded='true'] {
+  color: var(--color-accent, currentColor);
+}
+.info-hint-text {
+  display: block;
+  margin-top: var(--space-0);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+.term-list dt {
+  font-weight: 600;
+  margin-top: var(--space-1);
+}
+.term-list dd {
+  margin: 0;
+}
+
+/* Etagen-Wahl über Plan und 3D-Ansicht (#54): wie Aufzugknöpfe, oberste Etage oben */
+.level-bar {
+  position: absolute;
+  left: var(--space-3);
+  bottom: 56px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  background: var(--color-surface-floating);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-md);
+  max-height: calc(100% - 80px);
+  overflow: auto;
+}
+.level-bar > button {
+  text-align: left;
+  white-space: nowrap;
+}
+.level-bar-other {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+.level-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.level-list li {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.level-list li.active {
+  border-color: var(--color-accent);
+}
+
+/* Wohnungs-Check (#357) */
+.check-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+}
+.check-item[aria-pressed='true'] {
+  outline: 2px solid var(--color-accent, #2563eb);
+}
+
+.compass-row { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.compass-row p { margin: 0; }
+.plan-compass { position: absolute; top: 10px; right: 10px; pointer-events: none; z-index: 2; }
+.compass-rose { position: relative; display: inline-block; flex: none; }
+.compass-rose img { display: block; }

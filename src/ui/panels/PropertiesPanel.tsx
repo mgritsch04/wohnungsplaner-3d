@@ -1,5 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { makeLightSmartWithFeedback } from '../../smarthome/actions';
+import { DEVICE_PRODUCTS } from '../../smarthome/catalog';
 import { DeviceInfo } from '../../smarthome/DeviceInfo';
+import { FixtureProps } from '../../installation/FixtureProps';
+import { ASSEMBLIES, estimateInsulation, ratingOf, soundIssues, wallRooms, type WallAssembly } from '../../model/acoustics';
 import { derivePlan } from '../../model/derived';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
@@ -12,11 +16,17 @@ import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, ty
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
+import { runDeliveryCheck, useDeliveryStore } from '../../editor2d/deliveryStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
+import { InteriorSection } from './InteriorSection';
+import { PhotosSection } from '../../photos/PhotosSection';
+import { NotesSection } from '../../planning/NotesSection';
+import { RoomTasksSection } from '../../planning/TaskSections';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
-import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
+import { AngleSlider, Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
+import { DEFAULT_LUMEN, FALLBACK_LUMEN } from '../../model/lux';
 import { conflictSummary, issueLevel, placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
 import { GroupControls } from './GroupControls';
@@ -43,6 +53,8 @@ export function PropertiesPanel() {
       return <LightProps id={selection.id} project={project} />;
     case 'device':
       return <DeviceInfo id={selection.id} project={project} />;
+    case 'fixture':
+      return <FixtureProps id={selection.id} project={project} />;
   }
 }
 
@@ -147,6 +159,34 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           <NumberField label="Ende Y" value={b.y} factor={100} unit="cm" onChange={(v) => apply((d) => moveNode(d, w.b, { x: b.x, y: v }))} />
         </div>
       </PanelGroup>
+      <PanelGroup groupKey="wall.sound" title="Aufbau und Schallschutz">
+        <SelectField
+          label="Aufbau"
+          value={w.assembly ?? ''}
+          options={[{ value: '', label: 'unbekannt (wie Ziegel)' }, ...ASSEMBLIES.map((x) => ({ value: x.id as string, label: x.label }))]}
+          onChange={(v) =>
+            apply((d) => {
+              const x = d.walls.find((q) => q.id === id);
+              if (x) x.assembly = v ? (v as WallAssembly) : undefined;
+            })
+          }
+        />
+        <dl className="stats">
+          <dt>Schallschutz (Schätzung)</dt>
+          <dd>
+            ca. {estimateInsulation(w)} dB, {ratingOf(estimateInsulation(w))}
+          </dd>
+        </dl>
+        {soundIssues(project)
+          .filter((i) => i.wallId === id)
+          .map((i) => (
+            <p key={i.quietRoomId} className="warning small">
+              Laut neben ruhig: {project.rooms.find((r) => r.id === i.loudRoomId)?.name} grenzt an {project.rooms.find((r) => r.id === i.quietRoomId)?.name}.
+            </p>
+          ))}
+        {wallRooms(project, id).length < 2 && <p className="muted small">Grenzt an höchstens einen Raum – Raumnachbarn werden nur zwischen zwei Räumen bewertet.</p>}
+        <p className="muted small">Grobe Schätzung zur Orientierung, keine bauphysikalische Berechnung. Typische Richtwerte je Bauart.</p>
+      </PanelGroup>
       <PanelGroup groupKey="wall.surfaces" title="Oberflächen">
         <MaterialSelect
           label="Seite links"
@@ -187,6 +227,7 @@ function WallProps({ id, project }: { id: string; project: Project }) {
           ))}
         </ul>
       </PanelGroup>
+      <PhotosSection project={project} wallId={id} length={len} />
       <div className="btn-row padded">
         <button
           onClick={() => {
@@ -257,6 +298,13 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
             <dd>{furnitureInRoom}</dd>
           </dl>
         )}
+        {soundIssues(project)
+          .filter((i) => i.loudRoomId === id || i.quietRoomId === id)
+          .map((i) => (
+            <p key={i.wallId} className="warning small">
+              Schall (Schätzung): {project.rooms.find((q) => q.id === i.loudRoomId)?.name} grenzt an {project.rooms.find((q) => q.id === i.quietRoomId)?.name} – Wand mit ca. {i.db} dB, {i.rating}.
+            </p>
+          ))}
         {!area?.closed && <p className="warning small">Der Raum ist nicht vollständig von Wänden umschlossen.</p>}
       </PanelGroup>
       {rect && (
@@ -278,6 +326,8 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
         <MaterialSelect label="Wände" value={r.wallMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'tile', 'wood', 'stone']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.wallMaterialId = m))} />
         <MaterialSelect label="Decke" value={r.ceilingMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'wood']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.ceilingMaterialId = m))} />
       </PanelGroup>
+      <RoomTasksSection project={project} roomId={id} />
+      <NotesSection project={project} type="room" targetId={id} />
       <div className="btn-row padded">
         <button onClick={() => void deleteSelection()}>Raum entfernen (Wände behalten)</button>
         <button
@@ -377,7 +427,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
           <CheckField
             label={o.kind === 'door' ? 'Tür geöffnet' : 'Fenster geöffnet'}
             checked={o.open}
-            title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Taste E (oder Klick) aufs Fadenkreuz-Ziel"
+            title="Zustand in der 3D-Ansicht; ein geöffneter Flügel zählt in der Kollisionsprüfung. Auch: Taste O, Doppelklick in 3D, beim Begehen Taste F (oder Klick) aufs Fadenkreuz-Ziel"
             onChange={(v) => upd((x) => (x.open = v))}
           />
         </PanelGroup>
@@ -464,6 +514,29 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           onChange={(v) => upd((x) => (x.category = v))}
         />
       </PanelGroup>
+      {f.category === 'lighting' && (
+        <PanelGroup groupKey="furniture.lamp" title="Lichtstrom">
+          <NumberField
+            label="Lichtstrom"
+            value={f.lumen ?? (f.model.type === 'procedural' ? DEFAULT_LUMEN[f.model.shape] : undefined) ?? FALLBACK_LUMEN}
+            unit="lm"
+            digits={0}
+            min={0}
+            max={20000}
+            step={50}
+            title="Lichtstrom der Lampe in Lumen (steht auf der Verpackung oder im Datenblatt). Für die Lux-Lichtkarte im Tab Projekt."
+            onChange={(v) => upd((x) => (x.lumen = Math.round(v)))}
+          />
+          <p className="muted small" data-testid="lamp-lumen-hint">
+            {f.lumen === undefined ? 'Annahme: typischer Wert dieser Lampenart, kein Herstellerwert.' : 'Eigener Wert (z. B. von der Verpackung).'}
+          </p>
+          {f.lumen !== undefined && (
+            <button type="button" onClick={() => upd((x) => void delete x.lumen)}>
+              Auf typischen Wert zurücksetzen
+            </button>
+          )}
+        </PanelGroup>
+      )}
       <PanelGroup groupKey="furniture.position" title="Position" actions={f.locked ? <Badge kind="muted" title="Unter „Erweitert“ entsperren">gesperrt</Badge> : undefined}>
         <div className="field-row">
           <NumberField label="X" value={f.x} factor={100} unit="cm" disabled={f.locked} onChange={(v) => upd((x) => (x.x = v))} />
@@ -471,6 +544,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </div>
         <div className="field-row">
           <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
+          <AngleSlider label="Winkel (Regler)" testId="furniture-rotation-slider" value={radToDeg(f.rotation)} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
           <NumberField label="Über Boden" value={f.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
         </div>
       </PanelGroup>
@@ -582,6 +656,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           </button>
         )}
       </PanelGroup>
+      <InteriorSection f={f} upd={upd} />
       <PanelGroup groupKey="furniture.model" title="3D-Modell" defaultOpen={false} actions={f.model.type === 'gltf' ? <Badge kind="ok">GLB</Badge> : <Badge kind="muted">prozedural</Badge>}>
         <div className="btn-row">
           <button onClick={() => useDialogStore.getState().openModal('model', { furnitureId: f.id })}>{f.model.type === 'gltf' ? 'Anderes GLB…' : 'Eigenes GLB hinterlegen…'}</button>
@@ -609,10 +684,13 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           </a>
         )}
       </PanelGroup>
+      <DeliveryGroup f={f} />
       <PanelGroup groupKey="furniture.advanced" title="Erweitert" defaultOpen={false}>
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
+        <CheckField label="Bestand (schon in der Wohnung, nicht im Budget)" checked={f.existing} onChange={(v) => upd((x) => (x.existing = v))} />
       </PanelGroup>
+      <NotesSection project={project} type="furniture" targetId={id} />
       <div className="btn-row padded">
         <span className="rotate-group" role="group" aria-label="Drehen">
           <button onClick={() => (group ? rotateSelection(-Math.PI / 2) : setFurnitureRotation(f.id, f.rotation - Math.PI / 2))} disabled={f.locked} title="90° gegen den Uhrzeigersinn">
@@ -637,6 +715,25 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       </div>
       <p className="muted small padded">Tipp: Q/E dreht in 15°-Schritten, Pfeiltasten verschieben um 1 cm (Shift: 10 cm).</p>
     </div>
+  );
+}
+
+function DeliveryGroup({ f }: { f: Furniture }) {
+  const { furnitureId, result } = useDeliveryStore();
+  const mine = furnitureId === f.id ? result : null;
+  return (
+    <PanelGroup groupKey="furniture.delivery" title="Lieferweg" defaultOpen={false}>
+      <button className="block" onClick={() => runDeliveryCheck(f.id)} title="Prüft grob, ob das Möbel vom Eingang bis an seinen Platz getragen werden kann">
+        Lieferweg prüfen
+      </button>
+      {mine && (
+        <p className="small" data-testid="delivery-result" data-fits={mine.ok && mine.fits ? '1' : '0'} role="status">
+          {mine.ok ? mine.message : mine.reason}
+          {mine.ok && mine.bottleneck && mine.fits && <><br />{mine.bottleneck.label}</>}
+        </p>
+      )}
+      <p className="muted small">Schätzung: Türen und Gänge, Kippen/Hochkant grob; Treppen und Drehen um Ecken werden nicht geprüft.</p>
+    </PanelGroup>
   );
 }
 
@@ -672,12 +769,36 @@ function LightProps({ id, project }: { id: string; project: Project }) {
           <input type="range" min={0} max={5} step={0.1} value={l.intensity} onChange={(e) => upd((x) => (x.intensity = Number(e.target.value)))} />
         </label>
       </PanelGroup>
+      <LightSmart id={id} project={project} />
       <div className="btn-row padded">
         <button className="danger" onClick={() => void deleteSelection()}>
           Löschen
         </button>
       </div>
     </div>
+  );
+}
+
+/** „Smart machen“ for a placed light (#250): links a smart lamp device to it instead of adding a second light. */
+function LightSmart({ id, project }: { id: string; project: Project }) {
+  const lamps = DEVICE_PRODUCTS.filter((p) => p.kind === 'light');
+  const [productId, setProductId] = useState(lamps[0]?.id ?? '');
+  const dev = project.devices.find((x) => x.lightId === id);
+  return (
+    <PanelGroup groupKey="light.smart" title="Smart Home">
+      {dev ? (
+        <p className="small" data-testid="light-smart-linked">
+          Smart: {dev.name}. Im Smart-Home-Reiter schaltbar; beim Löschen des Geräts bleibt die Leuchte erhalten.
+        </p>
+      ) : (
+        <>
+          <SelectField label="Produkt" value={productId} options={[...lamps.map((p) => ({ value: p.id, label: `${p.brand} ${p.model}` })), { value: '', label: 'Allgemein (Annahmewerte)' }]} onChange={setProductId} />
+          <button onClick={() => makeLightSmartWithFeedback(id, productId || undefined)} data-testid="light-make-smart">
+            Smart machen
+          </button>
+        </>
+      )}
+    </PanelGroup>
   );
 }
 

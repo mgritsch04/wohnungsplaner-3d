@@ -25,6 +25,8 @@ export interface DeviceProduct {
   sourceKind: 'manufacturer' | 'retailer';
   sources: string[];
   note?: string;
+  /** Price range in € (min, max) where docs/smart-home/HARDWARE_AND_DEVICES.md states one (Stand 2026-10-16, check before buying); absent = unknown. */
+  priceEur?: [number, number];
 }
 
 export const DEVICE_PRODUCTS: DeviceProduct[] = [
@@ -38,6 +40,7 @@ export const DEVICE_PRODUCTS: DeviceProduct[] = [
     rangeM: 5,
     angleDeg: 120,
     router: 'no',
+    priceEur: [10, 10],
     sourceKind: 'manufacturer',
     sources: ['https://ikea.com/sg/en/p/vallhorn-wireless-motion-sensor-smart-white-70504342', 'https://www.ikea.is/static/web/ikea4/pdfs/advice/en/360/AA-2398360-3_pub.pdf'],
     note: 'Reichweite 5 m für Bewegung, Winkel laut Datenblatt 60–120°.',
@@ -95,6 +98,7 @@ export const DEVICE_PRODUCTS: DeviceProduct[] = [
     power: 'USB-C 5 V',
     rangeM: 4,
     router: 'stated',
+    priceEur: [17.58, 17.58],
     sourceKind: 'retailer',
     sources: ['https://cnx-software.com/?p=119622'],
     note: 'Reichweite 2,5–4 m je nach Empfindlichkeit; Winkel nicht angegeben.',
@@ -107,6 +111,7 @@ export const DEVICE_PRODUCTS: DeviceProduct[] = [
     protocol: 'Thread/Matter',
     power: '1× AAA (LADDA)',
     router: 'no',
+    priceEur: [7.99, 7.99],
     sourceKind: 'retailer',
     sources: ['https://csa-iot.org/csa_product/myggbett-door-window-sensor-2/'],
   },
@@ -119,6 +124,7 @@ export const DEVICE_PRODUCTS: DeviceProduct[] = [
     power: '1× CR2477',
     batteryLife: 'über 5 Jahre (Herstellerschätzung)',
     router: 'no',
+    priceEur: [10, 15],
     sourceKind: 'manufacturer',
     sources: ['https://sonoff.tech/en-eu/products/sonoff-zigbee-door-window-sensor-snzb-04p'],
   },
@@ -132,6 +138,7 @@ export const DEVICE_PRODUCTS: DeviceProduct[] = [
     lumen: 1055,
     kelvin: [2200, 6500],
     router: 'inferred',
+    priceEur: [4.99, 4.99],
     sourceKind: 'manufacturer',
     sources: ['https://www.ikea.com/gb/en/p/-10611298/'],
   },
@@ -165,9 +172,12 @@ export const KIND_LABEL: Record<SmartDeviceKind, string> = {
   contact: 'Tür-/Fensterkontakt',
   light: 'Smarte Lampe',
   plug: 'Smarte Steckdose',
+  router: 'Router / Access Point',
+  strip: 'LED-Streifen',
+  speaker: 'Lautsprecher',
 };
 
 export const productById = (id: string | undefined): DeviceProduct | undefined => (id ? DEVICE_PRODUCTS.find((p) => p.id === id) : undefined);
 
 /** Default mounting height (m) per kind. */
-export const DEFAULT_ELEVATION: Record<SmartDeviceKind, number> = { motion: 2.1, presence: 2.1, contact: 1.2, light: 2.3, plug: 0.3 };
+export const DEFAULT_ELEVATION: Record<SmartDeviceKind, number> = { motion: 2.1, presence: 2.1, contact: 1.2, light: 2.3, plug: 0.3, router: 1.5, strip: 0.9, speaker: 1 };

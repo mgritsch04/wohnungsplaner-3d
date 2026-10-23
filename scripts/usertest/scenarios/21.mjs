@@ -204,8 +204,8 @@ export default {
         const inward = (await leafCenter(t, id)).y > 0.25;
         await t.shot('Fenster nach dem Klick (Begehen)');
         const c2 = await press('O', () => page.keyboard.press('o'));
-        const c3 = await press('E', () => page.keyboard.press('e'));
-        const c4 = await press('E nochmal', () => page.keyboard.press('e'));
+        const c3 = await press('F', () => page.keyboard.press('f'));
+        const c4 = await press('F nochmal', () => page.keyboard.press('f'));
         return {
           status: aimed && c1 && inward && c2 && c3 && c4 ? 'ok' : 'fail',
           observed: `Wohnzimmerfenster im Fadenkreuz: ${aimed ? 'ja' : 'nein'}. ${results.join(', ')}. Flügel nach dem Klick ${inward ? 'nach innen geöffnet' : 'nicht nach innen'}.`,
@@ -234,7 +234,7 @@ export default {
     },
     {
       nr: 7,
-      action: 'Eine Tür schließen und versuchen hindurchzugehen. Danach mit Klick, O oder E öffnen.',
+      action: 'Eine Tür schließen und versuchen hindurchzugehen. Danach mit Klick, O oder F öffnen.',
       expected: 'Durch die geschlossene Tür kommst du nicht durch. Nach dem Öffnen schon.',
       async run(t) {
         const { page } = t;
@@ -264,7 +264,7 @@ export default {
         await restingLeaf(t, id);
         await lookAt(t, 5.06, 2.0, 1.0);
         const aimed = await t.poll(async () => ((await target(t)) === id ? true : null), 3000);
-        await page.keyboard.press('e');
+        await page.keyboard.press('f');
         await t.poll(async () => ((await openOf(t, id)) === true ? true : null), 3000);
         await restingLeaf(t, id);
         const x2 = await walkThrough();
@@ -274,7 +274,7 @@ export default {
         const passed = x2 > 5.2;
         return {
           status: blocked && passed && aimed ? 'ok' : 'fail',
-          observed: `Tür geschlossen, 3 s mit W auf die Tür zu (Start x 4,30 m, Wand bei 5,06 m): stehen geblieben bei x ${x1.toFixed(2).replace('.', ',')} m – ${blocked ? 'kein Durchkommen' : 'durchgegangen'}. Tür mit E geöffnet (im Fadenkreuz: ${aimed ? 'ja' : 'nein'}), gleicher Weg: bei x ${x2.toFixed(2).replace('.', ',')} m – ${passed ? 'im Schlafzimmer angekommen' : 'nicht durchgekommen'}.`,
+          observed: `Tür geschlossen, 3 s mit W auf die Tür zu (Start x 4,30 m, Wand bei 5,06 m): stehen geblieben bei x ${x1.toFixed(2).replace('.', ',')} m – ${blocked ? 'kein Durchkommen' : 'durchgegangen'}. Tür mit F geöffnet (im Fadenkreuz: ${aimed ? 'ja' : 'nein'}), gleicher Weg: bei x ${x2.toFixed(2).replace('.', ',')} m – ${passed ? 'im Schlafzimmer angekommen' : 'nicht durchgekommen'}.`,
           noFinalShot: true,
         };
       },

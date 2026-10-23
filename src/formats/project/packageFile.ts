@@ -1,4 +1,5 @@
 import type { Project } from '../../model/schema';
+import { allLevelPlans } from '../../model/levels';
 import { FileFormatError } from '../zodErrors';
 import { parseProject, type ParsedProject } from './projectFile';
 
@@ -39,12 +40,16 @@ export interface PackageVersion {
 /** All asset ids referenced by a project. */
 export function referencedAssetIds(p: Project): string[] {
   const ids = new Set<string>();
-  if (p.underlay) {
-    ids.add(p.underlay.imageAssetId);
-    if (p.underlay.sourceAssetId) ids.add(p.underlay.sourceAssetId);
+  // every storey (#54) has its own plan image, photos and furniture
+  for (const plan of allLevelPlans(p)) {
+    if (plan.underlay) {
+      ids.add(plan.underlay.imageAssetId);
+      if (plan.underlay.sourceAssetId) ids.add(plan.underlay.sourceAssetId);
+    }
+    for (const ph of plan.photos) ids.add(ph.assetId);
+    for (const m of plan.marks) if (m.photoAssetId) ids.add(m.photoAssetId);
+    for (const f of plan.furniture) if (f.model.type === 'gltf' && f.model.assetId) ids.add(f.model.assetId);
   }
-  for (const f of p.furniture) if (f.model.type === 'gltf' && f.model.assetId) ids.add(f.model.assetId);
-  for (const m of p.marks) if (m.photoAssetId) ids.add(m.photoAssetId);
   return [...ids];
 }
 

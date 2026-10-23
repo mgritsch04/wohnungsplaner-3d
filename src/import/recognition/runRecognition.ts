@@ -9,13 +9,20 @@ import type { ReconstructionDraft } from '../draft';
 import { useImportStore, useSourceAnalysis } from '../importStore';
 import { findDraftConflicts } from '../review';
 import { checkScale, scaleCheckMessage } from '../dimensions';
+import { applyDoorWidths, JAMB_ALLOWANCE } from '../doorWidths';
 import { balconyDoors, outdoorRailings, type AreaOutline } from '../outdoor';
 import { proposeRooms, refreshRoomProposals, roomInteriors, type PlacedText } from '../rooms';
 import { pointInPolygon } from '../../model/vec';
 import { imageToWorld } from '../underlayTransform';
+import { detectFixtures } from './fixtures';
+import { detectInstallations, INSTALLATION_ACCEPT_AT } from './installations';
+import { FIXTURE_ELEVATION, FIXTURE_LABEL } from '../../model/fixtures';
+import { dedupeOpenings } from './dedupe';
 import { RECOGNIZERS } from './recognizers';
 import type { RasterOutput } from './raster';
 import { isGlassDoor, type Underlay } from '../../model/schema';
+
+const FIXTURE_NAMES: Record<string, string> = { 'generic-bathtub': 'Badewanne', 'generic-washbasin': 'Waschbecken', 'generic-toilet': 'WC' };
 
 /** Run the best available local recognizer on the current underlay and open the review. */
 export async function runRecognition() {
@@ -43,7 +50,10 @@ export async function runRecognition() {
       out = await raster.recognize(input, (v) => progress({ label: `${raster.label}…`, value: v }));
       source = 'raster';
     }
+    const deduped = dedupeOpenings(out.openings);
+    out = { ...out, openings: deduped.openings };
     const draft = outputToDraft(out, u, source, recognizer.label);
+    if (deduped.removed) draft.warnings.push(`${deduped.removed} doppelt erkannte Öffnung(en) an derselben Stelle zusammengeführt.`);
     if (draft.walls.length === 0) {
       useUiStore.getState().toast('Es wurden keine Wände erkannt. Bitte die Wände manuell nachzeichnen (Werkzeug „Wand“).', 'info');
       return;
@@ -66,6 +76,58 @@ export async function runRecognition() {
       draft.openings = balconyDoors(draft.openings, texts, roomInteriors(draft.walls));
       if (draft.openings.filter(isGlassDoor).length > before) draft.warnings.push('Balkontüren: Öffnungen zum Balkon/zur Terrasse als bodentiefe Glastüren übernommen – bitte prüfen.');
     }
+    // clear door width from the label ("80 / 200") or the gap minus jambs (#267)
+    {
+      const widths = applyDoorWidths(draft.openings, texts);
+      draft.openings = widths.openings;
+      if (widths.labelled + widths.reduced > 0)
+        draft.warnings.push(`Türbreiten: ${widths.labelled} aus der Beschriftung im Plan, ${widths.reduced} als Wandlücke minus Zarge (${Math.round(JAMB_ALLOWANCE * 100)} cm) geschätzt – bitte prüfen.`);
+    }
+    // fitted tub, basin and WC from their symbols (#255)
+    const { detectSanitary, detectInstallationSymbols } = useImportStore.getState().options;
+    if (analysis && analysis.imageAssetId === u.imageAssetId && (detectSanitary || detectInstallationSymbols)) {
+      const interiors = roomInteriors(draft.walls);
+      const rooms = interiors.map((polygon) => ({ polygon, name: draft.rooms.find((r) => pointInPolygon(r.labelPoint, polygon))?.name ?? '' }));
+      const world = analysis.segments.map((s) => {
+        const a = imageToWorld(u, { x: s.x1, y: s.y1 });
+        const b = imageToWorld(u, { x: s.x2, y: s.y2 });
+        return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, curve: s.curve, areaFill: s.areaFill, darkFill: s.darkFill, faint: s.faint };
+      });
+      draft.fixtures = (detectSanitary ? detectFixtures(world, draft.walls, rooms) : []).map((f) => ({
+        id: newId('dfx'),
+        catalogId: f.catalogId,
+        name: FIXTURE_NAMES[f.catalogId] ?? f.catalogId,
+        center: { x: roundMm(f.center.x), y: roundMm(f.center.y) },
+        rotation: f.rotation,
+        width: roundMm(f.width),
+        depth: roundMm(f.depth),
+        status: 'uncertain' as const,
+        confidence: f.confidence,
+        note: f.note,
+        accepted: false,
+      }));
+      if (draft.fixtures.length) draft.warnings.push(`${draft.fixtures.length} Sanitärobjekt(e) aus den Symbolen im Plan erkannt – sind nicht vorausgewählt (Bestand, nicht im Budget). Bitte prüfen.`);
+      // sockets, switches, LAN, water, radiators from their symbols (#222)
+      draft.installations = (detectInstallationSymbols ? detectInstallations(world, draft.walls, rooms, draft.openings) : []).map((i) => {
+        const sure = i.confidence >= INSTALLATION_ACCEPT_AT;
+        return {
+          id: newId('dfi'),
+          kind: i.kind,
+          center: { x: roundMm(i.center.x), y: roundMm(i.center.y) },
+          elevation: FIXTURE_ELEVATION[i.kind],
+          width: i.width,
+          fixtureNote: i.symbol === 'lan' ? 'LAN / Daten' : undefined,
+          status: sure ? ('estimated' as const) : ('uncertain' as const),
+          confidence: i.confidence,
+          note: i.note,
+          accepted: sure,
+        };
+      });
+      if (draft.installations.length) {
+        const unsure = draft.installations.filter((i) => !i.accepted).length;
+        draft.warnings.push(`${draft.installations.length} Installationspunkt(e) (${[...new Set(draft.installations.map((i) => FIXTURE_LABEL[i.kind]))].join(', ')}) aus den Symbolen im Plan erkannt${unsure ? `, davon ${unsure} unsicher (nicht vorausgewählt)` : ''}. Höhen sind Richtwerte – bitte prüfen.`);
+      }
+    }
     if (draft.rooms.length > 0) draft.warnings.push('Räume wurden aus geschlossenen Wandzügen vorgeschlagen – Namen und Flächen bitte prüfen.');
     // dimension texts of a vector PDF that contradict the scale
     if (analysis?.dimensions?.length && analysis.imageAssetId === u.imageAssetId) {
@@ -74,7 +136,7 @@ export async function runRecognition() {
     }
     draft.warnings.push(...findDraftConflicts(draft).map((c) => c.message));
     useImportStore.getState().setDraft(draft);
-    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume vorgeschlagen – bitte prüfen.`, 'success');
+    useUiStore.getState().toast(`${draft.walls.length} Wände, ${draft.openings.length} Öffnungen und ${draft.rooms.length} Räume${draft.fixtures?.length ? ` und ${draft.fixtures.length} Sanitärobjekte` : ''}${draft.installations?.length ? `, ${draft.installations.length} Anschlüsse` : ''} vorgeschlagen – bitte prüfen.`, 'success');
   } catch (e) {
     reportError(e, 'Erkennung fehlgeschlagen');
   } finally {

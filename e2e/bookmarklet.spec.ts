@@ -19,6 +19,9 @@ const SHOP_PAGE = `<!doctype html><html lang="de"><head><meta charset="utf-8"><t
 <script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: 'TESTTISCH Synthetisch', url: SHOP_URL, offers: { price: '299', priceCurrency: 'EUR' } })}</script>
 </head><body><h1>TESTTISCH Synthetisch</h1><p>Esstisch</p><p>Breite: 160 cm</p><p>Tiefe: 90 cm</p><p>Höhe: 76 cm</p></body></html>`;
 
+// one helper process on a fixed port is shared by all tests in this file: keep them in one worker (also under fullyParallel / --shard)
+test.describe.configure({ mode: 'serial' });
+
 let helper: ChildProcess;
 let cache: string;
 

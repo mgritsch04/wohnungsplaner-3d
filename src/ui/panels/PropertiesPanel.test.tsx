@@ -54,9 +54,9 @@ describe('properties panel groups (#99)', () => {
 
   it('groups the furniture fields by topic; rarely used groups start collapsed', () => {
     select('furniture', furniture('generic-wardrobe-150').id);
-    expect([...toggles().keys()]).toEqual(['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis', '3D-Modell', 'Produkt', 'Erweitert']);
+    expect([...toggles().keys()]).toEqual(['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis', 'Innenaufteilung', '3D-Modell', 'Produkt', 'Lieferweg', 'Erweitert']);
     const state = Object.fromEntries([...toggles()].map(([t, b]) => [t, b.getAttribute('aria-expanded')]));
-    expect(state).toEqual({ Objekt: 'true', Position: 'true', 'Maße': 'true', Aussehen: 'true', Preis: 'true', '3D-Modell': 'false', Produkt: 'false', Erweitert: 'false' });
+    expect(state).toEqual({ Objekt: 'true', Position: 'true', 'Maße': 'true', Aussehen: 'true', Preis: 'true', Innenaufteilung: 'false', '3D-Modell': 'false', Produkt: 'false', Lieferweg: 'false', Erweitert: 'false' });
     // fields of open groups are there, those of collapsed groups are not rendered
     expect(labels()).toEqual(expect.arrayContaining(['Name', 'Kategorie', 'X', 'Y', 'Drehung', 'Über Boden', 'Breite', 'Tiefe', 'Höhe', 'Farbe', 'Preis', 'Menge']));
     expect(labels()).not.toContain('Marke');
@@ -66,6 +66,26 @@ describe('properties panel groups (#99)', () => {
     expect(body.hidden).toBe(true);
     // rotate buttons stay at the bottom, outside the groups (#31)
     expect(host.querySelector('[role="group"][aria-label="Drehen"]')!.closest('.panel-group')).toBeNull();
+  });
+
+  it('rotation slider: one drag is one undo step and the number field follows', () => {
+    const f = furniture('generic-wardrobe-150');
+    select('furniture', f.id);
+    const slider = host.querySelector<HTMLInputElement>('[data-testid="furniture-rotation-slider"]')!;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    const drag = (v: string) =>
+      act(() => {
+        setValue.call(slider, v);
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    const past = useProjectStore.getState().past.length;
+    act(() => useProjectStore.getState().beginTransaction());
+    drag('30');
+    drag('60');
+    act(() => useProjectStore.getState().commitTransaction());
+    expect(useProjectStore.getState().past.length).toBe(past + 1);
+    expect(furniture('generic-wardrobe-150').rotation).toBeCloseTo((60 * Math.PI) / 180, 5);
+    expect(slider.value).toBe('60');
   });
 
   it('opens and closes a group via its heading button and updates aria-expanded', () => {
@@ -111,7 +131,7 @@ describe('properties panel groups (#99)', () => {
 
   it('groups walls and rooms; room sizes stay open', () => {
     select('wall', useProjectStore.getState().project.walls[0].id);
-    expect([...toggles().keys()]).toEqual(['Wand', 'Position', 'Oberflächen', expect.stringMatching(/^Öffnungen \(\d+\)$/)]);
+    expect([...toggles().keys()]).toEqual(['Wand', 'Position', 'Aufbau und Schallschutz', 'Oberflächen', expect.stringMatching(/^Öffnungen \(\d+\)$/)]);
     expect(labels()).toEqual(expect.arrayContaining(['Länge (Achse)', 'Dicke', 'Höhe', 'Winkel']));
     expect(labels()).not.toContain('Start X');
     const room = useProjectStore.getState().project.rooms[0];

@@ -6,6 +6,9 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
 import { MarksSection } from './MarksSection';
+import { FIXTURE_KINDS, FIXTURE_LABEL } from '../../model/fixtures';
+import { guessAndPlaceSockets } from '../../installation/actions';
+import { useFixtureStore } from '../../installation/fixtureStore';
 import { CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 
 const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
@@ -27,6 +30,7 @@ export function ToolsPanel() {
   const clearMeasurements = useUiStore((s) => s.clearMeasurements);
   const settings = useProjectStore((s) => s.project.settings);
   const apply = useProjectStore((s) => s.apply);
+  const fixtureCount = useProjectStore((s) => s.project.fixtures.length);
   const [room, setRoom] = useState({ name: 'Neuer Raum', width: 4, depth: 3.5 });
 
   const createRoom = () => {
@@ -185,7 +189,40 @@ export function ToolsPanel() {
         </button>
         <p className="muted small">Leuchten wirken in der 3D-Ansicht (Lichtfarbe und Helligkeit rechts einstellbar).</p>
       </PanelGroup>
+
+      <InstallationGroup count={fixtureCount} />
     </div>
+  );
+}
+
+/** Installation plan (#64, #81): pick a kind, then click next to a wall in the 2D plan. */
+function InstallationGroup({ count }: { count: number }) {
+  const placing = useFixtureStore((s) => s.placing);
+  const setPlacing = useFixtureStore((s) => s.setPlacing);
+  const pick = (k: (typeof FIXTURE_KINDS)[number]) => {
+    setPlacing(placing === k ? null : k);
+    const ui = useUiStore.getState();
+    ui.setTool('select');
+    if (ui.viewMode === '3d') ui.setViewMode('split');
+  };
+  return (
+    <PanelGroup groupKey="tools.installation" title="Steckdosen & Anschlüsse" defaultOpen={false}>
+      <div className="btn-row" data-testid="fixture-buttons">
+        {FIXTURE_KINDS.map((k) => (
+          <button key={k} className={placing === k ? 'active' : ''} aria-pressed={placing === k} onClick={() => pick(k)}>
+            + {FIXTURE_LABEL[k]}
+          </button>
+        ))}
+      </div>
+      <button className="block" data-testid="guess-sockets" onClick={() => guessAndPlaceSockets()} title="Schlägt Steckdosen anhand der Wände und Türen vor – nur auf Klick">
+        Steckdosen raten
+      </button>
+      <p className="muted small">
+        {placing
+          ? `Jetzt im 2D-Plan auf oder neben eine Wand klicken – ${FIXTURE_LABEL[placing]} rastet an der Wand ein (Esc bricht ab).`
+          : `Art wählen, dann im 2D-Plan an eine Wand klicken. Möbel vor Wasser- und Abwasseranschlüssen werden orange markiert. ${count ? `${count} im Plan.` : ''}`}
+      </p>
+    </PanelGroup>
   );
 }
 

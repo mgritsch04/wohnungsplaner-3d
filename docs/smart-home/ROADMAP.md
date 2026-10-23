@@ -28,3 +28,9 @@ Zwei Stränge laufen getrennt: **A – reale Installation** (deine Hardware, Hom
 | P7 Erweiterungen | YAML-Export von Szenen, Saugroboter-Karte, Energieansicht | P5 | je Feature eigene Kriterien | offen |
 
 **Priorität:** P2 → P3 → P4 bringen sofort Nutzen beim Planen (Kabel-/Melderpositionen, Abdeckung) und sind unabhängig von Hardware. P5/P6 erst, wenn A1–A2 stabil laufen.
+
+## Stufe 2a: Bridge und CI-Test gegen echtes Home Assistant (#229)
+- `src/smarthome/haBridge.ts`: kleiner Client (Zustände lesen, Dienste aufrufen), nur für Node-Skripte/Tests, wird von der App nicht importiert (kein Token im Browser-Bundle, D8).
+- `scripts/ha/run-local.sh`: prüft den Export (`automationsYaml`) mit `hass --script check_config` (gültig → ok, absichtlich kaputt → muss scheitern) und startet ein Wegwerf-Home-Assistant mit `demo:`; die Bridge liest dort Zustände und schaltet ein Demo-Licht. Das Token entsteht zur Laufzeit per Onboarding der Testinstanz und wird verworfen.
+- CI: `.github/workflows/smart-home-ha.yml`, läuft nur bei Änderungen an `src/smarthome/**`, `scripts/ha/**` oder dem Workflow; HA-Version fest in `scripts/ha/requirements.txt` (pip-Cache). Lokal: `pip install -r scripts/ha/requirements.txt`, `libturbojpeg` installieren, `scripts/ha/run-local.sh`.
+- Hinweis: `check_config` endet auch bei verworfenen Automationen mit Exitcode 0; das Skript wertet deshalb zusätzlich die Fehlerzeilen aus.

@@ -9,6 +9,8 @@ function quad(a: Vec2, b: Vec2, t: number): Vec2[] {
   return [add(a, n), add(b, n), sub(b, n), sub(a, n)];
 }
 
+const INSTALL_LETTER = { socket: 'S', switch: 'L', radiator: 'H', water: 'W', drain: 'A' } as const;
+
 export function DraftOverlay({ draft, selected, px }: { draft: ReconstructionDraft; selected: DraftSelection; px: number }) {
   return (
     <g>
@@ -40,6 +42,18 @@ export function DraftOverlay({ draft, selected, px }: { draft: ReconstructionDra
           </g>
         );
       })}
+      {(draft.installations ?? []).map((x) => {
+        const sel = selected?.type === 'installation' && selected.id === x.id;
+        const c = STATUS_COLOR[x.status];
+        return (
+          <g key={x.id} opacity={x.accepted ? 1 : 0.35}>
+            <circle cx={x.center.x} cy={x.center.y} r={Math.max(0.1, 6 * px)} fill="#fff" fillOpacity={0.7} stroke={sel ? '#1d4ed8' : c} strokeWidth={sel ? 2.5 : 1.5} strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
+            <text x={x.center.x} y={x.center.y + 4 * px} fontSize={10 * px} textAnchor="middle" fill={c} fontWeight={700}>
+              {INSTALL_LETTER[x.kind]}
+            </text>
+          </g>
+        );
+      })}
       {draft.rooms.map((r) => {
         const sel = selected?.type === 'room' && selected.id === r.id;
         return (
@@ -57,6 +71,7 @@ export function DraftOverlay({ draft, selected, px }: { draft: ReconstructionDra
 
 export function hitTestDraft(draft: ReconstructionDraft, p: Vec2, tol: number): DraftSelection {
   for (const o of draft.openings) if (dist(o.center, p) <= Math.max(o.width / 2, tol)) return { type: 'opening', id: o.id };
+  for (const x of draft.installations ?? []) if (dist(x.center, p) <= Math.max(0.1, tol)) return { type: 'installation', id: x.id };
   for (const r of draft.rooms) if (dist(r.labelPoint, p) <= tol * 2) return { type: 'room', id: r.id };
   let best: { id: string; d: number } | null = null;
   for (const w of draft.walls) {

@@ -1,9 +1,17 @@
 import { create } from 'zustand';
-import type { DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from './draft';
+import type { DraftFixture, DraftInstallation, DraftOpening, DraftRoom, DraftWall, ReconstructionDraft } from './draft';
 
-export type DraftSelection = { type: 'wall' | 'opening' | 'room'; id: string } | null;
+export type DraftSelection = { type: 'wall' | 'opening' | 'room' | 'fixture' | 'installation'; id: string } | null;
+
+/** What the recognition may add beyond walls, openings and rooms – off unless G asks for it (#371, #372). */
+export interface RecognitionOptions {
+  detectSanitary: boolean;
+  detectInstallationSymbols: boolean;
+}
 
 interface ImportStore {
+  options: RecognitionOptions;
+  setOptions: (o: Partial<RecognitionOptions>) => void;
   draft: ReconstructionDraft | null;
   selected: DraftSelection;
   /** Progress of a running import/recognition (0..1) and its label. */
@@ -13,13 +21,17 @@ interface ImportStore {
   updateWall: (id: string, patch: Partial<DraftWall>) => void;
   updateOpening: (id: string, patch: Partial<DraftOpening>) => void;
   updateRoom: (id: string, patch: Partial<DraftRoom>) => void;
-  removeElement: (type: 'wall' | 'opening' | 'room', id: string) => void;
+  updateFixture: (id: string, patch: Partial<DraftFixture>) => void;
+  updateInstallation: (id: string, patch: Partial<DraftInstallation>) => void;
+  removeElement: (type: 'wall' | 'opening' | 'room' | 'fixture' | 'installation', id: string) => void;
   setAllAccepted: (accepted: boolean) => void;
   setProgress: (p: ImportStore['progress']) => void;
   patchDraft: (patch: Partial<ReconstructionDraft>) => void;
 }
 
 export const useImportStore = create<ImportStore>((set, get) => ({
+  options: { detectSanitary: false, detectInstallationSymbols: false },
+  setOptions: (o) => set({ options: { ...get().options, ...o } }),
   draft: null,
   selected: null,
   progress: null,
@@ -37,12 +49,22 @@ export const useImportStore = create<ImportStore>((set, get) => ({
     const d = get().draft;
     if (d) set({ draft: { ...d, rooms: d.rooms.map((r) => (r.id === id ? { ...r, ...patch } : r)) } });
   },
+  updateFixture: (id, patch) => {
+    const d = get().draft;
+    if (d) set({ draft: { ...d, fixtures: d.fixtures?.map((x) => (x.id === id ? { ...x, ...patch } : x)) } });
+  },
+  updateInstallation: (id, patch) => {
+    const d = get().draft;
+    if (d) set({ draft: { ...d, installations: d.installations?.map((x) => (x.id === id ? { ...x, ...patch } : x)) } });
+  },
   removeElement: (type, id) => {
     const d = get().draft;
     if (!d) return;
     if (type === 'wall') set({ draft: { ...d, walls: d.walls.filter((w) => w.id !== id), openings: d.openings.map((o) => (o.wallId === id ? { ...o, wallId: undefined } : o)) } });
     if (type === 'opening') set({ draft: { ...d, openings: d.openings.filter((o) => o.id !== id) } });
     if (type === 'room') set({ draft: { ...d, rooms: d.rooms.filter((r) => r.id !== id) } });
+    if (type === 'fixture') set({ draft: { ...d, fixtures: d.fixtures?.filter((x) => x.id !== id) } });
+    if (type === 'installation') set({ draft: { ...d, installations: d.installations?.filter((x) => x.id !== id) } });
     if (get().selected?.id === id) set({ selected: null });
   },
   setAllAccepted: (accepted) => {
@@ -54,6 +76,8 @@ export const useImportStore = create<ImportStore>((set, get) => ({
         walls: d.walls.map((w) => ({ ...w, accepted })),
         openings: d.openings.map((o) => ({ ...o, accepted })),
         rooms: d.rooms.map((r) => ({ ...r, accepted })),
+        fixtures: d.fixtures?.map((x) => ({ ...x, accepted })),
+        installations: d.installations?.map((x) => ({ ...x, accepted })),
       },
     });
   },

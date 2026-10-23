@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
@@ -15,8 +15,14 @@ import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore } from '../store/uiStore';
 import { Architecture, Ground } from './Architecture';
+import { OtherLevels3D } from './OtherLevels3D';
+import { activeLevel, neighbourLevel } from '../model/levels';
+import { stairwells, walkGroundAt } from '../model/stairs';
+import { goToNeighbourLevel } from '../ui/levelActions';
+import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
 import { Devices3D } from '../smarthome/Devices3D';
+import { Fixtures3D } from '../installation/Fixtures3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { eyeFromBody } from '../model/body';
 import { RefFigure } from './RefFigure';
@@ -52,6 +58,8 @@ import { useDialogStore } from '../ui/dialogStore';
 import { usePhoneLayout, useTouchUi } from '../ui/phoneLayout';
 import { TouchWalkPad } from './TouchWalkPad';
 import { OrbitContextMenu } from './OrbitContextMenu';
+import { Exterior3D } from './Exterior3D';
+import { exteriorWalls, facadeViewDirection, findEntrance, type Entrance } from './exterior';
 
 /** Read-only preview of a before/after comparison (#76): which state is shown and its markings. */
 interface ComparePreview {
@@ -131,6 +139,7 @@ export function Scene3D() {
             if (e.button === 0 && cameraMode === 'orbit' && !compare && moved <= CLICK_THRESHOLD_PX) useUiStore.getState().setSelection(null);
           }}
         >
+          <RenderOnResize />
           <SceneContent project={project} frame={storeProject} compare={compare} quality={quality} cameraMode={cameraMode} onLockChange={setLocked} cutaway={cutaway} />
         </Canvas>
       </WebGLBoundary>
@@ -162,9 +171,9 @@ export function Scene3D() {
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · F: Objekt-Menü · P: Referenzfigur · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · F (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · Q/E: Möbel drehen · Rechtsklick: Objekt-Menü · P: Referenzfigur · Esc: Maus freigeben</span>
           ) : (
-            <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, Mausrad zoomt, E öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
+            <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, Mausrad zoomt, F öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
           )}
           {gamepad && !carried && (
             <span data-testid="walk-gamepad">
@@ -175,6 +184,25 @@ export function Scene3D() {
       )}
     </div>
   );
+}
+
+/**
+ * After the canvas got a new size the drawing buffer is empty until the next frame (white flash while the
+ * divider is dragged, #368): draw once right away, in the same task as the resize.
+ */
+function RenderOnResize() {
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  const advance = useThree((s) => s.advance);
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    advance(performance.now());
+  }, [width, height, advance]);
+  return null;
 }
 
 function SceneContent({
@@ -303,11 +331,31 @@ function SceneContent({
   const onToggleOpening = useCallback((id: string) => void toggleOpening(id), []);
 
   const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 4);
+  // outside view (#92): only in the overview, never while comparing
+  const exteriorOn = usePerformanceStore((s) => s.exterior) && cameraMode === 'orbit' && !readOnly;
+  const entrance = useMemo(
+    () => (exteriorOn ? findEntrance(project, derived, exteriorWalls(project, derived)) : null),
+    [exteriorOn, project, derived],
+  );
   // walking (#164, #185): selecting happens at the crosshair (WalkControls) – the scene's click
   // handlers stay off: under pointer lock they would pick at the stale mouse position (the wall
   // behind the furniture), by touch a finger drag would move furniture or select walls/floors
   const walkPick = cameraMode === 'walk';
   const tier = tierSettings(useGraphicsTier());
+  const otherLevels = useUiStore((s) => s.otherLevels);
+  const activeElevation = activeLevel(project).elevation;
+  // stairwells (#54): rebuilt only when a stair between storeys changes
+  const wellsKey = JSON.stringify(stairwells(project));
+   
+  const wells = useMemo(() => JSON.parse(wellsKey) as ReturnType<typeof stairwells>, [wellsKey]);
+  // walking up and down stairs (#54)
+  const groundAt = useCallback((pt: { x: number; y: number }) => walkGroundAt(project, pt), [project]);
+  const above = neighbourLevel(project, 1);
+  const below = neighbourLevel(project, -1);
+  const riseUp = above ? above.elevation - activeElevation : null;
+  const riseDown = below ? activeElevation - below.elevation : null;
+  const levelRise = useMemo(() => ({ up: riseUp, down: riseDown }), [riseUp, riseDown]);
+  const onChangeLevel = useCallback((dir: 1 | -1) => goToNeighbourLevel(dir), []);
 
   return (
     <>
@@ -316,7 +364,16 @@ function SceneContent({
       {quality === 'realism' && <EnvironmentLight stepHours={tier.envStepHours} size={tier.envSize} />}
       <FpsMeter />
       <AdaptiveQuality />
-      <Ground quality={quality} />
+      {/* the ground lies at the ground storey's floor (#54); a cellar as active storey is shown without it */}
+      {activeElevation >= 0 && <Ground quality={quality} y={-activeElevation} />}
+      <OtherLevels3D
+        project={project}
+        mode={otherLevels}
+        cameraMode={cameraMode}
+        exterior={exteriorOn}
+        quality={quality}
+        showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
+      />
       <Architecture
         project={project}
         derived={derived}
@@ -325,8 +382,12 @@ function SceneContent({
         onSelect={readOnly || walkPick ? noop : onSelectArch}
         // walkthrough: doors/windows are opened by clicking at the crosshair (WalkControls)
         onToggleOpening={cameraMode === 'orbit' && !readOnly ? onToggleOpening : undefined}
-        showCeilings={project.settings.showCeilings || cameraMode === 'walk'}
+        showCeilings={project.settings.showCeilings || cameraMode === 'walk' || exteriorOn}
+        floorHoles={wells.floor}
+        ceilingHoles={wells.ceiling}
       />
+      <Photos3D project={project} derived={derived} />
+      {exteriorOn && <Exterior3D project={project} derived={derived} entrance={entrance} />}
       {project.furniture.map((f) => (
         <FurnitureObject
           key={f.id}
@@ -358,6 +419,7 @@ function SceneContent({
         </>
       )}
       <Devices3D project={project} />
+      <Fixtures3D project={project} />
       <TapeMeasure3D />
       {/* also while walking (#227): a drag can only start while the pointer is not locked */}
       {!readOnly && <CatalogDrop3D />}
@@ -370,7 +432,7 @@ function SceneContent({
       <CameraBookmarkDriver />
       {cameraMode === 'orbit' ? (
         <>
-          <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} rotateSpeed={project.settings.mouseSensitivity} />
+          <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} exterior={exteriorOn} entrance={entrance} rotateSpeed={project.settings.mouseSensitivity} />
           <OrbitKeyControls controlsRef={orbitRef} comparing={readOnly} />
         </>
       ) : (
@@ -382,6 +444,9 @@ function SceneContent({
           sensitivity={BASE_LOOK_SENSITIVITY * project.settings.mouseSensitivity}
           eyeHeight={eyeFromBody(project.settings.bodyHeight)}
           onLockChange={onLockChange}
+          groundAt={readOnly ? undefined : groundAt}
+          levelRise={levelRise}
+          onChangeLevel={readOnly ? undefined : onChangeLevel}
         />
       )}
     </>
@@ -473,12 +538,17 @@ function OrbitCamera({
   center,
   span,
   rotateSpeed,
+  exterior,
+  entrance,
 }: {
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   center: { x: number; y: number };
   span: number;
   /** Orbit rotation speed (OrbitControls default = 1). */
   rotateSpeed: number;
+  /** Outside view (#92): frame the whole building from the entrance side. */
+  exterior: boolean;
+  entrance: Entrance | null;
 }) {
   const { camera, get } = useThree();
   const resetRequest = usePerformanceStore((s) => s.cameraReset);
@@ -492,13 +562,14 @@ function OrbitCamera({
       const vfov = THREE.MathUtils.degToRad(cam.fov);
       const aspect = size.width / Math.max(1, size.height);
       const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-      const radius = span * 0.62 + 1;
+      const radius = exterior ? span * 0.85 + 3 : span * 0.62 + 1;
       const distance = radius / Math.sin(Math.min(vfov, hfov) / 2);
-      const dir = new THREE.Vector3(0.35, 0.95, 1.05).normalize();
+      const f = exterior ? facadeViewDirection(entrance) : null;
+      const dir = (f ? new THREE.Vector3(f.x, f.y, f.z) : new THREE.Vector3(0.35, 0.95, 1.05)).normalize();
       if (controlsRef.current) stopOrbitMotion(controlsRef.current);
-      camera.position.set(center.x + dir.x * distance, dir.y * distance, center.y + dir.z * distance);
-      camera.lookAt(center.x, 0, center.y);
-      controlsRef.current?.target.set(center.x, 0.8, center.y);
+      camera.position.set(center.x + dir.x * distance, dir.y * distance + (exterior ? 1.2 : 0), center.y + dir.z * distance);
+      camera.lookAt(center.x, exterior ? 1.4 : 0, center.y);
+      controlsRef.current?.target.set(center.x, exterior ? 1.4 : 0.8, center.y);
       controlsRef.current?.update();
     };
     fit();
@@ -507,7 +578,7 @@ function OrbitCamera({
     return () => clearTimeout(t);
     // only on mount, explicit reset or layout change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetRequest, viewMode]);
+  }, [resetRequest, viewMode, exterior]);
   // zoom slider (#6): report the camera distance, let the slider move the camera
   useEffect(() => {
     const c = controlsRef.current;

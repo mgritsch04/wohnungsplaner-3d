@@ -15,6 +15,8 @@ interface VectorParams {
   tMin: number;
   tMax: number;
   minLen: number;
+  /** Shortest wall piece (px) kept beside a door gap, between jamb and corner (#267). */
+  stubLen: number;
   /** Largest gap (px) between the pieces of one dashed wall line. */
   dashGap: number;
   /** How far the two lines of a closed outline may end apart (px). */
@@ -28,6 +30,7 @@ function vectorParams(mpp: number): VectorParams {
     tMin: 0.05 / mpp,
     tMax: 0.6 / mpp,
     minLen: 0.3 / mpp,
+    stubLen: 0.1 / mpp,
     dashGap: 0.12 / mpp,
     outlineTol: 0.03 / mpp,
     angTol: Math.sin((1.5 * Math.PI) / 180),
@@ -57,9 +60,9 @@ export function detectVectorWalls(
 /** Axis-aligned detection. Only segments accepted by `isWallLine` may form walls; all others count as symbols. */
 function detectInFrame(segments: VectorSegment[], p: VectorParams, isWallLine?: (i: number) => boolean): { walls: RecognizedWall[]; openings: RecognizedOpening[] } {
   const { tMin, tMax, minLen, outlineTol } = p;
-  const { hs, vs, others } = splitLines(segments, p, isWallLine);
+  const { hs, vs, others, shortHs, shortVs } = splitLines(segments, p, isWallLine);
 
-  const pair = (lines: L[], o: 'h' | 'v'): Band[] => {
+  const pair = (lines: L[], o: 'h' | 'v', minOverlap = minLen): Band[] => {
     const sorted = [...lines].sort((p, q) => p.c - q.c);
     const out: Band[] = [];
     for (let i = 0; i < sorted.length; i++) {
@@ -71,7 +74,7 @@ function detectInFrame(segments: VectorSegment[], p: VectorParams, isWallLine?: 
         if (d > tMax) break;
         if (d < tMin) continue;
         const overlap = Math.min(s.a1, t.a1) - Math.max(s.a0, t.a0);
-        if (overlap < Math.max(minLen, 0.5 * Math.min(s.a1 - s.a0, t.a1 - t.a0))) continue;
+        if (overlap < Math.max(minOverlap, 0.5 * Math.min(s.a1 - s.a0, t.a1 - t.a0))) continue;
         if (!best || d < best.d) best = { j, d };
       }
       if (best) {
@@ -93,10 +96,32 @@ function detectInFrame(segments: VectorSegment[], p: VectorParams, isWallLine?: 
     return out;
   };
   const bands = [...pair(hs, 'h'), ...pair(vs, 'v')];
+  bands.push(...wallStubs([...pair(shortHs, 'h', p.stubLen), ...pair(shortVs, 'v', p.stubLen)], bands, p));
   return assembleWalls(bands, p.assemble, makeVectorClassifier(hs, vs, others));
 }
 
-function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i: number) => boolean): { hs: L[]; vs: L[]; others: VectorSegment[] } {
+/**
+ * Short wall pieces (10–30 cm) between a door jamb and a corner (#267): they only count as wall if they
+ * stand in line with a longer wall across a door-sized gap and end at a perpendicular wall. Everywhere
+ * else short pairs of lines are symbols (frames, thresholds, hatching).
+ */
+function wallStubs(stubs: Band[], bands: Band[], p: VectorParams): Band[] {
+  const { minOpening, maxOpening, joinTol } = p.assemble;
+  return stubs.filter((s) => {
+    if (bands.some((b) => b.o === s.o && Math.abs(b.c - s.c) <= b.t / 2 && b.a0 - joinTol <= s.a0 && b.a1 + joinTol >= s.a1)) return false;
+    const corner = (at: number) =>
+      bands.some((q) => q.o !== s.o && q.a0 - q.t / 2 - joinTol <= s.c && q.a1 + q.t / 2 + joinTol >= s.c && at >= q.c - q.t / 2 - 2 * joinTol && at <= q.c + q.t / 2 + 2 * joinTol);
+    const gapTo = (from: number, dir: 1 | -1) =>
+      bands.some((b) => {
+        if (b.o !== s.o || Math.abs(b.c - s.c) > Math.max(b.t, s.t) * 0.5 || Math.abs(b.t - s.t) > Math.max(b.t, s.t) * 0.6) return false;
+        const gap = dir === 1 ? b.a0 - from : from - b.a1;
+        return gap >= minOpening && gap <= maxOpening;
+      });
+    return (corner(s.a1) && gapTo(s.a0, -1)) || (corner(s.a0) && gapTo(s.a1, 1));
+  });
+}
+
+function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i: number) => boolean): { hs: L[]; vs: L[]; others: VectorSegment[]; shortHs: L[]; shortVs: L[] } {
   const hs: L[] = [];
   const vs: L[] = [];
   const others: VectorSegment[] = [];
@@ -111,15 +136,22 @@ function splitLines(segments: VectorSegment[], p: VectorParams, isWallLine?: (i:
     else others.push(s);
   });
   // short pieces that do not join into a dashed wall face stay symbol lines (frames, thresholds)
+  const shortKept: Record<'h' | 'v', L[]> = { h: [], v: [] };
   const keep = (lines: L[], o: 'h' | 'v') => {
     const short = lines.filter((l) => l.a1 - l.a0 < p.minLen);
     const dashed = joinDashes(short, p.dashGap).filter((d) => d.a1 - d.a0 >= p.minLen && d.n >= 3);
     for (const l of short)
       if (!dashed.some((d) => Math.abs(d.c - l.c) <= 0.5 && l.a0 >= d.a0 && l.a1 <= d.a1))
-        others.push(o === 'h' ? { x1: l.a0, y1: l.c, x2: l.a1, y2: l.c } : { x1: l.c, y1: l.a0, x2: l.c, y2: l.a1 });
+        {
+          others.push(o === 'h' ? { x1: l.a0, y1: l.c, x2: l.a1, y2: l.c } : { x1: l.c, y1: l.a0, x2: l.c, y2: l.a1 });
+          if (l.a1 - l.a0 >= p.stubLen) shortKept[o].push(l);
+        }
     return [...lines.filter((l) => l.a1 - l.a0 >= p.minLen), ...dashed.map(({ a0, a1, c }) => ({ a0, a1, c }))];
   };
-  return { hs: keep(hs, 'h'), vs: keep(vs, 'v'), others };
+  const hsKept = keep(hs, 'h');
+  const vsKept = keep(vs, 'v');
+  // stub candidates: every line from stubLen up (a short piece pairs with the longer line of its wall)
+  return { hs: hsKept, vs: vsKept, others, shortHs: [...hsKept, ...shortKept.h], shortVs: [...vsKept, ...shortKept.v] };
 }
 
 /**

@@ -9,7 +9,7 @@ import { BODY_HEIGHT_DEFAULT, BODY_HEIGHT_MAX, BODY_HEIGHT_MIN, migrateBodyHeigh
  * migration step in formats/project/migrate.ts.
  */
 export const PROJECT_FORMAT = 'wohnungsplaner-project';
-export const PROJECT_SCHEMA_VERSION = 2;
+export const PROJECT_SCHEMA_VERSION = 7;
 
 const finite = () => z.number().refine(Number.isFinite, 'Zahl muss endlich sein');
 const len = (min: number, max: number) => finite().min(min).max(max);
@@ -32,6 +32,9 @@ export const NodeSchema = z.object({
   y: finite(),
 });
 
+/** Construction of a wall (#80); only used for a rough sound-insulation estimate. */
+export const WallAssemblySchema = z.enum(['brick', 'drywall', 'concrete', 'aerated']);
+
 export const WallSchema = z.object({
   id: z.string().min(1),
   /** Start node id. */
@@ -43,6 +46,8 @@ export const WallSchema = z.object({
   /** Material ids for the left (+perp) and right side of the wall, relative to a→b. */
   leftMaterialId: z.string().optional(),
   rightMaterialId: z.string().optional(),
+  /** Wall construction (#80); unset = unknown, treated as brick in the estimate. */
+  assembly: WallAssemblySchema.optional(),
   provenance: ProvenanceSchema.optional(),
 });
 
@@ -189,6 +194,23 @@ export const KitchenModuleSchema = z.object({
 /** Surface type of a furniture body (#63): replaces the model's built-in structure/gloss on its main parts. */
 export const FurnitureFinishSchema = z.enum(['fabric', 'leather', 'wood', 'lacquer', 'metal', 'stone']);
 
+/** One element of a cabinet's inner layout (#85): shelf, drawer or clothes rod in a column. */
+export const InteriorPartSchema = z.object({
+  kind: z.enum(['shelf', 'drawer', 'rod']),
+  /** Column (0-based, left to right as seen from the front). */
+  column: z.number().int().min(0).max(5),
+  /** Height of the part's underside (rod: of the rod) above the inner floor. */
+  z: len(0, 10),
+  /** Drawer front height; ignored for shelf and rod. */
+  h: len(0.01, 2).optional(),
+});
+
+/** Inner layout of a cabinet (#85); optional, so older files stay valid (no migration). */
+export const InteriorSchema = z.object({
+  columns: z.number().int().min(1).max(6),
+  parts: z.array(InteriorPartSchema).max(80),
+});
+
 export const FurnitureSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().optional(),
@@ -221,8 +243,14 @@ export const FurnitureSchema = z.object({
   solid: z.boolean().default(true),
   kitchen: KitchenModuleSchema.optional(),
   locked: z.boolean().default(false),
+  /** Already in the flat when moving in (fitted bath, WC): shown in the plan, but not part of budget or shopping list (#255). */
+  existing: z.boolean().default(false),
   /** Member of the furniture group with this id (#65), see `ProjectSchema.groups`; absent = not grouped. */
   groupId: z.string().min(1).optional(),
+  /** Inner layout of a cabinet (#85); absent = not planned. */
+  interior: InteriorSchema.optional(),
+  /** Luminous flux of a lamp in lumen (#360), e.g. from the packaging; absent = typical value of the lamp type is assumed. */
+  lumen: z.number().min(0).max(20000).optional(),
 });
 
 /**
@@ -254,7 +282,7 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
-export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug']);
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip', 'speaker']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(100),
@@ -273,6 +301,86 @@ export const SmartDeviceSchema = z.object({
   lightId: z.string().optional(),
   /** kind `contact`: the door/window it watches. */
   openingId: z.string().optional(),
+  /**
+   * kind `strip` (#238): LED strip along a path (2..12 points, plan metres); x/y stay the first
+   * point. `elevation` is its mounting height, `direction` where it shines (down, back to the
+   * wall, up into a cove). `color` (#rrggbb) or `kelvin` set the planned colour, brightness is
+   * switched in the simulation. All optional: older files without them stay valid (no migration).
+   */
+  points: z.array(Vec2Schema).min(2).max(12).optional(),
+  direction: z.enum(['down', 'back', 'up']).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  kelvin: z.number().min(1500).max(10000).optional(),
+  /**
+   * kind `speaker` (#138): which kind of loudspeaker is planned (generic type, no product);
+   * `rotation` is the direction it fires at, `elevation` its height. Optional: no migration.
+   */
+  speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']).optional(),
+  /** kind `speaker` (#336): the own device (project.audioCatalog) this speaker is; its size and coverage feed the hints. */
+  audioDefId: z.string().optional(),
+});
+
+/**
+ * Own audio device (#336): entered by the user (name, size, type, coverage angle when known) –
+ * never an invented product. `source` says where the data came from ("eigene Eingabe", or a
+ * checked source with retrieval date); no price is stored.
+ */
+export const AudioDeviceDefSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  speakerType: z.enum(['bookshelf', 'bluetooth', 'soundbar', 'subwoofer', 'desk']),
+  /** Outer size (m): width across the front, depth front to back, height. */
+  widthM: len(0.02, 3),
+  depthM: len(0.02, 3),
+  heightM: len(0.02, 3),
+  /** Horizontal coverage (degrees) when known. */
+  coverageDeg: z.number().min(10).max(360).optional(),
+  source: z.string().max(200).optional(),
+  note: z.string().max(200).optional(),
+});
+
+/**
+ * Installation point on a wall (#64, #81): socket, light switch, radiator, water or waste-water
+ * connection – only placement and display, no device logic. Stored like furniture with a plan
+ * position; placing and dragging snap it onto the nearest wall face (model/fixtures.ts), so it
+ * stays put when walls are edited later.
+ */
+export const FixtureKindSchema = z.enum(['socket', 'switch', 'radiator', 'water', 'drain']);
+export const FixtureSchema = z.object({
+  id: z.string().min(1),
+  kind: FixtureKindSchema,
+  /** Centre of the footprint in plan coordinates (in front of the wall face). */
+  x: finite(),
+  y: finite(),
+  /** Plan rotation like furniture: the front (local +y) faces away from the wall into the room. */
+  rotation: finite().default(0),
+  /** Height of the centre (sockets, switches, connections) or of the lower edge (radiator) above the floor. */
+  elevation: len(0, 3),
+  /** Radiator size (m); other kinds use fixed sizes. */
+  width: len(0.2, 3).optional(),
+  height: len(0.2, 2).optional(),
+  /** Sockets: number of outlets side by side (1 = single, 2 = double …). */
+  count: z.number().int().min(1).max(5).default(1),
+  note: z.string().max(200).optional(),
+  /** Sockets: the circuit (project.circuits) this socket hangs on (#135). */
+  circuitId: z.string().optional(),
+});
+
+/** Electrical circuit with its fuse (#135); the power check is a guide value only. */
+export const CircuitSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(60),
+  /** Fuse rating in ampere. */
+  amps: z.number().min(6).max(63).default(16),
+});
+
+/** Consumer with its power in watt, attached to a socket (fixtureId) or directly to a circuit (circuitId) (#135). */
+export const LoadSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(80),
+  watts: z.number().min(0).max(30000),
+  fixtureId: z.string().optional(),
+  circuitId: z.string().optional(),
 });
 
 /** Home-Assistant-like automation: trigger → optional condition → light action (#170). */
@@ -287,7 +395,13 @@ export const AutomationSchema = z.object({
   ]),
   /** only when it is dark (sun below the horizon at the simulated hour) */
   onlyWhenDark: z.boolean().default(false),
-  action: z.object({ deviceIds: z.array(z.string()), on: z.boolean(), brightness: z.number().min(1).max(100).optional() }),
+  action: z.object({
+    deviceIds: z.array(z.string()),
+    on: z.boolean(),
+    brightness: z.number().min(1).max(100).optional(),
+    /** LED strips (#238): colour (#rrggbb) the strip takes when the rule fires */
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  }),
   /** Motion trigger: switch the lights off again once the sensor reports "no motion" for this long (s). */
   offAfterS: z.number().min(0).max(7200).optional(),
 });
@@ -348,6 +462,10 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   /** Hour of day 0..24 for the sun position. */
   timeOfDay: z.number().min(0).max(24).default(14),
   exposure: z.number().min(0.1).max(4).default(1),
+  /** Compass bearing (degrees, 0 = north, 90 = east) the upper edge of the plan points to (#69, #93); 0 = plan up is north. */
+  northDirection: z.number().min(0).max(359).default(0),
+  /** Share of the fuse rating treated as continuous load before the power check warns (#135), percent. */
+  circuitLimitPct: z.number().min(10).max(100).default(80),
   /** Show ceilings in the 3D view (off by default for better overview). */
   showCeilings: z.boolean().default(false),
   /** Mouse sensitivity factor for looking around (walk) and orbiting; 1 = default feel. */
@@ -373,6 +491,9 @@ export const SettingsSchema = z.preprocess(migrateBodyHeight, z.object({
   minPassageWidth: z.number().min(0.6).max(1.5).default(0.9),
   /** Mark passages narrower than minPassageWidth in 2D and 3D. */
   showNarrowPassages: z.boolean().default(true),
+  /** Rough heating-cost estimate (#90): insulation standard and heating source; orientation only. */
+  insulation: z.enum(['unrenovated', 'partial', 'standard', 'good', 'passive']).default('standard'),
+  heatingSource: z.enum(['gas', 'oil', 'district', 'heatpump', 'electric']).default('gas'),
   /** Kitchen work triangle (#82): display + limits (rule of thumb, not a standard), metres. */
   kitchenTriangle: z
     .object({
@@ -419,6 +540,83 @@ export const MarkSchema = z.object({
   photoAssetId: z.string().optional(),
 });
 
+/** Short note pinned to a room or a piece of furniture (#83); shown as a pin in the 2D plan. */
+export const NoteSchema = z.object({
+  id: z.string().min(1),
+  target: z.object({ type: z.enum(['room', 'furniture']), id: z.string().min(1) }),
+  text: z.string().max(500),
+});
+
+/**
+ * Checkable to-do. With `roomId` it belongs to that room's task list (#84); without it, it is a
+ * step of the project-wide moving checklist (#91). `due` is an optional date (YYYY-MM-DD).
+ */
+export const TaskSchema = z.object({
+  id: z.string().min(1),
+  roomId: z.string().min(1).optional(),
+  text: z.string().max(200),
+  done: z.boolean().default(false),
+  due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+/**
+ * Reference photo hung on one side of a wall (#86), to compare real rooms with the plan.
+ * The image lives only in the local asset store (`assetId`), never in the repo or on a server.
+ * `along` = distance of the photo's left edge from the wall start (m), `bottom` = height of its
+ * lower edge (m); the height follows from `width` and the image aspect `aspect` (width / height).
+ */
+export const PhotoSchema = z.object({
+  id: z.string().min(1),
+  wallId: z.string().min(1),
+  /** Wall side relative to a→b: left = +normal side. */
+  side: z.enum(['left', 'right']),
+  assetId: z.string().min(1),
+  fileName: z.string().max(300).default(''),
+  aspect: z.number().min(0.05).max(20),
+  width: len(0.05, 20),
+  along: finite(),
+  bottom: finite(),
+  visible: z.boolean().default(true),
+  opacity: z.number().min(0.05).max(1).default(1),
+});
+
+/**
+ * Plan content of one storey (#54): everything with a plan position or a reference to plan
+ * elements. The ACTIVE storey keeps it in the project's top-level fields, so every editor and
+ * view works on one storey as before; the other storeys keep theirs in `Level.plan` until they
+ * are switched to (model/levels.ts swaps the two).
+ */
+export const LevelPlanSchema = z.object({
+  nodes: z.array(NodeSchema).default([]),
+  walls: z.array(WallSchema).default([]),
+  openings: z.array(OpeningSchema).default([]),
+  rooms: z.array(RoomSchema).default([]),
+  furniture: z.array(FurnitureSchema).default([]),
+  lights: z.array(LightSchema).default([]),
+  groups: z.array(FurnitureGroupSchema).default([]),
+  devices: z.array(SmartDeviceSchema).default([]),
+  fixtures: z.array(FixtureSchema).default([]),
+  loads: z.array(LoadSchema).default([]),
+  notes: z.array(NoteSchema).default([]),
+  photos: z.array(PhotoSchema).default([]),
+  /** Mieter-Paket marks (#362) of this storey. */
+  marks: z.array(MarkSchema).default([]),
+  underlay: UnderlaySchema.nullable().default(null),
+});
+
+/** Storey of a building (#54), e.g. Erdgeschoss, Obergeschoss, Keller. */
+export const LevelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(60),
+  /** Height of the storey's floor above the floor of the ground storey (m); negative = cellar. */
+  elevation: len(-50, 500),
+  /** Stored plan of an inactive storey; absent for the active storey (its plan is the top-level fields). */
+  plan: LevelPlanSchema.optional(),
+});
+
+export const DEFAULT_LEVEL_ID = 'level_0';
+export const DEFAULT_LEVEL_NAME = 'Erdgeschoss';
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -445,6 +643,21 @@ export const ProjectSchema = z.object({
   automations: z.array(AutomationSchema).default([]),
   /** Mieter-Paket marks (#362); projects saved before lack the field. */
   marks: z.array(MarkSchema).default([]),
+  /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
+  fixtures: z.array(FixtureSchema).default([]),
+  /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
+  circuits: z.array(CircuitSchema).default([]),
+  loads: z.array(LoadSchema).default([]),
+  /** Notes as pins (#83), room task lists (#84) and the moving checklist (#91, tasks without roomId); schema 4. */
+  notes: z.array(NoteSchema).default([]),
+  tasks: z.array(TaskSchema).default([]),
+  /** Reference photos on walls (#86); schema 5. */
+  photos: z.array(PhotoSchema).default([]),
+  /** Storeys (#54, schema 6), sorted by elevation; the plan fields above belong to `activeLevelId`. */
+  /** Own audio devices (#336, schema 7); shared by all storeys. */
+  audioCatalog: z.array(AudioDeviceDefSchema).max(100).default([]),
+  levels: z.array(LevelSchema).min(1).max(30).default([{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }]),
+  activeLevelId: z.string().min(1).default(DEFAULT_LEVEL_ID),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -460,13 +673,23 @@ export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 export type KitchenModule = z.infer<typeof KitchenModuleSchema>;
 export type Furniture = z.infer<typeof FurnitureSchema>;
+export type InteriorPart = z.infer<typeof InteriorPartSchema>;
+export type Interior = z.infer<typeof InteriorSchema>;
 export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
+export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
 export type MarkKind = z.infer<typeof MarkKindSchema>;
 export type Mark = z.infer<typeof MarkSchema>;
+export type FixtureKind = z.infer<typeof FixtureKindSchema>;
+export type Fixture = z.infer<typeof FixtureSchema>;
+export type Circuit = z.infer<typeof CircuitSchema>;
+export type Load = z.infer<typeof LoadSchema>;
+export type Note = z.infer<typeof NoteSchema>;
+export type Task = z.infer<typeof TaskSchema>;
+export type Photo = z.infer<typeof PhotoSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;
@@ -474,3 +697,5 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export type Vec3 = z.infer<typeof Vec3Schema>;
 export type CameraBookmark = z.infer<typeof CameraBookmarkSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type LevelPlan = z.infer<typeof LevelPlanSchema>;
+export type Level = z.infer<typeof LevelSchema>;

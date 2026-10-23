@@ -5,6 +5,7 @@ import { roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { usePerformanceStore } from './performanceStore';
+import { motionReduced } from '../ui/motionPreference';
 
 /**
  * Camera bookmarks (#55): saved 3D viewpoints in the project, jumped to from the
@@ -165,11 +166,7 @@ export function interpolateView(from: CameraView, to: CameraView, t: number): Ca
 }
 
 export function prefersReducedMotion(): boolean {
-  try {
-    return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
+  return motionReduced();
 }
 
 // ---------- current camera ----------

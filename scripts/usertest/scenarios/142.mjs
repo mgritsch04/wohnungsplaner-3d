@@ -177,7 +177,7 @@ export default {
         const aimed = await t.poll(async () => ((await page.evaluate(() => window.__wp.walk.targetOpening())) === door.id ? true : null), 3000);
         const p0 = await pose(t);
         const wasOpen = door.open;
-        await page.keyboard.press('e');
+        await page.keyboard.press('f');
         const toggled = await t.poll(async () => ((await t.project()).openings.find((o) => o.id === door.id).open !== wasOpen ? true : null), 3000);
         await page.waitForTimeout(800);
         const p1 = await pose(t);

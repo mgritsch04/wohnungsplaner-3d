@@ -1,6 +1,7 @@
 import { useProjectStore } from '../store/projectStore';
 import { selectedFurnitureIds, useUiStore, type Selection } from '../store/uiStore';
 import type { Project } from '../model/schema';
+import { fixtureLabel } from '../model/fixtures';
 import { deleteSelection, duplicateSelection, rotateSelection } from './actions';
 import { openObjectMenu } from './objectMenu';
 import type { PhoneSheet } from './phoneLayout';
@@ -45,6 +46,10 @@ export function selectionLabel(p: Project, sel: Selection, count: number): strin
     return kind === 'window' ? 'Fenster' : kind === 'passage' ? 'Durchgang' : 'Tür';
   }
   if (sel.type === 'light') return p.lights.find((l) => l.id === sel.id)?.name || 'Licht';
+  if (sel.type === 'fixture') {
+    const f = p.fixtures.find((x) => x.id === sel.id);
+    return f ? fixtureLabel(f) : 'Anschluss';
+  }
   if (sel.type === 'device') return p.devices.find((d) => d.id === sel.id)?.name || 'Gerät';
   return sel.type === 'wall' ? 'Wand' : 'Ecke';
 }

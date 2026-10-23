@@ -1,5 +1,6 @@
-import type { DerivedPlan } from '../model/derived';
-import type { Project } from '../model/schema';
+import { derivePlan, type DerivedPlan } from '../model/derived';
+import { projectOnLevel, sortedLevels } from '../model/levels';
+import type { Furniture, Project } from '../model/schema';
 import { pointInPolygon } from '../model/vec';
 import type { RoomOf } from './budget';
 
@@ -13,4 +14,25 @@ export function furnitureRoomLookup(project: Pick<Project, 'rooms'>, derived: De
     const r = rooms.find((x) => pointInPolygon({ x: f.x, y: f.y }, x.interior));
     return r ? { id: r.id, name: r.name } : null;
   };
+}
+
+/**
+ * Furniture of the whole building (#54): every storey, lowest first, with the room each item
+ * stands in; with several storeys the room name carries the storey ("Obergeschoss · Bad").
+ */
+export function buildingFurniture(project: Project): { furniture: Furniture[]; roomOf: RoomOf } {
+  const multi = project.levels.length > 1;
+  const rooms = new Map<string, { id: string; name: string } | null>();
+  const furniture: Furniture[] = [];
+  for (const level of sortedLevels(project)) {
+    const view = projectOnLevel(project, level.id);
+    if (view.furniture.length === 0) continue;
+    const lookup = furnitureRoomLookup(view, derivePlan(view));
+    for (const f of view.furniture) {
+      furniture.push(f);
+      const r = lookup(f);
+      rooms.set(f.id, r && multi ? { id: r.id, name: `${level.name} · ${r.name}` } : r);
+    }
+  }
+  return { furniture, roomOf: (f) => rooms.get(f.id) ?? null };
 }

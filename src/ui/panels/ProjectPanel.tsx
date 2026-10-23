@@ -12,6 +12,15 @@ import { newId } from '../../model/ids';
 import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
+import { DaylightSection } from './DaylightSection';
+import { LuxSection } from './LuxSection';
+import { HeatingSection } from './HeatingSection';
+import { CircuitsSection } from '../../installation/CircuitsSection';
+import { MoveChecklistSection } from '../../planning/TaskSections';
+import { MotionControl } from '../MotionControl';
+import { HintsControl } from '../HintsControl';
+import { InfoHint } from '../InfoHint';
+import { LevelsSection } from '../LevelBar';
 import { useSightStore } from '../../editor2d/sightStore';
 import { exportPlanPng } from '../../export/exportPng';
 import { openPrintView } from '../../export/PrintView';
@@ -29,15 +38,23 @@ export function ProjectPanel() {
     <div className="panel-scroll">
       <Section title="Oberfläche">
         <ThemeControl />
+        <MotionControl />
+        <HintsControl />
       </Section>
+
+      <LevelsSection />
 
       <Section title="Licht & Darstellung (3D)">
         <div className="field">
-          <span className="field-label">Tageszeit (wirkt im Realismusmodus)</span>
+          <span className="field-label">
+            Tageszeit (wirkt im Realismusmodus) <InfoHint id="timeOfDay" />
+          </span>
           <TimeOfDayControl />
         </div>
         <label className="field">
-          <span className="field-label">Belichtung {s.exposure.toFixed(2)}</span>
+          <span className="field-label">
+            Belichtung {s.exposure.toFixed(2)} <InfoHint id="exposure" />
+          </span>
           <input
             type="range"
             min={0.3}
@@ -62,6 +79,13 @@ export function ProjectPanel() {
           title="Decken sind nur von unten sichtbar (z. B. beim Begehen)"
         />
       </Section>
+
+      <DaylightSection />
+      <LuxSection />
+      <HeatingSection />
+
+      <CircuitsSection />
+      <MoveChecklistSection project={project} />
 
       <SightlineSection />
 
@@ -132,7 +156,7 @@ export function ProjectPanel() {
 
       <Section title="Leistung">
         <p className="small">
-          Modus: <strong>{s.quality === 'planning' ? 'Planung' : 'Realismus'}</strong>
+          Modus: <strong>{s.quality === 'planning' ? 'Planung' : 'Realismus'}</strong> <InfoHint id="realism" />
           {fps !== null && (
             <>
               {' '}

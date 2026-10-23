@@ -381,3 +381,60 @@ export function clippedCadPlanPdf(): Buffer {
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(out, 'latin1');
 }
+
+/**
+ * Synthetic CAD plan for the "nothing invented" checks (#371–#374): one 6 × 4 m room with a door in the
+ * south wall (leaf + swing arc), a window in the north wall, one real socket symbol on the west wall,
+ * a socket-like shape inside the door's swing and a radiator-like rectangle at the north wall.
+ * Scale 1:75, text layer "Wohnen 24,00 m2".
+ */
+export function installationPlanPdf(): Buffer {
+  const m = 1000 / 75 / 25.4 * 72;
+  const ox = 200;
+  const oy = 300;
+  const P = (x: number, y: number) => `${(ox + x * m).toFixed(2)} ${(oy + y * m).toFixed(2)}`;
+  const rect = (x0: number, y0: number, x1: number, y1: number) => `${P(x0, y0)} m ${P(x1, y0)} l ${P(x1, y1)} l ${P(x0, y1)} l h`;
+  const line = (x0: number, y0: number, x1: number, y1: number) => `${P(x0, y0)} m ${P(x1, y1)} l S`;
+  const label = (s: string, x: number, y: number) => `BT /F1 9 Tf 1 0 0 1 ${P(x, y)} Tm (${s}) Tj ET`;
+  const circle = (cx: number, cy: number, r: number) => {
+    const k = 0.5523 * r;
+    return [`${P(cx + r, cy)} m`, `${P(cx + r, cy + k)} ${P(cx + k, cy + r)} ${P(cx, cy + r)} c`, `${P(cx - k, cy + r)} ${P(cx - r, cy + k)} ${P(cx - r, cy)} c`, `${P(cx - r, cy - k)} ${P(cx - k, cy - r)} ${P(cx, cy - r)} c`, `${P(cx + k, cy - r)} ${P(cx + r, cy - k)} ${P(cx + r, cy)} c S`].join(' ');
+  };
+  const socket = (cx: number, cy: number) => `${circle(cx, cy, 0.1)} ${line(cx - 0.1, cy, cx + 0.1, cy)}`;
+  const ops: string[] = ['0 G 0.7 w'];
+  const walls: [number, number, number, number][] = [
+    [-0.25, -0.25, 1.0, 0], // south, door gap 1.0–1.9
+    [1.9, -0.25, 6.25, 0],
+    [-0.25, 4, 2.0, 4.25], // north, window gap 2.0–4.0
+    [4.0, 4, 6.25, 4.25],
+    [-0.25, 0, 0, 4],
+    [6, 0, 6.25, 4],
+  ];
+  for (const [x0, y0, x1, y1] of walls) ops.push(`${rect(x0, y0, x1, y1)} S`);
+  ops.push('0 G 0.18 w', line(2.0, 4.08, 4.0, 4.08), line(2.0, 4.17, 4.0, 4.17));
+  const k = 0.5523 * 0.9;
+  ops.push(line(1.0, 0, 1.0, 0.9), `${P(1.0, 0.9)} m ${P(1.0 + k, 0.9)} ${P(1.9, k)} ${P(1.9, 0)} c S`);
+  ops.push(socket(0.2, 2.0)); // real symbol on the west wall (gap 0.2 m)
+  ops.push(socket(1.45, 0.45)); // lookalike inside the door's swing
+  ops.push(`${rect(2.5, 3.8, 3.5, 3.9)} S`); // rectangle 10 cm off the north wall: radiator lookalike
+  ops.push('0 g', label('Wohnen 24,00 m2', 2.5, 2), label('Massstab M 1:75', 4.5, -1));
+  const content = ops.join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}

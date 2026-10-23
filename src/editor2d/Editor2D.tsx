@@ -6,12 +6,14 @@ import { newId } from '../model/ids';
 import { add, boundsOf, dist, dot, normalize, perp, rotate, scale, sub, type Vec2 } from '../model/vec';
 import { formatLength, radToDeg, roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
+import { CompassRose, compassName, compassOf } from '../ui/CompassRose';
 import { selectedFurnitureIds, useUiStore, type Selection, type View2D } from '../store/uiStore';
 import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { FurnitureSymbol, PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
-import { fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { ICON_MIN_ZOOM, MAX_ZOOM, MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { isSplitChangeRecent, zoomForWidth } from '../ui/splitResize';
 import { ZoomSlider } from '../ui/ZoomSlider';
 import { useWalkPose } from '../store/walkPoseStore';
 import { UnderlayImage } from './UnderlayImage';
@@ -21,17 +23,24 @@ import type { OpeningKind } from '../model/schema';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../model/materials';
 import { buildPlacementObstacles, furnitureConflicts, furnitureSnapOptions, moveFurnitureTo } from '../model/placement';
 import { catalogDropPreview, draggedCatalogItem, droppedCatalogItem, isCatalogDrag, useCatalogDragStore, type DropPreview } from '../catalog/catalogDrag';
-import { dropCatalogItemAt } from '../ui/actions';
+import { dropCatalogItemAt, toggleUnderlayVisible } from '../ui/actions';
 import { openObjectMenu } from '../ui/objectMenu';
 import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
+import { LowerLevelOverlay } from './LowerLevelOverlay';
 import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
+import { CheckFocusOverlay } from './CheckFocusOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
+import { NotePins2D } from '../planning/NotePins2D';
 import { SightlineOverlay } from './SightlineOverlay';
 import { ClearanceOverlay } from './ClearanceOverlay';
+import { DeliveryOverlay } from './DeliveryOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
+import { Fixtures2D } from '../installation/Fixtures2D';
+import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
+import { LuxOverlay2D } from './LuxOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { markKindInfo } from '../model/marks';
 import { calibrateUnderlay } from '../import/underlayTransform';
@@ -40,7 +49,7 @@ import { pressFurnitureSelection, reportGroupTurn, selectFurnitureWithGroups, se
 import { GroupOverlay, groupHandlePoint } from './GroupOverlay';
 
 type Drag =
-  | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean; device?: string | null }
+  | { kind: 'pan'; startScreen: Vec2; startView: { cx: number; cy: number; zoom: number }; moved: boolean; clickSel: boolean; device?: string | null; fixture?: string | null }
   | {
       kind: 'furniture';
       id: string;
@@ -148,7 +157,17 @@ export function Editor2D() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setVp({ width: el.clientWidth, height: el.clientHeight }));
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      // divider moved: keep the visible part of the plan and zoom out (or back in) instead of cropping it
+      if (isSplitChangeRecent() && width !== lastWidth) {
+        const v = useUiStore.getState().view2d;
+        useUiStore.getState().setView2d({ ...v, zoom: zoomForWidth(v.zoom, lastWidth, width, MIN_ZOOM, MAX_ZOOM) });
+      }
+      lastWidth = width;
+      setVp({ width, height: el.clientHeight });
+    });
     ro.observe(el);
     setVp({ width: el.clientWidth, height: el.clientHeight });
     return () => ro.disconnect();
@@ -284,7 +303,8 @@ export function Editor2D() {
     if (isPan) {
       // a smart device under a right-click (drawn by its own overlay, not in hitTest) – for the context menu (#235)
       const device = e.button === 2 ? ((e.target as Element).closest?.('[data-device-id]')?.getAttribute('data-device-id') ?? null) : null;
-      drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: false, device };
+      const fixture = e.button === 2 ? ((e.target as Element).closest?.('[data-fixture-id]')?.getAttribute('data-fixture-id') ?? null) : null;
+      drag.current = { kind: 'pan', startScreen: { x: e.clientX, y: e.clientY }, startView: view, moved: false, clickSel: false, device, fixture };
       return;
     }
     if (e.button !== 0) return;
@@ -671,7 +691,7 @@ export function Editor2D() {
     if (dr.kind === 'pan') {
       // right-click without dragging: context menu of the object under the pointer (#235)
       if (!dr.moved && e.button === 2 && tool === 'select') {
-        const hit: Selection | null = dr.device ? { type: 'device', id: dr.device } : hitTest(project, derived, toWorld(e), 6 / view.zoom);
+        const hit: Selection | null = dr.device ? { type: 'device', id: dr.device } : dr.fixture ? { type: 'fixture', id: dr.fixture } : hitTest(project, derived, toWorld(e), 6 / view.zoom);
         if (hit) openObjectMenu(hit, e.clientX, e.clientY, '2d');
         return;
       }
@@ -851,6 +871,7 @@ export function Editor2D() {
       ref={containerRef}
       className={`editor2d ${cursorClass}`}
       data-testid="editor2d"
+      data-zoom={view.zoom.toFixed(2)}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropGhost(null);
@@ -894,6 +915,7 @@ export function Editor2D() {
         <rect width={vp.width} height={vp.height} fill="url(#grid-major)" />
         <g transform={transform}>
           {project.underlay && project.underlay.visible && <UnderlayImage underlay={project.underlay} />}
+          <LowerLevelOverlay project={project} />
           <PlanDrawing
             project={project}
             derived={derived}
@@ -908,13 +930,19 @@ export function Editor2D() {
           {tool === 'select' && <GroupOverlay project={project} selectedIds={selectedIds} groupId={groupSel} px={px} />}
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}
           <FurnishPreviewOverlay px={px} />
-          <NarrowPassageOverlay project={project} derived={derived} px={px} />
+          {view.zoom >= ICON_MIN_ZOOM && <NarrowPassageOverlay project={project} derived={derived} px={px} />}
+          <CheckFocusOverlay px={px} />
           <KitchenTriangleOverlay project={project} derived={derived} px={px} />
           <SightlineOverlay project={project} derived={derived} px={px} />
           {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
+          <DeliveryOverlay px={px} />
           <WalkMarker px={px} />
-          <DevicesOverlay2D project={project} px={px} />
+          <WifiOverlay2D project={project} />
+          <LuxOverlay2D project={project} px={px} />
+          {view.zoom >= ICON_MIN_ZOOM && <Fixtures2D project={project} px={px} />}
+          {view.zoom >= ICON_MIN_ZOOM && <DevicesOverlay2D project={project} px={px} />}
+          {view.zoom >= ICON_MIN_ZOOM && <NotePins2D project={project} derived={derived} px={px} />}
 
           {/* node handles */}
           {(tool === 'select' || tool === 'wall') &&
@@ -1073,6 +1101,24 @@ export function Editor2D() {
           )}
         </g>
       </svg>
+
+      {project.underlay && (
+        <button
+          type="button"
+          className={`underlay-toggle${project.underlay.visible ? ' active' : ''}`}
+          data-testid="underlay-toggle"
+          aria-pressed={project.underlay.visible}
+          title="Plan-Hintergrund ein- / ausblenden (P)"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => toggleUnderlayVisible()}
+        >
+          Plan-Hintergrund
+        </button>
+      )}
+
+      <div className="plan-compass" title={`Obere Plankante zeigt nach ${compassName(compassOf(project.settings.northDirection))}`}>
+        <CompassRose north={project.settings.northDirection} size={44} testId="compass-plan" />
+      </div>
 
       <ZoomSlider
         testId="zoom-2d"
