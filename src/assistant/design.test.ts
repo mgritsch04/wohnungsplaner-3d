@@ -5,7 +5,7 @@ import { addOpening, addRectRoom, closestWall } from '../model/operations';
 import { derivePlan } from '../model/derived';
 import { placementIssues } from '../model/placement';
 import { applyFurnishing, suggestFurnishing } from '../suggest/furnishing';
-import { buildDesignPrompt, EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, preselect, proposalTotal, realProducts, searchLinks, swapPick } from './design';
+import { apartmentPalette, buildDesignPrompt, EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, preselect, proposalTotal, realProducts, searchLinks, swapPick } from './design';
 import { summarizePlan } from './planSummary';
 import { designWishes, placementReport } from './designRun';
 import { polygonInside, polygonsOverlap, rectPoints } from '../model/zones';
@@ -197,6 +197,37 @@ describe('Einrichtungsvorschlag mit Claude für die ganze Wohnung (#350)', () =>
     const shelf = p.furniture.find((f) => f.catalogId === 'mx-shelf')!;
     expect(shelf.retailer).toBe('Möbelix Österreich');
     expect(shelf.productUrl).toBe('https://www.moebelix.at/p/mx-shelf');
+  });
+
+  it('eine Farbpalette für die ganze Wohnung im Prompt, Platzhalterfarbe aus Claudes Antwort im Plan (Runde 2)', () => {
+    const p = flatProject();
+    const { plan, living } = keys(p);
+    const prompt = buildDesignPrompt({ ...EMPTY_WISHES, style: 'gemütlich' }, plan, []);
+    expect(prompt).toContain('Farbpalette der ganzen Wohnung');
+    expect(prompt).toContain('Terrakotta #c46f4c');
+    expect(apartmentPalette({ style: 'modern', colors: 'Dunkelblau und Messing' })[0]).toBe('Wunschfarben: Dunkelblau und Messing');
+    const sofa = PLACEHOLDERS.find((c) => c.id === 'generic-sofa-3')!;
+    const answer = parseDesignAnswer(
+      { rooms: [{ room: living, items: [{ catalogId: sofa.id, color: '#C46F4C', label: 'Sofa terrakotta' }, { catalogId: 'ik-sofa', color: '#123456' }, { catalogId: 'generic-coffee-table', color: 'rot' }] }] },
+      plan,
+      p.rooms.map((r) => r.id),
+      [SOFA],
+    );
+    const picks = answer.rooms[0].picks;
+    expect(picks.map((x) => x.color)).toEqual(['#c46f4c', undefined, undefined]);
+    const wishes = designWishes(answer.rooms[0]);
+    expect(wishes[0]).toEqual({ catalogId: sofa.id, quantity: 1, color: '#c46f4c' });
+    const s = suggestFurnishing(p, [{ roomId: answer.rooms[0].roomId, type: 'living', wishes }], [SOFA]);
+    expect(s.items.find((f) => f.catalogId === sofa.id)!.color).toBe('#c46f4c');
+  });
+
+  it('Nachprüfung: der Bericht nennt Bewertung und Mängel der Aufstellung (Runde 2)', () => {
+    const p = flatProject();
+    const { plan, living } = keys(p);
+    const answer = parseDesignAnswer({ rooms: [{ room: living, items: [{ catalogId: 'generic-sofa-3' }, { catalogId: 'generic-wardrobe-200', quantity: 3 }] }] }, plan, p.rooms.map((r) => r.id), []);
+    const report = placementReport(p, answer.rooms[0], 'living', PLACEHOLDERS);
+    expect(report).toMatch(/Bewertung der Aufstellung: \d+ von 100 Punkten/);
+    expect(report).toContain('- Mangel:');
   });
 });
 

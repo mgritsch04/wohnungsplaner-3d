@@ -62,7 +62,7 @@ const isFatal = (e: unknown) => {
 const cm = (v: number) => Math.round(v * 100);
 
 /** Claude's picks of a room as the wish list of the placement, with their marked area (#416). */
-export const designWishes = (room: DesignRoom): WishItem[] => room.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity, ...(p.zone ? { zoneId: p.zone } : {}) }));
+export const designWishes = (room: DesignRoom): WishItem[] => room.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity, ...(p.zone ? { zoneId: p.zone } : {}), ...(p.placeholder && p.color ? { color: p.color } : {}) }));
 
 /**
  * The planner's check of Claude's picks for one room (#350, `completeRoom`): misfits out, missing
@@ -115,7 +115,9 @@ export function placementReport(project: Project, room: DesignRoom, type: RoomTy
   const missing = (r?.notes ?? []).map((n) => `- kein Platz: ${n.name} – ${n.why}`);
   const fixes = (room.fixes ?? []).map((f) => `- Planer hat ${f.kind === 'added' ? 'ergänzt' : 'weggelassen'}: ${f.name} (${f.why})`);
   const area = g ? `Raumfläche ${g.area.toFixed(1)} m², davon zugestellt ca. ${(((r?.placed ?? []).filter((f) => f.elevation < 0.05 && f.solid).reduce((a, f) => a + f.width * f.depth, 0) / Math.max(g.area, 0.1)) * 100).toFixed(0)} %.` : '';
-  return [area, 'Aufgestellt:', ...(lines.length ? lines : ['- nichts']), ...missing, ...empty, ...fixes].filter(Boolean).join('\n');
+  // the planner's own judgement (#350): what an interior designer would still criticise
+  const score = r?.score ? [`Bewertung der Aufstellung: ${r.score.score} von 100 Punkten.`, ...r.score.issues.map((i) => `- Mangel: ${i.text}`)] : [];
+  return [area, 'Aufgestellt:', ...(lines.length ? lines : ['- nichts']), ...missing, ...empty, ...fixes, ...score].filter(Boolean).join('\n');
 }
 
 export async function runDesign(input: DesignRunInput): Promise<DesignRunResult> {
@@ -165,7 +167,7 @@ export async function runDesign(input: DesignRunInput): Promise<DesignRunResult>
     // second round: Claude sees how its picks were placed and improves the room (keeps the first answer if that fails)
     const rooms: DesignRoom[] = [];
     for (const r of first.rooms) {
-      const review = placementReport(project, r, r.type ?? typeOf(r.roomId), catalog);
+      const review = placementReport(project, r, r.type ?? typeOf(r.roomId), catalog) + '\nBehebe die Mängel: andere Größen oder Alternativen wählen, Überflüssiges weglassen, Fehlendes ergänzen.';
       const prev = JSON.stringify({ room: Object.entries(plan.roomKeys).find(([, v]) => v === r.roomId)?.[0], type: r.type, brief: r.brief, items: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity, ...(p.zone ? { zone: Object.entries(plan.zoneKeys).find(([, v]) => v === p.zone)?.[0] } : {}) })) });
       try {
         const again = parseDesignAnswer(
