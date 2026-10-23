@@ -383,6 +383,8 @@ export function DesignPanel() {
                 ) : (
                   <p className="muted small">
                     Echte Produkte statt Platzhalter sucht Claude in der Claude-Desktop-App (eingebauter Browser) oder im lokalen Planer mit Claude Code und „npm run ikea-helper“.
+                    <br />
+                    Claude Code fehlt noch? Windows: in PowerShell <code>irm https://claude.ai/install.ps1 | iex</code> (oder <code>npm install -g @anthropic-ai/claude-code</code>), neues Terminal öffnen, <code>claude</code> eingeben und einmal anmelden, dann <code>npm run ikea-helper</code> neu starten. Prüfen: <code>npm run ikea-helper -- --check</code>.
                   </p>
                 )}
                 {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}
