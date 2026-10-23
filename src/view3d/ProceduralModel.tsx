@@ -7,11 +7,10 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { FurnitureFinish, Interior, ModelRef, QualityMode, TableBase } from '../model/schema';
 import { BOARD, columnWidth, DEFAULT_DRAWER_HEIGHT, innerHeight } from '../model/interior';
 import { getColorMaterial, type DetailKind } from './materials3d';
-import { kelvinToColor } from './lighting';
+import { lampLight, type LampSpec } from './lighting';
 import { registerLampLight, registerLampShade, registerShadowLamp } from './lampRegistry';
 
 /** Light of one lamp at full brightness (candela-like, physically based lights). */
-const LAMP_INTENSITY = 6;
 
 /**
  * Procedural, primitive-based furniture models. All models are built in a local
@@ -683,6 +682,7 @@ export const ProceduralModel = memo(function ProceduralModel({
   interior,
   quality,
   castShadow,
+  lamp,
 }: {
   shape: string;
   width: number;
@@ -696,6 +696,8 @@ export const ProceduralModel = memo(function ProceduralModel({
   interior?: Interior;
   quality: QualityMode;
   castShadow: boolean;
+  /** Lamps (#420): luminous flux, colour temperature and switch; absent = a typical warm 800 lm bulb, on. */
+  lamp?: LampSpec;
 }) {
   const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
   const photo = usePhotoTexture(texture);
@@ -706,18 +708,21 @@ export const ProceduralModel = memo(function ProceduralModel({
         : buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
     [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight, interior],
   );
+  const light = lampLight(lamp ?? DEFAULT_LAMP);
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;
   const materials = useMemo(
     () =>
       parts.map((p) => {
         // the product photo on the main surface (#273); without it the plain colour material
         if (p.textured && photo) return new THREE.MeshStandardMaterial({ map: photo, roughness: p.rough ?? 0.6, metalness: 0 });
-        const m = getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive: p.emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat });
+        // a lamp's shade glows in the colour of its light, and not at all while the lamp is switched off
+        const emissive = p.emissive && lamp ? (lamp.on ? light.glow : undefined) : p.emissive;
+        const m = getColorMaterial(p.color, quality, { roughness: p.rough, metalness: p.metal, emissive, opacity: p.opacity, doubleSide: p.doubleSide, detail: p.detail, detailRepeat: p.detailRepeat });
         // in realism mode, glowing shades follow the lamp switch / time of day
-        if (p.emissive && quality === 'realism') registerLampShade(m);
+        if (emissive && quality === 'realism') registerLampShade(m);
         return m;
       }),
-    [parts, quality, photo],
+    [parts, quality, photo, lamp, light.glow],
   );
   return (
     <group>
@@ -733,7 +738,7 @@ export const ProceduralModel = memo(function ProceduralModel({
           receiveShadow={quality === 'realism'}
         />
       ))}
-      {quality === 'realism' && LIGHT_SHAPES.has(shape) && <LampBulb y={lampY} />}
+      {quality === 'realism' && LIGHT_SHAPES.has(shape) && (lamp?.on ?? true) && <LampBulb y={lampY} intensity={light.intensity} distance={light.distance} color={light.color} />}
     </group>
   );
 });
@@ -761,17 +766,19 @@ function usePhotoTexture(url: string | undefined): THREE.Texture | null {
 }
 
 /** The light of a lamp; its brightness follows the lamp switch / time of day, its shadow keeps it out of neighbouring rooms. */
-function LampBulb({ y }: { y: number }) {
+function LampBulb({ y, intensity, distance, color }: { y: number; intensity: number; distance: number; color: string }) {
   const ref = useRef<THREE.PointLight>(null);
   useEffect(() => {
     const l = ref.current;
     if (!l) return;
-    const offLight = registerLampLight(l, LAMP_INTENSITY);
-    const offShadow = registerShadowLamp(l);
-    return () => {
-      offLight();
-      offShadow();
-    };
+    const offLight = registerLampLight(l, intensity);
+    return offLight;
+  }, [intensity]);
+  useEffect(() => {
+    const l = ref.current;
+    return l ? registerShadowLamp(l) : undefined;
   }, []);
-  return <pointLight ref={ref} position={[0, y, 0]} color={kelvinToColor(2700)} intensity={0} distance={5} decay={2} />;
+  return <pointLight ref={ref} position={[0, y, 0]} color={color} intensity={0} distance={distance} decay={2} />;
 }
+
+const DEFAULT_LAMP: LampSpec = { lumen: 800, kelvin: 2700, on: true };

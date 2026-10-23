@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approachHour, lampLevel, lightingAt, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
+import { approachHour, lampLevel, lampLight, lightingAt, sunDirection, sunElevationDeg, TIME_PRESETS } from './lighting';
 
 const lum = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
@@ -23,6 +23,17 @@ describe('time-of-day lighting', () => {
     expect(sunElevationDeg(1)).toBeLessThan(-40);
     expect(sunDirection(8).x).toBeGreaterThan(0.3); // morning sun from the east
     expect(sunDirection(18).x).toBeLessThan(-0.3); // evening sun from the west
+  });
+
+  it('turns the sun with the plan orientation (#420)', () => {
+    // default: plan up is north, so the noon sun stands at plan "down" (+z)
+    expect(sunDirection(13).z).toBeGreaterThan(0.3);
+    // plan up points south: the noon sun is above the upper edge (-z), the morning sun comes from plan left (-x)
+    expect(sunDirection(13, 180).z).toBeLessThan(-0.3);
+    expect(sunDirection(8, 180).x).toBeLessThan(-0.3);
+    // plan up points east: the morning sun comes from above the plan (-z)
+    expect(sunDirection(7, 90).z).toBeLessThan(-0.3);
+    expect(sunDirection(13, 90).y).toBeCloseTo(sunDirection(13).y, 6);
   });
 
   it('distinguishes all presets plausibly', () => {
@@ -86,5 +97,20 @@ describe('time-of-day smoothing', () => {
     expect(dusk).toBeLessThan(1);
     expect(lampLevel('on', lightingAt(13))).toBe(1);
     expect(lampLevel('off', lightingAt(23.5))).toBe(0);
+  });
+
+  it('lamps shine by their lumen and colour temperature (#420)', () => {
+    const base = lampLight({ lumen: 800, kelvin: 2700 });
+    const bright = lampLight({ lumen: 1600, kelvin: 2700 });
+    const dim = lampLight({ lumen: 200, kelvin: 2700 });
+    expect(base.intensity).toBeCloseTo(6); // the strength every lamp had before
+    expect(bright.intensity).toBeCloseTo(2 * base.intensity);
+    expect(bright.distance).toBeGreaterThan(base.distance);
+    expect(dim.distance).toBeLessThan(base.distance);
+    expect(lampLight({ lumen: 100000, kelvin: 2700 }).distance).toBeLessThanOrEqual(9);
+    const cool = lampLight({ lumen: 800, kelvin: 5000 });
+    const blue = (hex: string) => parseInt(hex.slice(5, 7), 16);
+    expect(blue(cool.color)).toBeGreaterThan(blue(base.color));
+    expect(blue(base.glow)).toBeGreaterThan(blue(base.color)); // the shade glows softer than the bare light colour
   });
 });

@@ -6,15 +6,22 @@ export function sunElevationDeg(hour: number): number {
   return MAX_ELEVATION_DEG * Math.cos((Math.PI * (hour - 13)) / 14);
 }
 
+/** Compass bearing of the sun (0 = north, 90 = east): east at 6:00, south at 13:00, west at 20:00. */
+export function sunBearing(hour: number): number {
+  return 90 + (180 * (hour - 6)) / 14;
+}
+
 /**
- * Approximate sun direction (unit vector, world space, Y up, pointing TO the sun).
- * Sunrise in the east (+X), noon in the south (+Z, plan "down"), sunset in the west.
+ * Approximate sun direction (unit vector, world space, Y up, pointing TO the sun). `north` is the
+ * compass bearing of the plan's upper edge (settings.northDirection, #420): with 0 the sun rises in
+ * the east (+X), stands in the south at noon (+Z, plan "down") and sets in the west.
  */
-export function sunDirection(hour: number): { x: number; y: number; z: number } {
+export function sunDirection(hour: number, north = 0): { x: number; y: number; z: number } {
   const elev = (sunElevationDeg(hour) * Math.PI) / 180;
-  const azimuth = (Math.PI * (hour - 6)) / 14; // 0 = east, π/2 = south, π = west
+  // plan direction of a compass bearing: plan "up" (-y) is `north`
+  const a = ((sunBearing(hour) - north) * Math.PI) / 180;
   const ce = Math.cos(elev);
-  return { x: Math.cos(azimuth) * ce, y: Math.sin(elev), z: Math.sin(azimuth) * ce };
+  return { x: Math.sin(a) * ce, y: Math.sin(elev), z: -Math.cos(a) * ce };
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -59,7 +66,7 @@ export interface LightingState {
  * renderer can blend smoothly between hours. Colour temperatures are clamped to
  * plausible values (sun ≥ 3000 K) to avoid unnaturally orange scenes.
  */
-export function lightingAt(hourRaw: number): LightingState {
+export function lightingAt(hourRaw: number, north = 0): LightingState {
   const hour = ((hourRaw % 24) + 24) % 24;
   const elev = sunElevationDeg(hour);
   const daylight = smoothstep(-6, 12, elev);
@@ -76,7 +83,7 @@ export function lightingAt(hourRaw: number): LightingState {
   const night = 1 - smoothstep(-30, -4, elev);
   return {
     hour,
-    sun: sunDirection(hour),
+    sun: sunDirection(hour, north),
     elevationDeg: elev,
     daylight,
     twilight,
@@ -138,4 +145,28 @@ export function kelvinToColor(kelvin: number): string {
   }
   const c = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
   return `#${[r, g, b].map((v) => c(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Lamp furniture in 3D (#420): what the lamp emits, from its luminous flux and colour temperature. */
+export interface LampSpec {
+  lumen: number;
+  kelvin: number;
+  /** Switched on (lights in the evening / at night as the lamp switch allows). */
+  on: boolean;
+}
+
+/** Typical colour temperature of a household bulb when none is given (warm white; an assumption). */
+export const DEFAULT_LAMP_KELVIN = 2700;
+/** Point-light intensity of an 800 lm (60 W-equivalent) bulb – the strength all lamps had before #420. */
+const INTENSITY_PER_800_LM = 6;
+
+/**
+ * Point light of a lamp: brightness proportional to the lumen, reach growing with the square root
+ * (like the distance at which the illuminance falls to a fixed value), colour from the temperature.
+ * `glow` is the colour of the glowing shade: the light colour softened, so a lampshade does not look orange.
+ */
+export function lampLight(spec: Pick<LampSpec, 'lumen' | 'kelvin'>): { intensity: number; distance: number; color: string; glow: string } {
+  const k = Math.max(0, spec.lumen) / 800;
+  const color = kelvinToColor(spec.kelvin);
+  return { intensity: INTENSITY_PER_800_LM * k, distance: Math.min(9, Math.max(3, 5 * Math.sqrt(k))), color, glow: mixHex(color, '#ffffff', 0.45) };
 }

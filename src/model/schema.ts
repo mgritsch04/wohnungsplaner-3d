@@ -279,6 +279,10 @@ export const FurnitureSchema = z.object({
   interior: InteriorSchema.optional(),
   /** Luminous flux of a lamp in lumen (#360), e.g. from the packaging; absent = typical value of the lamp type is assumed. */
   lumen: z.number().min(0).max(20000).optional(),
+  /** Colour temperature of a lamp in Kelvin (#420); absent = warm white (2700 K) is assumed. */
+  kelvin: z.number().min(1500).max(10000).optional(),
+  /** Lamp switched off in 3D (#420); absent = on (it lights when the lamp switch / time of day allows). */
+  lightOff: z.boolean().optional(),
   /** Purchase phase (#363); absent = moving in. Optional: older files stay valid (no migration). */
   buyPhase: BuyPhaseSchema.optional(),
   /** Placed by a furnishing suggestion (#137, #350): a new preview of the same rooms replaces it. Optional: older files stay valid. */

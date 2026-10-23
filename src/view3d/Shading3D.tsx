@@ -42,13 +42,13 @@ export function Shading3D({ opening, width, height, depth }: { opening: Opening;
         <meshStandardMaterial color="#9a958a" roughness={0.7} />
       </mesh>
       {cover > 0.01 && shading.type !== 'venetian' && (
-        <mesh position={[0, height - box - cover / 2, 0]} scale={[width - 0.02, cover, shading.type === 'roller' ? 0.02 : 0.012]}>
+        <mesh position={[0, height - box - cover / 2, 0]} scale={[width - 0.02, cover, shading.type === 'roller' ? 0.02 : 0.012]} castShadow>
           <boxGeometry />
           <meshStandardMaterial color={color} roughness={0.9} />
         </mesh>
       )}
       {Array.from({ length: slats }, (_, i) => (
-        <mesh key={i} position={[0, height - box - 0.025 - i * (cover / Math.max(1, slats)), 0]} rotation={[0.35, 0, 0]} scale={[width - 0.02, 0.045, 0.006]}>
+        <mesh key={i} position={[0, height - box - 0.025 - i * (cover / Math.max(1, slats)), 0]} rotation={[0.35, 0, 0]} scale={[width - 0.02, 0.045, 0.006]} castShadow>
           <boxGeometry />
           <meshStandardMaterial color={color} roughness={0.5} metalness={0.2} />
         </mesh>

@@ -18,10 +18,15 @@ import {
 import { DEFAULT_CEILING_MATERIAL_ID, DEFAULT_FLOOR_MATERIAL_ID, DEFAULT_WALL_MATERIAL_ID, materialById } from '../model/materials';
 import { buildFlatPolygon, buildWallGeometry } from './prismGeometry';
 import { holeInRoom } from '../model/stairs';
+import { isOutdoorRoom } from '../model/daylight';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { blockBehind, isClick, isClippedHit } from './pointer';
 import { requestLampShadowUpdate } from './lampRegistry';
 import { Shading3D } from './Shading3D';
+
+/** Invisible in the picture, but casts a shadow (the shadow pass uses its own depth material). */
+const SHADOW_ONLY = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
+const NO_RAYCAST = () => null;
 
 interface Props {
   project: Project;
@@ -162,7 +167,12 @@ export const Architecture = memo(function Architecture({ project, derived, quali
               if (isClick(e)) onSelect('room', f.room.id);
             }}
           />
-          {showCeilings && <mesh geometry={f.ceiling} material={getSurfaceMaterial(f.ceilingMat, quality)} receiveShadow={shadows} />}
+          {showCeilings ? (
+            <mesh geometry={f.ceiling} material={getSurfaceMaterial(f.ceilingMat, quality)} castShadow={shadows} receiveShadow={shadows} />
+          ) : (
+            // hidden ceiling (overview from above): still keeps the sun out, so daylight only comes in through the windows (#420)
+            shadows && !isOutdoorRoom(f.room) && <mesh geometry={f.ceiling} material={SHADOW_ONLY} castShadow raycast={NO_RAYCAST} />
+          )}
         </group>
       ))}
       <ArchitecturalDetails project={project} derived={derived} quality={quality} />

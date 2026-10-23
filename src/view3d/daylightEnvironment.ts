@@ -68,9 +68,9 @@ export function environmentTint(st: LightingState, lamps: number): EnvironmentTi
 const SUN_SPOT = 40;
 
 /** RoomEnvironment tinted for a lighting state; its dispose() frees all geometry and materials, the sun spot included. */
-export function createDaylightEnvironment(hour: number, lamps: number): RoomEnvironment {
+export function createDaylightEnvironment(hour: number, lamps: number, north = 0): RoomEnvironment {
   const env = new RoomEnvironment();
-  const tint = environmentTint(lightingAt(hour), lamps);
+  const tint = environmentTint(lightingAt(hour, north), lamps);
   env.traverse((o) => {
     if (o instanceof THREE.PointLight) o.color.copy(tint.room);
     if (!(o instanceof THREE.Mesh)) return;
@@ -89,11 +89,11 @@ export function createDaylightEnvironment(hour: number, lamps: number): RoomEnvi
 }
 
 /**
- * Hour and lamp level the lighting currently shows, published by the lighting rig every time it
+ * Hour, lamp level and plan orientation (north) the lighting currently shows, published by the lighting rig every time it
  * changes and read by the environment in its render loop (no React re-render).
  */
-let shown = { hour: 13, lamps: 0 };
-export function setEnvironmentLighting(hour: number, lamps: number): void {
-  shown = { hour, lamps };
+let shown = { hour: 13, lamps: 0, north: 0 };
+export function setEnvironmentLighting(hour: number, lamps: number, north = 0): void {
+  shown = { hour, lamps, north };
 }
 export const environmentLighting = () => shown;
