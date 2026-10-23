@@ -140,7 +140,7 @@ export default {
         await t.page.locator('[data-testid="scene3d"] canvas').waitFor({ timeout: 20000 });
         await t.page.waitForTimeout(1500);
         const wf = await wardrobe(t);
-        await t.lookAt([wf.x + 1.6, 1.7, wf.y + 1.6], [wf.x, 0.9, wf.y]);
+        await t.lookAt({ x: wf.x + 1.6, y: 1.7, z: wf.y + 1.6 }, { x: wf.x, y: 0.9, z: wf.y });
         await t.shot('85-offen-3d');
         return { status: d1 > d0 ? 'look' : 'fail', observed: `2D: gestrichelte Linien/Rechtecke ${d0} → ${d1} nach dem Öffnen. Das Aussehen (Spaltentrennung, Stange, Schubladen vor dem Schrank, 3D ohne Türen mit Bügeln) ist Optik: Screenshots 85-offen-2d und 85-offen-3d.` };
       },
