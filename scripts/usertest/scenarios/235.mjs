@@ -136,8 +136,8 @@ export default {
     },
     {
       nr: 7,
-      action: '„Begehen“, in die Ansicht klicken, auf ein Möbel zielen und F drücken.',
-      expected: 'Das Feld erscheint unter dem Fadenkreuz mit „Tragen“; „Tragen“ hebt das Möbel auf, F zeigt dann „Absetzen“.',
+      action: '„Begehen“, in die Ansicht klicken, auf ein Möbel zielen und mit der rechten Maustaste klicken (F öffnet seit #257 Türen und Fenster).',
+      expected: 'Das Feld erscheint unter dem Fadenkreuz mit „Tragen“; „Tragen“ hebt das Möbel auf, ein weiterer Rechtsklick zeigt dann „Absetzen“.',
       async run(t) {
         const { page } = t;
         await page.keyboard.press('Escape');
@@ -151,11 +151,8 @@ export default {
           wp.walk.look(Math.atan2(-(tx - c.x), -(ty - c.z)), -Math.atan2(c.y - 0.3, dist));
         }, [f.x, f.y]);
         const tgt = await t.poll(async () => (await page.evaluate(() => window.__wp.walk.target())) === f.id);
-        await page.keyboard.press('f');
-        await page.waitForTimeout(500);
-        const fOpens = await menu(t).isVisible(); // seit #257 öffnet/schließt F Türen und Fenster
         const box = await page.getByTestId('crosshair').boundingBox();
-        if (!fOpens) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
         await menu(t).waitFor({ timeout: 4000 }).catch(() => undefined);
         const shown = await menu(t).isVisible();
         const carry = shown && (await menu(t).locator('[data-action="carry"]').count()) === 1;
@@ -169,7 +166,7 @@ export default {
           drop = (await menu(t).locator('[data-action="drop"]').count()) === 1;
         }
         await t.shot('Feld in der Ich-Ansicht');
-        return { status: tgt && fOpens && carry && carried && drop ? 'ok' : 'fail', observed: `Ziel erkannt: ${!!tgt}; Feld nach F: ${fOpens} (F öffnet seit #257 Türen/Fenster); per Rechtsklick am Fadenkreuz: Feld ${shown}, „Tragen“ ${carry}; getragen: ${carried}; danach Rechtsklick zeigt „Absetzen“: ${drop}.` };
+        return { status: tgt && carry && carried && drop ? 'ok' : 'fail', observed: `Ziel erkannt: ${!!tgt}; per Rechtsklick am Fadenkreuz (F öffnet seit #257 Türen/Fenster): Feld ${shown}, „Tragen“ ${carry}; getragen: ${carried}; danach Rechtsklick zeigt „Absetzen“: ${drop}.` };
       },
     },
     {
