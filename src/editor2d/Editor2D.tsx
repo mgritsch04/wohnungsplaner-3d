@@ -6,6 +6,7 @@ import { newId } from '../model/ids';
 import { add, boundsOf, dist, dot, normalize, perp, rotate, scale, sub, type Vec2 } from '../model/vec';
 import { formatLength, radToDeg, roundMm } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
+import { CompassRose, compassName, compassOf } from '../ui/CompassRose';
 import { selectedFurnitureIds, useUiStore, type Selection, type View2D } from '../store/uiStore';
 import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
@@ -1088,6 +1089,10 @@ export function Editor2D() {
           Plan-Hintergrund
         </button>
       )}
+
+      <div className="plan-compass" title={`Obere Plankante zeigt nach ${compassName(compassOf(project.settings.northDirection))}`}>
+        <CompassRose north={project.settings.northDirection} size={44} testId="compass-plan" />
+      </div>
 
       <ZoomSlider
         testId="zoom-2d"
