@@ -211,6 +211,12 @@ export function applyDraft(d: Project, draft: ReconstructionDraft): ApplyResult 
     const wdir = normalize(sub(wb, wa));
     const hinge = o.hingeSide && o.hingeSide.x * wdir.x + o.hingeSide.y * wdir.y > 0 ? 'end' : 'start';
     const swing = o.swingSide && o.swingSide.x * -wdir.y + o.swingSide.y * wdir.x < 0 ? 'right' : 'left';
+    // a second opening on a spot another one already covers is a recognition duplicate (#373)
+    const covered = d.openings.some((x) => x.wallId === hit.wall.id && Math.abs(x.offset - hit.s) < 0.35 * (x.width + o.width));
+    if (covered) {
+      warnings.push(`${o.kind === 'window' ? 'Fenster' : 'Tür'} bei (${o.center.x.toFixed(2)}, ${o.center.y.toFixed(2)}) überdeckt eine bestehende Öffnung und wurde nicht doppelt gesetzt.`);
+      continue;
+    }
     const id = addOpening(d, hit.wall.id, o.kind, hit.s, {
       width: o.width,
       height: o.height,

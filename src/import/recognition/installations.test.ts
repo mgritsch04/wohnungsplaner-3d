@@ -108,3 +108,15 @@ describe('installation symbols (#222)', () => {
     expect(l.note).toBe('LAN / Daten');
   });
 });
+
+describe('no invented installations near openings (#371)', () => {
+  it('drops a symbol-like shape inside a door opening', () => {
+    const segs = [...faces, ...socket({ x: 1.0, y: 0.3 })];
+    expect(detectInstallations(segs, walls, [living], [{ center: { x: 1.1, y: 0 }, width: 0.9 }])).toHaveLength(0);
+    expect(detectInstallations(segs, walls, [living], [])).toHaveLength(1);
+  });
+  it('drops a socket that floats far from any wall face', () => {
+    const segs = [...faces, ...socket({ x: 1.0, y: 0.45 })];
+    expect(detectInstallations(segs, walls, [living])).toHaveLength(0);
+  });
+});
