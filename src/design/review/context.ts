@@ -126,15 +126,6 @@ export class RoomCtx {
     ));
   }
 
-  /** The same room with only the existing pieces: the walks of the empty room. */
-  emptyGrid(): WalkGrid {
-    return new WalkGrid(
-      this.an.polygon,
-      this.items.filter((i) => i.obstacle && i.existing),
-      this.doors.map((d) => d.mid),
-    );
-  }
-
   /** Cells reachable from any door at 50 cm width. */
   get reach(): Uint8Array {
     return (this.reachCache ??= this.grid.reachable(

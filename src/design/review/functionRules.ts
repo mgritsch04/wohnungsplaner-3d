@@ -86,7 +86,7 @@ export function checkKitchen(ctx: RoomCtx): void {
   if (sink && cook) {
     const gap = Math.max(0, polyDist(sink.poly, cook.poly) - 0);
     // the cooktop sits on a base module: the distance counts along the run from the sink's edge
-    if (gap < 0.6) ctx.add('A4', 'M', `Zwischen Spüle und Kochfeld sind nur ${Math.round(gap * 100)} cm Arbeitsfläche, gebraucht werden mindestens 60 cm.`, [sink, cook], cook);
+    if (gap < 0.6 - 0.01) ctx.add('A4', 'M', `Zwischen Spüle und Kochfeld sind nur ${Math.round(gap * 100)} cm Arbeitsfläche, gebraucht werden mindestens 60 cm.`, [sink, cook], cook);
   }
   if (cook) {
     const tall = mods.find((i) => (i.kitchen === 'tall' || i.kitchen === 'fridge') && i !== cook && polyDist(i.poly, cook.poly) < 0.3);

@@ -38,22 +38,29 @@ describe('Heutiger Vorschlag, Testwohnung A', () => {
   const flat = inputs('A');
   const review = reviewFlat(flat);
   const f = (room: string, rule: string) => rules(review, room, flat).filter((x) => x.rule === rule);
-  it('finds the dishwasher and sink cabinet in the door swing of the kitchen', () => {
-    expect(f('Küche', 'B4').some((x) => x.severity === 'S')).toBe(true);
+  it('finds the dishwasher and the sink cabinet in the door swing of the kitchen', () => {
+    expect(f('Küche', 'B4').filter((x) => x.severity === 'S').length).toBe(2);
   });
-  it('finds pieces right behind the doors (kitchen, hall, store room, bath, WC)', () => {
-    for (const room of ['Küche', 'Gang', 'Abstellraum', 'Bad', 'WC']) expect(f(room, 'B5').length + f(room, 'B4').length, room).toBeGreaterThan(0);
+  it('finds the dining table in the working aisle and the narrow kitchen run', () => {
+    expect(f('Küche', 'C4').length).toBeGreaterThan(0);
+    expect(f('Küche', 'B6').length).toBeGreaterThan(0);
   });
-  it('finds the missing hand basin in the WC', () => {
+  it('finds the new WC the old flow planned in the bath and the missing hand basin in the WC', () => {
+    expect(f('Bad', 'A3').some((x) => x.severity === 'S')).toBe(true);
     expect(f('WC', 'A1').some((x) => /Handwaschbecken/.test(x.text))).toBe(true);
   });
-  it('finds the bed and wardrobe 21 cm apart in room 1 and armchair and chair in the living room', () => {
-    expect(f('Zimmer 1', 'C9').length).toBeGreaterThan(0);
+  it('finds armchair and chair squeezed together in the living room, and the dining table twice in the flat', () => {
     expect(f('Wohnzimmer', 'C9').length).toBeGreaterThan(0);
+    expect(review.flat.some((x) => x.rule === 'A2' && /Esstisch/.test(x.text))).toBe(true);
   });
-  it('does not pass the rooms with severe findings', () => {
+  it('finds small plants on the floor and a lamp on the dining table', () => {
+    expect(f('Gang', 'D2').length + f('WC', 'D2').length).toBeGreaterThan(0);
+    expect(f('Wohnzimmer', 'D3').length).toBeGreaterThan(0);
+  });
+  it('does not pass the kitchen, the bath and the WC; the flat does not pass', () => {
+    for (const room of ['Küche', 'Bad', 'WC']) expect(review.rooms.find((r) => r.roomId === flat.find((i) => i.analysis.name === room)!.analysis.roomId)!.passed, room).toBe(false);
     expect(review.passed).toBe(false);
-    expect(review.rooms.filter((r) => !r.passed).length).toBeGreaterThanOrEqual(3);
+    expect(review.minScore).toBeLessThan(75);
   });
 });
 
@@ -62,19 +69,20 @@ describe('Heutiger Vorschlag, Testwohnung B', () => {
   const review = reviewFlat(flat);
   const f = (room: string, rule: string) => rules(review, room, flat).filter((x) => x.rule === rule);
   it('finds that one cannot get between the doors of the living kitchen', () => {
-    expect(f('Wohnküche', 'B1').some((x) => x.severity === 'S')).toBe(true);
+    expect(f('Wohnküche', 'B1').filter((x) => x.severity === 'S').length).toBe(3);
   });
-  it('finds the tall cabinet and the fridge in the door swing', () => {
-    expect(f('Wohnküche', 'B4').length).toBeGreaterThanOrEqual(1);
+  it('finds the tall cabinet and the fridge in the door swing and the plant in the way', () => {
+    expect(f('Wohnküche', 'B4').length).toBe(2);
+    expect(f('Wohnküche', 'D1').some((x) => /im Weg/.test(x.text))).toBe(true);
   });
-  it('finds pieces behind the doors of hall and bedroom, the dining table squeezed against the shelf', () => {
-    expect(f('Vorraum', 'B5').length).toBeGreaterThan(0);
-    expect(f('Schlafzimmer', 'B5').length).toBeGreaterThan(0);
-    expect(f('Wohnküche', 'C9').length).toBeGreaterThan(0);
+  it('finds the WC squeezed against the washing machine and the nightstand nobody can reach', () => {
+    expect(f('Bad', 'C9').length).toBeGreaterThan(0);
+    expect(f('Schlafzimmer', 'B7').length).toBeGreaterThan(0);
   });
   it('does not pass the living kitchen', () => {
     const room = flat.find((i) => i.analysis.name === 'Wohnküche')!.analysis.roomId;
     expect(review.rooms.find((r) => r.roomId === room)!.passed).toBe(false);
+    expect(review.passed).toBe(false);
   });
 });
 

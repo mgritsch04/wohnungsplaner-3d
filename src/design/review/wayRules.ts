@@ -1,63 +1,30 @@
 /** B Wege und Zugang (#441): can one get through, to the doors, to the pieces and around them? */
 import type { Vec2 } from '../../model/vec';
+import { checkWalkways } from '../analysis';
 import type { RoomMetrics } from '../types';
-import type { Door, RoomCtx } from './context';
+import type { RoomCtx } from './context';
 import { cm, localRect, overlaps } from './geom';
 import { isDiningTable, isKitchenModule, type RItem } from './items';
 
-/** Half of the narrowest walk that still counts as getting through (50 cm). */
-const PASS = 0.25;
-
-interface Pair {
-  from: Door;
-  to: Door;
-  width: number;
-  main: boolean;
-}
-
-function pairs(ctx: RoomCtx): Pair[] {
-  const door = (label: string) => ctx.doors.find((d) => d.label === label);
-  const out: Pair[] = [];
-  const seen = new Set<string>();
-  for (const w of ctx.an.walkways) {
-    const from = door(w.from);
-    const to = door(w.to);
-    if (from && to) {
-      out.push({ from, to, width: w.width, main: w.main });
-      seen.add(`${w.from}|${w.to}`);
-    }
-  }
-  if (!out.length)
-    for (let i = 0; i < ctx.doors.length; i++)
-      for (let k = i + 1; k < ctx.doors.length; k++) out.push({ from: ctx.doors[i], to: ctx.doors[k], width: ctx.an.passThrough || ctx.type === 'hall' ? 0.9 : 0.7, main: false });
-  return out;
-}
-
-/** B1 (S), B2 (M), B3 (L) between the doors; returns the walk lengths for the metrics. */
-export function checkWalkways(ctx: RoomCtx): Pick<RoomMetrics, 'walkEmpty' | 'walkFurnished'> {
+/** B1 (S), B2 (M), B3 (L) between the doors (the ways of stage 0); returns the walk lengths for the metrics. */
+export function checkWays(ctx: RoomCtx): Pick<RoomMetrics, 'walkEmpty' | 'walkFurnished'> {
   let walkEmpty = 0;
   let walkFurnished = 0;
-  const empty = ctx.emptyGrid();
-  for (const p of pairs(ctx)) {
-    const e = empty.walk(p.from.entry, p.to.entry, PASS);
-    if (!e) continue;
-    const f = ctx.grid.walk(p.from.entry, p.to.entry, PASS);
-    const mid = e.points[Math.floor(e.points.length / 2)];
-    const names = `${p.from.label} und ${p.to.label}`;
-    walkEmpty += e.length;
-    if (!f) {
+  const checks = checkWalkways(
+    ctx.an,
+    ctx.items.filter((i) => i.obstacle).map((i) => i.poly),
+  );
+  for (const w of checks) {
+    const names = `${w.from} und ${w.to}`;
+    const mid = w.path.length ? w.path[Math.floor(w.path.length / 2)] : (ctx.doors.find((d) => d.label === w.from)?.entry ?? ctx.an.polygon[0]);
+    walkEmpty += w.emptyLength;
+    if (w.fits === 0) {
       ctx.add('B1', 'S', `Zwischen den Türen ${names} kommt man nicht mehr durch.`, [], mid);
       continue;
     }
-    walkFurnished += f.length;
-    const wide = ctx.grid.walk(p.from.entry, p.to.entry, p.width / 2);
-    const wideEmpty = empty.walk(p.from.entry, p.to.entry, p.width / 2);
-    if (!wide && wideEmpty) {
-      const usable = cm(p.width) >= 90 ? 90 : 70;
-      ctx.add('B2', 'M', `Der Weg zwischen den Türen ${names} ist enger als ${usable} cm.`, [], mid);
-    } else if (f.length > e.length * 1.25 + 0.5) {
-      ctx.add('B3', 'L', `Der Weg zwischen den Türen ${names} wird durch die Möbel von ${e.length.toFixed(1)} m auf ${f.length.toFixed(1)} m länger.`, [], mid);
-    }
+    walkFurnished += w.length;
+    if (w.fits < w.width - 1e-6) ctx.add('B2', 'M', `Der Weg zwischen den Türen ${names} ist nur ${cm(w.fits)} cm breit, gebraucht werden ${cm(w.width)} cm.`, [], mid);
+    else if (w.length > w.emptyLength * 1.25 + 0.5) ctx.add('B3', 'L', `Der Weg zwischen den Türen ${names} wird durch die Möbel von ${w.emptyLength.toFixed(1)} m auf ${w.length.toFixed(1)} m länger.`, [], mid);
   }
   return { walkEmpty, walkFurnished };
 }

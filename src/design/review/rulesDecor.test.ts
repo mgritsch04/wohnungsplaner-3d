@@ -183,7 +183,7 @@ describe('Punkte und Kennzahlen', () => {
     const room = rectRoom(4, 3, { doors: [{ wall: 'W', at: 1.5 }, { wall: 'O', at: 1.5 }] });
     const r = review({ room, type: 'other', items: [put('generic-sideboard', { x: 2, y: 1.5, face: 'W', width: 1.0 })], dropped: [{ id: 'x', catalogId: 'generic-sofa-3', reason: 'passt nicht' }] });
     expect(r.metrics.occupancy).toBeCloseTo(0.45 * 1.0 / 12, 3);
-    expect(r.metrics.walkEmpty).toBeCloseTo(3, 1);
+    expect(r.metrics.walkEmpty).toBeCloseTo(4, 1);
     expect(r.metrics.walkFurnished).toBeGreaterThan(r.metrics.walkEmpty);
     expect(r.metrics.dropped).toBe(1);
   });

@@ -164,19 +164,20 @@ export function checkWallFit(ctx: RoomCtx): void {
 
 /** C9 (M): wedged in. */
 export function checkWedged(ctx: RoomCtx): void {
-  const list = ctx.items.filter((i) => i.floor && !isKitchenModule(i) && !isLamp(i) && !isPlant(i) && i.category !== 'decor' && i.role !== 'seat' && i.category !== 'bathroom');
+  const list = ctx.items.filter((i) => i.floor && !isKitchenModule(i) && !isLamp(i) && !isPlant(i) && i.category !== 'decor');
+  const sitting = (i: RItem) => i.role === 'seat' || i.category === 'desk' || i.role === 'table';
   for (let a = 0; a < list.length; a++)
     for (let b = a + 1; b < list.length; b++) {
       const p = list[a];
       const q = list[b];
+      if (p.existing && q.existing) continue;
       if (q.parent === p.id || p.parent === q.id) continue;
-      const pair = new Set([p.role, q.role]);
-      if (p.role === 'bed' || q.role === 'bed' || p.role === 'nightstand' || q.role === 'nightstand') {
-        if (pair.has('bed') && pair.has('nightstand')) continue;
-      }
-      if (pair.has('coffee-table')) continue;
+      if (sitting(p) && sitting(q)) continue;
+      const roles = new Set([p.role, q.role]);
+      if (roles.has('bed') && roles.has('nightstand')) continue;
+      if (roles.has('coffee-table')) continue;
       if (p.category === 'storage' && q.category === 'storage' && p.shape === q.shape) continue;
       const gap = polyDist(p.poly, q.poly);
-      if (gap > 0.02 && gap < 0.2) ctx.add('C9', 'M', `Zwischen ${ctx.label(p)} und ${ctx.label(q)} sind nur ${cm(gap)} cm, da passt niemand durch und man kommt schlecht an beide heran.`, [p, q], { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+      if (gap > 0.05 && gap < 0.2) ctx.add('C9', 'M', `Zwischen ${ctx.label(p)} und ${ctx.label(q)} sind nur ${cm(gap)} cm, da passt niemand durch und man kommt schlecht an beide heran.`, [p, q], { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
     }
 }

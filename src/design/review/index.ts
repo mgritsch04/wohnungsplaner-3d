@@ -7,7 +7,7 @@
 import type { Finding, RoomMetrics, RoomReview, Review } from '../types';
 import { flatScore, passes, roomScore } from '../score';
 import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary } from './functionRules';
-import { checkClearances, checkDoors, checkReach, checkWalkways } from './wayRules';
+import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
 import { checkBeds, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs } from './decorRules';
 import { checkFocus, checkOccupancy, checkPalette, checkTogether, checkZones, occupancy } from './overallRules';
@@ -22,7 +22,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkSanitary(ctx);
   checkKitchen(ctx);
   checkAnchors(ctx);
-  const walks = checkWalkways(ctx);
+  const walks = checkWays(ctx);
   checkDoors(ctx);
   checkClearances(ctx);
   checkReach(ctx);

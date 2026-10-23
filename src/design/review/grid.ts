@@ -1,15 +1,10 @@
 /**
- * Walking grid of a room (#441): where one can stand with a given clear radius, shortest walks
- * (A*) and what can be reached from the doors. Grid cell 5 cm (10 cm in big rooms).
+ * Walking grid of a room (#441): where one can stand with a given clear radius and what can be
+ * reached from the doors (the ways between doors are measured by stage 0, `checkWalkways`). Grid cell 5 cm (10 cm in big rooms).
  */
 import { pointInPolygon, type Vec2 } from '../../model/vec';
 import { boundaryDist, bounds } from './geom';
 import type { RItem } from './items';
-
-export interface Walk {
-  length: number;
-  points: Vec2[];
-}
 
 export class WalkGrid {
   readonly cell: number;
@@ -109,57 +104,6 @@ export class WalkGrid {
     return best;
   }
 
-  /** Shortest walk between two points with a clear radius, or null. */
-  walk(from: Vec2, to: Vec2, radius: number): Walk | null {
-    const mask = this.mask(radius);
-    const s = this.snap(from, mask);
-    const t = this.snap(to, mask);
-    if (s < 0 || t < 0) return null;
-    const n = mask.length;
-    const g = new Float32Array(n).fill(Infinity);
-    const prev = new Int32Array(n).fill(-1);
-    const closed = new Uint8Array(n);
-    const tx = t % this.nx;
-    const ty = Math.floor(t / this.nx);
-    const h = (k: number) => {
-      const dx = Math.abs((k % this.nx) - tx);
-      const dy = Math.abs(Math.floor(k / this.nx) - ty);
-      return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
-    };
-    const heap = new MinHeap();
-    g[s] = 0;
-    heap.push(h(s), s);
-    while (heap.size) {
-      const k = heap.pop();
-      if (closed[k]) continue;
-      closed[k] = 1;
-      if (k === t) break;
-      const ki = k % this.nx;
-      const kj = (k - ki) / this.nx;
-      for (let dj = -1; dj <= 1; dj++)
-        for (let di = -1; di <= 1; di++) {
-          if (!di && !dj) continue;
-          const ni = ki + di;
-          const nj = kj + dj;
-          if (ni < 0 || nj < 0 || ni >= this.nx || nj >= this.ny) continue;
-          const nk = nj * this.nx + ni;
-          if (!mask[nk] || closed[nk]) continue;
-          if (di && dj && (!mask[kj * this.nx + ni] || !mask[nj * this.nx + ki])) continue;
-          const ng = g[k] + (di && dj ? Math.SQRT2 : 1);
-          if (ng < g[nk]) {
-            g[nk] = ng;
-            prev[nk] = k;
-            heap.push(ng + h(nk), nk);
-          }
-        }
-    }
-    if (!closed[t]) return null;
-    const points: Vec2[] = [];
-    for (let k = t; k >= 0; k = prev[k]) points.push(this.centre(k % this.nx, Math.floor(k / this.nx)));
-    points.reverse();
-    return { length: g[t] * this.cell, points };
-  }
-
   /** Cells one can reach from the given points with a clear radius. */
   reachable(starts: Vec2[], radius: number): Uint8Array {
     const mask = this.mask(radius);
@@ -198,49 +142,5 @@ export class WalkGrid {
       for (let i = Math.max(0, ci - r); i <= Math.min(this.nx - 1, ci + r); i++)
         if (seen[j * this.nx + i] && Math.hypot(i - ci, j - cj) * this.cell <= reach) return true;
     return false;
-  }
-}
-
-class MinHeap {
-  private keys: number[] = [];
-  private vals: number[] = [];
-  get size(): number {
-    return this.keys.length;
-  }
-  push(key: number, val: number): void {
-    const { keys, vals } = this;
-    let i = keys.length;
-    keys.push(key);
-    vals.push(val);
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (keys[p] <= keys[i]) break;
-      [keys[p], keys[i]] = [keys[i], keys[p]];
-      [vals[p], vals[i]] = [vals[i], vals[p]];
-      i = p;
-    }
-  }
-  pop(): number {
-    const { keys, vals } = this;
-    const top = vals[0];
-    const lk = keys.pop()!;
-    const lv = vals.pop()!;
-    if (keys.length) {
-      keys[0] = lk;
-      vals[0] = lv;
-      let i = 0;
-      for (;;) {
-        const l = 2 * i + 1;
-        const r = l + 1;
-        let m = i;
-        if (l < keys.length && keys[l] < keys[m]) m = l;
-        if (r < keys.length && keys[r] < keys[m]) m = r;
-        if (m === i) break;
-        [keys[m], keys[i]] = [keys[i], keys[m]];
-        [vals[m], vals[i]] = [vals[i], vals[m]];
-        i = m;
-      }
-    }
-    return top;
   }
 }

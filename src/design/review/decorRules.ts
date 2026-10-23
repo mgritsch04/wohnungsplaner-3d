@@ -59,7 +59,7 @@ export function checkRugs(ctx: RoomCtx): void {
       const loc = toLocal(r, front);
       if (Math.abs(loc.u) > r.width / 2 || Math.abs(loc.v) > r.depth / 2) ctx.add('D5', 'L', `${ctx.label(sofa)} steht nicht mit den Vorderfüßen auf ${ctx.label(r)}.`, [r, sofa], r);
     }
-    const bed = ctx.items.find((b) => b.shape === 'bed' && b.floor && overlaps(r.poly, b.poly, -0.2));
+    const bed = ctx.items.find((b) => b.shape === 'bed' && b.floor && overlaps(r.poly, b.poly, 0.15));
     if (bed) {
       const corners = r.poly.map((c) => toLocal(bed, c).u);
       const left = -Math.min(...corners) - bed.width / 2;
@@ -85,7 +85,7 @@ export function checkPictures(ctx: RoomCtx): void {
     if (p.shape === 'wall-shelf') continue;
     for (const w of ctx.windows) if (overlaps(w.strip, p.poly, 1e-3) && p.elevation + p.height > w.sill) ctx.add('D6', 'L', `${ctx.label(p)} hängt über dem Fenster ${w.label}.`, [p], p);
     for (const d of ctx.doors) if (Math.abs(dot(sub(p, d.mid), d.wall.dir)) < d.width / 2 && dot(sub(p, d.mid), d.wall.inward) < 0.3) ctx.add('D6', 'L', `${ctx.label(p)} hängt über der Tür ${d.label}.`, [p], p);
-    const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25).sort((a, b) => dist(a, p) - dist(b, p))[0];
+    const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
     if (under && (under.role === 'sofa' || under.shape === 'bed')) {
       const off = Math.abs(toLocal(under, p).u);
       const ratio = p.width / under.width;

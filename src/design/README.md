@@ -29,6 +29,15 @@ Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinate
   - Teppiche, Vorhänge und Hängendes zählen nicht.
 - Ein Raum mit mehr als vier Türen (Gang, Vorraum) bekommt Wege von der Haupttür zu jeder anderen Tür. Bleiben die frei, erreicht jede Tür jede andere.
 
+## Stufe 4 benutzen (`review/`)
+
+- `reviewRoom({ analysis, type, layout, existing?, program?, palette?, catalog?, options? })` gibt ein `RoomReview` zurück: Befunde (Regel A1 … E5, Schwere, Text in Alltagssprache, betroffene Teile, Ort im Plan), Punkte nach `score.ts`, `passed` und die Kennzahlen (Belegung, Weglänge leer und eingerichtet, nicht aufgestellte Teile).
+- `reviewFlat(inputs)` prüft alle Räume und liefert zusätzlich die Befunde der ganzen Wohnung (A2, eine Funktion doppelt) und `Review.score`/`minScore`/`passed`.
+- Eingabe ist `Layout` von Stufe 3. Bestand im Raum (`RoomAnalysis.existing`) wird als `existing` mitgegeben: Er zählt für A1, blockiert Wege und löst keine Befunde über Neuplanung aus.
+- Wege (B1–B3) misst `checkWalkways` aus Stufe 0, also dasselbe wie der Solver. Alles andere (Bewegungsflächen, Erreichbarkeit, Schwenkflächen) rechnet `review/` auf einem Raster von 5 cm (10 cm ab 45 m²).
+- Ohne `program` entfallen nur die Regeln, die Claudes Zonen brauchen (A5, E2, die Leseecke in D4, Farben E4, Raumteiler in C6/C8). `options` hält Ausnahmen, die der Nutzer bewusst wollte: neue Sanitärobjekte, Verdunkelung, erlaubte Doppelungen.
+- Tests: `review/rules*.test.ts` (je Regel ein gutes und ein schlechtes Beispiel mit `review/testkit.ts`), `review/heute.test.ts` (der Vorschlag des alten Ablaufs für A und B liefert die bekannten Mängel), `review/flats.test.ts` (alle sechs Testwohnungen leer, unter 100 ms je Raum).
+
 ## Konventionen
 
 - **Intern** Plankoordinaten in Metern wie im Modell: x nach Osten, y nach Süden, Norden ist oben im 2D-Plan. Drehung wie `Furniture.rotation`; die Vorderseite eines Möbels ist lokal +y (`rotationFacing`, `frontOf` in `suggest/roomGeometry.ts`).

@@ -98,12 +98,13 @@ export function rectRoom(w: number, d: number, opts: { doors?: DoorSpec[]; windo
     x: wall.a.x + wall.dir.x * ((o.t0 + o.t1) / 2) + wall.inward.x * 0.5,
     y: wall.a.y + wall.dir.y * ((o.t0 + o.t1) / 2) + wall.inward.y * 0.5,
   });
+  const mid = (o: WallOpening, wall: WallInfo): Vec2 => ({ x: wall.a.x + wall.dir.x * ((o.t0 + o.t1) / 2), y: wall.a.y + wall.dir.y * ((o.t0 + o.t1) / 2) });
   const doorList = walls.flatMap((wall) => wall.openings.filter((o) => o.kind !== 'window').map((o) => ({ o, wall })));
   const walkways: Walkway[] = [];
   for (let i = 0; i < doorList.length; i++)
     for (let k = i + 1; k < doorList.length; k++) {
-      const p = entry(doorList[i].o, doorList[i].wall);
-      const q = entry(doorList[k].o, doorList[k].wall);
+      const p = mid(doorList[i].o, doorList[i].wall);
+      const q = mid(doorList[k].o, doorList[k].wall);
       walkways.push({ from: doorList[i].o.id, to: doorList[k].o.id, path: [p, q], length: Math.hypot(p.x - q.x, p.y - q.y), width: opts.walkwayWidth ?? (opts.passThrough ? 0.9 : 0.7), main: !!opts.passThrough });
     }
   return {
