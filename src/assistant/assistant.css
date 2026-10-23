@@ -105,3 +105,13 @@
 .design-dislike {
   margin: var(--space-1) 0;
 }
+
+/* Plan per Textanweisung ändern (#415) */
+.plan-edit-list {
+  list-style: none;
+  margin: var(--space-1) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
