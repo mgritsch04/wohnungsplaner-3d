@@ -87,6 +87,44 @@ describe('sanitary fixtures from plan symbols (#255)', () => {
   });
 });
 
+/** Square outline of half-size h, dashed (dash 5 cm, gap 4 cm), plus a drum circle. */
+function washerSymbol(c: P, side: number): FixtureSegment[] {
+  const out: FixtureSegment[] = [];
+  const h = side / 2;
+  const edge = (x1: number, y1: number, x2: number, y2: number) => {
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    for (let t = 0; t < len; t += 0.09) {
+      const e = Math.min(t + 0.05, len);
+      out.push({ x1: x1 + ((x2 - x1) * t) / len, y1: y1 + ((y2 - y1) * t) / len, x2: x1 + ((x2 - x1) * e) / len, y2: y1 + ((y2 - y1) * e) / len });
+    }
+  };
+  edge(c.x - h, c.y - h, c.x + h, c.y - h);
+  edge(c.x + h, c.y - h, c.x + h, c.y + h);
+  edge(c.x + h, c.y + h, c.x - h, c.y + h);
+  edge(c.x - h, c.y + h, c.x - h, c.y - h);
+  return [...out, ...oval(c, side * 0.6, side * 0.6)];
+}
+
+describe('flush and washer symbols', () => {
+  it('finds a 1.8 m tub whose back edge lies on the wall face', () => {
+    const f = detectFixtures(roundedRect({ x: 1.2, y: 0.06 + 0.375 }, 1.8, 0.75, 0.1), walls, [room]);
+    expect(f.map((x) => x.catalogId)).toEqual(['generic-bathtub']);
+  });
+
+  it('finds a washing machine (dashed square with circle)', () => {
+    const f = detectFixtures(washerSymbol({ x: 3.5, y: 2.6 }, 0.6), walls, [{ ...room, name: 'Bad' }]);
+    expect(f).toHaveLength(1);
+    expect(f[0].catalogId).toBe('generic-washer');
+    expect(f[0].center.x).toBeCloseTo(3.5, 1);
+    expect(f[0].width).toBeCloseTo(0.6, 1);
+  });
+
+  it('calls the same symbol in a kitchen a dishwasher, and ignores a bare circle', () => {
+    expect(detectFixtures(washerSymbol({ x: 3.5, y: 2.6 }, 0.6), walls, [{ ...room, name: 'Küche' }])[0].catalogId).toBe('generic-k-dishwasher');
+    expect(detectFixtures(oval({ x: 2, y: 1.5 }, 0.36, 0.36), walls, [room])).toHaveLength(0);
+  });
+});
+
 describe('fixtures as existing furniture (#255)', () => {
   const draft = (): ReconstructionDraft => ({
     source: 'pdf-vector', sourceName: 'x', scaleConfirmed: true, walls: [], openings: [], rooms: [], furniture: [], warnings: [], mode: 'merge',
