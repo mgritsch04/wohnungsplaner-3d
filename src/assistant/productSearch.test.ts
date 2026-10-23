@@ -79,6 +79,8 @@ describe('Produktsuche durch Claude (#350, Stufe 3)', () => {
     expect(prompt).toContain('https://www.ikea.com/at/de/search/?q=Sofa%20grau');
     expect(prompt).toContain('open_page');
     expect(buildFindPrompt({ catalogId: 'x', reason: '', placeholder: true, label: 'x', search: 'x' }, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R')).toContain('Websuche');
+    expect(prompt).toContain('BEIDEN Shops');
+    expect(buildFindPrompt({ catalogId: 'x', reason: '', placeholder: true, label: 'x', search: 'x' }, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R')).not.toContain('BEIDEN');
   });
 
   it('Browser-Werkzeuge öffnen nur Shop-Seiten und liefern gekürzten Text', async () => {
@@ -139,7 +141,7 @@ describe('Claude im lokalen Planer über den Helfer (#350)', () => {
     expect(plain).not.toContain('--allowedTools');
     const web = claudeArgs({ web: true });
     const allowed = web[web.indexOf('--allowedTools') + 1];
-    expect(allowed).toBe('WebSearch,WebFetch(domain:www.ikea.com),WebFetch(domain:www.moebelix.at)');
+    expect(allowed).toBe('WebSearch,WebFetch(domain:www.ikea.com),WebFetch(domain:www.moebelix.at),WebFetch(domain:moebelix.at)');
     expect(web[web.indexOf('--disallowedTools') + 1]).toContain('Bash');
     expect(resultText(JSON.stringify({ type: 'result', result: 'hallo', is_error: false }))).toBe('hallo');
     expect(resultText(JSON.stringify([{ type: 'system' }, { type: 'result', result: 'b' }]))).toBe('b');

@@ -35,7 +35,7 @@
  *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
  *   POST /claude { prompt, web? }       → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
  *                                         (#350; `web`: Websuche + Seiten von ikea.com/moebelix.at lesen),
- *                                         eine Anfrage zur Zeit; `/status` meldet `claude: true`, wenn verfügbar
+ *                                         bis zu 4 Anfragen gleichzeitig (WP_CLAUDE_PARALLEL); `/status` meldet `claude: true`, wenn verfügbar
  *
  * 3D-Modelle und Bilder sind urheberrechtlich geschützt: nur privat nutzen.
  */
@@ -83,20 +83,22 @@ const tokenOk = (t) => typeof t === 'string' && t.length === TOKEN.length && tim
 const mods = await loadIkeaModules();
 const get = politeFetcher();
 
-/** Claude Code on this computer (#350): checked once at start; one request at a time. */
+/** Claude Code on this computer (#350): checked once at start; a few requests at a time. */
 let claudeReady = false;
 void claudeAvailable().then((ok) => {
   claudeReady = ok;
   console.log(ok ? 'Claude Code gefunden – „Claude fragen“ und „Einrichten lassen“ funktionieren auch im lokalen Planer.' : `${INSTALL_HELP} Bis dahin gibt es Claude-Funktionen nur im App-Artefakt.`);
 });
-let claudeBusy = false;
+/** Requests to Claude at the same time (parallel rooms / product searches of the planner); more get 429. */
+const CLAUDE_PARALLEL = Math.max(1, Number(process.env.WP_CLAUDE_PARALLEL) || 4);
+let claudeRunning = 0;
 
 async function askClaude(body) {
   if (!claudeReady) return [503, { error: `Claude Code ist auf diesem Rechner nicht verfügbar. ${INSTALL_HELP}` }];
   const prompt = typeof body?.prompt === 'string' ? body.prompt : '';
   if (!prompt || prompt.length > 200_000) return [400, { error: 'Leere oder zu lange Anfrage.' }];
-  if (claudeBusy) return [429, { error: 'Claude arbeitet noch an der vorigen Anfrage.' }];
-  claudeBusy = true;
+  if (claudeRunning >= CLAUDE_PARALLEL) return [429, { error: 'Claude arbeitet noch an anderen Anfragen.' }];
+  claudeRunning++;
   try {
     const web = body.web === true;
     console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''} …`);
@@ -105,7 +107,7 @@ async function askClaude(body) {
   } catch (e) {
     return [502, { error: e instanceof Error ? e.message : String(e) }];
   } finally {
-    claudeBusy = false;
+    claudeRunning--;
   }
 }
 

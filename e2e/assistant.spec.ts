@@ -187,9 +187,14 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   await expect(panel.getByTestId('design-total')).toHaveText(/89,90/);
   await expect(proposal).toContainText('nicht in den Listen – weggelassen');
 
-  const prompt = (await page.evaluate(() => (window as unknown as { __prompts: string[] }).__prompts))[0];
+  // one request per room, run at the same time; each knows the other rooms and carries the same wishes
+  const prompts = await page.evaluate(() => (window as unknown as { __prompts: string[] }).__prompts);
+  expect(prompts).toHaveLength(2);
+  const prompt = prompts.find((q) => q.includes('„Wohnzimmer“'))!;
+  expect(prompts.every((q) => q.includes('Stil: gemütlich'))).toBe(true);
   expect(prompt).toContain('Interessen/Hobbys: Gaming, Lesen');
-  expect(prompt).toContain('„Schlafzimmer“');
+  expect(prompt).toContain('Schlafzimmer (');
+  expect(prompt).not.toContain('„Schlafzimmer“');
   expect(prompt).toContain('e2e-mx-shelf: TESTREGAL Möbelix (Möbelix)');
   expect(prompt).not.toContain('Beispielwohnung');
   expect(prompt).not.toContain('https://');

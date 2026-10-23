@@ -115,6 +115,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     '',
     'Regeln:',
     `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst.`,
+    ...(retailer === 'both' ? ['- Schau in BEIDEN Shops (IKEA und Möbelix). Gibt es in beiden passende Produkte, nimm mindestens eines von jedem Shop in die Liste.'] : []),
     '- Nur Angaben, die du auf der Produktseite gelesen hast: Name, Adresse der Produktseite, Preis in Euro, Breite/Tiefe/Höhe in cm. Nichts schätzen oder erfinden; fehlt eine Angabe, lass das Produkt weg.',
     '- Keine Konten, keine Warenkörbe, nichts bestellen.',
     '',

@@ -113,11 +113,19 @@ export function summarizePlaceholders(items: CatalogItem[] = PLACEHOLDERS): stri
   return items.map((c) => `${c.id}: ${c.name}, ${dims(c)}, ${c.category}${c.price ? `, Richtwert ${Math.round(c.price.amount)} €` : ''}`).join('\n');
 }
 
-export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS): string {
+/** Room-by-room mode: the other rooms are furnished by parallel requests with the same wishes. */
+export interface RoomContext {
+  others: string;
+  wholeBudget: number;
+}
+
+export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: CatalogItem[], placeholders: CatalogItem[] = PLACEHOLDERS, room?: RoomContext): string {
   const field = (label: string, v: string) => `${label}: ${clip(v, MAX_FIELD) || '(keine Angabe)'}`;
   const shops = w.retailer === 'ikea' ? 'IKEA' : w.retailer === 'moebelix' ? 'Möbelix' : 'IKEA oder Möbelix';
   return [
-    'Du bist Innenarchitekt für einen Wohnungsplaner. Richte die Wohnung unten ganzheitlich und stimmig ein: jeder genannte Raum bekommt alles, was er für seinen Zweck braucht, Stil und Farben ziehen sich durch, das Budget wird sinnvoll auf die Räume verteilt (Antwort auf Deutsch).',
+    room
+      ? `Du bist Innenarchitekt für einen Wohnungsplaner. Richte NUR den Raum unten ein; die übrigen Räume (${room.others}) richtet gleichzeitig eine andere Anfrage mit denselben Wünschen ein. Halte Stil und Farben genau ein, damit alle Räume zusammenpassen, und plane nur Möbel, die in diesen Raum gehören (Antwort auf Deutsch).`
+      : 'Du bist Innenarchitekt für einen Wohnungsplaner. Richte die Wohnung unten ganzheitlich und stimmig ein: jeder genannte Raum bekommt alles, was er für seinen Zweck braucht, Stil und Farben ziehen sich durch, das Budget wird sinnvoll auf die Räume verteilt (Antwort auf Deutsch).',
     '',
     plan.text,
     '',
@@ -127,7 +135,9 @@ export function buildDesignPrompt(w: DesignWishes, plan: PlanSummary, products: 
     field('Wünscht sich', w.wants),
     field('Stil', w.style),
     field('Farben', w.colors),
-    `Budget: ${w.budget > 0 ? `höchstens ${Math.round(w.budget)} € für alles zusammen` : 'kein festes Budget'}`,
+    `Budget: ${
+      w.budget > 0 ? (room ? `höchstens ${Math.round(w.budget)} € für diesen Raum (Anteil am Gesamtbudget von ${Math.round(room.wholeBudget)} €, nach Fläche verteilt)` : `höchstens ${Math.round(w.budget)} € für alles zusammen`) : 'kein festes Budget'
+    }`,
     `Händler: ${shops}`,
     '',
     'A) Eigene Produkte – echte Produkte, die schon ausgewählt sind (bevorzugen, wenn sie passen; Format „id: Name (Händler), Breite×Tiefe×Höhe, Kategorie, Preis“):',
