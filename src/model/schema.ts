@@ -136,6 +136,11 @@ export const PriceSchema = z.object({
   status: z.enum(['confirmed', 'estimate', 'user']),
   /** ISO date of when the price was recorded, if known. */
   recordedAt: z.string().optional(),
+  /**
+   * Multipack: pieces per pack. `amount` is then the price of one PACK; absent = sold singly (1).
+   * `Furniture.quantity` stays the number of PIECES needed; packs to buy = ceil(quantity / packSize).
+   */
+  packSize: z.number().int().min(2).max(999).optional(),
 });
 
 /** Kinds of table base the procedural stand-in can draw (#273). */

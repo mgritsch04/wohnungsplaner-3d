@@ -10,6 +10,7 @@
  * (shop host, plausible size and price) before it becomes a catalogue entry.
  */
 import { z } from 'zod';
+import { normalizePackSize } from '../catalog/packSize';
 import { MOEBELIX_AT } from '../catalog/providers/registry';
 import type { CatalogItem } from '../catalog/types';
 import type { McpRuntime, SampleTool } from './claude';
@@ -117,10 +118,11 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst.`,
     ...(retailer === 'both' ? ['- Schau in BEIDEN Shops (IKEA und Möbelix). Gibt es in beiden passende Produkte, nimm mindestens eines von jedem Shop in die Liste.'] : []),
     '- Nur Angaben, die du auf der Produktseite gelesen hast: Name, Adresse der Produktseite, Preis in Euro, Breite/Tiefe/Höhe in cm. Nichts schätzen oder erfinden; fehlt eine Angabe, lass das Produkt weg.',
+    '- Multipacks: Wird das Produkt nur als Packung/Set mit mehreren Stück verkauft (z. B. „3er-Set“, „4 Stück“, „Packung à 6“), gib „price“ als Preis der GANZEN Packung an und „pack_size“ als Stück pro Packung; Maße gelten pro Stück. Wird es einzeln verkauft, lass „pack_size“ weg (oder 1).',
     '- Keine Konten, keine Warenkörbe, nichts bestellen.',
     '',
     'Antworte zuletzt nur mit JSON in genau dieser Form:',
-    '{"products":[{"name":"…","url":"https://…","price":199.99,"width_cm":200,"depth_cm":90,"height_cm":80,"why":"1 kurzer Satz"}]}',
+    '{"products":[{"name":"…","url":"https://…","price":199.99,"pack_size":1,"width_cm":200,"depth_cm":90,"height_cm":80,"why":"1 kurzer Satz"}]}',
   ].join('\n');
 }
 
@@ -128,7 +130,10 @@ export interface FoundProduct {
   name: string;
   url: string;
   shop: 'IKEA' | 'Möbelix';
+  /** Price of one pack (= one piece when `packSize` is 1). */
   price: number;
+  /** Pieces per pack; 1 = sold singly. */
+  packSize: number;
   width: number;
   depth: number;
   height: number;
@@ -152,7 +157,7 @@ export function parseFound(raw: unknown): FoundProduct[] {
     if (!shop || !name || out.some((x) => x.url === url)) continue;
     if (![w, d, h].every((v) => Number.isFinite(v) && v >= 1 && v <= 600)) continue;
     if (!Number.isFinite(price) || price <= 0 || price > 50_000) continue;
-    out.push({ name, url, shop, price: Math.round(price * 100) / 100, width: w / 100, depth: d / 100, height: h / 100, why: typeof p.why === 'string' ? p.why.trim().slice(0, 200) : '' });
+    out.push({ name, url, shop, price: Math.round(price * 100) / 100, packSize: normalizePackSize(p.pack_size) ?? 1, width: w / 100, depth: d / 100, height: h / 100, why: typeof p.why === 'string' ? p.why.trim().slice(0, 200) : '' });
     if (out.length >= MAX_FOUND) break;
   }
   return out;
@@ -177,7 +182,7 @@ export function foundToCatalog(f: FoundProduct, placeholder: CatalogItem, today 
     ...(placeholder.elevation ? { elevation: placeholder.elevation } : {}),
     color: placeholder.color,
     model: structuredClone(placeholder.model),
-    price: { amount: f.price, currency: 'EUR', status: 'confirmed', recordedAt: today },
+    price: { amount: f.price, currency: 'EUR', status: 'confirmed', recordedAt: today, ...(f.packSize > 1 ? { packSize: f.packSize } : {}) },
     retailer: f.shop === 'IKEA' ? IKEA_RETAILER : MOEBELIX_AT.label,
     productUrl: f.url,
     approximate: true,

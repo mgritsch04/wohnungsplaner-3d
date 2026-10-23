@@ -16,6 +16,9 @@ export interface PurchaseItem {
   type: 'furniture' | 'device';
   name: string;
   quantity: number;
+  /** Multipack: packs to buy and pieces per pack (1 = sold singly). */
+  packs: number;
+  packSize: number;
   /** Known price of the line (devices: middle of the catalogue range, an estimate); null = unknown. */
   total: number | null;
   /** Estimates (device catalogue range) are not a retailer price. */
@@ -65,10 +68,10 @@ export function computePurchasePlan(
     const items: PurchaseItem[] = [
       ...furnitureLines
         .filter((l) => phaseOfFurniture(l.id) === phase)
-        .map((l): PurchaseItem => ({ id: l.id, type: 'furniture', name: l.name, quantity: l.quantity, total: l.total, estimate: l.priceStatus === 'estimate' })),
+        .map((l): PurchaseItem => ({ id: l.id, type: 'furniture', name: l.name, quantity: l.quantity, packs: l.packs, packSize: l.packSize, total: l.total, estimate: l.priceStatus === 'estimate' })),
       ...devices
         .filter((d) => devicePhase(d) === phase)
-        .map((d): PurchaseItem => ({ id: d.id, type: 'device', name: d.name || KIND_LABEL[d.kind], quantity: 1, total: devicePrice(d), estimate: true })),
+        .map((d): PurchaseItem => ({ id: d.id, type: 'device', name: d.name || KIND_LABEL[d.kind], quantity: 1, packs: 1, packSize: 1, total: devicePrice(d), estimate: true })),
     ];
     const total = round2(items.reduce((s, i) => s + (i.total ?? 0), 0));
     const budget = budgets[phase] ?? null;

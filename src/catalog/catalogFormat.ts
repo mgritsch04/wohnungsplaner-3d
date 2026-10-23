@@ -22,6 +22,8 @@ const CatalogEntrySchema = z.object({
   elevation: num.min(0).optional(),
   price: num.min(0).optional(),
   priceDate: z.string().max(40).optional(),
+  /** pieces per pack; price is then the price of one pack */
+  packSize: z.number().int().min(2).max(999).optional(),
   brand: z.string().max(100).optional(),
   retailer: z.string().max(100).optional(),
   productUrl: z.string().max(2000).optional(),
@@ -99,7 +101,7 @@ export function entriesToCatalogItems(entries: CatalogEntry[], units: 'm' | 'cm'
             ...part('legSize', e.legSize, k, 0.01, 0.25),
             ...part('seatHeight', e.seatHeight, k, 0.25, 0.9),
           },
-      price: e.price !== undefined ? { amount: e.price, currency: 'EUR', status: 'user', recordedAt: e.priceDate } : undefined,
+      price: e.price !== undefined ? { amount: e.price, currency: 'EUR', status: 'user', recordedAt: e.priceDate, ...(e.packSize ? { packSize: e.packSize } : {}) } : undefined,
       brand: e.brand,
       retailer: e.retailer,
       productUrl: isHttpUrl(e.productUrl) ? e.productUrl : undefined,
@@ -200,6 +202,8 @@ const CSV_COLUMNS: Record<string, keyof CatalogEntry | 'width_cm' | 'depth_cm' |
   preis_eur: 'price',
   price_eur: 'price',
   preisdatum: 'priceDate',
+  stueck_pro_packung: 'packSize',
+  pack_size: 'packSize',
   price_date: 'priceDate',
   marke: 'brand',
   brand: 'brand',
@@ -239,7 +243,8 @@ export function parseCatalogCsv(text: string, fileName: string): { items: Catalo
       if (v === '') return;
       if (key === 'width_cm' || key === 'depth_cm' || key === 'height_cm' || key === 'price') {
         obj[key === 'width_cm' ? 'width' : key === 'depth_cm' ? 'depth' : key === 'height_cm' ? 'height' : 'price'] = parseFloat(v.replace(/\s|€/g, '').replace(',', '.'));
-      } else obj[key] = v;
+      } else if (key === 'packSize') obj[key] = parseInt(v, 10);
+      else obj[key] = v;
     });
     const res = CatalogEntrySchema.safeParse(obj);
     if (res.success) entries.push(res.data);

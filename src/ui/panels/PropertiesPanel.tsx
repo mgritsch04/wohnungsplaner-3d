@@ -10,6 +10,7 @@ import { rectangularRoomSize } from '../../model/geometry/rooms';
 import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
 import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
+import { packsNeeded } from '../../catalog/packSize';
 import { catalogColors } from '../../catalog/generic';
 import { useCatalogStore } from '../../catalog/catalogStore';
 import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
@@ -465,6 +466,8 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       const x = d.furniture.find((q) => q.id === id);
       if (x) fn(x);
     });
+  const packSize = f.price?.packSize ?? 1;
+  const packs = packsNeeded(f.quantity, packSize);
   const issues = placementIssues(project, derivePlan(project), f);
   const summary = conflictSummary(issues);
   const original = catalogColors(f.catalogId, extraCatalog);
@@ -635,12 +638,31 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             digits={2}
             onChange={(v) => upd((x) => (x.price = { amount: v, currency: 'EUR', status: 'user', recordedAt: new Date().toISOString().slice(0, 10) }))}
           />
-          <NumberField label="Menge" value={f.quantity} min={1} max={999} digits={0} onChange={(v) => upd((x) => (x.quantity = Math.max(1, Math.round(v))))} />
+          <NumberField label={packSize > 1 ? 'Menge (Stück)' : 'Menge'} value={f.quantity} min={1} max={999} digits={0} onChange={(v) => upd((x) => (x.quantity = Math.max(1, Math.round(v))))} />
         </div>
+        <div className="field-row">
+          <NumberField
+            label="Stück pro Packung"
+            value={packSize}
+            min={1}
+            max={999}
+            digits={0}
+            onChange={(v) =>
+              upd((x) => {
+                const n = Math.max(1, Math.round(v));
+                if (!x.price) return; // first enter the price
+                if (n > 1) x.price.packSize = n;
+                else delete x.price.packSize;
+              })
+            }
+          />
+        </div>
+        {!f.price && <p className="muted small">Erst den Preis eintragen, dann „Stück pro Packung“ setzen.</p>}
+        {packSize > 1 && <p className="muted small">Der Preis oben gilt für 1 Packung mit {packSize} Stück ({f.price ? formatEuro(f.price.amount / packSize) : '–'} pro Stück).</p>}
         <p className="small">
           {f.price ? (
             <>
-              {formatEuro(f.price.amount * f.quantity)} gesamt ·{' '}
+              {formatEuro(f.price.amount * packs)} gesamt{packSize > 1 ? ` (${packs} ${packs === 1 ? 'Packung' : 'Packungen'} à ${packSize} Stück)` : ''} ·{' '}
               <Badge kind={f.price.status === 'confirmed' ? 'ok' : f.price.status === 'user' ? 'info' : 'warn'}>
                 {f.price.status === 'confirmed' ? 'bestätigter Preis' : f.price.status === 'user' ? 'eigene Angabe' : 'Schätzung'}
               </Badge>

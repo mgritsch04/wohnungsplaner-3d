@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseProductPage, type InputKind, type ParsedProductPage } from '../catalog/providers/structuredData';
 import { providerForUrl } from '../catalog/providers/registry';
+import { detectPackSize, normalizePackSize } from '../catalog/packSize';
 import { productToCatalogItem } from '../catalog/providers/toCatalog';
 import { classifyProduct, type CategoryGuess } from '../catalog/providers/classify';
 import { useCatalogStore } from '../catalog/catalogStore';
@@ -145,7 +146,7 @@ export function ProductImportModal() {
   const [source, setSource] = useState('');
   const [product, setProduct] = useState<ParsedProductPage | null>(null);
   // no preset category: it comes from the page or the user picks it (never a silent default)
-  const [form, setForm] = useState({ name: '', category: '', width: '', depth: '', height: '' });
+  const [form, setForm] = useState({ name: '', category: '', width: '', depth: '', height: '', packSize: '' });
   const [guess, setGuess] = useState<CategoryGuess | null>(null);
   const [model, setModel] = useState<FetchedModel | null>(null);
   const [modelState, setModelState] = useState<{ busy: boolean; message: string | null; failed: boolean }>({ busy: false, message: null, failed: false });
@@ -159,7 +160,7 @@ export function ProductImportModal() {
     const cm = (v: number | null) => (v === null ? '' : String(Math.round(v * 10) / 10).replace('.', ','));
     const g = classifyProduct(p.name, p.categoryHints);
     setGuess(g);
-    setForm({ name: p.name ?? '', category: g.category ?? '', width: cm(p.dimensions.width), depth: cm(p.dimensions.depth), height: cm(p.dimensions.height) });
+    setForm({ name: p.name ?? '', category: g.category ?? '', width: cm(p.dimensions.width), depth: cm(p.dimensions.depth), height: cm(p.dimensions.height), packSize: String(detectPackSize(p.name) ?? '') });
   };
 
   const num = (s: string) => {
@@ -175,7 +176,7 @@ export function ProductImportModal() {
 
   const save = async (place: boolean) => {
     if (!product || !w || !d || !h) return;
-    const base = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape });
+    const base = productToCatalogItem({ product, width: w, depth: d, height: h, name: form.name.trim(), category: form.category, shape, packSize: normalizePackSize(form.packSize) });
     let item = base;
     if (model) {
       const assetId = newId('asset');
@@ -333,6 +334,13 @@ export function ProductImportModal() {
                   </label>
                 ))}
               </div>
+              <label className="field">
+                <span className="field-label">Stück pro Packung {detectPackSize(product.name) ? <Badge kind="warn">Multipack erkannt – bitte prüfen</Badge> : null}</span>
+                <span className="field-input">
+                  <input value={form.packSize} onChange={(e) => setForm({ ...form, packSize: e.target.value })} inputMode="numeric" placeholder="leer = Einzelstück" />
+                </span>
+              </label>
+              <p className="muted small">Wird das Produkt nur als Packung verkauft (z. B. 3er-Set), gilt der Preis für die ganze Packung; im Budget wird die nötige Packungsanzahl aufgerundet.</p>
               {product.dimensions.sourceText && <p className="muted small">Gefundene Maßangabe: „{product.dimensions.sourceText}“</p>}
               <ModelSection
                 url={product.modelUrl}

@@ -42,7 +42,7 @@ describe('budget', () => {
     const chair = lines.filter((l) => l.includes(a.name));
     expect(chair).toHaveLength(1);
     expect(chair[0]).toContain('45 × 52 × 86');
-    expect(chair[0]).toContain(';4;70,00;280,00;');
+    expect(chair[0]).toContain(';4;1;4;70,00;70,00;280,00;');
   });
 });
 
@@ -80,10 +80,10 @@ describe('shopping list by room (#75)', () => {
     expect(rows[0].startsWith('Raum;Kategorie;Artikel')).toBe(true);
     const firstCol = rows.slice(1).map((r) => r.split(';')[0]);
     expect(firstCol).toEqual(['Bad', 'Bad', 'Küche', 'Küche', 'Küche', 'Ohne Raum', 'Ohne Raum', '', '']);
-    expect(rows).toContain('Bad;;Zwischensumme Bad;;;;;70,00;;');
-    expect(rows).toContain('Küche;;Zwischensumme Küche;;;;;290,00;;');
-    expect(rows.at(-2)).toBe(';;Gesamt (bekannte Preise);;;;;360,00;;');
-    expect(rows.at(-1)).toBe(';;1 Position(en) ohne Preis;;;;;;;');
+    expect(rows).toContain('Bad;;Zwischensumme Bad;;;;;;;;70,00;;');
+    expect(rows).toContain('Küche;;Zwischensumme Küche;;;;;;;;290,00;;');
+    expect(rows.at(-2)).toBe(';;Gesamt (bekannte Preise);;;;;;;;360,00;;');
+    expect(rows.at(-1)).toBe(';;1 Position(en) ohne Preis;;;;;;;;;;');
   });
 });
 

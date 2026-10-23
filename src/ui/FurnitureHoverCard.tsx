@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORIES } from '../catalog/types';
 import { derivePlan } from '../model/derived';
 import { conflictSummary, placementIssues } from '../model/placement';
+import { packsNeeded } from '../catalog/packSize';
 import { formatEuro } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
@@ -81,8 +82,15 @@ export function FurnitureHoverCard() {
       </span>
       {item.price && (
         <span>
-          {formatEuro(item.price.amount * (item.quantity ?? 1))}
-          {item.quantity > 1 && <span className="muted"> ({item.quantity} Stk.)</span>}
+          {formatEuro(item.price.amount * packsNeeded(item.quantity ?? 1, item.price.packSize))}
+          {(item.price.packSize ?? 1) > 1 ? (
+            <span className="muted">
+              {' '}
+              ({packsNeeded(item.quantity ?? 1, item.price.packSize)} × Packung à {item.price.packSize} Stk., {formatEuro(item.price.amount / (item.price.packSize ?? 1))} pro Stück)
+            </span>
+          ) : (
+            item.quantity > 1 && <span className="muted"> ({item.quantity} Stk.)</span>
+          )}
           {item.price.status === 'estimate' && <span className="muted"> · Schätzung</span>}
         </span>
       )}
