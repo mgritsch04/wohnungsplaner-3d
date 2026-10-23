@@ -31,6 +31,7 @@ import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
 import { LevelBar } from './ui/LevelBar';
 import { MobileBar } from './ui/MobileBar';
+import { ShopMode } from './shop/ShopMode';
 import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
 import { SplitDivider } from './ui/SplitDivider';
 import { loadSplit, saveSplit } from './ui/splitPreference';
@@ -89,6 +90,8 @@ export default function App() {
   // phone view (#129): plan/3D get the whole screen, the side panels open as a sheet from the bottom
   const phone = usePhoneLayout();
   const [sheet, setSheet] = useState<PhoneSheet>(null);
+  // shop mode (#361): `?laden` opens it right away (e.g. as a home-screen shortcut)
+  const [shop, setShop] = useState(() => new URLSearchParams(location.search).has('laden'));
   const hasSelection = useUiStore((s) => s.selection !== null);
   const phoneClass = phone ? ` phone${sheet ? ` sheet-${sheet}` : ''}${hasSelection && !sheet ? ' has-selection' : ''}` : '';
   const [sheetHeight, setSheetHeight] = useState(0.55);
@@ -185,8 +188,9 @@ export default function App() {
         </aside>
       </div>
       <div className={`compare-lock-contents ${locked ?? ''}`.trim()} inert={comparing}>
-        {phone ? <MobileBar sheet={sheet} onSheet={setSheet} /> : <StatusBar />}
+        {phone ? <MobileBar sheet={sheet} onSheet={setSheet} onShop={() => setShop(true)} /> : <StatusBar />}
       </div>
+      {shop && <ShopMode onClose={() => setShop(false)} />}
       <ModalHost />
       <PrintViewHost />
       <Toasts />

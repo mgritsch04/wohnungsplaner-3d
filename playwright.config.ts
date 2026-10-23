@@ -19,6 +19,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
+    // the offline shell (#361) would answer requests that tests mock with page.route; the shop-mode spec switches it on
+    serviceWorkers: 'block',
     viewport: { width: 1440, height: 900 },
     launchOptions: {
       executablePath: existsSync(localChromium) ? localChromium : undefined,

@@ -11,7 +11,7 @@ import { IconDuplicate, IconRotateLeft, IconRotateRight, IconTrash } from './ico
  * Untere Leiste der Handy-Ansicht (#129, Backlog-Zeile 89): Plan/3D bekommen den ganzen Platz, die beiden
  * Seitenpanels öffnen sich als Blatt von unten (erneut tippen schließt).
  */
-export function MobileBar({ sheet, onSheet }: { sheet: PhoneSheet; onSheet: (s: PhoneSheet) => void }) {
+export function MobileBar({ sheet, onSheet, onShop }: { sheet: PhoneSheet; onSheet: (s: PhoneSheet) => void; onShop: () => void }) {
   const hasSelection = useUiStore((s) => s.selection !== null || s.multi.length > 0);
   const toggle = (s: Exclude<PhoneSheet, null>) => onSheet(sheet === s ? null : s);
   return (
@@ -23,6 +23,9 @@ export function MobileBar({ sheet, onSheet }: { sheet: PhoneSheet; onSheet: (s: 
         </button>
         <button className={sheet === 'right' ? 'active' : ''} aria-pressed={sheet === 'right'} onClick={() => toggle('right')}>
           Details{hasSelection && <span className="mobile-bar-dot" aria-label="(Auswahl)" />}
+        </button>
+        <button onClick={onShop} data-testid="open-shop-mode">
+          Laden
         </button>
         {sheet && (
           <button className="mobile-bar-close" aria-label="Panel schließen" onClick={() => onSheet(null)}>
