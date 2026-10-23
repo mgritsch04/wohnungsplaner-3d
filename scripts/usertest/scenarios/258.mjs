@@ -1,4 +1,4 @@
-// Plan-Hintergrund schnell ein- und ausblenden (#258) – Testschritte aus dem Kommentar in #258.
+// Plan-Hintergrund schnell ein- und ausblenden (#258) – Testschritte aus dem Kommentar in #258 (Stand nach Fix mgritsch04/wohnungsplaner-3d#333).
 import { pdfOf, roomWalls } from './_pdf.mjs';
 
 const left = (t) => t.page.locator('.panel.left');
@@ -20,7 +20,7 @@ export default {
   steps: [
     {
       nr: 1,
-      action: 'App öffnen und einen Grundriss (PDF) importieren.',
+      action: 'App öffnen, 2D-Ansicht, einen Grundriss (PDF oder Bild) importieren.',
       expected: 'Der Plan liegt als Hintergrund im 2D-Plan.',
       async run(t) {
         const { page } = t;
@@ -42,7 +42,7 @@ export default {
     },
     {
       nr: 2,
-      action: 'In der 2D-Ansicht unten rechts „Plan-Hintergrund“ ausschalten.',
+      action: 'Unten rechts den Schalter „Plan-Hintergrund“ mit der Maus anklicken (er liegt über dem Zoomregler).',
       expected: 'Der Grundriss verschwindet, Wände und Möbel bleiben.',
       async run(t) {
         const { page } = t;
@@ -66,59 +66,48 @@ export default {
     },
     {
       nr: 3,
-      action: 'Wieder einschalten oder P drücken.',
-      expected: 'Der Grundriss ist mit gleicher Deckkraft wieder da. Der Haken „Anzeigen“ im Import-Reiter zeigt denselben Zustand.',
+      action: 'Erneut klicken (oder P drücken).',
+      expected: 'Der Grundriss ist mit gleicher Deckkraft wieder da; der Haken „Anzeigen“ im Import-Reiter folgt.',
       async run(t) {
         const { page } = t;
         const offBefore = (await vis(t)) === false;
-        await pressP(t);
-        await page.waitForTimeout(300);
+        const box = await toggle(t).boundingBox();
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await page.waitForTimeout(400);
         const onByClick = (await vis(t)) === true && (await under(t)) > 0;
-        await pressP(t);
+        const cbOn = await left(t).getByLabel('Anzeigen').isChecked();
+        const op = (await t.project()).underlay.opacity;
+        await t.shot('Plan wieder eingeblendet');
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         await page.waitForTimeout(300);
-        const offByP = (await vis(t)) === false;
+        const offAgain = (await vis(t)) === false;
         const cbOff = await left(t).getByLabel('Anzeigen').isChecked();
         await pressP(t);
         await page.waitForTimeout(300);
         const onByP = (await vis(t)) === true && (await under(t)) > 0;
-        const cbOn = await left(t).getByLabel('Anzeigen').isChecked();
-        const op = (await t.project()).underlay.opacity;
-        return { status: offBefore && onByClick && offByP && onByP && cbOff === false && cbOn === true && op === t.opacity ? 'ok' : 'fail', observed: `Ausgangszustand aus: ${offBefore}; P ein (Schalter selbst nicht klickbar, siehe Schritt 2): ${onByClick}; P aus: ${offByP} (Haken „Anzeigen“: ${cbOff}); P ein: ${onByP} (Haken: ${cbOn}); Deckkraft ${t.opacity} → ${op}.` };
+        return { status: offBefore && onByClick && cbOn === true && op === t.opacity && offAgain && cbOff === false && onByP ? 'ok' : 'fail', observed: `Ausgangszustand aus: ${offBefore}; Mausklick ein: ${onByClick} (Haken „Anzeigen“: ${cbOn}, Deckkraft ${t.opacity} → ${op}); zweiter Mausklick aus: ${offAgain} (Haken: ${cbOff}); P ein: ${onByP}.` };
       },
     },
     {
       nr: 4,
-      action: 'Projekt speichern und neu laden.',
-      expected: 'Der Zustand bleibt erhalten.',
-      async run(t) {
-        const { page } = t;
-        await pressP(t); // aus
-        await page.waitForTimeout(1800);
-        await page.reload();
-        await page.locator('input.project-name').waitFor();
-        await page.waitForTimeout(800);
-        const v = await vis(t);
-        return { status: v === false ? 'ok' : 'fail', observed: `Nach dem Neuladen: Unterlage sichtbar = ${v} (vorher ausgeschaltet).` };
-      },
-    },
-    {
-      nr: 5,
       optional: true,
-      action: 'Optional: In der Ich-Ansicht P drücken.',
-      expected: 'P bleibt dort die Referenzfigur, der Plan-Hintergrund wird nicht umgeschaltet.',
+      action: 'Optional: Zoomregler benutzen.',
+      expected: 'Der Regler ist unverändert bedienbar und wird nicht vom Schalter verdeckt.',
       async run(t) {
         const { page } = t;
-        const before = await vis(t);
-        await page.getByRole('button', { name: '3D', exact: true }).click();
-        await page.getByRole('button', { name: 'Begehen' }).click();
-        await page.getByTestId('crosshair').waitFor();
-        await page.waitForTimeout(800);
-        await page.evaluate(() => window.__wp.walk?.look(0, -0.4));
-        await pressP(t);
-        await page.waitForTimeout(500);
-        const after = await vis(t);
-        const fig = (await t.project()).settings.refFigure ?? (await t.ui()).refFigure;
-        return { status: before === after ? 'ok' : 'fail', observed: `Unterlage sichtbar vor/nach P in der Ich-Ansicht: ${before}/${after} (unverändert); Referenzfigur-Zustand: ${JSON.stringify(fig)?.slice(0, 80)}.` };
+        const slider = page.getByTestId('zoom-2d').locator('input[type=range]').first();
+        const wrap = page.getByTestId('zoom-2d');
+        const tb = await toggle(t).boundingBox();
+        const zb = await wrap.boundingBox();
+        const sb = await slider.boundingBox();
+        const overlap = zb.x < tb.x + tb.width && zb.x + zb.width > tb.x && zb.y < tb.y + tb.height && zb.y + zb.height > tb.y;
+        const read = () => page.evaluate(() => { const px = document.querySelector('[data-testid="editor2d"] svg').getBoundingClientRect().width; return px; });
+        const v0 = await slider.inputValue();
+        await page.mouse.click(sb.x + sb.width * 0.9, sb.y + sb.height / 2);
+        await page.waitForTimeout(400);
+        const v1 = await slider.inputValue();
+        await t.shot('Ecke unten rechts', { x: 760, y: 740, width: 360, height: 140 });
+        return { status: !overlap && v0 !== v1 ? 'ok' : 'fail', observed: `Schalter bei x ${Math.round(tb.x)}–${Math.round(tb.x + tb.width)}, y ${Math.round(tb.y)}–${Math.round(tb.y + tb.height)}; Zoomregler bei x ${Math.round(zb.x)}–${Math.round(zb.x + zb.width)}, y ${Math.round(zb.y)}–${Math.round(zb.y + zb.height)}; überlappen: ${overlap}. Reglerwert nach Klick auf den Regler: ${v0} → ${v1}.` };
       },
     },
   ],
