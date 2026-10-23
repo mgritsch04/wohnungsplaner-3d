@@ -502,7 +502,7 @@ function* centerPoses(c: RoomCtx, item: CatalogItem, around: Vec2 = c.centroid):
 
 const findIn = (c: RoomCtx, pred: (f: Furniture) => boolean) => roomItems(c).filter(pred);
 /** A sized copy of a catalogue item (curtain to the window width, mattress to the bed). */
-const sized = (item: CatalogItem, width: number, depth = item.depth): CatalogItem => ({ ...item, width: mm(width), depth: mm(depth) });
+const sized = (item: CatalogItem, width: number, depth = item.depth, height = item.height): CatalogItem => ({ ...item, width: mm(width), depth: mm(depth), height: mm(height) });
 
 /** Back-centre poses of `item` on the wall behind `anchor` (picture above the sofa, mirror above the washbasin). */
 function* aboveAnchor(item: CatalogItem, anchors: Furniture[], elevation: (a: Furniture) => number): Generator<Furniture> {
@@ -703,7 +703,7 @@ function placeItem(c: RoomCtx, item: CatalogItem, role: Role, companions: Catalo
   }
 }
 
-/** Curtain in front of every window of the room, a bit wider than the window, hanging from just under the ceiling. */
+/** Curtain in front of every window: a bit wider than the window, rod just above its top edge, hanging down to just below the sill (to the floor at a floor-length window). */
 function* curtainPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
   const hung = findIn(c, (f) => roleOf(f) === 'curtain');
   for (const e of c.edges) {
@@ -713,7 +713,10 @@ function* curtainPoses(c: RoomCtx, item: CatalogItem): Generator<Furniture> {
       const mid = Math.min(Math.max((o.t0 + o.t1) / 2, w / 2 + 0.01), e.length - w / 2 - 0.01);
       const p = add(add(e.a, scale(e.dir, mid)), scale(e.inward, item.depth / 2 + 0.06));
       if (hung.some((h) => dist(h, p) < 0.3)) continue;
-      yield withPose(sized(item, w), p.x, p.y, rotationFacing(e.inward));
+      const floorLength = o.bottom < 0.05;
+      const low = floorLength ? 0 : Math.max(0, o.bottom - 0.15);
+      const rod = Math.max(low + 0.4, o.top + 0.1);
+      yield withPose(sized(item, w, item.depth, rod - low), p.x, p.y, rotationFacing(e.inward), low);
     }
   }
 }

@@ -55,6 +55,20 @@ describe('furnishing per room type (#350)', () => {
     expect(by(s.items, 'generic-picture')[0]?.elevation).toBeGreaterThan(1);
   });
 
+  it('curtain fits the window: rod just above it, ends below the sill – to the floor only at a floor-length window', () => {
+    const wishes = (type: RoomType) => [...defaultWishes(type), { catalogId: 'generic-curtain', quantity: 1 }];
+    const p = roomProject(4, 3.5, 'Schlafzimmer');
+    const o = p.openings.find((x) => x.kind === 'window')!;
+    const c1 = by(suggest(p, 'bedroom', wishes('bedroom')).items, 'generic-curtain')[0];
+    expect(c1.elevation).toBeGreaterThan(0.3);
+    expect(c1.elevation).toBeLessThan(o.sillHeight);
+    expect(c1.elevation + c1.height).toBeCloseTo(o.sillHeight + o.height + 0.1, 2);
+    o.sillHeight = 0;
+    const c2 = by(suggest(p, 'bedroom', wishes('bedroom')).items, 'generic-curtain')[0];
+    expect(c2.elevation).toBe(0);
+    expect(c2.height).toBeCloseTo(o.height + 0.1, 2);
+  });
+
   it('storeroom: shelves and broom cabinet at the walls, boxes on the shelf boards, vacuum has a place', () => {
     const p = roomProject(2.2, 1.8, 'Abstellraum', false);
     const s = suggest(p, 'utility');
