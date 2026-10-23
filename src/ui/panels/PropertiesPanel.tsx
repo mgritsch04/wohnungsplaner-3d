@@ -556,6 +556,18 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </div>
       </PanelGroup>
       <PanelGroup groupKey="furniture.size" title="Maße">
+        {isRoundFootprint(f) && (
+          <NumberField
+            label="Durchmesser"
+            value={f.width}
+            factor={100}
+            unit="cm"
+            min={1}
+            max={2000}
+            title="Rund (Pflanze, Rundtisch, Lampe, Pouf): Breite und Tiefe werden gleich dem Durchmesser"
+            onChange={(v) => upd((x) => { x.width = v; x.depth = v; })}
+          />
+        )}
         <div className="field-grid three">
           <NumberField label="Breite" value={f.width} factor={100} unit="cm" min={1} max={2000} onChange={(v) => upd((x) => (x.width = v))} />
           <NumberField label="Tiefe" value={f.depth} factor={100} unit="cm" min={1} max={2000} onChange={(v) => upd((x) => (x.depth = v))} />
@@ -915,4 +927,11 @@ function simplifyGeo<G extends { interior: { x: number; y: number }[] }>(g: G): 
     return Math.abs(cr) > 1e-6;
   });
   return { ...g, interior: keep };
+}
+
+const ROUND_SHAPES = new Set(['table-round', 'plant', 'floor-lamp', 'table-lamp', 'pendant', 'stool']);
+/** Round things are listed by diameter in shops: offer one field that sets width = depth. */
+function isRoundFootprint(f: { model: { type: string; shape?: string; fallbackShape?: string }; width: number; depth: number }): boolean {
+  const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;
+  return ROUND_SHAPES.has(shape ?? '') || Math.abs(f.width - f.depth) < 0.0005;
 }

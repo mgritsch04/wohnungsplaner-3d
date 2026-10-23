@@ -88,6 +88,15 @@ describe('properties panel groups (#99)', () => {
     expect(slider.value).toBe('60');
   });
 
+  it('round things get a Durchmesser field that sets width and depth', () => {
+    const f = useProjectStore.getState().project.furniture.find((x) => x.model.type === 'procedural' && x.model.shape === 'table-round');
+    if (!f) return;
+    select('furniture', f.id);
+    expect(labels()).toContain('Durchmesser');
+    const input = [...host.querySelectorAll<HTMLInputElement>('input')].find((i) => i.getAttribute('aria-label') === 'Durchmesser' || i.closest('label')?.textContent?.startsWith('Durchmesser'));
+    expect(input).toBeTruthy();
+  });
+
   it('opens and closes a group via its heading button and updates aria-expanded', () => {
     select('furniture', furniture('generic-wardrobe-150').id);
     act(() => toggle('Produkt').click());
