@@ -3,6 +3,7 @@
  * Lokaler IKEA-Helfer für den Wohnungsplaner (Katalog › Abschnitt „IKEA“).
  *
  *   npm run ikea-helper            (oder: node scripts/ikea-helper.mjs [--port 4791])
+ *   npm run ikea-helper -- --check  prüft nur, ob Claude Code gefunden und angemeldet ist
  *
  * Läuft nur auf diesem Rechner (127.0.0.1) und beantwortet nur Anfragen der lokal
  * geöffneten Planer-App (Herkunft localhost/127.0.0.1). Pro eingefügter Artikelnummer
@@ -43,9 +44,14 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fetchArticle, fetchIkeaModel, fetchProductImage, loadIkeaModules, politeFetcher } from './lib/ikea-fetch.mjs';
-import { claudeAvailable, runClaude } from './lib/claude-cli.mjs';
+import { checkClaude, claudeAvailable, INSTALL_HELP, runClaude } from './lib/claude-cli.mjs';
 
 const args = process.argv.slice(2);
+if (args.includes('--check')) {
+  const { ok, lines } = await checkClaude();
+  for (const l of lines) console.log(l);
+  process.exit(ok ? 0 : 1);
+}
 const portArg = args.indexOf('--port');
 const PORT = Number(portArg >= 0 ? args[portArg + 1] : process.env.IKEA_HELPER_PORT) || 4791;
 const CACHE = resolve(process.env.IKEA_HELPER_CACHE || join('ikea-import', 'auswahl'));
@@ -81,12 +87,12 @@ const get = politeFetcher();
 let claudeReady = false;
 void claudeAvailable().then((ok) => {
   claudeReady = ok;
-  console.log(ok ? 'Claude Code gefunden – „Claude fragen“ und „Einrichten lassen“ funktionieren auch im lokalen Planer.' : 'Claude Code („claude“) nicht gefunden – Claude-Funktionen nur im App-Artefakt.');
+  console.log(ok ? 'Claude Code gefunden – „Claude fragen“ und „Einrichten lassen“ funktionieren auch im lokalen Planer.' : `${INSTALL_HELP} Bis dahin gibt es Claude-Funktionen nur im App-Artefakt.`);
 });
 let claudeBusy = false;
 
 async function askClaude(body) {
-  if (!claudeReady) return [503, { error: 'Claude Code ist auf diesem Rechner nicht verfügbar (Befehl „claude“).' }];
+  if (!claudeReady) return [503, { error: `Claude Code ist auf diesem Rechner nicht verfügbar. ${INSTALL_HELP}` }];
   const prompt = typeof body?.prompt === 'string' ? body.prompt : '';
   if (!prompt || prompt.length > 200_000) return [400, { error: 'Leere oder zu lange Anfrage.' }];
   if (claudeBusy) return [429, { error: 'Claude arbeitet noch an der vorigen Anfrage.' }];
