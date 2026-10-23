@@ -11,11 +11,8 @@ import { addIkeaArticles } from '../catalog/ikeaSelection';
 import { errorText, HIDE_CODES, loadMcp, loadSample, missingClaude, type McpRuntime, type Sample, type SampleError } from './claude';
 import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, ITEM_TIMEOUT_MS, MAX_AUTO_SEARCH, parseFound, replaceWithFound, searchTargets, TOTAL_TIMEOUT_MS, type FoundProduct, type SearchTarget } from './productSearch';
 import {
-  buildDesignPrompt,
   MAX_FIELD,
-  parseDesignAnswer,
   PLACEHOLDERS,
-  preselect,
   proposalTotal,
   realProducts,
   RETAILER_CHOICES,
@@ -28,11 +25,14 @@ import {
   type DesignWishes,
   type RetailerChoice,
 } from './design';
+import { runDesign } from './designRun';
 import { useDesignStore } from './designStore';
-import { summarizePlan } from './planSummary';
+import { runPool } from './pool';
 import './assistant.css';
 
 const ALL = '__all';
+/** Pieces searched at the same time with local Claude Code. */
+const SEARCH_PARALLEL = 3;
 let controller: AbortController | null = null;
 let searchCtl: AbortController | null = null;
 
@@ -75,6 +75,7 @@ export function DesignPanel() {
   const [mcp, setMcp] = useState<McpRuntime | null>(null);
   const [browser, setBrowser] = useState(false);
   const [search, setSearch] = useState<{ done: number; total: number; current: string } | null>(null);
+  const [designProgress, setDesignProgress] = useState<{ done: number; total: number } | null>(null);
   const [notFound, setNotFound] = useState<Set<string>>(new Set());
   const [skipped, setSkipped] = useState(0);
   const [note, setNote] = useState<string | null>(null);
@@ -143,23 +144,25 @@ export function DesignPanel() {
 
   const ask = async () => {
     if (!targets.length || st.asking) return;
-    const types = targets.map((r) => roomTypes[r.id] ?? guessRoomType(r.name));
-    const offer = preselect(products, types, w.budget);
-    const plan = summarizePlan(project, { roomTypes, focusRoomId: scope === ALL ? null : scope });
     controller?.abort();
     searchCtl?.abort();
     const ctl = new AbortController();
     controller = ctl;
     st.set({ asking: true, error: null });
+    setDesignProgress(null);
     let made: DesignProposal | null = null;
     try {
-      const raw = await sample.json(buildDesignPrompt(w, plan, offer), { signal: ctl.signal, modelTier: 'complex' });
-      const proposal = parseDesignAnswer(
-        raw,
-        plan,
-        targets.map((r) => r.id),
-        offer,
-      );
+      const { proposal, failedRooms } = await runDesign({
+        sample,
+        project,
+        roomIds: targets.map((r) => r.id),
+        roomTypes,
+        wishes: w,
+        products,
+        signal: ctl.signal,
+        onProgress: (done, total) => setDesignProgress({ done, total }),
+      });
+      if (failedRooms.length) useUiStore.getState().toast(`Für ${failedRooms.map(roomName).join(', ')} kam keine verwertbare Antwort – dafür bitte den Raum einzeln einrichten lassen.`, 'info');
       clearPreview();
       setNotFound(new Set());
       setSkipped(0);
@@ -259,54 +262,70 @@ export function DesignPanel() {
     searchCtl = ctl;
     const missed = new Set(notFound);
     const deadline = Date.now() + TOTAL_TIMEOUT_MS;
+    const active = new Set<string>();
+    let finished = 0;
+    let halt = false;
+    let late = false;
     setNote(null);
-    try {
-      for (const [n, t] of targets.entries()) {
-        if (ctl.signal.aborted) break;
-        if (Date.now() > deadline) {
-          setNote('Die Suche wurde nach 20 Minuten beendet; übrige Platzhalter kannst du mit „Nachsuchen“ erneut versuchen.');
-          break;
-        }
-        const current = useDesignStore.getState().proposal;
-        const pick = current?.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
-        const placeholder = pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
-        if (!current || !pick || !placeholder) continue;
-        setSearch({ done: n, total: targets.length, current: pick.label });
-        // one piece may take at most ITEM_TIMEOUT_MS; the user's stop ends the whole search
-        const item = new AbortController();
-        const onStop = () => item.abort();
-        ctl.signal.addEventListener('abort', onStop);
-        let timedOut = false;
-        const timer = setTimeout(() => {
-          timedOut = true;
-          item.abort();
-        }, ITEM_TIMEOUT_MS);
-        try {
-          const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
-          const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true });
-          const found = await toCatalog(parseFound(raw), placeholder);
-          const latest = useDesignStore.getState().proposal;
-          if (found.length && latest) st.set({ proposal: replaceWithFound(latest, t.roomId, t.index, found) });
-          else missed.add(`${t.roomId}:${t.index}`);
-        } catch (e) {
-          const code = (e as SampleError | undefined)?.code;
-          if (code === 'cancelled' && !timedOut) break;
-          if (code === 'tools_unavailable' || (code && HIDE_CODES.includes(code))) {
-            setBrowser(false);
-            setNote('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC) – es bleiben Platzhalter mit Suchlink.');
-            break;
-          }
+    const show = () => setSearch({ done: finished, total: targets.length, current: [...active].join(', ') });
+    const one = async (t: SearchTarget) => {
+      const current = useDesignStore.getState().proposal;
+      const pick = current?.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
+      const placeholder = pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
+      if (!current || !pick || !placeholder) {
+        finished++;
+        return;
+      }
+      active.add(pick.label);
+      show();
+      // one piece may take at most ITEM_TIMEOUT_MS; the user's stop ends the whole search
+      const item = new AbortController();
+      const onStop = () => item.abort();
+      ctl.signal.addEventListener('abort', onStop);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        item.abort();
+      }, ITEM_TIMEOUT_MS);
+      try {
+        const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
+        const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true });
+        const found = await toCatalog(parseFound(raw), placeholder);
+        const latest = useDesignStore.getState().proposal;
+        if (found.length && latest) st.set({ proposal: replaceWithFound(latest, t.roomId, t.index, found) });
+        else missed.add(`${t.roomId}:${t.index}`);
+      } catch (e) {
+        const code = (e as SampleError | undefined)?.code;
+        if (code === 'cancelled' && !timedOut) halt = true;
+        else if (code === 'tools_unavailable' || (code && HIDE_CODES.includes(code))) {
+          halt = true;
+          setBrowser(false);
+          setNote('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC) – es bleiben Platzhalter mit Suchlink.');
+        } else {
           missed.add(`${t.roomId}:${t.index}`);
-          if (code === 'rate_limited') {
+          if (code === 'rate_limited' && !halt) {
+            halt = true;
             useUiStore.getState().toast(errorText(e), 'info');
             setNote('Claude-Kontingent erreicht – die übrigen Platzhalter bleiben stehen; später mit „Nachsuchen“ fortsetzen.');
-            break;
           }
-        } finally {
-          clearTimeout(timer);
-          ctl.signal.removeEventListener('abort', onStop);
         }
+      } finally {
+        clearTimeout(timer);
+        ctl.signal.removeEventListener('abort', onStop);
+        active.delete(pick.label);
+        finished++;
+        show();
       }
+    };
+    try {
+      // browser of the desktop app: one tab, so one piece at a time; local Claude Code: a few at once
+      await runPool(targets, searchMode === 'web' ? SEARCH_PARALLEL : 1, one, () => {
+        if (!late && Date.now() > deadline) {
+          late = true;
+          setNote('Die Suche wurde nach 20 Minuten beendet; übrige Platzhalter kannst du mit „Nachsuchen“ erneut versuchen.');
+        }
+        return halt || late || ctl.signal.aborted;
+      });
     } finally {
       if (searchCtl === ctl) searchCtl = null;
       setNotFound(missed);
@@ -389,7 +408,7 @@ export function DesignPanel() {
             </p>
             <div className="btn-row">
               <button className="primary" disabled={st.asking || !!search} onClick={() => void ask()}>
-                {st.asking ? 'Claude richtet ein…' : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
+                {st.asking ? `Claude richtet ein…${designProgress && designProgress.total > 1 ? ` (${designProgress.done}/${designProgress.total} Räume)` : ''}` : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
               </button>
               {st.asking && <button onClick={() => controller?.abort()}>Stopp</button>}
             </div>
@@ -452,7 +471,7 @@ export function DesignPanel() {
                   search ? (
                     <>
                       <p>
-                        Suche {search.current} {search.done + 1}/{search.total} …
+                        Suche {search.current} {Math.min(search.done + 1, search.total)}/{search.total} …
                       </p>
                       <button onClick={() => searchCtl?.abort()}>Suche stoppen</button>
                     </>
