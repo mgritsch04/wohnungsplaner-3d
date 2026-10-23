@@ -22,6 +22,7 @@ Urteil (`report.json` › `verdict`, Konsole, Kopf von `report.md`):
 | `pruefen` | alles andere (Abweichung, `look`, `device`, `realDevice`) | Kommentar „bitte selbst anschauen“ mit der Liste |
 
 Lokal ohne `/opt/pw-browsers/chromium` wird Playwrights eigenes Chromium genommen (einmalig `npx playwright install chromium`).
+Maßstab seit 23.10.: G prüft nur echte Geräte und echte Daten (Handy, Controller, Händlerseiten, eigener Plan/PDF, echter Claude-Chat); Optik, Gefühl und Wortlaut beurteilt der Test-Thread selbst ([`docs/DEVELOPMENT_WORKFLOW.md`](../../docs/DEVELOPMENT_WORKFLOW.md) › „Automatische User-Tests“).
 Optik-Tests (Realismus, Materialien, Licht) sind mit `--gpu` auf einem PC aussagekräftiger; ein iPhone ersetzt das nicht.
 
 Ergebnis in `usertest-reports/<nr>/` (nicht im Git):
@@ -64,7 +65,7 @@ Jeder Schritt liefert `{ status, observed }`:
 |---|---|
 | `ok` | Erwartung nachweislich erfüllt (Zustand im Projekt/DOM geprüft) |
 | `fail` | nicht erfüllt |
-| `look` | Zustand stimmt, die Optik beurteilt nur ein Mensch am Bild |
+| `look` | Zustand stimmt, die Optik beurteilt der Test-Thread selbst am Screenshot (Maßstab seit 23.10.); das Werkzeug-Urteil bleibt `pruefen`, bis der Thread das Bild angesehen und im Kommentar bewertet hat |
 | `device` | nur auf einem echten Gerät prüfbar |
 | `skip` | optionaler Schritt, nicht geprüft |
 

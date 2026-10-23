@@ -165,3 +165,5 @@ Abnahme 23.10.: #220 von G bestätigt; #85 wartet auf Gs Test (user-test); #258 
 Ready (Planer-Reihenfolge, je ein Schema-Thread): #80 Wandaufbau · #138 Audio · #90 Heizkosten · #83/#84/#91 Notizen/Checkliste · #85 Schrankinnenaufteilung · #86 Fotos an Wänden · #54 Mehrgeschoss (groß, Opus, zuletzt).
 Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
 Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
+
+**Nachtrag 23.10. (Planer):** Gemergt seit dem letzten Eintrag: #335 gewendelte Treppen (PR #339), #336 Audio-Geräte im Katalog (PR #338), Drehregler für Möbel und Plan-Hintergrund (#340, PR #342; 🧪 automatischer User-Test offen), e2e-Aufteilung (#341, PR #343; 🧪 automatischer User-Test offen), Reiter links zweizeilig und Tischlampe neben Fenster (PR #348, Refs #345/#346). Neu: #350 Einrichtungsvorschlag mit echten Möbelix-/IKEA-Möbeln über Claude (Label `planned`, noch nicht bewertet; Nachfolger von #137).
