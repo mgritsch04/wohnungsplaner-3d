@@ -25,6 +25,17 @@ describe('time-of-day lighting', () => {
     expect(sunDirection(18).x).toBeLessThan(-0.3); // evening sun from the west
   });
 
+  it('turns the sun with the plan orientation (#420)', () => {
+    // default: plan up is north, so the noon sun stands at plan "down" (+z)
+    expect(sunDirection(13).z).toBeGreaterThan(0.3);
+    // plan up points south: the noon sun is above the upper edge (-z), the morning sun comes from plan left (-x)
+    expect(sunDirection(13, 180).z).toBeLessThan(-0.3);
+    expect(sunDirection(8, 180).x).toBeLessThan(-0.3);
+    // plan up points east: the morning sun comes from above the plan (-z)
+    expect(sunDirection(7, 90).z).toBeLessThan(-0.3);
+    expect(sunDirection(13, 90).y).toBeCloseTo(sunDirection(13).y, 6);
+  });
+
   it('distinguishes all presets plausibly', () => {
     const [morning, noon, afternoon, sunset, evening, night] = TIME_PRESETS.map((p) => lightingAt(p.hour));
     expect(noon.daylight).toBeGreaterThan(0.95);
