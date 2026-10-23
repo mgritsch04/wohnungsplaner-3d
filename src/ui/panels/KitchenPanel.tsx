@@ -36,9 +36,9 @@ export function KitchenPanel() {
   // which modules would not stand free – shown before placing (#220)
   // after placing, the run itself occupies its slots: show what was skipped until the input changes
   const runKey = JSON.stringify([wallId, side, start, run]);
-  const [placed, setPlaced] = useState<{ key: string; skipped: { name: string; problem: string }[] } | null>(null);
+  const [placed, setPlaced] = useState<{ key: string; project: typeof project; skipped: { name: string; problem: string }[] } | null>(null);
   const blocked = useMemo(() => {
-    if (placed?.key === runKey) return placed.skipped;
+    if (placed?.key === runKey && placed.project === project) return placed.skipped;
     if (!wallId || !project.walls.some((w) => w.id === wallId)) return [];
     return layoutKitchenRun(project, { wallId, side, start, modules: run }).slots.flatMap((s) => (s.problem ? [{ name: s.name, problem: s.problem }] : []));
   }, [project, wallId, side, start, run, placed, runKey]);
@@ -108,7 +108,7 @@ export function KitchenPanel() {
         </div>
         {blocked.length > 0 && (
           <div className="warning small" data-testid="kitchen-run-blocked">
-            <p>{placed?.key === runKey ? 'Nicht gesetzt, weil sie hier nicht passen:' : 'Diese Module passen hier nicht und werden nicht gesetzt:'}</p>
+            <p>{placed?.key === runKey && placed.project === project ? 'Nicht gesetzt, weil sie hier nicht passen:' : 'Diese Module passen hier nicht und werden nicht gesetzt:'}</p>
             <ul className="plain">
               {blocked.map((s, i) => (
                 <li key={i}>
@@ -137,7 +137,7 @@ export function KitchenPanel() {
               skipped = r.skipped;
               if (n) generateCountertops(d);
             });
-            setPlaced({ key: runKey, skipped });
+            setPlaced({ key: runKey, project: useProjectStore.getState().project, skipped });
             const ui = useUiStore.getState();
             if (!skipped.length) ui.toast(`${n} Küchenmodule platziert, Arbeitsplatten erzeugt.`, 'success');
             else ui.toast(`${n} Küchenmodule platziert, ${skipped.length} passten nicht (siehe Liste).`, n ? 'info' : 'error');

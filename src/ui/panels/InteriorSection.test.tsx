@@ -61,4 +61,25 @@ describe('Schrankinnenaufteilung (#85)', () => {
     const closed = openCabinetParts(f.width, f.depth, f.height, f.color, { columns: 1, parts: [] });
     expect(parts.length).toBeGreaterThan(closed.length + 5);
   });
+
+  it('Höhenfelder speichern Meter (20 cm = 0,2 m, nicht doppelt durch 100)', () => {
+    if (!button('+ Schublade')) click([...host.querySelectorAll('button.panel-group-toggle')].find((b) => b.textContent!.includes('Innenaufteilung')));
+    click(button('+ Schublade'));
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    const type = (label: string, v: string) => {
+      const input = [...host.querySelectorAll('label.field')].find((l) => l.textContent!.includes(label))!.querySelector('input')!;
+      act(() => {
+        input.focus();
+        setValue.call(input, v);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      act(() => void input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+      act(() => void input.blur());
+    };
+    type('Höhe der Schublade', '25');
+    type('Höhe von unten', '20');
+    const part = wardrobe().interior!.parts[0];
+    expect(part.h).toBeCloseTo(0.25, 6);
+    expect(part.z).toBeCloseTo(0.2, 6);
+  });
 });

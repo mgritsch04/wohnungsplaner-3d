@@ -158,7 +158,9 @@ Jeder Eintrag steht genau einmal in der Tabelle; die Spalte **Status** ist maßg
 Gemergt, Status 🧪 automatischer User-Test offen: #263 (Gefühlt echt, Stufe 1; Panini/Stufe 2 nur auf Gs Go) · #269 · #219 · #273 (Stufe 1–2; Bildpaket Stufe 3 auf Halt bis Gs Urteil, Branch `claude/moebelix-bildpaket-273` nicht löschen) · #278 · #282 · #283 (Strahl an Möbeln vorbei nicht umgesetzt) · #257 · #255 · #258 · #281 · #267 · #285 · #217 (❌ → erneut testen).
 Seit 22.10. abends ebenfalls gemergt, 🧪 automatischer User-Test offen: #280 (PR #290) · #253 (PR #300) · #101 (PR #301) · #69/#93 (PR #302) · #79 (PR #303) · #304 Quelltext-Import (PR #305, Zeile 19).
 Ebenfalls gemergt, 🧪 automatischer User-Test offen: #92 (PR #306) · #250 (PR #310) · #136 (PR #309) · #225 (PR #312) · #64/#81 (PR #314) · #238 (PR #313) · #222 (PR #315).
+Gemergt 23.10., 🧪 automatischer User-Test offen: #138 (PR #317) · #80 (PR #318) · #90 (PR #319) · #83/#84/#91 (PR #320) · #85 (PR #321) · #86 (PR #322) · #54 (PR #323, #324).
 In Progress: #229 (PR #296), #135.
+Ready-Liste leer; Folge-Ideen kommen als `idea-inbox`-Issues (gewendelte Treppen, Audio-Katalog, Regler für Möbel-Drehung u. a.).
 Ready (Planer-Reihenfolge, je ein Schema-Thread): #80 Wandaufbau · #138 Audio · #90 Heizkosten · #83/#84/#91 Notizen/Checkliste · #85 Schrankinnenaufteilung · #86 Fotos an Wänden · #54 Mehrgeschoss (groß, Opus, zuletzt).
 Blocked: #224 Preisvergleich (wartet auf Gs PC-Test von #221).
 Auto-User-Tests laufen ganz zuletzt (Manager-Budgetregel).
