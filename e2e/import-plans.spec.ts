@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cadFilledPlanPdf, clippedCadPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
+import { cadFilledPlanPdf, clippedCadPlanPdf, installationPlanPdf, getProject, getSelection, planToScreen, syntheticPlanPng, vectorPlanPdf, worldToScreen3d } from './fixtures';
 import { boxGlb } from '../src/test/glbFixture';
 
 const IGNORED = [/THREE\.Clock/, /GPU stall/, /GL Driver Message/, /swiftshader/i];
@@ -760,5 +760,75 @@ test('catalog: while dragging, the item itself is previewed in 2D and 3D instead
   const placed = (await getProject(page)).furniture.filter((f: { name: string }) => f.name === 'Zimmerpflanze groß').at(-1);
   expect(placed.x).toBeCloseTo(g.x, 2);
   expect(placed.y).toBeCloseTo(g.z, 2);
+  expect(errors).toEqual([]);
+});
+
+/** Import of the synthetic installation plan; `symbols` / `sanitary` tick the opt-in boxes. Returns the draft. */
+async function importInstallationPlan(page: Page, opts: { symbols: boolean }) {
+  await freshStart(page);
+  await page.getByRole('button', { name: /^Projekt ▾/ }).click();
+  await page.getByRole('button', { name: 'Neues leeres Projekt' }).click();
+  await page.getByRole('button', { name: 'Neu anlegen' }).click();
+  const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+  await page.getByTestId('start-card').getByRole('button', { name: 'Grundriss importieren' }).click();
+  await (await chooser).setFiles({ name: 'installationen.pdf', mimeType: 'application/pdf', buffer: installationPlanPdf() });
+  await expect(page.getByRole('button', { name: 'Aus Angabe übernehmen' })).toBeVisible({ timeout: 15000 });
+  await page.locator('.field-row.compact input').fill('75');
+  await page.getByRole('button', { name: 'Aus Angabe übernehmen' }).click();
+  await page.evaluate(() => {
+    (window as any).__wp.useProjectStore.getState().apply((d: any) => {
+      d.underlay.calibrated = true;
+      d.underlay.scaleSource = 'reference';
+    });
+  });
+  if (opts.symbols) {
+    await page.getByLabel(/Steckdosen, Schalter, Heizkörper aus Symbolen suchen/).check();
+    await page.getByLabel(/WC, Badewanne, Waschbecken aus Symbolen suchen/).check();
+  }
+  await page.getByRole('button', { name: 'Erkennung starten' }).click();
+  await expect(page.getByText('Import prüfen')).toBeVisible({ timeout: 20000 });
+  return page.evaluate(() => (window as any).__wp.useImportStore.getState().draft);
+}
+
+const shotDir = process.env.INSTALL_SHOTS;
+
+test('import invents no installations and no duplicate doors by default; "Steckdosen raten" places marked sockets on walls (#371–#374)', async ({ page }) => {
+  const errors = collectErrors(page);
+  const draft = await importInstallationPlan(page, { symbols: false });
+  expect(draft.installations ?? []).toHaveLength(0);
+  expect(draft.fixtures ?? []).toHaveLength(0);
+  expect(draft.openings.filter((o: { kind: string }) => o.kind === 'door')).toHaveLength(1);
+  if (shotDir) await page.screenshot({ path: join(shotDir, '1-standard-pruefansicht.png') });
+  await page.getByRole('button', { name: 'In Plan übernehmen' }).click();
+  const confirm = page.getByRole('alertdialog');
+  if (await confirm.isVisible().catch(() => false)) await confirm.getByRole('button').last().click();
+  await expect.poll(async () => (await getProject(page)).walls.length).toBeGreaterThan(3);
+  expect((await getProject(page)).fixtures).toHaveLength(0);
+  const left = page.locator('.panel.left');
+  await left.getByRole('button', { name: 'Werkzeuge' }).click();
+  await left.getByRole('button', { name: /Steckdosen & Anschlüsse/ }).click();
+  await page.getByTestId('guess-sockets').click();
+  await expect.poll(async () => (await getProject(page)).fixtures.length).toBeGreaterThan(0);
+  const p = await getProject(page);
+  for (const f of p.fixtures) {
+    expect(f.kind).toBe('socket');
+    expect(f.note).toMatch(/geraten/);
+  }
+  // none in the door gap (x 1.0–1.9 on the south wall) and the room is a 6 × 4 m rectangle
+  expect(p.fixtures.some((f: { x: number; y: number }) => f.x > 0.7 && f.x < 2.2 && f.y < 0.5)).toBe(false);
+  if (shotDir) await page.screenshot({ path: join(shotDir, '3-steckdosen-raten.png') });
+  expect(errors).toEqual([]);
+});
+
+test('with the boxes ticked only symbols at a wall face outside openings are proposed (#371)', async ({ page }) => {
+  const errors = collectErrors(page);
+  const draft = await importInstallationPlan(page, { symbols: true });
+  const inst: { kind: string; center: { x: number; y: number } }[] = draft.installations ?? [];
+  // the real symbol on the west wall is found
+  expect(inst.some((i) => i.kind === 'socket' && Math.hypot(i.center.x - 0.2, i.center.y - 2.0) < 0.6)).toBe(true);
+  // the lookalike in the door's swing (1.45, 0.45) is dropped
+  expect(inst.some((i) => Math.hypot(i.center.x - 1.45, i.center.y - 0.45) < 0.4)).toBe(false);
+  expect(draft.openings.filter((o: { kind: string }) => o.kind === 'door')).toHaveLength(1);
+  if (shotDir) await page.screenshot({ path: join(shotDir, '2-mit-haekchen-pruefansicht.png') });
   expect(errors).toEqual([]);
 });
