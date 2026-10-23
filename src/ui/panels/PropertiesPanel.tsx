@@ -519,7 +519,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </div>
         <div className="field-row">
           <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
-          <AngleSlider label="Drehung (Regler)" testId="furniture-rotation-slider" value={radToDeg(f.rotation)} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
+          <AngleSlider label="Winkel (Regler)" testId="furniture-rotation-slider" value={radToDeg(f.rotation)} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
           <NumberField label="Über Boden" value={f.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
         </div>
       </PanelGroup>
