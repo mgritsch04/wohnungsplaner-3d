@@ -137,6 +137,28 @@ function roomEdges(room: Room, plan: DerivedPlan): Edge[] {
   return edges;
 }
 
+export interface RoomWindow {
+  /** Centre of the window in the wall (plan metres). */
+  pos: Vec2;
+  /** Glazed area, m². */
+  area: number;
+}
+
+/** Windows in the outer walls of a room with their position (#360), for the light estimate. */
+export function roomWindows(plan: DerivedPlan, room: Room): RoomWindow[] {
+  const out: RoomWindow[] = [];
+  for (const e of roomEdges(room, plan)) {
+    if (!e.exterior || !e.wallId) continue;
+    const fp = plan.footprints.get(e.wallId);
+    if (!fp) continue;
+    for (const r of plan.openings.get(e.wallId) ?? []) {
+      if (r.opening.kind !== 'window') continue;
+      out.push({ pos: add(fp.a, scale(fp.dir, (r.s0 + r.s1) / 2)), area: r.opening.width * r.opening.height });
+    }
+  }
+  return out;
+}
+
 export function computeDaylight(project: Project, plan: DerivedPlan): Daylight {
   const north = project.settings.northDirection;
   const rooms: RoomDaylight[] = [];

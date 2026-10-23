@@ -25,6 +25,7 @@ import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotat
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { AngleSlider, Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
+import { DEFAULT_LUMEN, FALLBACK_LUMEN } from '../../model/lux';
 import { conflictSummary, issueLevel, placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
 import { GroupControls } from './GroupControls';
@@ -512,6 +513,29 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           onChange={(v) => upd((x) => (x.category = v))}
         />
       </PanelGroup>
+      {f.category === 'lighting' && (
+        <PanelGroup groupKey="furniture.lamp" title="Lichtstrom">
+          <NumberField
+            label="Lichtstrom"
+            value={f.lumen ?? (f.model.type === 'procedural' ? DEFAULT_LUMEN[f.model.shape] : undefined) ?? FALLBACK_LUMEN}
+            unit="lm"
+            digits={0}
+            min={0}
+            max={20000}
+            step={50}
+            title="Lichtstrom der Lampe in Lumen (steht auf der Verpackung oder im Datenblatt). Für die Lux-Lichtkarte im Tab Projekt."
+            onChange={(v) => upd((x) => (x.lumen = Math.round(v)))}
+          />
+          <p className="muted small" data-testid="lamp-lumen-hint">
+            {f.lumen === undefined ? 'Annahme: typischer Wert dieser Lampenart, kein Herstellerwert.' : 'Eigener Wert (z. B. von der Verpackung).'}
+          </p>
+          {f.lumen !== undefined && (
+            <button type="button" onClick={() => upd((x) => void delete x.lumen)}>
+              Auf typischen Wert zurücksetzen
+            </button>
+          )}
+        </PanelGroup>
+      )}
       <PanelGroup groupKey="furniture.position" title="Position" actions={f.locked ? <Badge kind="muted" title="Unter „Erweitert“ entsperren">gesperrt</Badge> : undefined}>
         <div className="field-row">
           <NumberField label="X" value={f.x} factor={100} unit="cm" disabled={f.locked} onChange={(v) => upd((x) => (x.x = v))} />

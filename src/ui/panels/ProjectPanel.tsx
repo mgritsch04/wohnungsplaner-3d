@@ -13,6 +13,7 @@ import { TimeOfDayControl } from '../TimeOfDayControl';
 import { MouseSensitivityControl } from '../MouseSensitivityControl';
 import { ThemeControl } from '../ThemeControl';
 import { DaylightSection } from './DaylightSection';
+import { LuxSection } from './LuxSection';
 import { HeatingSection } from './HeatingSection';
 import { CircuitsSection } from '../../installation/CircuitsSection';
 import { MoveChecklistSection } from '../../planning/TaskSections';
@@ -80,6 +81,7 @@ export function ProjectPanel() {
       </Section>
 
       <DaylightSection />
+      <LuxSection />
       <HeatingSection />
 
       <CircuitsSection />
