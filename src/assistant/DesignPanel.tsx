@@ -335,6 +335,28 @@ export function DesignPanel() {
           <p className="warning small">Bitte zuerst Räume anlegen (Werkzeuge › Raum).</p>
         ) : (
           <>
+            {searchMode ? (
+              <>
+                <SelectField
+                  label="Ablauf"
+                  value={w.searchReal ? 'direct' : 'later'}
+                  options={[
+                    { value: 'direct', label: 'Direkt mit echten Produkten (Claude sucht gleich im Shop)' },
+                    { value: 'later', label: 'Erst Vorschlag, dann suchen (Platzhalter, echte Produkte auf Knopfdruck)' },
+                  ]}
+                  onChange={(v) => st.setWishes({ searchReal: v === 'direct' })}
+                />
+                <p className="muted small" data-testid="design-mode-hint">
+                  {w.searchReal
+                    ? `Claude plant und sucht dann für die Platzhalter echte Produkte (je Möbel etwa eine Minute, höchstens ${MAX_AUTO_SEARCH} Stück je Lauf).`
+                    : 'Du bekommst zuerst den Vorschlag mit Platzhaltern und kannst dann für einzelne Möbel oder für alle echte Produkte suchen lassen.'}
+                </p>
+              </>
+            ) : (
+              <p className="muted small" data-testid="design-no-search">
+                Ohne Helfer bzw. Claude-Desktop-App plant Claude nur mit deinen eigenen Produkten und Platzhaltern. Für echte Produkte: <code>npm run ikea-helper</code> starten oder das Artefakt in der Claude-Desktop-App öffnen.
+              </p>
+            )}
             <SelectField label="Umfang" value={scope} options={[{ value: ALL, label: 'Ganze Wohnung' }, ...rooms.map((r) => ({ value: r.id, label: r.name || 'Raum ohne Namen' }))]} onChange={(v) => st.set({ scope: v })} />
             {FIELDS.map((f) => (
               <label key={f.key} className="field">
@@ -365,15 +387,6 @@ export function DesignPanel() {
             <p className="muted small" data-testid="design-own-count">
               {products.length ? `${products.length === 1 ? '1 eigenes Produkt' : `${products.length} eigene Produkte`} aus deiner Auswahl kommen in Frage, der Rest wird als Platzhalter geplant.` : 'Noch keine eigenen IKEA-/Möbelix-Produkte: Claude plant mit Platzhaltern und Suchlinks (Produkte übernimmst du unter Katalog › IKEA bzw. Möbelix).'}
             </p>
-            {searchMode ? (
-              <label className="small">
-                <input type="checkbox" checked={w.searchReal} onChange={(e) => st.setWishes({ searchReal: e.target.checked })} /> Gleich mit echten IKEA-/Möbelix-Produkten planen (Claude sucht im Shop, je Möbel etwa eine Minute, höchstens {MAX_AUTO_SEARCH} Stück)
-              </label>
-            ) : (
-              <p className="muted small" data-testid="design-no-search">
-                Ohne Helfer bzw. Claude-Desktop-App plant Claude nur mit deinen eigenen Produkten und Platzhaltern. Für echte Produkte: <code>npm run ikea-helper</code> starten oder das Artefakt in der Claude-Desktop-App öffnen.
-              </p>
-            )}
             <div className="btn-row">
               <button className="primary" disabled={st.asking || !!search} onClick={() => void ask()}>
                 {st.asking ? 'Claude richtet ein…' : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
@@ -445,7 +458,7 @@ export function DesignPanel() {
                     </>
                   ) : (
                     <button className="primary" onClick={() => void findReal(placeholders.map(({ roomId, index }) => ({ roomId, index })))}>
-                      Nachsuchen ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
+                      {w.searchReal ? 'Nachsuchen' : 'Alle suchen'} ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
                     </button>
                   )
                 ) : (
