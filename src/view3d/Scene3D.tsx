@@ -56,6 +56,7 @@ import { CompareMarkers } from './CompareMarkers';
 import { FurnishPreview3D } from './FurnishPreview3D';
 import { orbitKeyInput, orbitKeyMoves, orbitKeySpeed, orbitPlaneStep, setPointerOver3d } from './orbitKeys';
 import { useDialogStore } from '../ui/dialogStore';
+import { useAimHintStore } from '../ui/aimHintPreference';
 import { usePhoneLayout, useTouchUi } from '../ui/phoneLayout';
 import { TouchWalkPad } from './TouchWalkPad';
 import { OrbitContextMenu } from './OrbitContextMenu';
@@ -86,6 +87,7 @@ export function Scene3D() {
   const gamepad = useGamepadState((s) => s.connected);
   const ducking = useUiStore((s) => s.walkDuck);
   const feelReal = useProjectStore((s) => s.project.settings.walkTrueScale);
+  const aimHint = useAimHintStore((s) => s.visible);
   const carried = useUiStore((s) => (s.walkCarry ? storeProject.furniture.find((f) => f.id === s.walkCarry)?.name ?? null : null));
   const [webglError, setWebglError] = useState<string | null>(null);
   // pointerdown position, to tell an empty-space click (deselect) from an orbit drag
@@ -151,7 +153,7 @@ export function Scene3D() {
       {!session && <TapeMeasureButton />}
       {session && <CompareBar />}
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
-      {cameraMode === 'walk' && feelReal && <AimReadout />}
+      {cameraMode === 'walk' && feelReal && aimHint && <AimReadout />}
       {cameraMode === 'walk' && ducking && (
         <div className="walk-duck" data-testid="walk-duck">
           ⤓ Geduckt

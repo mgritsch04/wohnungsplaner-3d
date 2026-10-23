@@ -19,6 +19,7 @@ import { CircuitsSection } from '../../installation/CircuitsSection';
 import { MoveChecklistSection } from '../../planning/TaskSections';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
+import { AimHintControl } from '../AimHintControl';
 import { InfoHint } from '../InfoHint';
 import { LevelsSection } from '../LevelBar';
 import { useSightStore } from '../../editor2d/sightStore';
@@ -113,6 +114,7 @@ export function ProjectPanel() {
           onChange={(v) => apply((d) => void (d.settings.walkTrueScale = v))}
           title="Natürliches Sichtfeld (62°) mit Maßstabshinweisen: Entfernung und Höhe am Fadenkreuz, Durchgangshöhe an Türen. Aus: Sichtfeld vom Regler"
         />
+        <AimHintControl />
         <NumberField
           label="Bildschirmdiagonale"
           value={s.screenDiagonal}
