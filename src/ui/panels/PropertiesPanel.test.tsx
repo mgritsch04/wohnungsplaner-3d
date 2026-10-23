@@ -68,6 +68,26 @@ describe('properties panel groups (#99)', () => {
     expect(host.querySelector('[role="group"][aria-label="Drehen"]')!.closest('.panel-group')).toBeNull();
   });
 
+  it('rotation slider: one drag is one undo step and the number field follows', () => {
+    const f = furniture('generic-wardrobe-150');
+    select('furniture', f.id);
+    const slider = host.querySelector<HTMLInputElement>('[data-testid="furniture-rotation-slider"]')!;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    const drag = (v: string) =>
+      act(() => {
+        setValue.call(slider, v);
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    const past = useProjectStore.getState().past.length;
+    act(() => useProjectStore.getState().beginTransaction());
+    drag('30');
+    drag('60');
+    act(() => useProjectStore.getState().commitTransaction());
+    expect(useProjectStore.getState().past.length).toBe(past + 1);
+    expect(furniture('generic-wardrobe-150').rotation).toBeCloseTo((60 * Math.PI) / 180, 5);
+    expect(slider.value).toBe('60');
+  });
+
   it('opens and closes a group via its heading button and updates aria-expanded', () => {
     select('furniture', furniture('generic-wardrobe-150').id);
     act(() => toggle('Produkt').click());

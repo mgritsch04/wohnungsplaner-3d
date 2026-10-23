@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
-import { CheckField, NumberField, Section, Badge, SelectField } from '../fields';
+import { AngleSlider, CheckField, NumberField, Section, Badge, SelectField } from '../fields';
 import { importIkeaPlannerFile } from '../../import/ikeaPlanActions';
 import { applyScaleNotation, PLAN_FILE_ACCEPT, removeUnderlay, startPlanImport } from '../../import/underlayImport';
 import { importFloorPlanJsonFile, acceptDraft } from '../../import/floorPlanActions';
@@ -185,6 +185,7 @@ function UnderlayControls() {
           <NumberField label="Y" value={u.y} factor={100} unit="cm" disabled={u.locked} onChange={(v) => set((x) => (x.y = v))} />
         </div>
         <NumberField label="Drehung" value={radToDeg(u.rotation)} unit="°" min={-360} max={360} step={0.5} disabled={u.locked} onChange={(v) => set((x) => (x.rotation = degToRad(v)))} />
+        <AngleSlider label="Drehung (Regler)" testId="underlay-rotation-slider" value={radToDeg(u.rotation)} disabled={u.locked} onChange={(v) => set((x) => (x.rotation = degToRad(v)))} />
         <p className="muted small">Verschieben: Strg + Ziehen im Plan (wenn nicht gesperrt).</p>
         <CheckField
           label="Zuschneiden"
