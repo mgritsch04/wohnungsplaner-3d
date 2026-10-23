@@ -108,7 +108,9 @@ export async function localSample(base = IKEA_HELPER_URL, f: Fetch = fetch): Pro
         if (options.signal?.aborted) throw { code: 'cancelled' } satisfies SampleError;
         throw { code: 'upstream_error', message: e instanceof Error ? e.message : String(e) } satisfies SampleError;
       }
-      const body = (await res.json().catch(() => ({}))) as { text?: unknown; error?: unknown };
+      const body = (await res.json().catch(() => ({}))) as { text?: unknown; error?: unknown; busy?: unknown };
+      // the helper is busy with other requests (not a quota limit): the caller may wait and ask again
+      if (res.status === 429 && body.busy === true) throw { code: 'busy', message: String(body.error ?? '') } satisfies SampleError;
       if (res.status === 429) throw { code: 'rate_limited', message: String(body.error ?? '') } satisfies SampleError;
       if (!res.ok || typeof body.text !== 'string') throw { code: 'upstream_error', message: String(body.error ?? `HTTP ${res.status}`) } satisfies SampleError;
       return jsonFromText(body.text) as T;

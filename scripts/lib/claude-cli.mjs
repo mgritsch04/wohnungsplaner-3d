@@ -24,7 +24,7 @@ const BLOCKED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Task', 'Agent'];
 export const MODELS = ['opus', 'sonnet'];
 
 export function claudeArgs({ web = false, maxTurns, model } = {}) {
-  const args = ['-p', '--output-format', 'json', '--max-turns', String(maxTurns ?? (web ? 30 : 2))];
+  const args = ['-p', '--output-format', 'json', '--max-turns', String(maxTurns ?? (web ? 40 : 2))];
   args.push('--disallowedTools', BLOCKED.join(','));
   if (web) args.push('--allowedTools', ['WebSearch', ...SHOP_FETCH].join(','));
   // WP_CLAUDE_MODEL fixes the model for every request; otherwise the planner's choice, else the Claude Code default

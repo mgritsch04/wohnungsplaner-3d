@@ -237,17 +237,21 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   expect(errors).toEqual([]);
 });
 
-/** Claude desktop app nachgebildet: Entwurf mit Sessel + Monstera, Shop-Suche findet nur den Sessel. */
+/** Claude desktop app nachgebildet: Entwurf mit Sessel + Monstera, Shop-Suche findet nur den Sessel (die Monstera auch nach Nachfassen nicht). */
 async function installDesktopMock(page: Page) {
   await page.addInitScript(() => {
-    const w = window as unknown as { claude: unknown; __browser: string[] };
+    const w = window as unknown as { claude: unknown; __browser: string[]; __monstera: string[] };
     w.__browser = [];
+    w.__monstera = [];
     type Tool = { name: string; execute: (input: unknown) => Promise<unknown> };
     const sample = {
       json: async (input: string, options?: { tools?: Tool[] }) => {
         await new Promise((r) => setTimeout(r, 30));
-        if (options?.tools) await new Promise((r) => setTimeout(r, 2500));
-        if (options?.tools && /Monstera/.test(input)) return { products: [] };
+        if (options?.tools) await new Promise((r) => setTimeout(r, /Monstera/.test(input) ? 300 : 2500));
+        if (options?.tools && /Monstera/.test(input)) {
+          w.__monstera.push(/Versuch (\d)/.exec(input)?.[1] ?? '1');
+          return { products: [] };
+        }
         if (options?.tools) {
           // product search: open the search page through the page function, then report what was "read"
           const open = options.tools.find((t) => t.name === 'open_page')!;
@@ -322,7 +326,9 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await expect(plant.getByRole('link', { name: 'bei IKEA suchen' })).toBeVisible();
   await expect(proposal.getByRole('button', { name: 'Nachsuchen (1 Platzhalter)' })).toBeVisible();
   // what was not found, and why, is listed
-  await expect(panel.getByTestId('design-notfound-list')).toContainText('Monstera groß (Wohnzimmer): kein passendes Produkt im Shop gefunden');
+  await expect(panel.getByTestId('design-notfound-list')).toContainText('Monstera groß (Wohnzimmer): kein passendes Produkt im Shop gefunden – nach 3 Versuchen');
+  // the search asked again by itself (other search terms) before reporting „nicht gefunden“
+  expect(await page.evaluate(() => (window as unknown as { __monstera: string[] }).__monstera)).toEqual(['1', '2', '3']);
   const browser = await page.evaluate(() => (window as unknown as { __browser: string[] }).__browser);
   expect(browser).toEqual(['navigate https://www.ikea.com/at/de/search/?q=Sessel%20Cord', 'get_page_text', 'fremd abgelehnt']);
   await page.screenshot({ path: 'test-results/design-350-found.png' });
@@ -365,7 +371,7 @@ test('Einrichtungsvorschlag mit Claude (#350): Schalter „Erst Vorschlag, dann 
   await expect(panel.getByTestId('design-pick').nth(1)).toHaveAttribute('data-placeholder', 'yes');
   // all remaining
   await proposal.getByRole('button', { name: 'Alle suchen (1 Platzhalter)' }).click();
-  await expect(panel.getByTestId('design-notfound')).toBeVisible();
+  await expect(panel.getByTestId('design-notfound')).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: 'test-results/design-350-mode-later.png' });
 
   // the choice is remembered
