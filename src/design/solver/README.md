@@ -12,14 +12,17 @@ const layout = solveRoom(room, program, { existing, seed: 1 });
 
 1. **Modell** (`model.ts`, `items.ts`): Aus dem Programm werden Gruppen („Units“). Ein Hauptmöbel nimmt mit, was an ihm hängt (Stühle `around`, Nachttische, Couchtisch `front-of`, Teppich `under-*`, Bild/Pendel/TV `above`, Lampe `on`); eine Küchenzeile ist eine Gruppe; Vorhänge und Fensterbank-Teile hängen am Fenster. Jedes Teil bekommt Bewegungsflächen nach Neufert (`items.ts`, z. B. Schrank 70 cm, Bett seitlich 50 cm).
 2. **Kosten** (`cost.ts`): harte Regeln zählen je Verstoß `HARD` = 4 plus Menge, weiche Regeln (Nähe zum Hint, Drehung, Zone, Beziehungen, Abstände, Komfortflächen) wenig.
+   - Gegen Warum-Momente: Das Sofa schaut zum Fernseher (Gewicht 3; aus „tv facing sofa“ folgt die Gegenrichtung, ohne Beziehung gilt sie für das einzige Sofa), eine Pflanze ohne Beziehung steht in einer Ecke, am Fenster oder an der Wand und meidet den Stufe-0-Weg stark, ein Sessel für sich schaut zur Sitzgruppe (C2).
    - Hart: im Raum, keine Überlappung, Türschwenk frei, 50 cm hinter jeder Tür frei, vor Fenstern nichts höher als die Brüstung, „frei lassen“-Bereiche und Nutzerbereiche, Bewegungsflächen, Wandteile nicht über Öffnungen.
    - **Wege** (B1/B2): Ein Laufraster (`grid.ts`, 5 cm) prüft, ob zwischen allen Türen ein Weg der verlangten Breite frei bleibt und jedes Möbel erreichbar ist. Der Stufe-0-Weg ist nur Referenz (schwache Anziehung), keine Sperrfläche.
 3. **Suche** (`solve.ts`, `search.ts`): drei Starts (Hints, Ankermöbel zuerst, Hints mit Rauschen), Reparatur (bester Einzelzug), Simulated Annealing, inkrementelle Kosten.
-4. **Ausweichen** (`settle`): Bleibt ein harter Verstoß, wird nacheinander versucht: abhängiges Teil weglassen, Küchenzeile um ein Stauraum-Modul kürzen, kleinere Variante (Bett 160 → 140 → 90, `SMALLER`), zuletzt das unwichtigste Teil weglassen. Alles Weggelassene steht mit Grund in `dropped`, bei Pflichtmöbeln mit „Pflichtmöbel fehlt: “.
+4. **Küche** (`kitchenTops.ts`): Das Programm nennt nur die Bodenmodule. Das Kochfeld kommt auf den Backofen, sonst auf einen Unterschrank mit 60 cm Arbeitsfläche zur Spüle und 30 cm zu Hochschrank und Wand, möglichst nicht unter ein Fenster; die Haube hängt darüber, außer vor einem Fenster. Arbeitsplatte und Oberschränke ergänzt die Übernahme ins Projekt.
+5. **Ausweichen** (`settle`): Bleibt ein harter Verstoß, wird nacheinander versucht: abhängiges Teil weglassen, Küchenzeile um ein Stauraum-Modul kürzen, kleinere Variante (Bett 160 → 140 → 90, `SMALLER`), zuletzt das unwichtigste Teil weglassen. Alles Weggelassene steht mit Grund in `dropped`, bei Pflichtmöbeln mit „Pflichtmöbel fehlt: “. Die Pendelleuchte eines weggelassenen Tisches fällt mit weg.
 
 ## Tests
 
 - `solver.test.ts`: aufgezeichnete Programme der Testwohnungen A/B (`recordedProgram.ts`), Determinismus, Laufzeit unter 300 ms je Raum.
 - `flats.test.ts`: Testwohnungen C–F mit synthetischen Programmen (`testPrograms.ts`).
 - `invariants.test.ts`: zufällige Rechteck- und L-Räume; Wege und Türschwenk bleiben frei.
+- `sense.test.ts`: keine Warum-Momente (Sofa zum Fernseher, Pflanze nicht frei und nicht im Weg, Sessel zur Sitzgruppe, Kochfeld und Haube, Läufer direkt vor der Küchenzeile, Pendel fällt mit dem Tisch weg).
 - Unabhängige Nachprüfung mit `checkWalkways` aus Stufe 0 (`verify.ts`).
