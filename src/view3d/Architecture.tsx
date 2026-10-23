@@ -21,6 +21,7 @@ import { holeInRoom } from '../model/stairs';
 import { getColorMaterial, getSurfaceMaterial } from './materials3d';
 import { blockBehind, isClick, isClippedHit } from './pointer';
 import { requestLampShadowUpdate } from './lampRegistry';
+import { Shading3D } from './Shading3D';
 
 interface Props {
   project: Project;
@@ -208,6 +209,11 @@ export const Architecture = memo(function Architecture({ project, derived, quali
                     </mesh>
                   ))}
                 </group>
+                {o.shading && (
+                  <group position={[center.x, r.bottom, center.y]} rotation={[0, angle, 0]}>
+                    <Shading3D opening={o} width={width} height={h} depth={depth} />
+                  </group>
+                )}
                 {leaves.map((l, k) => (
                   <LeafPivot key={k} leaf={l} name={`leaf:${o.id}:${k}`}>
                     <WindowSash leaf={l} depth={depth * WINDOW_SASH_DEPTH_FACTOR} frame={frameM} glass={glassMat} metal={metalMat} shadows={shadows} />

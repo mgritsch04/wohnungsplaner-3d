@@ -69,6 +69,20 @@ export const isGlassDoor = (o: { kind: z.infer<typeof OpeningKindSchema>; sillHe
 export const openingLabel = (o: { kind: z.infer<typeof OpeningKindSchema>; sillHeight: number }): string =>
   o.kind === 'door' ? 'Tür' : isGlassDoor(o) ? 'Glastür' : o.kind === 'window' ? 'Fenster' : 'Durchgang';
 
+/** Window covering (#413): roller shutter, venetian blind/raffstore or pleated blind. */
+export const ShadingTypeSchema = z.enum(['roller', 'venetian', 'pleated']);
+export const ShadingSchema = z.object({
+  type: ShadingTypeSchema,
+  /** 0 = fully open (pulled up), 1 = fully closed. Also the state shown while the simulation does not move it. */
+  closed: z.number().min(0).max(1).default(0),
+  /** Motor / radio drive: can be controlled by a smart-home device. */
+  motor: z.boolean().default(false),
+  /** Own product entry (name, link, price) – only what the user enters, never an invented product. */
+  productName: z.string().max(200).optional(),
+  productUrl: z.string().max(2000).optional(),
+  price: z.number().min(0).max(100000).optional(),
+});
+
 export const OpeningSchema = z
   .object({
     id: z.string().min(1),
@@ -90,6 +104,8 @@ export const OpeningSchema = z
      * (see defaultLeafOpen), so it is filled in below instead of a plain `.default()`.
      */
     open: z.boolean().optional(),
+    /** Window covering (#413); absent = none. */
+    shading: ShadingSchema.optional(),
     provenance: ProvenanceSchema.optional(),
   })
   .transform((o) => ({ ...o, open: o.open ?? defaultLeafOpen(o.kind) }));
@@ -255,6 +271,8 @@ export const FurnitureSchema = z.object({
   locked: z.boolean().default(false),
   /** Already in the flat when moving in (fitted bath, WC): shown in the plan, but not part of budget or shopping list (#255). */
   existing: z.boolean().default(false),
+  /** Curtains (#413): 0 = drawn open, 1 = closed; absent = open. */
+  closed: z.number().min(0).max(1).optional(),
   /** Member of the furniture group with this id (#65), see `ProjectSchema.groups`; absent = not grouped. */
   groupId: z.string().min(1).optional(),
   /** Inner layout of a cabinet (#85); absent = not planned. */
@@ -296,7 +314,7 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
-export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip', 'speaker']);
+export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip', 'speaker', 'blind']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(100),
@@ -313,8 +331,10 @@ export const SmartDeviceSchema = z.object({
   holdS: z.number().min(1).max(3600).optional(),
   /** kind `light`: the placed light (project.lights) this bulb switches. */
   lightId: z.string().optional(),
-  /** kind `contact`: the door/window it watches. */
+  /** kind `contact`: the door/window it watches; kind `blind` (#413): the window whose covering it drives. */
   openingId: z.string().optional(),
+  /** kind `blind` (#413): the curtain (furniture) it drives instead of a window covering. */
+  furnitureId: z.string().optional(),
   /**
    * kind `strip` (#238): LED strip along a path (2..12 points, plan metres); x/y stay the first
    * point. `elevation` is its mounting height, `direction` where it shines (down, back to the
@@ -696,6 +716,7 @@ export type InteriorPart = z.infer<typeof InteriorPartSchema>;
 export type Interior = z.infer<typeof InteriorSchema>;
 export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
 export type Light = z.infer<typeof LightSchema>;
+export type Shading = z.infer<typeof ShadingSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
 export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;

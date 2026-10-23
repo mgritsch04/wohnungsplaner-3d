@@ -9,6 +9,11 @@ import { useAssetUrl } from '../persistence/useAssetUrl';
 import { baseBox, DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
 import { useUiStore } from '../store/uiStore';
+import { useProjectStore } from '../store/projectStore';
+import { blindOverrides } from '../smarthome/simulation';
+import { useSimStore } from '../smarthome/simStore';
+import { curtainShownWidth } from '../model/shading';
+import { cycleCurtain } from '../ui/shadingActions';
 import { requestLampShadowUpdate } from './lampRegistry';
 import { supportsInterior } from '../model/interior';
 import { deskewAngle, fitModel, type ModelFit } from './modelFit';
@@ -61,8 +66,23 @@ export const FurnitureObject = memo(
     const open = useUiStore((s) => s.interiorOpen.includes(item.id));
     // a cabinet shown open (#85): only the procedural model, a GLB has no known inside
     const interior = open && item.model.type === 'procedural' && supportsInterior(shape) ? item.interior : undefined;
+    // a curtain is drawn open (gathered at one side) or closed (#413); the running simulation may drive it
+    const simClosed = useSimStore((s) => (shape === 'curtain' && s.state ? blindOverrides(useProjectStore.getState().project, s.state).furniture.get(item.id) : undefined));
+    const curtainW = shape === 'curtain' ? curtainShownWidth(item.width, simClosed ?? item.closed) : item.width;
     const fallback = (
-      <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} interior={interior} quality={quality} castShadow={castShadow} />
+      <group
+        position={[(curtainW - item.width) / 2, 0, 0]}
+        onDoubleClick={
+          shape === 'curtain' && !readOnly
+            ? (e: ThreeEvent<MouseEvent>) => {
+                e.stopPropagation();
+                cycleCurtain(item.id);
+              }
+            : undefined
+        }
+      >
+      <ProceduralModel shape={shape} width={curtainW} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} interior={interior} quality={quality} castShadow={castShadow} />
+      </group>
     );
 
     /** End the current gesture; `commit` keeps the moved position, otherwise it is reverted. */

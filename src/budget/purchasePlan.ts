@@ -1,3 +1,4 @@
+import { SHADING_LABEL } from '../model/shading';
 import type { BuyPhase, Project, SmartDevice } from '../model/schema';
 import { projectOnLevel, sortedLevels } from '../model/levels';
 import { KIND_LABEL, productById } from '../smarthome/catalog';
@@ -13,7 +14,7 @@ const CONCEPT_PHASE: BuyPhase[] = ['movein', 'month2', 'later'];
 
 export interface PurchaseItem {
   id: string;
-  type: 'furniture' | 'device';
+  type: 'furniture' | 'device' | 'covering';
   name: string;
   quantity: number;
   /** Multipack: packs to buy and pieces per pack (1 = sold singly). */
@@ -58,14 +59,32 @@ export function devicePrice(d: SmartDevice): number | null {
  * (`computeBudget`), `furniturePhase` gives each line's phase; the sum over all phases equals
  * the furniture total plus the priced devices.
  */
+/** Window coverings with an own price entered by the user (#413); planned for moving in. */
+export function coveringItems(project: Project): PurchaseItem[] {
+  return project.openings
+    .filter((o) => o.shading && (o.shading.price !== undefined || o.shading.productName))
+    .map((o): PurchaseItem => ({
+      id: o.id,
+      type: 'covering',
+      name: o.shading!.productName || SHADING_LABEL[o.shading!.type],
+      quantity: 1,
+      packs: 1,
+      packSize: 1,
+      total: o.shading!.price ?? null,
+      estimate: false,
+    }));
+}
+
 export function computePurchasePlan(
   furnitureLines: BudgetLine[],
   phaseOfFurniture: (id: string) => BuyPhase,
   devices: SmartDevice[],
   budgets: Project['purchaseBudgets'],
+  coverings: PurchaseItem[] = [],
 ): { phases: PurchasePhase[]; total: number } {
   const phases = BUY_PHASES.map((phase): PurchasePhase => {
     const items: PurchaseItem[] = [
+      ...(phase === 'movein' ? coverings : []),
       ...furnitureLines
         .filter((l) => phaseOfFurniture(l.id) === phase)
         .map((l): PurchaseItem => ({ id: l.id, type: 'furniture', name: l.name, quantity: l.quantity, packs: l.packs, packSize: l.packSize, total: l.total, estimate: l.priceStatus === 'estimate' })),

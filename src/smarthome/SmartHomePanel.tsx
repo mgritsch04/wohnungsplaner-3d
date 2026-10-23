@@ -436,7 +436,7 @@ function RulesStep({ project }: { project: Project }) {
 
 function AutomationEditor({ project, a }: { project: Project; a: Automation }) {
   const derived = useMemo(() => derivePlan(project), [project]);
-  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip');
+  const targets = project.devices.filter((d) => d.kind === 'light' || d.kind === 'plug' || d.kind === 'strip' || d.kind === 'blind');
   const roomName = (d: SmartDevice) => project.rooms.find((r) => r.id === roomAt(project, derived, d))?.name;
   const s = ruleSentence(project, a);
   return (

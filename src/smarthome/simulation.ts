@@ -22,6 +22,8 @@ export interface EntityState {
   on: boolean;
   /** lights: 1..100 % */
   brightness?: number;
+  /** blinds / curtain drives (#413): closing degree 0 (open) .. 1 (closed) */
+  closed?: number;
   /** LED strips (#238): colour (#rrggbb) set by a rule; unset = the strip's planned colour */
   color?: string;
   /** sensors: simulated second of the last detection */
@@ -167,6 +169,12 @@ export function withHour(state: SimState, hour: number, text = `Uhrzeit von Hand
   return { ...state, hour: h, events: [...state.events, { t: state.t, hour: h, text }].slice(-MAX_EVENTS) };
 }
 
+/** Closing degree a blind drive starts with: the planned state of its window covering or curtain. */
+export function blindClosed(project: Pick<Project, 'openings' | 'furniture'>, d: SmartDevice): number {
+  if (d.furnitureId) return project.furniture.find((f) => f.id === d.furnitureId)?.closed ?? 0;
+  return project.openings.find((o) => o.id === d.openingId)?.shading?.closed ?? 0;
+}
+
 export function initialState(project: Project, hour = project.settings.timeOfDay): SimState {
   const entities: Record<string, EntityState> = {};
   for (const d of project.devices) {
@@ -174,6 +182,9 @@ export function initialState(project: Project, hour = project.settings.timeOfDay
     else if (d.kind === 'light') {
       const l = project.lights.find((x) => x.id === d.lightId);
       entities[d.id] = { on: l?.on ?? false, brightness: 100 };
+    } else if (d.kind === 'blind') {
+      const closed = blindClosed(project, d);
+      entities[d.id] = { on: closed > 0.5, closed };
     } else if (d.kind === 'contact') {
       entities[d.id] = { on: project.openings.find((o) => o.id === d.openingId)?.open ?? false };
     } else entities[d.id] = { on: false };
@@ -228,8 +239,16 @@ export function step(project: Project, occluders: Occluder[], prev: SimState, dt
   const act = (a: Automation, on: boolean) => {
     for (const id of a.action.deviceIds) {
       const d = devices.get(id);
-      if (!d || (d.kind !== 'light' && d.kind !== 'plug' && d.kind !== 'strip')) continue;
+      if (!d || (d.kind !== 'light' && d.kind !== 'plug' && d.kind !== 'strip' && d.kind !== 'blind')) continue;
       const e = (entities[id] ??= { on: false });
+      if (d.kind === 'blind') {
+        const target = on ? (a.action.brightness ?? 100) / 100 : 0;
+        if (e.closed === target) continue;
+        e.closed = target;
+        e.on = target > 0.5;
+        log(`${a.name}: ${d.name} ${target >= 0.95 ? 'zu' : target <= 0.05 ? 'auf' : `${Math.round(target * 100)} % zu`}`);
+        continue;
+      }
       const color = d.kind === 'strip' && on ? a.action.color : undefined;
       if (e.on === on && (!on || (e.brightness === (a.action.brightness ?? 100) && (color === undefined || e.color === color)))) continue;
       e.on = on;
@@ -366,4 +385,18 @@ export function detectionPolygon(d: SmartDevice, params: SensorParams, occluders
     pts.push({ x: d.x + dir.x * r, y: d.y + dir.y * r });
   }
   return pts;
+}
+
+/** Closing degrees the simulation imposes on window coverings (by opening id) and curtains (by furniture id). */
+export function blindOverrides(project: Project, state: SimState): { openings: Map<string, number>; furniture: Map<string, number> } {
+  const openings = new Map<string, number>();
+  const furniture = new Map<string, number>();
+  for (const d of project.devices) {
+    if (d.kind !== 'blind') continue;
+    const c = state.entities[d.id]?.closed;
+    if (c === undefined) continue;
+    if (d.furnitureId) furniture.set(d.furnitureId, c);
+    else if (d.openingId) openings.set(d.openingId, c);
+  }
+  return { openings, furniture };
 }

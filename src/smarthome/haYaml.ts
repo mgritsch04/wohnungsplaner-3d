@@ -20,7 +20,7 @@ export function slug(name: string): string {
   return s || 'geraet';
 }
 
-const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch', router: 'device_tracker', strip: 'light', speaker: 'media_player' };
+const DOMAIN: Record<SmartDevice['kind'], string> = { motion: 'binary_sensor', presence: 'binary_sensor', contact: 'binary_sensor', light: 'light', plug: 'switch', router: 'device_tracker', strip: 'light', speaker: 'media_player', blind: 'cover' };
 
 /** Entity id per device; duplicates get a numeric suffix. */
 export function entityIds(devices: SmartDevice[]): Map<string, string> {
@@ -77,6 +77,12 @@ function automationYaml(a: Automation, ids: Map<string, string>, devices: Map<st
       if (data.length) L.push('      data:', ...data.map((x) => `        ${x}`));
     }
     const sw = target('switch');
+    const covers = target('cover');
+    if (covers.length) {
+      // HA cover position: 100 = open, 0 = closed
+      const pos = on ? 100 - Math.round(a.action.brightness ?? 100) : 100;
+      L.push('    - action: cover.set_cover_position', '      target:', '        entity_id:', ...covers.map((e) => `          - ${e}`), '      data:', `        position: ${pos}`);
+    }
     if (sw.length) L.push(`    - action: switch.turn_${on ? 'on' : 'off'}`, '      target:', '        entity_id:', ...sw.map((e) => `          - ${e}`));
   };
   L.push('  actions:');
