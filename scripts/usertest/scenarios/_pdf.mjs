@@ -36,6 +36,16 @@ export function roundedRect(cx, cy, w, h, r) {
     `${px(x0)} ${py(y0 + r - K * r)} ${px(x0 + r - K * r)} ${py(y0)} ${px(x0 + r)} ${py(y0)} c h S`
   );
 }
+/** Quarter arc (door swing) around centre (cx, cy) from angle a0 to a0 + 90° (plan angles, y down), one bézier. */
+export function quarterArc(cx, cy, r, a0) {
+  const k = 0.5523 * r;
+  const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = -s0, s1 = c0; // end direction = start rotated by +90°
+  const p0 = { x: cx + r * c0, y: cy + r * s0 };
+  const p3 = { x: cx + r * c1, y: cy + r * s1 };
+  const p1 = { x: p0.x - k * s0, y: p0.y + k * c0 };
+  const p2 = { x: p3.x + k * s1, y: p3.y - k * c1 };
+  return `${px(p0.x)} ${py(p0.y)} m ${px(p1.x)} ${py(p1.y)} ${px(p2.x)} ${py(p2.y)} ${px(p3.x)} ${py(p3.y)} c S`;
+}
 export const poly = (pts) => pts.map((p, i) => `${px(p.x)} ${py(p.y)} ${i ? 'l' : 'm'}`).join(' ') + ' h S';
 
 /** Room 5 × 4 m, walls 20 cm (outline of each wall as two lines, like a CAD export). */
