@@ -18,7 +18,7 @@ export function checkPlants(ctx: RoomCtx): void {
     const atWindow = ctx.windows.some((w) => dist(w.mid, p) < 1.0 || pointPolyDist(p, w.strip) < 0.5);
     if (!inCorner && !beside && !atWindow) ctx.add('D1', 'M', `${ctx.label(p)} steht frei im Raum, Pflanzen gehören in eine Ecke, neben ein Möbel oder ans Fenster.`, [p], p);
     const onWay = walkLines.find((w) => w.path.length > 1 && Math.min(...w.path.slice(1).map((q, k) => segmentDist(p, w.path[k], q))) < p.width / 2 + 0.25);
-    if (onWay) ctx.add('D1', ctx.type === 'hall' ? 'S' : 'M', `${ctx.label(p)} steht im Weg zwischen den Türen ${onWay.from} und ${onWay.to}.`, [p], p);
+    if (onWay) ctx.add('D1', 'S', `${ctx.label(p)} steht im Weg zwischen den Türen ${onWay.from} und ${onWay.to}.`, [p], p);
     if (!ctx.windows.length && p.height >= 1.0) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
   }
   for (const b of ctx.placed.filter((i) => i.role === 'box' && i.elevation < 0.05 && !i.parent))
@@ -37,6 +37,8 @@ export function checkLight(ctx: RoomCtx): void {
   const nearLight = (p: Vec2, r: number) => lights.some((l) => dist(l, p) < r);
   for (const d of ctx.items.filter((i) => i.category === 'desk' && i.floor))
     if (!nearLight(d, 1.6)) ctx.add('D4', 'L', 'Am Schreibtisch fehlt eine Lampe.', [d], d);
+  // outside there is daylight and no ceiling for a pendant
+  if (ctx.type === 'balcony') return;
   if (!ctx.items.some((i) => i.role === 'pendant'))
     for (const t of ctx.items.filter((i) => isDiningTable(i) && i.floor)) if (ctx.items.filter((s) => s.role === 'seat' && dist(s, t) < 1.5).length >= 2) ctx.add('D4', 'L', 'Über dem Esstisch fehlt eine Pendelleuchte.', [t], t);
   for (const z of ctx.program?.zones ?? []) {

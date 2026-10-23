@@ -110,6 +110,6 @@ export function checkReach(ctx: RoomCtx): void {
     if (!i.floor || i.category === 'decor' || isKitchenModule(i)) continue;
     if (!g.touches(ctx.reach, i, Math.max(i.width, i.depth) / 2 + 0.5)) ctx.add('B7', 'M', `${ctx.label(i)} ist nicht erreichbar, der Weg dorthin ist zugestellt.`, [i], i);
   }
-  if (ctx.windows.length && !ctx.windows.some((w) => g.touches(ctx.reach, { x: w.mid.x + w.wall.inward.x * 0.3, y: w.mid.y + w.wall.inward.y * 0.3 }, 0.5)))
+  if (ctx.type !== 'balcony' && ctx.windows.length && !ctx.windows.some((w) => g.touches(ctx.reach, { x: w.mid.x + w.wall.inward.x * 0.3, y: w.mid.y + w.wall.inward.y * 0.3 }, 0.5)))
     ctx.add('B8', 'L', 'Kein Fenster des Raums ist erreichbar, man kann nicht lüften.', [], ctx.windows[0].mid);
 }

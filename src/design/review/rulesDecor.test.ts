@@ -15,10 +15,10 @@ describe('D1 / D2 Pflanzen', () => {
     expect(has(living([sofa, put('generic-plant', { x: 2.5, y: 0.5 })]), 'D1')).toBe(false); // at the window
     expect(has(living([sofa, put('generic-plant', { x: 3.0, y: 1.8 })]), 'D1', /frei im Raum/)).toBe(true);
   });
-  it('a plant on the way between two doors: severe in a hall, medium elsewhere', () => {
+  it('a plant on the way between two doors is severe in every room', () => {
     const hall = (type: 'hall' | 'other') => review({ room: rectRoom(1.2, 4, { doors: [{ wall: 'S', at: 0.6, width: 0.8 }, { wall: 'N', at: 0.6, width: 0.8 }], passThrough: true }), type, items: [put('generic-plant', { x: 0.6, y: 2 })] });
     expect(hall('hall').findings.find((f) => f.rule === 'D1' && /im Weg/.test(f.text))?.severity).toBe('S');
-    expect(hall('other').findings.find((f) => f.rule === 'D1' && /im Weg/.test(f.text))?.severity).toBe('M');
+    expect(hall('other').findings.find((f) => f.rule === 'D1' && /im Weg/.test(f.text))?.severity).toBe('S');
     const corner = review({ room: rectRoom(1.2, 4, { doors: [{ wall: 'S', at: 0.6, width: 0.8 }, { wall: 'N', at: 0.6, width: 0.8 }], passThrough: true }), type: 'hall', items: [put('generic-plant-small', { x: 1.0, y: 2, elevation: 0.8 })] });
     expect(has(corner, 'D1')).toBe(false);
   });
@@ -52,6 +52,9 @@ describe('D3 / D4 Licht', () => {
       review({ room: rectRoom(4, 3, { doors: [{ wall: 'W', at: 1.5 }] }), type: 'dining', items: [put('generic-dining-table-4', { x: 2, y: 1.5, face: 'S' }), put('generic-chair', { x: 1.6, y: 0.915, face: 'S' }), put('generic-chair', { x: 2.4, y: 0.915, face: 'S' }), ...(pendant ? [put('generic-pendant', { x: 2, y: 1.5 })] : [])] });
     expect(has(dining(false), 'D4', /Pendelleuchte/)).toBe(true);
     expect(has(dining(true), 'D4', /Pendelleuchte/)).toBe(false);
+    // outside there is no ceiling for a pendant
+    const balcony = review({ room: rectRoom(3, 1.5, { doors: [{ wall: 'S', at: 0.5 }] }), type: 'balcony', items: [put('generic-balcony-table', { x: 1, y: 0.75 }), put('generic-balcony-chair', { x: 0.5, y: 0.75, face: 'O' }), put('generic-balcony-chair', { x: 1.5, y: 0.75, face: 'W' })] });
+    expect(has(balcony, 'D4')).toBe(false);
     const zone = { id: 'lesen', function: 'Leseecke', rect: { x0: 3.8, y0: 2.2, x1: 5, y1: 3.4 }, why: '' };
     expect(has(living([sofa, put('generic-armchair', { x: 4.4, y: 2.8, face: 'W' })], { program: prog({ zones: [zone] }) }), 'D4', /Leseecke/)).toBe(true);
     expect(has(living([sofa, put('generic-armchair', { x: 4.4, y: 2.8, face: 'W' }), put('generic-floor-lamp', { x: 4.7, y: 3.2 })], { program: prog({ zones: [zone] }) }), 'D4', /Leseecke/)).toBe(false);

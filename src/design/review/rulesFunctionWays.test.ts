@@ -48,6 +48,14 @@ describe('A Funktion', () => {
     expect(k(all.filter((x) => !x.includes('sink'))).findings.some((f) => f.rule === 'A1' && /Spüle/.test(f.text))).toBe(true);
     expect(k(all.filter((x) => !x.includes('sink')), ['generic-k-sink-80']).findings.some((f) => f.rule === 'A1')).toBe(false);
   });
+  it('A1 a living room with a kitchen run is checked like a kitchen; a wall cabinet over the washer is none', () => {
+    const r = (type: Parameters<typeof review>[0]['type'], ids: string[]) =>
+      review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows: [{ wall: 'N', at: 2.5 }] }), type, items: ids.map((id, n) => put(id, { x: 0.4 + n * 0.7, y: 0.3, face: 'S' })) });
+    const run = ['generic-k-fridge', 'generic-k-base-60', 'generic-k-sink-80', 'generic-k-oven', 'generic-sofa-3'];
+    expect(r('living', run).findings.some((f) => f.rule === 'A1' && /Kochfeld/.test(f.text))).toBe(true);
+    expect(r('living', [...run, 'generic-k-cooktop']).findings.some((f) => f.rule === 'A1')).toBe(false);
+    expect(r('bath', ['generic-washer', 'generic-k-wall-60']).findings.some((f) => /Küche/.test(f.text))).toBe(false);
+  });
   it('A1 dining, office, hall, kids, balcony and bath', () => {
     const r = (type: Parameters<typeof review>[0]['type'], items: ReturnType<typeof put>[], existing: ReturnType<typeof put>[] = [], area: [number, number] = [4, 3]) =>
       review({ room: rectRoom(area[0], area[1], { doors: [{ wall: 'S', at: 2 }] }), type, items, existing });
@@ -146,6 +154,15 @@ describe('A4 Küche', () => {
   it('hob next to a tall cabinet or the wall', () => {
     expect(kitchen({ fridge: 0.3, sink: 1.6, cook: 2.9 }, [put('generic-k-tall-60', { x: 3.5, y: 0.3, face: 'S' })]).findings.some((f) => f.rule === 'A4' && /Hochschrank/.test(f.text))).toBe(true);
     expect(kitchen({ fridge: 0.3, sink: 1.2, cook: 3.7 }).findings.some((f) => f.rule === 'A4' && /Wand/.test(f.text))).toBe(true);
+  });
+  it('the existing kitchen is not judged, it stays as it is', () => {
+    const r = review({
+      room: rectRoom(4, 3, { doors: [{ wall: 'W', at: 1.5 }], windows: [{ wall: 'O', at: 1.5 }] }),
+      type: 'kitchen',
+      items: [],
+      existing: [put('generic-k-fridge', { x: 0.3, y: 0.325, face: 'S' }), put('generic-k-sink-80', { x: 1.0, y: 0.3, face: 'S' }), put('generic-k-base-60', { x: 1.7, y: 0.3, face: 'S' }), put('generic-k-cooktop', { x: 1.7, y: 0.3, face: 'S' })],
+    });
+    expect(rulesOf(r)).not.toContain('A4');
   });
   it('working triangle between 3.6 and 7 m', () => {
     expect(kitchen({ fridge: 0.3, sink: 1.6, cook: 2.9 }).findings.some((f) => /Arbeitsdreieck/.test(f.text))).toBe(false);
@@ -248,5 +265,7 @@ describe('B Wege und Zugang', () => {
     const row = [0.5, 1.5, 2.5, 3.5].map((x) => put('generic-wardrobe-100', { x, y: 0.3, face: 'S' }));
     expect(rulesOf(review({ room: room(), type: 'other', items: row }), 'L')).toContain('B8');
     expect(rulesOf(review({ room: room(), type: 'other', items: [] }))).not.toContain('B8');
+    // on the balcony one is outside already
+    expect(rulesOf(review({ room: room(), type: 'balcony', items: row }))).not.toContain('B8');
   });
 });

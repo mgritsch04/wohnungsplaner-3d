@@ -21,13 +21,8 @@ export function checkRequired(ctx: RoomCtx): void {
     case 'living':
       if (ctx.items.reduce((n, i) => n + seatsOf(i), 0) < 3) miss('Im Wohnzimmer gibt es weniger als drei Sitzplätze.');
       break;
-    case 'kitchen': {
-      if (!has(ctx, (i) => i.kitchen === 'sink')) miss('In der Küche fehlt die Spüle.');
-      if (!has(ctx, (i) => i.kitchen === 'cooktop')) miss('In der Küche fehlt das Kochfeld.');
-      if (!has(ctx, (i) => i.kitchen === 'fridge')) miss('In der Küche fehlt der Kühlschrank.');
-      if (!has(ctx, (i) => i.kitchen === 'base')) miss('In der Küche fehlt eine Arbeitsfläche.');
+    case 'kitchen':
       break;
-    }
     case 'dining':
       if (!has(ctx, isDiningTable)) miss('Im Esszimmer fehlt der Esstisch.');
       else if (ctx.items.filter((i) => i.role === 'seat').length < 2) miss('Im Esszimmer fehlen die Stühle am Tisch.');
@@ -59,6 +54,14 @@ export function checkRequired(ctx: RoomCtx): void {
       break;
     default:
   }
+  // a kitchen, or another room with a kitchen run (Wohnküche); a wall cabinet over the washer is none
+  if (ctx.type === 'kitchen' || has(ctx, (i) => ['sink', 'cooktop', 'oven', 'dishwasher'].includes(i.kitchen ?? ''))) {
+    if (!has(ctx, (i) => i.kitchen === 'sink')) miss('In der Küche fehlt die Spüle.');
+    if (!has(ctx, (i) => i.kitchen === 'cooktop')) miss('In der Küche fehlt das Kochfeld.');
+    if (!has(ctx, (i) => i.kitchen === 'fridge')) miss('In der Küche fehlt der Kühlschrank.');
+    // the worktop runs over base cabinets and the dishwasher
+    if (!has(ctx, (i) => i.kitchen === 'base' || i.kitchen === 'dishwasher')) miss('In der Küche fehlt eine Arbeitsfläche.');
+  }
   // a required piece of the programme that was left out: never silent
   for (const d of ctx.layout.dropped) {
     const prog = ctx.program?.items.find((p) => p.id === d.id);
@@ -80,6 +83,8 @@ export function checkSanitary(ctx: RoomCtx): void {
 /** A4 (M): the working triangle and worktop of a kitchen. */
 export function checkKitchen(ctx: RoomCtx): void {
   const mods = ctx.items.filter(isKitchenModule);
+  // the existing kitchen stays as it is: nothing to plan there
+  if (!mods.some((i) => !i.existing)) return;
   const sink = mods.find((i) => i.kitchen === 'sink');
   const cook = mods.find((i) => i.kitchen === 'cooktop');
   const fridge = mods.find((i) => i.kitchen === 'fridge');
@@ -115,7 +120,8 @@ export function checkAnchors(ctx: RoomCtx): void {
   }
   for (const z of prog.zones) {
     if (!/lese|lesen/i.test(z.function)) continue;
-    const inside = ctx.placed.some((i) => i.floor && (i.role === 'armchair' || i.role === 'sofa') && i.x >= z.rect.x0 - 0.2 && i.x <= z.rect.x1 + 0.2 && i.y >= z.rect.y0 - 0.2 && i.y <= z.rect.y1 + 0.2);
+    // outside, the folding chair is the reading seat
+    const inside = ctx.placed.some((i) => i.floor && (i.role === 'armchair' || i.role === 'sofa' || (ctx.type === 'balcony' && i.role === 'seat')) && i.x >= z.rect.x0 - 0.2 && i.x <= z.rect.x1 + 0.2 && i.y >= z.rect.y0 - 0.2 && i.y <= z.rect.y1 + 0.2);
     if (!inside) ctx.add('A5', 'M', `Die ${z.function} hat keinen Sessel oder kein Sofa zum Sitzen.`, [], { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 });
   }
 }
