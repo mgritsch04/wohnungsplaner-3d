@@ -9,7 +9,27 @@ import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
 import { addIkeaArticles } from '../catalog/ikeaSelection';
 import { errorText, HIDE_CODES, loadMcp, loadSample, missingClaude, type McpRuntime, type Sample, type SampleError } from './claude';
-import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, ITEM_TIMEOUT_MS, MAX_AUTO_SEARCH, parseFound, replaceWithFound, searchTargets, TOTAL_TIMEOUT_MS, type FoundProduct, type SearchTarget } from './productSearch';
+import {
+  browserAvailable,
+  browserTools,
+  buildFindPrompt,
+  FOUND_SOURCE,
+  foundToCatalog,
+  ITEM_TIMEOUT_MS,
+  MAX_AUTO_SEARCH,
+  notFoundReason,
+  openPlaceholders,
+  searchErrorReason,
+  parseFound,
+  replaceKitchenWithFound,
+  replaceWithFound,
+  searchLeft,
+  searchTargets,
+  TOTAL_TIMEOUT_MS,
+  type FoundProduct,
+  type SearchTarget,
+} from './productSearch';
+import { furnishWithKitchens, kitchenShoppingList, resolveWith, runLength, type DesignKitchen, type KitchenPart, type Resolve } from './kitchenDesign';
 import {
   MAX_FIELD,
   PLACEHOLDERS,
@@ -76,7 +96,7 @@ export function DesignPanel() {
   const [browser, setBrowser] = useState(false);
   const [search, setSearch] = useState<{ done: number; total: number; current: string } | null>(null);
   const [designProgress, setDesignProgress] = useState<{ done: number; total: number } | null>(null);
-  const [notFound, setNotFound] = useState<Set<string>>(new Set());
+  const [notFound, setNotFound] = useState<Map<string, NotFound>>(new Map());
   const [skipped, setSkipped] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const st = useDesignStore();
@@ -89,6 +109,8 @@ export function DesignPanel() {
   const own = useMemo(() => realProducts(items), [items]);
   const products = useMemo(() => realProducts(items, w.retailer), [items, w.retailer]);
   const catalog = useMemo(() => [...own, ...PLACEHOLDERS], [own]);
+  // kitchen modules: generic modules and products found for them (not part of `own`)
+  const resolve = useMemo(() => resolveWith(items), [items]);
 
   useEffect(() => {
     let live = true;
@@ -164,7 +186,7 @@ export function DesignPanel() {
       });
       if (failedRooms.length) useUiStore.getState().toast(`Für ${failedRooms.map(roomName).join(', ')} kam keine verwertbare Antwort – dafür bitte den Raum einzeln einrichten lassen.`, 'info');
       clearPreview();
-      setNotFound(new Set());
+      setNotFound(new Map());
       setSkipped(0);
       setNote(null);
       st.set({ asking: false, proposal, preview: null });
@@ -183,7 +205,7 @@ export function DesignPanel() {
     // one step: plan with real products right away; placeholders stay only for pieces that are not found
     if (made && searchMode && w.searchReal) {
       const { targets: found, skipped: rest } = searchTargets(made, (id) => {
-        const c = catalog.find((x) => x.id === id);
+        const c = catalog.find((x) => x.id === id) ?? resolve(id);
         return c ? c.width * c.depth * c.height : 0;
       });
       setSkipped(rest);
@@ -196,16 +218,19 @@ export function DesignPanel() {
 
   const showPreview = () => {
     if (!proposal) return;
-    const preview = suggestFurnishing(
+    const inPlan = proposal.rooms.filter((r) => rooms.some((x) => x.id === r.roomId));
+    const typeOf = (r: (typeof inPlan)[number]) => r.type ?? roomTypes[r.roomId] ?? guessRoomType(roomName(r.roomId));
+    // kitchen runs first (against their wall), the other furniture around them
+    const preview = furnishWithKitchens(
       project,
-      proposal.rooms
-        .filter((r) => rooms.some((x) => x.id === r.roomId))
-        .map((r) => ({
-          roomId: r.roomId,
-          type: r.type ?? roomTypes[r.roomId] ?? guessRoomType(roomName(r.roomId)),
-          wishes: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })),
-        })),
-      own,
+      inPlan.flatMap((r) => (r.kitchen ? [{ roomId: r.roomId, roomName: roomName(r.roomId), type: typeOf(r), kitchen: r.kitchen }] : [])),
+      resolve,
+      (draft) =>
+        suggestFurnishing(
+          draft,
+          inPlan.map((r) => ({ roomId: r.roomId, type: typeOf(r), wishes: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) })),
+          own,
+        ),
     );
     labelPreview(preview, proposal);
     useFurnishStore.getState().setPreview(preview);
@@ -260,7 +285,7 @@ export function DesignPanel() {
     st.set({ preview: null });
     const ctl = new AbortController();
     searchCtl = ctl;
-    const missed = new Set(notFound);
+    const missed = new Map(notFound);
     const deadline = Date.now() + TOTAL_TIMEOUT_MS;
     const active = new Set<string>();
     let finished = 0;
@@ -270,8 +295,10 @@ export function DesignPanel() {
     const show = () => setSearch({ done: finished, total: targets.length, current: [...active].join(', ') });
     const one = async (t: SearchTarget) => {
       const current = useDesignStore.getState().proposal;
-      const pick = current?.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
-      const placeholder = pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
+      const room = current?.rooms.find((r) => r.roomId === t.roomId);
+      const part = t.kitchen && room?.kitchen ? kitchenShoppingList(room.kitchen).find((x) => x.key === t.kitchen)?.part : undefined;
+      const pick = t.kitchen ? (part && part.catalogId === part.base ? kitchenOption(part, room!.kitchen!) : undefined) : room?.picks[t.index];
+      const placeholder = t.kitchen ? (part ? resolve(part.base) : undefined) : pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
       if (!current || !pick || !placeholder) {
         finished++;
         return;
@@ -289,11 +316,15 @@ export function DesignPanel() {
       }, ITEM_TIMEOUT_MS);
       try {
         const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
-        const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true });
-        const found = await toCatalog(parseFound(raw), placeholder);
+        const label = `Produktsuche: ${pick.label} (${searchLeft({ done: finished, total: targets.length })})`;
+        const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true, label });
+        const parsed = parseFound(raw);
+        const found = await toCatalog(parsed, placeholder);
         const latest = useDesignStore.getState().proposal;
-        if (found.length && latest) st.set({ proposal: replaceWithFound(latest, t.roomId, t.index, found) });
-        else missed.add(`${t.roomId}:${t.index}`);
+        if (found.length && latest) {
+          st.set({ proposal: t.kitchen ? replaceKitchenWithFound(latest, t.roomId, t.kitchen, found) : replaceWithFound(latest, t.roomId, t.index, found) });
+          missed.delete(targetKey(t));
+        } else missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: notFoundReason(raw, parsed.length) });
       } catch (e) {
         const code = (e as SampleError | undefined)?.code;
         if (code === 'cancelled' && !timedOut) halt = true;
@@ -302,7 +333,7 @@ export function DesignPanel() {
           setBrowser(false);
           setNote('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC) – es bleiben Platzhalter mit Suchlink.');
         } else {
-          missed.add(`${t.roomId}:${t.index}`);
+          missed.set(targetKey(t), { name: pick.label, room: roomName(t.roomId), reason: timedOut ? `Zeitlimit von ${Math.round(ITEM_TIMEOUT_MS / 60_000)} Minuten überschritten` : searchErrorReason(e) });
           if (code === 'rate_limited' && !halt) {
             halt = true;
             useUiStore.getState().toast(errorText(e), 'info');
@@ -330,10 +361,12 @@ export function DesignPanel() {
       if (searchCtl === ctl) searchCtl = null;
       setNotFound(missed);
       setSearch(null);
+      const fresh = targets.filter((t) => missed.has(targetKey(t))).length;
+      if (fresh) useUiStore.getState().toast(`${fresh === 1 ? '1 Produkt' : `${fresh} Produkte`} nicht gefunden – welche und warum, steht im Vorschlag unter „Nicht gefunden“.`, 'info');
     }
   };
 
-  const placeholders = proposal ? proposal.rooms.flatMap((r) => r.picks.map((p, index) => ({ roomId: r.roomId, index, p })).filter((x) => x.p.placeholder)) : [];
+  const placeholders = proposal ? openPlaceholders(proposal) : [];
 
   const swap = (roomId: string, index: number, alt: number) => {
     if (!proposal) return;
@@ -434,7 +467,7 @@ export function DesignPanel() {
                     return (
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
-                        {p.placeholder && notFound.has(key) && <p className="muted" data-testid="design-notfound">Kein passendes Produkt mit vollständigen Angaben gefunden – bleibt Platzhalter, Suchlink siehe oben.</p>}
+                        {p.placeholder && notFound.has(key) && <p className="warning small" data-testid="design-notfound">Nicht gefunden: {notFound.get(key)!.reason} – bleibt Platzhalter, Suchlink siehe oben.</p>}
                         {p.placeholder && searchMode && !search && (
                           <button className="small" onClick={() => void findReal([{ roomId: r.roomId, index: i }])}>
                             {notFound.has(key) ? 'Nochmal suchen' : 'Echtes Produkt suchen'}
@@ -463,6 +496,15 @@ export function DesignPanel() {
                     );
                   })}
                 </ul>
+                {r.kitchen && (
+                  <KitchenBlock
+                    kitchen={r.kitchen}
+                    resolve={resolve}
+                    retailer={w.retailer}
+                    notFound={(key) => notFound.get(targetKey({ roomId: r.roomId, index: -1, kitchen: key }))?.reason}
+                    onSearch={searchMode && !search ? (key) => void findReal([{ roomId: r.roomId, index: -1, kitchen: key }]) : undefined}
+                  />
+                )}
               </div>
             ))}
             {placeholders.length > 0 && (
@@ -470,13 +512,14 @@ export function DesignPanel() {
                 {searchMode ? (
                   search ? (
                     <>
-                      <p>
-                        Suche {search.current} {Math.min(search.done + 1, search.total)}/{search.total} …
+                      <p data-testid="design-search-progress">
+                        Produktsuche: <strong>{searchLeft(search)}</strong>{search.current ? ` – gerade: ${search.current}` : ''} …
                       </p>
+                      <progress max={search.total} value={search.done} aria-label="Fortschritt der Produktsuche" />
                       <button onClick={() => searchCtl?.abort()}>Suche stoppen</button>
                     </>
                   ) : (
-                    <button className="primary" onClick={() => void findReal(placeholders.map(({ roomId, index }) => ({ roomId, index })))}>
+                    <button className="primary" onClick={() => void findReal(placeholders.map(({ catalogId: _id, ...t }) => t))}>
                       {w.searchReal ? 'Nachsuchen' : 'Alle suchen'} ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
                     </button>
                   )
@@ -489,6 +532,18 @@ export function DesignPanel() {
                 )}
                 {skipped > 0 && !search && <p className="muted small">{skipped === 1 ? 'Ein Platzhalter' : `${skipped} Platzhalter`} über der Obergrenze von {MAX_AUTO_SEARCH} Suchen – mit „Nachsuchen“ nachholen.</p>}
                 {note && <p className="warning small" role="status">{note}</p>}
+                {!search && notFound.size > 0 && (
+                  <div className="warning small" data-testid="design-notfound-list">
+                    <p>Nicht gefunden ({notFound.size}):</p>
+                    <ul className="plain">
+                      {[...notFound.entries()].map(([k, n]) => (
+                        <li key={k}>
+                          {n.name} ({n.room}): {n.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}
               </div>
             )}
@@ -534,6 +589,54 @@ export function DesignPanel() {
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+/** A piece the product search did not find, with the reason shown to the user. */
+interface NotFound {
+  name: string;
+  room: string;
+  reason: string;
+}
+
+const targetKey = (t: SearchTarget) => (t.kitchen ? `${t.roomId}:k:${t.kitchen}` : `${t.roomId}:${t.index}`);
+
+/** A kitchen part as search request: Claude's description plus the fronts of the whole kitchen. */
+function kitchenOption(part: KitchenPart, kitchen: DesignKitchen): DesignOption {
+  return { catalogId: part.base, reason: kitchen.fronts ? `Küche: ${kitchen.fronts}` : 'Modul der Küchenzeile', placeholder: true, label: part.label, search: part.search };
+}
+
+/** The kitchen run of a room: rows with their length, one line per distinct module (placeholder with search link, or the found product). */
+function KitchenBlock({ kitchen, resolve, retailer, notFound, onSearch }: { kitchen: DesignKitchen; resolve: Resolve; retailer: RetailerChoice; notFound: (key: string) => string | undefined; onSearch?: (key: string) => void }) {
+  return (
+    <div className="design-kitchen" data-testid="design-kitchen">
+      <h6>
+        Küchenzeile{' '}
+        <span className="design-swatch" style={{ background: kitchen.frontColor }} title={`Frontfarbe ${kitchen.frontColor}`} aria-hidden="true" />
+      </h6>
+      {kitchen.fronts && <p>{kitchen.fronts}</p>}
+      {kitchen.reason && <p className="muted">{kitchen.reason}</p>}
+      <p className="muted small">
+        {kitchen.runs.map((run, i) => `${kitchen.runs.length > 1 ? `Zeile ${i + 1}: ` : ''}${cm(runLength(run, resolve))} cm`).join(' · ')} · Arbeitsplatte erzeugt der Planer (Richtwert). Die Wand sucht der Planer in der Vorschau aus.
+      </p>
+      <ul className="assistant-list">
+        {kitchenShoppingList(kitchen).map(({ part, key, count }) => {
+          const item = resolve(part.catalogId);
+          const placeholder = part.catalogId === part.base;
+          return (
+            <li key={key} data-testid="design-kitchen-part" data-placeholder={placeholder ? 'yes' : 'no'}>
+              <PickLine option={{ catalogId: part.catalogId, reason: '', placeholder, label: part.label, search: part.search }} quantity={count} item={item} retailer={retailer} />
+              {placeholder && notFound(key) && <p className="warning small" data-testid="design-notfound">Nicht gefunden: {notFound(key)} – bleibt Platzhalter.</p>}
+              {placeholder && onSearch && (
+                <button className="small" onClick={() => onSearch(key)}>
+                  {notFound(key) ? 'Nochmal suchen' : 'Echtes Produkt suchen'}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

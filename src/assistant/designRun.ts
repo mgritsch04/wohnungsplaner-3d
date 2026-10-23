@@ -12,6 +12,7 @@ import { derivePlan } from '../model/derived';
 import { guessRoomType, type RoomType } from '../suggest/furnishing';
 import type { Sample, SampleError } from './claude';
 import { buildDesignPrompt, parseDesignAnswer, preselect, type DesignProposal, type DesignWishes, MAX_PRODUCTS } from './design';
+import { hasKitchen, kitchenFaces } from './kitchenDesign';
 import { runPool } from './pool';
 import { summarizePlan } from './planSummary';
 
@@ -55,6 +56,10 @@ const isFatal = (e: unknown) => {
 export async function runDesign(input: DesignRunInput): Promise<DesignRunResult> {
   const { sample, project, roomIds, roomTypes, wishes, products, signal, onProgress } = input;
   const typeOf = (id: string) => roomTypes[id] ?? guessRoomType(nameOf(project, id));
+  const derived = derivePlan(project);
+  // a kitchen room without kitchen run: Claude plans the run from its wall faces
+  const facesOf = (id: string) => (typeOf(id) === 'kitchen' && !hasKitchen(project, id, derived) ? kitchenFaces(project, id, derived) : []);
+  const kitchenRooms = roomIds.filter((id) => facesOf(id).length);
   if (roomIds.length <= 1) {
     const offer = preselect(
       products,
@@ -64,13 +69,13 @@ export async function runDesign(input: DesignRunInput): Promise<DesignRunResult>
     );
     const plan = summarizePlan(project, { roomTypes, focusRoomId: roomIds[0] ?? null });
     onProgress?.(0, 1);
-    const raw = await sample.json(buildDesignPrompt(wishes, plan, offer), { signal, modelTier: 'complex' });
+    const label = `Einrichtung: ${roomIds.length ? nameOf(project, roomIds[0]) : 'Wohnung'}`;
+    const raw = await sample.json(buildDesignPrompt(wishes, plan, offer, undefined, undefined, roomIds[0] ? facesOf(roomIds[0]) : undefined), { signal, modelTier: 'complex', label });
     onProgress?.(1, 1);
-    return { proposal: parseDesignAnswer(raw, plan, roomIds, offer), failedRooms: [], offered: offer };
+    return { proposal: parseDesignAnswer(raw, plan, roomIds, offer, undefined, kitchenRooms), failedRooms: [], offered: offer };
   }
 
-  const d = derivePlan(project);
-  const shares = budgetShares(roomIds.map((id) => d.rooms.get(id)?.area ?? 0), wishes.budget);
+  const shares = budgetShares(roomIds.map((id) => derived.rooms.get(id)?.area ?? 0), wishes.budget);
   const parts: DesignProposal[] = [];
   const offered = new Map<string, CatalogItem>();
   const failed: string[] = [];
@@ -86,10 +91,10 @@ export async function runDesign(input: DesignRunInput): Promise<DesignRunResult>
         .filter((x) => x !== id)
         .map((x) => `${nameOf(project, x)} (${typeOf(x)})`)
         .join(', ');
-      const prompt = buildDesignPrompt({ ...wishes, budget: shares[i] }, plan, offer, undefined, { others, wholeBudget: wishes.budget });
+      const prompt = buildDesignPrompt({ ...wishes, budget: shares[i] }, plan, offer, undefined, { others, wholeBudget: wishes.budget }, facesOf(id));
       try {
-        const raw = await sample.json(prompt, { signal, modelTier: 'complex' });
-        parts.push(parseDesignAnswer(raw, plan, [id], offer));
+        const raw = await sample.json(prompt, { signal, modelTier: 'complex', label: `Einrichtung: ${nameOf(project, id)} (${i + 1} von ${roomIds.length} Räumen)` });
+        parts.push(parseDesignAnswer(raw, plan, [id], offer, undefined, kitchenRooms));
         for (const c of offer) offered.set(c.id, c);
       } catch (e) {
         if (signal?.aborted || isFatal(e)) throw e;
