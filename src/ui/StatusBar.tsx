@@ -13,7 +13,7 @@ export function StatusBar() {
   const suggest = usePerformanceStore((s) => s.suggestPlanning);
   const dismiss = usePerformanceStore((s) => s.dismissSuggestion);
   const apply = useProjectStore((s) => s.apply);
-  const toolLabel = { select: 'Auswählen', wall: 'Wand', room: 'Raum', door: 'Tür', window: 'Fenster', passage: 'Durchgang', measure: 'Messen', walkpath: 'Laufweg', mark: 'Markierung', calibrate: 'Kalibrieren' }[tool];
+  const toolLabel = { select: 'Auswählen', wall: 'Wand', room: 'Raum', door: 'Tür', window: 'Fenster', passage: 'Durchgang', measure: 'Messen', walkpath: 'Laufweg', mark: 'Markierung', zone: 'Bereich', calibrate: 'Kalibrieren' }[tool];
   return (
     <footer className="statusbar">
       <span>Werkzeug: {toolLabel}</span>

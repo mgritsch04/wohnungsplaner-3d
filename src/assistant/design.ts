@@ -212,6 +212,15 @@ export function buildDesignPrompt(
     ...types.flatMap((t) => [`Leitlinien für ${ROOM_TYPES.find((x) => x.id === t)?.label ?? t}:`, ...guidePrompt(t), '']),
     ...(extra.feedback ? [`Rückmeldung zum letzten Vorschlag für diesen Raum (unbedingt berücksichtigen, anders machen): ${clipLines(extra.feedback, MAX_FIELD).replace(/\n/g, ' ')}`, ''] : []),
     ...(extra.review ? ['Zweite Runde – so hat der Planer deinen ersten Vorschlag aufgestellt; prüfe ihn mit der Prüfliste und liefere den verbesserten, vollständigen Vorschlag für den Raum (gleiches Format):', clip(extra.review, 4000), ''] : []),
+    ...(plan.listedZones.length
+      ? [
+          `Vom Bewohner markierte Bereiche (${plan.listedZones.join(', ')}, Lage und Zweck stehen oben beim Raum) – verbindliche Vorgabe:`,
+          '- Jeder Bereich bekommt genau das, wofür er markiert ist (z. B. Arbeitsecke: Schreibtisch, Bürostuhl, Licht). Gib bei diesen Möbeln "zone":"Z…" an; der Planer stellt sie nur innerhalb dieses Bereichs auf.',
+          '- Möbel ohne "zone" stellt der Planer außerhalb aller markierten Bereiche auf. Ein Bereich „frei lassen“ bleibt leer (keine Möbel mit dieser Zone).',
+          '- Wähle Größen, die in den Bereich passen (Maße stehen oben); was nicht hineinpasst, wird nicht aufgestellt. Die Zonen im Leitfaden ("brief.zones") richten sich nach diesen Bereichen.',
+          '',
+        ]
+      : []),
     'Regeln:',
     `- Nur catalogId aus A oder B. Je Raum höchstens ${MAX_PICKS} verschiedene Einträge.`,
     '- Achte auf Raumgröße, vorhandene Möbel, Türen und Fenster; lieber weniger, dafür passend. Vorhandene Möbel nicht doppelt kaufen.',
@@ -222,7 +231,7 @@ export function buildDesignPrompt(
     `- "type" je Raum: einer von ${ROOM_TYPES.map((t) => t.id).join(', ')}.`,
     '',
     'Antworte nur mit JSON in genau dieser Form:',
-    `{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"${kitchen?.length ? 'kitchen' : 'living'}","brief":{"purpose":"wofür der Raum da ist","zones":["Zone: was dort passiert"],"focus":"Blickfang","paths":"Laufwege","palette":["Farbe"],"decor":"Wanddeko, Textilien, Pflanzen"},"concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern","alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]${kitchen?.length ? `,${KITCHEN_JSON_HINT}` : ''}}]}`,
+    `{"summary":"2–3 Sätze zum Gesamtkonzept","rooms":[{"room":"R1","type":"${kitchen?.length ? 'kitchen' : 'living'}","brief":{"purpose":"wofür der Raum da ist","zones":["Zone: was dort passiert"],"focus":"Blickfang","paths":"Laufwege","palette":["Farbe"],"decor":"Wanddeko, Textilien, Pflanzen"},"concept":"1 Satz","items":[{"catalogId":"…","quantity":1,"reason":"…","label":"nur bei Platzhaltern","search":"nur bei Platzhaltern",${plan.listedZones.length ? '"zone":"nur bei Möbeln für einen markierten Bereich, z. B. Z1",' : ''}"alternatives":[{"catalogId":"…","reason":"…","label":"…","search":"…"}]}]${kitchen?.length ? `,${KITCHEN_JSON_HINT}` : ''}}]}`,
   ].join('\n');
 }
 
@@ -237,6 +246,8 @@ export interface DesignOption {
 
 export interface DesignPick extends DesignOption {
   quantity: number;
+  /** Marked area (#416, zone id) the item belongs to; placed only inside it. */
+  zone?: string;
   /** Other items Claude would take instead (shown under „Alternativen“, swappable). */
   alternatives: DesignOption[];
 }
@@ -275,7 +286,7 @@ export interface DesignProposal {
 }
 
 const OptionSchema = z.object({ catalogId: z.unknown(), reason: z.unknown().optional(), label: z.unknown().optional(), search: z.unknown().optional() });
-const ItemSchema = OptionSchema.extend({ quantity: z.unknown().optional(), alternatives: z.array(OptionSchema).optional().catch([]) });
+const ItemSchema = OptionSchema.extend({ quantity: z.unknown().optional(), zone: z.unknown().optional(), alternatives: z.array(OptionSchema).optional().catch([]) });
 const DesignSchema = z.object({
   summary: z.unknown().optional(),
   rooms: z.array(z.object({ room: z.unknown().optional(), type: z.unknown().optional(), concept: z.unknown().optional(), items: z.array(ItemSchema).catch([]), kitchen: z.unknown().optional(), brief: z.unknown().optional() })).catch([]),
@@ -325,7 +336,10 @@ export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: stri
         continue;
       }
       const q = Math.max(1, Math.min(MAX_QUANTITY, Math.round(Number(it.quantity ?? 1)) || 1));
-      const same = room.picks.find((p) => p.catalogId === opt.catalogId);
+      // only a marked area of this room counts (#416); anything else is ignored
+      const zkey = typeof it.zone === 'string' ? it.zone.trim().toUpperCase() : '';
+      const zone = (plan.zonesByRoom?.[roomId] ?? []).includes(zkey) ? plan.zoneKeys[zkey] : undefined;
+      const same = room.picks.find((p) => p.catalogId === opt.catalogId && p.zone === zone);
       if (same) same.quantity = Math.min(MAX_QUANTITY, same.quantity + q);
       else if (room.picks.length < MAX_PICKS) {
         const alternatives: DesignOption[] = [];
@@ -333,7 +347,7 @@ export function parseDesignAnswer(raw: unknown, plan: PlanSummary, roomIds: stri
           const alt = option(a);
           if (alt && alt.catalogId !== opt.catalogId && !alternatives.some((x) => x.catalogId === alt.catalogId) && alternatives.length < MAX_ALTERNATIVES) alternatives.push(alt);
         }
-        room.picks.push({ ...opt, quantity: q, alternatives });
+        room.picks.push({ ...opt, quantity: q, alternatives, ...(zone ? { zone } : {}) });
       }
     }
   }
@@ -359,8 +373,8 @@ export function swapPick(p: DesignProposal, roomId: string, index: number, alt: 
       const pick = r.picks[index];
       const chosen = pick?.alternatives[alt];
       if (!chosen) return r;
-      const { quantity, alternatives, ...current } = pick;
-      const picks = r.picks.map((x, i) => (i === index ? { ...chosen, quantity, alternatives: alternatives.map((a, k) => (k === alt ? current : a)) } : x));
+      const { quantity, alternatives, zone, ...current } = pick;
+      const picks = r.picks.map((x, i) => (i === index ? { ...chosen, quantity, alternatives: alternatives.map((a, k) => (k === alt ? current : a)), ...(zone ? { zone } : {}) } : x));
       return { ...r, picks };
     }),
   };

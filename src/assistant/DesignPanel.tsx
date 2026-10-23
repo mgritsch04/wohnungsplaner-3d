@@ -4,6 +4,7 @@ import type { CatalogItem } from '../catalog/types';
 import { formatEuro } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
+import type { PlanZone } from '../model/schema';
 import { applyFurnishing, guessRoomType, suggestedIn, suggestFurnishing, type FurnishingSuggestion } from '../suggest/furnishing';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
@@ -55,7 +56,7 @@ import {
   type RetailerChoice,
 } from './design';
 import { implausibleSize } from './designGuide';
-import { runDesign } from './designRun';
+import { designWishes, runDesign } from './designRun';
 import { useDesignStore } from './designStore';
 import { runPool } from './pool';
 import './assistant.css';
@@ -254,7 +255,7 @@ export function DesignPanel() {
       (draft) =>
         suggestFurnishing(
           draft,
-          inPlan.map((r) => ({ roomId: r.roomId, type: typeOf(r), wishes: r.picks.map((p) => ({ catalogId: p.catalogId, quantity: p.quantity })) })),
+          inPlan.map((r) => ({ roomId: r.roomId, type: typeOf(r), wishes: designWishes(r) })),
           own,
         ),
     );
@@ -471,6 +472,14 @@ export function DesignPanel() {
               </p>
             )}
             <SelectField label="Umfang" value={scope} options={[{ value: ALL, label: 'Ganze Wohnung' }, ...rooms.map((r) => ({ value: r.id, label: r.name || 'Raum ohne Namen' }))]} onChange={(v) => st.set({ scope: v })} />
+            <p className="muted small" data-testid="design-zones">
+              {project.zones.length
+                ? `Markierte Bereiche (verbindlich für Claude): ${project.zones.map((z, i) => `${i + 1} ${z.purpose || 'ohne Angabe'}`).join(' · ')}. `
+                : 'Tipp: Unter Werkzeuge › „Bereich“ kannst du im Plan Bereiche aufziehen und dazuschreiben, wofür sie sind (z. B. Arbeitsecke) – Claude plant sie verbindlich ein. '}
+              <button className="link-btn" onClick={() => useUiStore.getState().setTool('zone')} data-testid="design-zone-tool">
+                Bereich markieren
+              </button>
+            </p>
             {FIELDS.map((f) => (
               <label key={f.key} className="field">
                 <span className="field-label">{f.label}</span>
@@ -550,6 +559,7 @@ export function DesignPanel() {
                     return (
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
+                        {p.zone && <ZoneBadge zones={project.zones} id={p.zone} />}
                         {p.placeholder && notFound.has(key) && <p className="warning small" data-testid="design-notfound">Nicht gefunden: {notFound.get(key)!.reason} – bleibt Platzhalter, Suchlink siehe oben.</p>}
                         {p.placeholder && notSold(p.catalogId) && (
                           <p className="muted small" data-testid="design-not-sold">
@@ -794,6 +804,17 @@ function PickLine({ option, quantity, item, retailer }: { option: DesignOption; 
       )}
       {option.reason && <p>{option.reason}</p>}
     </div>
+  );
+}
+
+/** Marked area (#416) a pick belongs to. */
+function ZoneBadge({ zones, id }: { zones: PlanZone[]; id: string }) {
+  const i = zones.findIndex((z) => z.id === id);
+  if (i < 0) return null;
+  return (
+    <Badge kind="info" title="Der Planer stellt dieses Möbel nur in diesem markierten Bereich auf.">
+      Bereich {i + 1}: {zones[i].purpose || 'ohne Angabe'}
+    </Badge>
   );
 }
 

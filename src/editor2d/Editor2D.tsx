@@ -12,7 +12,7 @@ import { furnitureCorners } from './furnitureGeometry';
 import { hitTest } from './hitTest';
 import { FurnitureSymbol, PlanDrawing } from './PlanDrawing';
 import { snapPoint, type SnapResult } from './snapping';
-import { ICON_MIN_ZOOM, MAX_ZOOM, MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, zoomAt, type Viewport } from './viewTransform';
+import { ICON_MIN_ZOOM, MAX_ZOOM, MIN_ZOOM, fitView, niceGridStep, pinchView, screenToWorld, worldToScreen, zoomAt, type Viewport } from './viewTransform';
 import { isSplitChangeRecent, zoomForWidth } from '../ui/splitResize';
 import { ZoomSlider } from '../ui/ZoomSlider';
 import { useWalkPose } from '../store/walkPoseStore';
@@ -44,6 +44,8 @@ import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
 import { LuxOverlay2D } from './LuxOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { markKindInfo } from '../model/marks';
+import { MIN_ZONE_SIZE, rectPoints, zoneAt } from '../model/zones';
+import { ZoneDraft, ZonesOverlay2D, ZoneTextBox } from './ZonesOverlay2D';
 import { calibrateUnderlay } from '../import/underlayTransform';
 import { groupBounds, groupCenter, groupName, moveGroupBy, rotateGroupPoses, selectedGroup, settleGroup, type GroupTurnResult } from '../model/groups';
 import { pressFurnitureSelection, reportGroupTurn, selectFurnitureWithGroups, selectSingleFurniture } from '../ui/groupActions';
@@ -71,6 +73,7 @@ type Drag =
   | { kind: 'opening'; id: string; wallId: string; grabOffset: number; moved: boolean }
   | { kind: 'light'; id: string; moved: boolean }
   | { kind: 'room-rect'; start: Vec2 }
+  | { kind: 'zone-rect'; start: Vec2 }
   | { kind: 'underlay'; start: Vec2; origin: Vec2 };
 
 interface Preview {
@@ -137,6 +140,9 @@ export function Editor2D() {
   const [measureStart, setMeasureStart] = useState<Vec2 | null>(null);
   const [calib, setCalib] = useState<{ p1: Vec2 | null; p2: Vec2 | null }>({ p1: null, p2: null });
   const [lengthInput, setLengthInput] = useState<string | null>(null);
+  /** Marked area (#416): points of a free shape being clicked, and the text box after drawing (new: id null). */
+  const [zonePoly, setZonePoly] = useState<Vec2[]>([]);
+  const [zoneEdit, setZoneEdit] = useState<{ id: string | null; points: Vec2[]; at: Vec2; text: string } | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   /** Catalog entry being dragged over the plan (#131, #217): the item itself at the drop spot. */
   const [dropGhostState, setDropGhost] = useState<DropPreview | null>(null);
@@ -153,6 +159,8 @@ export function Editor2D() {
     setCalib({ p1: null, p2: null });
     setLengthInput(null);
     setPreview({});
+    setZonePoly([]);
+    setZoneEdit(null);
   }
 
   // track container size
@@ -201,6 +209,8 @@ export function Editor2D() {
     setCalib({ p1: null, p2: null });
     setPreview({});
     setLengthInput(null);
+    setZonePoly([]);
+    setZoneEdit(null);
   }, [tool]);
 
   const toWorld = useCallback(
@@ -460,6 +470,22 @@ export function Editor2D() {
         ui().toast(`${markKindInfo(kind).label} gesetzt – Notiz und Foto im Werkzeug-Reiter ergänzen`, 'info');
         return;
       }
+      case 'zone': {
+        const s = snap(w, e);
+        if (zoneEdit) setZoneEdit(null);
+        if (zonePoly.length) {
+          // free shape: click adds a point; double click, Enter or a click on the first point closes it
+          const first = zonePoly[0];
+          const closing = e.detail >= 2 || (zonePoly.length >= 3 && dist(first, s.point) < 8 / view.zoom);
+          const pts = closing || dist(zonePoly[zonePoly.length - 1], s.point) < 0.01 ? zonePoly : [...zonePoly, s.point];
+          if (closing) finishZonePoly(pts, e);
+          else setZonePoly(pts);
+          return;
+        }
+        drag.current = { kind: 'zone-rect', start: s.point };
+        setPreview({ rect: { a: s.point, b: s.point } });
+        return;
+      }
       case 'calibrate': {
         const u = project.underlay;
         if (!u) {
@@ -488,7 +514,7 @@ export function Editor2D() {
     const dr = drag.current;
     if (dr) {
       // a click with a little jitter must not move anything
-      if (dr.kind !== 'pan' && dr.kind !== 'room-rect' && downScreen.current && !dragStarted.current) {
+      if (dr.kind !== 'pan' && dr.kind !== 'room-rect' && dr.kind !== 'zone-rect' && downScreen.current && !dragStarted.current) {
         if (Math.hypot(e.clientX - downScreen.current.x, e.clientY - downScreen.current.y) < DRAG_THRESHOLD_PX) return;
         dragStarted.current = true;
       }
@@ -601,7 +627,8 @@ export function Editor2D() {
           });
           return;
         }
-        case 'room-rect': {
+        case 'room-rect':
+        case 'zone-rect': {
           const s = snap(w, e);
           setPreview({ rect: { a: dr.start, b: s.point }, snap: s });
           return;
@@ -633,6 +660,7 @@ export function Editor2D() {
         return;
       }
       case 'room':
+      case 'zone':
         setPreview({ snap: snap(w, e) });
         return;
       case 'door':
@@ -741,6 +769,20 @@ export function Editor2D() {
       ui().setSelection({ type: 'room', id: roomId });
       return;
     }
+    if (dr.kind === 'zone-rect') {
+      const b = snap(toWorld(e), e).point;
+      const a = dr.start;
+      setPreview({});
+      if (Math.abs(b.x - a.x) < MIN_ZONE_SIZE || Math.abs(b.y - a.y) < MIN_ZONE_SIZE) {
+        // a click: open an existing area for editing, otherwise start a free shape there
+        const hit = zoneAt(project.zones, a);
+        if (hit) setZoneEdit({ id: hit.id, points: hit.points, at: boxAt(e), text: hit.purpose });
+        else setZonePoly([a]);
+        return;
+      }
+      setZoneEdit({ id: null, points: rectPoints(a, b).map((p) => ({ x: roundMm(p.x), y: roundMm(p.y) })), at: boxAt(e), text: '' });
+      return;
+    }
     if (dr.kind === 'node' && dr.moved) {
       // merge the dragged node into a node it was dropped onto
       const s = preview.snap;
@@ -767,6 +809,45 @@ export function Editor2D() {
     commitTx();
   };
 
+  /** Where the zone text box opens: at the pointer, kept inside the plan (#416). */
+  const boxAt = (e: { clientX: number; clientY: number }): Vec2 => {
+    const r = svgRef.current!.getBoundingClientRect();
+    return { x: Math.max(8, Math.min(e.clientX - r.left + 8, vp.width - 308)), y: Math.max(8, Math.min(e.clientY - r.top + 8, vp.height - 190)) };
+  };
+  const finishZonePoly = (pts: Vec2[], e?: { clientX: number; clientY: number }) => {
+    setZonePoly([]);
+    setPreview({});
+    if (pts.length < 3) {
+      ui().toast('Für einen Bereich mindestens drei Punkte setzen – oder ein Rechteck aufziehen', 'info');
+      return;
+    }
+    const last = pts[pts.length - 1];
+    const at = e ? boxAt(e) : (() => {
+      const s = worldToScreen(last, view, vp);
+      return { x: Math.max(8, Math.min(s.x + 8, vp.width - 308)), y: Math.max(8, Math.min(s.y + 8, vp.height - 190)) };
+    })();
+    setZoneEdit({ id: null, points: pts.map((p) => ({ x: roundMm(p.x), y: roundMm(p.y) })), at, text: '' });
+  };
+  const saveZone = (text: string) => {
+    const z = zoneEdit;
+    if (!z) return;
+    setZoneEdit(null);
+    if (z.id) {
+      apply((d) => {
+        const t = d.zones.find((x) => x.id === z.id);
+        if (t) t.purpose = text;
+      });
+      return;
+    }
+    apply((d) => void d.zones.push({ id: newId('zone'), purpose: text, points: z.points }));
+    ui().toast(text ? `Bereich „${text}“ markiert – Claude plant ihn beim Einrichtungsvorschlag ein` : 'Bereich markiert – Zweck im Werkzeug-Reiter ergänzen', 'success');
+  };
+  const deleteZone = () => {
+    const id = zoneEdit?.id;
+    setZoneEdit(null);
+    if (id) apply((d) => void (d.zones = d.zones.filter((x) => x.id !== id)));
+  };
+
   const onWheel = (e: React.WheelEvent) => {
     const r = svgRef.current!.getBoundingClientRect();
     const factor = Math.exp(-e.deltaY * 0.0015);
@@ -783,6 +864,8 @@ export function Editor2D() {
         e.preventDefault();
       }
       if (e.key === 'Escape') {
+        setZonePoly([]);
+        setZoneEdit(null);
         setChain([]);
         setMeasureStart(null);
         setCalib({ p1: null, p2: null });
@@ -790,6 +873,7 @@ export function Editor2D() {
         setPreview({});
       }
       if (e.key === 'Enter' && tool === 'wall') setChain([]);
+      if (e.key === 'Enter' && tool === 'zone' && zonePoly.length) finishZonePoly(zonePoly);
       if (tool === 'wall' && chain.length > 0 && /^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
         setLengthInput(e.key);
         e.preventDefault();
@@ -804,7 +888,8 @@ export function Editor2D() {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [tool, chain.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool, chain.length, zonePoly]);
 
   // ---------- rendering ----------
   const px = 1 / view.zoom;
@@ -898,6 +983,8 @@ export function Editor2D() {
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
         onDoubleClick={(e) => {
+          // pointerdown carries no click count in every browser: the double click closes a free shape (#416)
+          if (tool === 'zone' && zonePoly.length) finishZonePoly(zonePoly, e);
           if (tool === 'select') {
             const hit = hitTest(project, derived, toWorld(e), 6 / view.zoom);
             if (hit?.type === 'room' || hit?.type === 'furniture') ui().setRightTab('properties');
@@ -946,6 +1033,8 @@ export function Editor2D() {
           {view.zoom >= ICON_MIN_ZOOM && <Fixtures2D project={project} px={px} />}
           {view.zoom >= ICON_MIN_ZOOM && <DevicesOverlay2D project={project} px={px} />}
           {view.zoom >= ICON_MIN_ZOOM && <NotePins2D project={project} derived={derived} px={px} />}
+          <ZonesOverlay2D zones={project.zones} px={px} editingId={zoneEdit?.id} />
+          {tool === 'zone' && <ZoneDraft points={zoneEdit && !zoneEdit.id ? zoneEdit.points.concat(zoneEdit.points[0]) : zonePoly} cursor={zonePoly.length ? preview.snap?.point : null} px={px} />}
 
           {/* node handles */}
           {(tool === 'select' || tool === 'wall') &&
@@ -1031,7 +1120,7 @@ export function Editor2D() {
                 fill="#1d4ed8"
                 fontWeight={600}
               >
-                {formatLength(Math.abs(preview.rect.b.x - preview.rect.a.x))} × {formatLength(Math.abs(preview.rect.b.y - preview.rect.a.y))} (innen)
+                {formatLength(Math.abs(preview.rect.b.x - preview.rect.a.x))} × {formatLength(Math.abs(preview.rect.b.y - preview.rect.a.y))}{tool === 'room' ? ' (innen)' : ''}
               </text>
             </g>
           )}
@@ -1139,6 +1228,14 @@ export function Editor2D() {
             ? 'Klicken, um eine Wand zu beginnen. Shift = freier Winkel, Alt = ohne Fang.'
             : 'Klicken für nächsten Punkt · Länge als Zahl (cm) tippen + Enter · Doppelklick/Esc beendet'}
         </div>
+      )}
+      {tool === 'zone' && (
+        <div className="editor-hint">
+          {zonePoly.length ? 'Punkte klicken · Doppelklick, Enter oder Klick auf den ersten Punkt schließt · Esc bricht ab' : 'Bereich aufziehen und Zweck eintippen · Klick auf einen Bereich bearbeitet ihn'}
+        </div>
+      )}
+      {zoneEdit && (
+        <ZoneTextBox key={zoneEdit.id ?? 'new'} at={zoneEdit.at} initial={zoneEdit.text} editing={!!zoneEdit.id} onSave={saveZone} onCancel={() => setZoneEdit(null)} onDelete={zoneEdit.id ? deleteZone : undefined} />
       )}
       {tool === 'room' && <div className="editor-hint">Rechteck mit Innenmaßen aufziehen – oder in eine umschlossene Fläche klicken.</div>}
       {(tool === 'door' || tool === 'window' || tool === 'passage') && <div className="editor-hint">Auf eine Wand klicken, um {tool === 'door' ? 'eine Tür' : tool === 'window' ? 'ein Fenster' : 'einen Durchgang'} einzusetzen.</div>}

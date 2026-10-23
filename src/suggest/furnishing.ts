@@ -19,7 +19,8 @@ import { derivePlan, type DerivedPlan } from '../model/derived';
 import { buildPlacementObstacles, placementIssues, type Obstacle } from '../model/placement';
 import { frontClearance, isSurface } from '../model/placementRules';
 import { newId } from '../model/ids';
-import type { Furniture, Project } from '../model/schema';
+import type { Furniture, PlanZone, Project } from '../model/schema';
+import { isKeepFree, polygonsOverlap, zoneRoomId } from '../model/zones';
 import { add, boundsOf, dist, dot, normalize, perp, pointInPolygon, polygonCentroid, rotate, scale, sub, type Vec2 } from '../model/vec';
 
 export type RoomType = 'living' | 'bedroom' | 'kids' | 'office' | 'dining' | 'kitchen' | 'bath' | 'hall' | 'utility' | 'balcony' | 'other';
@@ -60,6 +61,8 @@ export function guessRoomType(name: string): RoomType {
 export interface WishItem {
   catalogId: string;
   quantity: number;
+  /** Marked area (#416) the item belongs to: it is placed only inside this zone. */
+  zoneId?: string;
 }
 
 /** Typical furnishing per room type, from the built-in generic catalogue (sizes/prices are guide values). */
@@ -347,7 +350,7 @@ interface Ctx {
 }
 
 /** Why poses of the current item were rejected (for the „no place“ note). */
-type Reject = 'outside' | 'opening' | 'walkway' | 'collision';
+type Reject = 'outside' | 'opening' | 'walkway' | 'collision' | 'zone';
 
 interface RoomCtx extends Ctx {
   roomId: string;
@@ -358,6 +361,10 @@ interface RoomCtx extends Ctx {
   rejects: Set<Reject>;
   /** Living room with a dining place (#350): the half of the room the current piece's zone may use. */
   zone?: Vec2[];
+  /** Areas the user marked in this room (#416): only their own furniture may stand there. */
+  userZones: PlanZone[];
+  /** The marked area the current piece belongs to (#416); free-standing poses start at its centre. */
+  ownZone?: PlanZone;
 }
 
 /** Pieces of the seating group and of the dining place: a living room with both is split into two zones (#350). */
@@ -416,6 +423,20 @@ function fits(c: RoomCtx, f: Furniture, opts: { walkway?: number } = {}): boolea
   }
   const rug = f.category === 'textile' && f.height < 0.05;
   const curtain = shapeOf(f) === 'curtain';
+  // marked areas (#416) are reserved for their own furniture; hanging items and things on furniture do not take floor space
+  if (f.elevation < 0.05 && !curtain) {
+    for (const z of c.userZones) {
+      if (z.id === c.ownZone?.id) continue;
+      if (polygonsOverlap(inset, z.points)) {
+        c.rejects.add('zone');
+        return false;
+      }
+    }
+  }
+  if (c.ownZone && isKeepFree(c.ownZone.purpose) && f.elevation < 0.05 && !curtain) {
+    c.rejects.add('zone');
+    return false;
+  }
   if (!rug) {
     // a small lamp on a nightstand next to a window does not block the window (#346); a curtain belongs there
     const lamp = shapeOf(f) === 'table-lamp';
@@ -488,7 +509,7 @@ const longestFirst = (edges: Edge[]) => [...edges].sort((a, b) => b.length - a.l
 const closedFirst = (edges: Edge[]) => [...edges].sort((a, b) => Number(hasWindow(a)) + 0.5 * Number(hasDoor(a)) - (Number(hasWindow(b)) + 0.5 * Number(hasDoor(b))) || b.length - a.length);
 
 /** Free-standing poses near the room centre (grid, both orientations along the longest wall). */
-function* centerPoses(c: RoomCtx, item: CatalogItem, around: Vec2 = c.centroid): Generator<Furniture> {
+function* centerPoses(c: RoomCtx, item: CatalogItem, around: Vec2 = c.ownZone ? polygonCentroid(c.ownZone.points) : c.centroid): Generator<Furniture> {
   const b = boundsOf(c.interior);
   if (!b) return;
   const pts: Vec2[] = [];
@@ -813,8 +834,10 @@ function missingReason(c: RoomCtx, item: CatalogItem, role: Role): string {
   if (role === 'box') return 'kein Regal mit freiem Fach im Raum – erst ein Regal einplanen oder die Box weglassen';
   if (role === 'mattress') return 'kein Bettgestell im Raum';
   if (role === 'curtain') return 'kein freies Fenster im Raum';
+  if (c.ownZone) return `passt nicht in den markierten Bereich „${c.ownZone.purpose || 'ohne Namen'}“ (${size}) – Bereich größer ziehen, kleineres Modell wählen oder einem anderen Bereich zuordnen`;
   if (Math.max(item.width, item.depth) > span || Math.min(item.width, item.depth) > narrow) return `zu groß für den Raum (${size}) – eine kleinere Alternative wählen`;
   if (c.rejects.has('walkway') && !c.rejects.has('collision')) return `würde den Laufweg zustellen (${cmText(walkway(c.type))} cm frei vor dem Möbel nötig) – schmaleres Modell wählen oder weglassen`;
+  if (c.rejects.has('zone') && !c.rejects.has('collision')) return `nur in markierten Bereichen wäre Platz (${size}) – die sind für ihren Zweck reserviert; Bereich verkleinern oder das Möbel einem Bereich zuordnen`;
   if (c.rejects.has('opening') && !c.rejects.has('collision')) return 'nur vor Türen oder Fenstern wäre Platz – weglassen oder kleiner wählen';
   return `zwischen Wänden, Türen, Fenstern und den anderen Möbeln ist kein Platz mehr (${size}) – kleinere Alternative wählen oder ein anderes Möbel weglassen`;
 }
@@ -845,11 +868,13 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
     const room = project.rooms.find((r) => r.id === req.roomId);
     const g = derived.rooms.get(req.roomId);
     if (!room) continue;
-    const pieces: { item: CatalogItem; role: Role }[] = [];
+    const userZones = (project.zones ?? []).filter((z) => zoneRoomId(project, derived, z) === room.id);
+    const pieces: { item: CatalogItem; role: Role; zone?: PlanZone }[] = [];
     for (const w of req.wishes) {
       const item = findCatalogItem(w.catalogId, catalog);
       if (!item) continue;
-      for (let i = 0; i < w.quantity; i++) pieces.push({ item, role: roleOf(item) });
+      const zone = w.zoneId ? project.zones?.find((z) => z.id === w.zoneId) : undefined;
+      for (let i = 0; i < w.quantity; i++) pieces.push({ item, role: roleOf(item), ...(zone ? { zone } : {}) });
     }
     pieces.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.item.width * b.item.depth - a.item.width * a.item.depth);
     const out: RoomSuggestion = { roomId: room.id, roomName: room.name, type: req.type, placed: [], missing: [], notes: [] };
@@ -859,28 +884,31 @@ export function suggestFurnishing(project: Project, requests: RoomRequest[], cat
       out.notes!.push(...pieces.map((p) => ({ name: p.item.name, why: 'der Raum hat keine geschlossenen Wände' })));
       continue;
     }
-    const rc: RoomCtx = { ...ctx, roomId: room.id, type: req.type, interior: g.interior, edges: roomEdges(g.interior, derived), centroid: polygonCentroid(g.interior), rejects: new Set() };
+    const rc: RoomCtx = { ...ctx, roomId: room.id, type: req.type, interior: g.interior, edges: roomEdges(g.interior, derived), centroid: polygonCentroid(g.interior), rejects: new Set(), userZones };
     const companions = pieces.map((p) => p.item);
     const base = ctx.draft.furniture.length;
     const attempt = (zones: [Vec2[], Vec2[]] | null) => {
       ctx.draft.furniture.length = base;
       const placed: Furniture[] = [];
       const notes: { name: string; why: string }[] = [];
-      for (const { item, role } of pieces) {
+      for (const { item, role, zone } of pieces) {
         rc.rejects = new Set();
-        rc.zone = zones ? (LOUNGE_ROLES.has(role) ? zones[0] : DINING_ROLES.has(role) && shapeOf(item) !== 'office-chair' ? zones[1] : undefined) : undefined;
+        rc.zone = zone ? zone.points : zones ? (LOUNGE_ROLES.has(role) ? zones[0] : DINING_ROLES.has(role) && shapeOf(item) !== 'office-chair' ? zones[1] : undefined) : undefined;
+        rc.ownZone = zone;
         const f = placeItem(rc, item, role, companions);
-        rc.zone = undefined;
         if (f) {
           f.suggested = true;
           ctx.draft.furniture.push(f);
           placed.push(f);
         } else notes.push({ name: item.name, why: missingReason(rc, item, role) });
+        rc.zone = undefined;
+        rc.ownZone = undefined;
       }
       return { placed, notes, items: ctx.draft.furniture.slice(base) };
     };
     // living room with seating group and dining table (#350): one half each, both ways round, plain as fallback
-    const halves = (req.type === 'living' || req.type === 'dining') && pieces.some((p) => p.role === 'sofa') && pieces.some((p) => p.role === 'table') ? roomHalves(g.interior, rc.edges) : null;
+    // the user's marked areas (#416) replace the automatic split
+    const halves = !userZones.length && (req.type === 'living' || req.type === 'dining') && pieces.some((p) => p.role === 'sofa') && pieces.some((p) => p.role === 'table') ? roomHalves(g.interior, rc.edges) : null;
     const tries = halves ? [halves, [halves[1], halves[0]] as [Vec2[], Vec2[]], null] : [null];
     let best: ReturnType<typeof attempt> | null = null;
     for (const z of tries) {
