@@ -622,6 +622,13 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
         rbox(-W, 0.4, -D, W, h, -D + 0.12, 0.02, '#f3f4f6', { rough: 0.3 }),
       ];
     case 'washbasin':
+      // a low basin (wall-hung or countertop bowl, no vanity unit): only bowl and tap
+      if (h < 0.6)
+        return [
+          rbox(-W, 0, -D, W, h, D, Math.min(0.03, h / 3), '#ffffff', { rough: 0.12 }),
+          rbox(-W * 0.8, h - 0.002, -D * 0.7, W * 0.8, h + 0.001, D * 0.7, 0.03, '#dfe5ea', { rough: 0.1 }),
+          cyl(0, h, -D * 0.8, 0.015, h + 0.15, METAL, { metal: 0.9, rough: 0.2 }),
+        ];
       return [
         rbox(-W, 0.35, -D, W, h - 0.15, D - 0.02, 0.01, '#e9e3da'),
         rbox(-W, h - 0.15, -D, W, h, D, 0.03, '#ffffff', { rough: 0.12 }),
