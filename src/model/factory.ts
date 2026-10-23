@@ -21,6 +21,7 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     lights: [],
     devices: [],
     automations: [],
+    marks: [],
     materials: DEFAULT_MATERIALS.map((m) => ({ ...m })),
     underlay: null,
     cameraBookmarks: [],

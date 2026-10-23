@@ -404,6 +404,21 @@ export const CameraBookmarkSchema = z.object({
   cutaway: z.boolean().optional(),
 });
 
+/**
+ * Mieter-Paket (#362): Markierung im Plan für das Übergabeprotokoll – Zustand beim Einzug,
+ * Bohrloch oder Klebestelle (für Rückgabe und Kaution). Das Foto liegt nur im lokalen Asset-Speicher.
+ */
+export const MarkKindSchema = z.enum(['condition', 'drill', 'glue']);
+export const MarkSchema = z.object({
+  id: z.string().min(1),
+  kind: MarkKindSchema,
+  x: finite(),
+  y: finite(),
+  note: z.string().max(500).default(''),
+  /** Local photo (asset store); never part of the repository. */
+  photoAssetId: z.string().optional(),
+});
+
 export const ProjectSchema = z.object({
   format: z.literal(PROJECT_FORMAT),
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
@@ -428,6 +443,8 @@ export const ProjectSchema = z.object({
   /** Simulated smart-home devices and automations (#170, schema 2). */
   devices: z.array(SmartDeviceSchema).default([]),
   automations: z.array(AutomationSchema).default([]),
+  /** Mieter-Paket marks (#362); projects saved before lack the field. */
+  marks: z.array(MarkSchema).default([]),
 });
 
 export type Provenance = z.infer<typeof ProvenanceSchema>;
@@ -448,6 +465,8 @@ export type Light = z.infer<typeof LightSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
+export type MarkKind = z.infer<typeof MarkKindSchema>;
+export type Mark = z.infer<typeof MarkSchema>;
 export type Calibration = z.infer<typeof CalibrationSchema>;
 export type Underlay = z.infer<typeof UnderlaySchema>;
 export type QualityMode = z.infer<typeof QualityModeSchema>;

@@ -33,6 +33,7 @@ import { ClearanceOverlay } from './ClearanceOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
 import { walkPathClick } from './walkPathStore';
+import { markKindInfo } from '../model/marks';
 import { calibrateUnderlay } from '../import/underlayTransform';
 import { groupBounds, groupCenter, groupName, moveGroupBy, rotateGroupPoses, selectedGroup, settleGroup, type GroupTurnResult } from '../model/groups';
 import { pressFurnitureSelection, reportGroupTurn, selectFurnitureWithGroups, selectSingleFurniture } from '../ui/groupActions';
@@ -426,6 +427,15 @@ export function Editor2D() {
           setMeasureStart(null);
           setPreview({});
         }
+        return;
+      }
+      case 'mark': {
+        const s = snap(w, e);
+        const kind = ui().markKind;
+        apply((d) => {
+          d.marks.push({ id: newId('mark'), kind, x: s.point.x, y: s.point.y, note: '' });
+        });
+        ui().toast(`${markKindInfo(kind).label} gesetzt – Notiz und Foto im Werkzeug-Reiter ergänzen`, 'info');
         return;
       }
       case 'calibrate': {
@@ -1084,6 +1094,7 @@ export function Editor2D() {
       {tool === 'room' && <div className="editor-hint">Rechteck mit Innenmaßen aufziehen – oder in eine umschlossene Fläche klicken.</div>}
       {(tool === 'door' || tool === 'window' || tool === 'passage') && <div className="editor-hint">Auf eine Wand klicken, um {tool === 'door' ? 'eine Tür' : tool === 'window' ? 'ein Fenster' : 'einen Durchgang'} einzusetzen.</div>}
       {tool === 'measure' && <div className="editor-hint">Zwei Punkte klicken, um zu messen. Esc bricht ab.</div>}
+      {tool === 'mark' && <div className="editor-hint">Auf den Plan klicken, um eine Markierung zu setzen (Art: im Werkzeug-Reiter unter „Mieter-Paket“).</div>}
       {tool === 'walkpath' && <WalkPathHint />}
       {tool === 'calibrate' && !calib.p2 && (
         <div className="editor-hint">Maßstab kalibrieren: {calib.p1 ? 'zweiten Punkt' : 'ersten Punkt'} einer bekannten Strecke im Plan anklicken.</div>
