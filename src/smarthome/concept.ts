@@ -115,6 +115,8 @@ const ROLE: Record<RoomType, string> = {
   kitchen: 'Bewegung für Licht, Fenster im Blick.',
   bath: 'Licht per Bewegung, Feuchte später messen.',
   hall: 'Durchgang: Licht per Bewegung, Außentür meldet Ankunft und Abwesenheit.',
+  utility: 'Abstellraum: Licht per Bewegung, Wasser- oder Feuchtemelder bei Waschmaschine.',
+  balcony: 'Außenbereich: Licht per Dämmerung, Balkontür im Blick.',
   other: 'Nebenraum: Licht per Bewegung, wo es nützt.',
 };
 

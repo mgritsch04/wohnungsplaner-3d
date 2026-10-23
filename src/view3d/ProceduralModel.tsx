@@ -566,6 +566,50 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       parts.push(cyl(0, potH, 0, 0.01, h * 0.75, '#4a3a24'));
       return parts;
     }
+    case 'picture': {
+      // framed print (#350): thin frame, light mat, a simple two-tone motif in the item colour
+      const f = Math.min(0.03, w / 12, h / 12);
+      const m = Math.min(0.06, w / 8, h / 8);
+      return [
+        rbox(-W, 0, -D, W, h, D, 0.004, '#2f2a26', { rough: 0.6 }),
+        box(-W + f, f, D - 0.004, W - f, h - f, D + 0.001, '#f4f1ea', { rough: 0.9 }),
+        box(-W + f + m, f + m, D, W - f - m, h - f - m, D + 0.002, color, { rough: 0.85 }),
+        box(-W + f + m, f + m, D + 0.001, W - f - m, f + m + (h - 2 * (f + m)) * 0.42, D + 0.003, shade(color, 0.72), { rough: 0.85 }),
+      ];
+    }
+    case 'wall-shelf': {
+      // floating board with a few objects on it
+      const t = 0.025;
+      const parts: Part[] = [rbox(-W, 0, -D, W, t, D, 0.004, color, { detail: 'woodgrain', detailRepeat: 1 })];
+      const objs = Math.max(1, Math.floor(w / 0.25));
+      for (let i = 0; i < objs; i++) {
+        const x = -W + ((i + 0.5) * w) / objs;
+        parts.push(i % 2 ? cyl(x, t, 0, Math.min(0.05, D * 0.6), Math.min(h, t + 0.16), '#d9cbb8', { rough: 0.4 }) : box(x - 0.08, t, -D + 0.02, x + 0.08, Math.min(h, t + 0.2), D - 0.04, ['#7b3f2f', '#2f4b6b', '#3f5f45'][i % 3], { rough: 0.8 }));
+      }
+      return parts;
+    }
+    case 'coat-rack': {
+      const parts: Part[] = [rbox(-W, 0, -D, W, Math.min(h, 0.09), -D + 0.025, 0.004, color, { detail: 'woodgrain', detailRepeat: 1 })];
+      const hooks = Math.max(2, Math.round(w / 0.16));
+      for (let i = 0; i < hooks; i++) {
+        const x = -W + ((i + 0.5) * w) / hooks;
+        parts.push(box(x - 0.008, 0.03, -D + 0.025, x + 0.008, 0.05, D, BLACK, { metal: 0.6 }));
+      }
+      return parts;
+    }
+    case 'mattress':
+      return [
+        rbox(-W, 0, -D, W, h, D, 0.05, color, { rough: 0.95, detail: 'fabric', detailRepeat: 3 }),
+        rbox(-W + 0.01, h - 0.05, -D + 0.5, W - 0.01, h + 0.04, D - 0.01, 0.04, '#e6e1d8', { rough: 0.95, detail: 'fabric', detailRepeat: 3 }),
+      ];
+    case 'vacuum':
+      // stick vacuum in its wall holder
+      return [
+        box(-W * 0.5, 0, -D, W * 0.5, 0.06, D * 0.6, shade(color, 0.8)),
+        cyl(0, 0.06, 0, 0.015, h - 0.25, METAL, { metal: 0.8, rough: 0.3 }),
+        rbox(-0.06, h - 0.3, -0.06, 0.06, h - 0.05, 0.08, 0.02, color),
+        box(-W * 0.4, h - 0.12, -D, W * 0.4, h - 0.08, -D + 0.03, BLACK),
+      ];
     case 'tv':
       return [rbox(-W, 0, -D, W, h, D, 0.006, '#0b0b0c', { rough: 0.2, metal: 0.3 }), box(-W + 0.008, 0.008, D, W - 0.008, h - 0.008, D + 0.001, '#141b25', { rough: 0.05 })];
     case 'panel':

@@ -77,6 +77,8 @@ const ROOM_CATEGORIES: Record<RoomType, string[]> = {
   kitchen: ['table', 'chair', 'storage', 'lighting', 'appliance'],
   bath: ['bathroom', 'storage', 'textile', 'decor', 'lighting'],
   hall: ['storage', 'lighting', 'textile', 'decor', 'chair'],
+  utility: ['storage', 'appliance'],
+  balcony: ['chair', 'table', 'decor', 'textile', 'lighting'],
   other: ['storage', 'table', 'chair', 'lighting', 'decor', 'textile', 'sofa', 'desk', 'bed'],
 };
 
