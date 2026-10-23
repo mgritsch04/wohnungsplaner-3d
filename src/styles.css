@@ -807,10 +807,12 @@ dl.stats dd {
 .budget-total strong {
   font-size: var(--font-size-xl);
 }
-.budget-group + .budget-group {
+.budget-group + .budget-group,
+.purchase-group + .purchase-group {
   margin-top: var(--space-4);
 }
-.budget-group-head {
+.budget-group-head,
+.purchase-group-head {
   display: flex;
   justify-content: space-between;
   font-weight: var(--font-weight-semibold);

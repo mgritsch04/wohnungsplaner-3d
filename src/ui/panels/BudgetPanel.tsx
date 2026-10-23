@@ -146,8 +146,8 @@ export function BudgetPanel() {
           <strong>{formatEuro(plan.total)}</strong>
         </div>
         {plan.phases.map((ph) => (
-          <div key={ph.phase} className="budget-group" data-testid={`kaufplan-${ph.phase}`}>
-            <div className="budget-group-head">
+          <div key={ph.phase} className="purchase-group" data-testid={`kaufplan-${ph.phase}`}>
+            <div className="purchase-group-head">
               <span>{ph.label}</span>
               <span>{formatEuro(ph.total)}</span>
             </div>
