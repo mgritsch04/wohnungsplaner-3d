@@ -20,6 +20,8 @@ import { useFurnishStore } from '../../suggest/furnishStore';
 import { AssistantPanel } from '../../assistant/AssistantPanel';
 import { useAssistantStore } from '../../assistant/assistantStore';
 import { DesignPanel } from '../../assistant/DesignPanel';
+import { PlanEditPanel } from '../../assistant/PlanEditPanel';
+import { usePlanEditStore } from '../../assistant/planEditStore';
 import { useDesignStore } from '../../assistant/designStore';
 import { useCatalogStore } from '../../catalog/catalogStore';
 import type { CatalogItem } from '../../catalog/types';
@@ -50,7 +52,8 @@ export function FurnishPanel() {
   // a preview built from a Claude suggestion (#151, #350) is shown and taken over in the Claude panels
   const assistantPreview = useAssistantStore((s) => s.preview);
   const designPreview = useDesignStore((s) => s.preview);
-  const fromAssistant = preview !== null && (assistantPreview === preview || designPreview === preview);
+  const editPreview = usePlanEditStore((s) => s.plan?.preview);
+  const fromAssistant = preview !== null && (assistantPreview === preview || designPreview === preview || editPreview === preview);
   // generic catalogue plus the user's own imported products (built-in kitchen modules → kitchen planner)
   const offer = useMemo(() => [...WISH_CATALOG, ...extraCatalog.filter((c) => !c.kitchen)], [extraCatalog]);
 
@@ -90,6 +93,7 @@ export function FurnishPanel() {
   return (
     <div className="panel-scroll furnish-panel">
       <DesignPanel />
+      <PlanEditPanel />
       <AssistantPanel />
       <Section title="Einrichtungsvorschlag">
         <p className="muted small">
