@@ -14,7 +14,7 @@ import { normalizePackSize } from '../catalog/packSize';
 import { MOEBELIX_AT } from '../catalog/providers/registry';
 import type { CatalogItem } from '../catalog/types';
 import type { McpRuntime, SampleTool } from './claude';
-import { MAX_ALTERNATIVES, MAX_FIELD, searchLinks, type DesignOption, type DesignProposal, type DesignWishes, type RetailerChoice } from './design';
+import { MAX_ALTERNATIVES, MAX_FIELD, clipLines, searchLinks, type DesignOption, type DesignProposal, type DesignWishes, type RetailerChoice } from './design';
 import { kitchenShoppingList, setKitchenProduct } from './kitchenDesign';
 
 export const BROWSER = 'host:claude_browser';
@@ -128,7 +128,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     '',
     `Gesucht für „${roomName}“: ${option.label}${option.reason ? ` – ${option.reason}` : ''}`,
     `Platz eingeplant für ca. ${cm(item.width)}×${cm(item.depth)}×${cm(item.height)} cm (Breite×Tiefe×Höhe); ähnliche Größe bevorzugen.`,
-    `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${wishes.colors.slice(0, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
+    `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
     `Suchseiten: ${links.join(' , ')}`,
     how,
     '',
