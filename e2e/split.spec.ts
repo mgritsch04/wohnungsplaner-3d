@@ -66,3 +66,35 @@ test('divider drags, clamps, resets, persists and works by keyboard (#368)', asy
   expect(Math.abs(reset.w2d - reset.w3d)).toBeLessThan(4);
   await page.screenshot({ path: 'test-results/split-reset.png' });
 });
+
+test('2D zooms out with the divider instead of cropping the plan, 3D never goes blank', async ({ page }) => {
+  await open(page);
+  const zoom = async () => Number(await page.getByTestId('editor2d').getAttribute('data-zoom'));
+  const z0 = await zoom();
+  const w0 = (await widths(page)).w2d;
+  const sep = page.getByRole('separator');
+  const box = (await sep.boundingBox())!;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + 0.5, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 200, y, { steps: 8 });
+  // while dragging: the 3D canvas keeps a drawing buffer (no cleared, blank canvas)
+  const filled = await page.evaluate(() => {
+    const c = document.querySelector('.pane-3d canvas') as HTMLCanvasElement;
+    return c.width > 0 && c.height > 0;
+  });
+  expect(filled).toBe(true);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const w1 = (await widths(page)).w2d;
+  expect(await zoom()).toBeCloseTo((z0 * w1) / w0, 0);
+  // back: the same view returns
+  const b2 = (await sep.boundingBox())!;
+  await page.mouse.move(b2.x + 0.5, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 0.5, y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  expect(Math.abs((await zoom()) - z0)).toBeLessThan(z0 * 0.03);
+  await page.screenshot({ path: 'test-results/split-zoom-back.png' });
+});
