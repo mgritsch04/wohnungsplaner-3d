@@ -1,5 +1,7 @@
 # Umzug in ein Claude-Code-Projekt (Projects, Beta)
 
+> **Historisch, veraltet seit 22.10.2026.** Dieser Text beschreibt das frühere eigene Wohnungsplaner-Projekt (Leiter, Haupt-Thread „Weiterarbeit am Wohnungsplaner“, Merge-Commit, Artefakt-Neuveröffentlichung nach jedem Merge, alte Dashboard-Zulieferung). Seit 22.10. gilt das Ein-Projekt-Modell: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md) › „Organisation seit 22.10.2026“ und `CLAUDE.md`. Der Inhalt unten bleibt unverändert als Nachweis erhalten; nicht danach arbeiten, wo er dem Workflow widerspricht.
+
 Stand: 2026-10-17. Diese Datei beschreibt, wie das Projekt in ein Claude-Code-Projekt (Seitenleiste „Projects“ auf claude.ai/code bzw. im Code-Tab der Desktop-App) eingerichtet wird, und enthält den Text für die Projektanweisungen.
 
 ## 1. Projekt anlegen (du)
@@ -50,7 +52,7 @@ Test runs never publish their own artifacts: the report goes only into the issue
 
 - **main** enthält alles bis PR #141 (Symbolleiste, Möbelgruppen, Sichtlinien, Maßband, kurze Maßlinien, 2D-Plan, Artefakt-Build).
 - **In Arbeit:** Korrektur-Paket aus fehlgeschlagenen User-Tests (#47 Ducken umschalten, #107 E öffnet Türen beim Begehen, #94 Maßlinien bei Mehrfachauswahl, #16 Kollisions-Rückmeldungen, #133 Messlinie im neuen Projekt) – Branch `claude/usertest-fixes` (Opus-Agent der bisherigen Sitzung).
-- **Als Nächstes:** #114 Grundriss-Import mit dem Plan des Nutzers (liegt nur lokal vor; für Tests synthetisch nachbauen: AutoCAD-PDF A3 1:75 mit farbig gefüllten Räumen, dunkelgrau gefüllten Wänden, Nebenplänen; zusätzlich gescannte Fassung – schief, verrauscht, ohne Papiergröße); #12 IKEA-Produktlisten-Import (Kallax fehlt, Teil B des Tests verständlicher beschreiben); #134 Smart-Home-Gesamtkonzept (priority: high); UI-Runde #122 (wartet auf Stichworte des Nutzers) inkl. Lesbarkeit im Artefakt und Handy-Ansicht.
+- **Als Nächstes:** #114 Grundriss-Import mit dem Plan des Nutzers (liegt nur lokal vor und bleibt privat; für Tests synthetisch nachbauen, auch als gescannte Fassung – schief, verrauscht, ohne Papiergröße); #12 IKEA-Produktlisten-Import (Kallax fehlt, Teil B des Tests verständlicher beschreiben); #134 Smart-Home-Gesamtkonzept (priority: high); UI-Runde #122 (wartet auf Stichworte des Nutzers) inkl. Lesbarkeit im Artefakt und Handy-Ansicht.
 - **Offene User-Tests:** siehe Label `user-test` (Dashboard „Zum Testen“).
 - **Dashboard-Updater:** Haiku-Cloud-Session „Dashboard-Updater“, endet spätestens 2026-10-17 00:00 UTC. Hinweise: geplante Routinen-Sessions hatten die nötigen claude-code-remote-Lesewerkzeuge nicht; Updater-Läufe brauchen die ausdrückliche Freigabe des Nutzers in ihrer eigenen Session (Auto-Modus), und pro Lauf sollte ein Wegwerf-Hilfsagent die großen Daten holen.
 - **Lokale Sitzung „Hallo“** (Windows-PC des Nutzers) ist beendet; Kanal-Issue #110 wird nicht mehr gelesen.

@@ -1,3 +1,5 @@
+> **Historisch (Stand 22.10.2026):** Die Routine „Wohnungsplaner Tageslauf“ ist deaktiviert; der Prompt unten nennt `[USERTEST]`-Issues und Merge-Commit und gilt nicht mehr. Aktueller Ablauf: [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md). Inhalt bleibt als Nachweis unverändert.
+
 # Prompt für die geplante Routine „Wohnungsplaner Tageslauf“
 
 **Einrichten (durch dich, einmalig):** https://claude.ai/code/routines → neue Routine →
