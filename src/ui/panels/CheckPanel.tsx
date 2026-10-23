@@ -1,3 +1,4 @@
+import { CritiquePanel } from '../../assistant/CritiquePanel';
 import { CHECK_CATEGORY_LABEL, TRAFFIC_LABEL, type CheckSeverity } from '../../model/planCheck';
 import { useProjectStore } from '../../store/projectStore';
 import { jumpToCheckItem, startPlanCheck } from '../checkActions';
@@ -61,6 +62,7 @@ export function CheckPanel() {
           </div>
         )}
       </Section>
+      <CritiquePanel />
     </div>
   );
 }
