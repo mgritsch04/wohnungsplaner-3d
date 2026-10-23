@@ -30,6 +30,8 @@ import { WalkPostureBadge } from './view3d/WalkPostureBadge';
 import { StartCard } from './ui/StartCard';
 import { MobileBar } from './ui/MobileBar';
 import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
+import { SplitDivider } from './ui/SplitDivider';
+import { loadSplit, saveSplit } from './ui/splitPreference';
 import { FileFormatError } from './formats/zodErrors';
 import './ui/phone.css';
 
@@ -101,6 +103,11 @@ export default function App() {
   }, [touchUi]);
   // the object menu's „Eigenschaften“ opens the Details sheet on the phone (#235)
   useEffect(() => useObjectMenuStore.setState({ onDetails: phone ? () => setSheet('right') : null }), [phone]);
+  const [split, setSplit] = useState(() => loadSplit());
+  const changeSplit = (r: number) => {
+    setSplit(r);
+    saveSplit(r);
+  };
   const grip = phone ? <SheetGrip height={sheetHeight} onHeight={setSheetHeight} /> : null;
 
   return (
@@ -135,13 +142,14 @@ export default function App() {
           {leftTab === 'smarthome' && <SmartHomePanel />}
           {leftTab === 'import' && <ImportPanel />}
         </aside>
-        <main className={`workspace view-${viewMode}`}>
+        <main className={`workspace view-${viewMode}`} style={{ '--split': `${(split * 100).toFixed(2)}%` } as CSSProperties}>
           <StartCard />
           {viewMode !== '3d' && (
             <div className="pane pane-2d">
               <Editor2D />
             </div>
           )}
+          {viewMode === 'split' && <SplitDivider ratio={split} onRatio={changeSplit} />}
           {viewMode !== '2d' && (
             <div className="pane pane-3d">
               <Suspense fallback={<div className="empty-state">3D-Ansicht wird geladen…</div>}>
