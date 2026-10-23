@@ -88,3 +88,20 @@
 .design-search progress {
   width: 100%;
 }
+/* Leitfaden, Planer-Prüfung und „Gefällt mir nicht“ je Raum (#350) */
+.design-brief,
+.design-fixes {
+  margin: var(--space-1) 0;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-2, rgba(127, 127, 127, 0.08));
+}
+.design-brief ul,
+.design-fixes ul,
+.assistant-preview ul {
+  margin: 2px 0 0;
+  padding-left: 1.1em;
+}
+.design-dislike {
+  margin: var(--space-1) 0;
+}

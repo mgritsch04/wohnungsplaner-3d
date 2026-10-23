@@ -21,6 +21,7 @@ import { stairwells, walkGroundAt } from '../model/stairs';
 import { goToNeighbourLevel } from '../ui/levelActions';
 import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
+import { useFurnishStore } from '../suggest/furnishStore';
 import { Devices3D } from '../smarthome/Devices3D';
 import { Fixtures3D } from '../installation/Fixtures3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
@@ -225,6 +226,8 @@ function SceneContent({
   onLockChange: (l: boolean) => void;
   cutaway: boolean;
 }) {
+  // a furnishing preview replaces the furniture of the earlier suggestion (#350): hidden while it is shown
+  const replaced = useFurnishStore((s) => s.preview?.replaces);
   const archKey = architectureKey(project);
   const frameKey = architectureKey(frame);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,7 +391,7 @@ function SceneContent({
       />
       <Photos3D project={project} derived={derived} />
       {exteriorOn && <Exterior3D project={project} derived={derived} entrance={entrance} />}
-      {project.furniture.map((f) => (
+      {project.furniture.filter((f) => !replaced?.includes(f.id)).map((f) => (
         <FurnitureObject
           key={f.id}
           item={f}

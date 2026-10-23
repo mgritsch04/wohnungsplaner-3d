@@ -47,6 +47,8 @@ export interface SampleOptions {
   web?: boolean;
   /** Local Claude Code only: short note for the helper's window (what is asked, how many are left). */
   label?: string;
+  /** Local Claude Code only: ask for this model by name (#350, „gründlich“ = opus); the artifact uses `modelTier`. */
+  model?: 'opus' | 'sonnet';
 }
 
 /** The part of the runtime's `sample` function this app uses. */
@@ -101,7 +103,7 @@ export async function localSample(base = IKEA_HELPER_URL, f: Fetch = fetch): Pro
     async json<T>(input: string, options: SampleOptions = {}): Promise<T> {
       let res: Response;
       try {
-        res = await f(`${base}/claude`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: input, web: options.web === true, ...(options.label ? { label: options.label.slice(0, 120) } : {}) }), signal: options.signal });
+        res = await f(`${base}/claude`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: input, web: options.web === true, ...(options.label ? { label: options.label.slice(0, 120) } : {}), ...(options.model ? { model: options.model } : {}) }), signal: options.signal });
       } catch (e) {
         if (options.signal?.aborted) throw { code: 'cancelled' } satisfies SampleError;
         throw { code: 'upstream_error', message: e instanceof Error ? e.message : String(e) } satisfies SampleError;
@@ -140,8 +142,8 @@ export function loadSample(): Promise<Sample | null> {
             const run = s as RuntimeSample;
             return {
               kind: 'artifact',
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `web` and `label` are for the local helper only
-              json: <T,>(input: string, { web, label, ...options }: SampleOptions = {}) => run.json(input, options) as Promise<T>,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `web`, `label` and `model` are for the local helper only
+              json: <T,>(input: string, { web, label, model, ...options }: SampleOptions = {}) => run.json(input, options) as Promise<T>,
             } satisfies Sample;
           },
           () => null,

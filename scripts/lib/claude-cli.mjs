@@ -20,11 +20,16 @@ export const SHOP_FETCH = ['WebFetch(domain:www.ikea.com)', 'WebFetch(domain:www
 const BLOCKED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Task', 'Agent'];
 
 /** Argumente für `claude`; die Anfrage selbst kommt über stdin (Längengrenze der Kommandozeile). */
-export function claudeArgs({ web = false, maxTurns } = {}) {
+/** Models the planner may ask for by name (#350, „gründlich“); anything else uses the Claude Code default. */
+export const MODELS = ['opus', 'sonnet'];
+
+export function claudeArgs({ web = false, maxTurns, model } = {}) {
   const args = ['-p', '--output-format', 'json', '--max-turns', String(maxTurns ?? (web ? 30 : 2))];
   args.push('--disallowedTools', BLOCKED.join(','));
   if (web) args.push('--allowedTools', ['WebSearch', ...SHOP_FETCH].join(','));
-  if (process.env.WP_CLAUDE_MODEL) args.push('--model', process.env.WP_CLAUDE_MODEL);
+  // WP_CLAUDE_MODEL fixes the model for every request; otherwise the planner's choice, else the Claude Code default
+  const chosen = process.env.WP_CLAUDE_MODEL || (MODELS.includes(model) ? model : '');
+  if (chosen) args.push('--model', chosen);
   return args;
 }
 
@@ -115,7 +120,7 @@ function locate(bin) {
  * Führt eine Anfrage aus. `bin` (Standard: `claude` bzw. Umgebungsvariable `WP_CLAUDE_BIN`).
  * Löst mit dem Antworttext auf; wirft bei Fehler oder Zeitüberschreitung.
  */
-export function runClaude(prompt, { web = false, maxTurns, timeoutMs = web ? 8 * 60_000 : 4 * 60_000, bin, signal } = {}) {
+export function runClaude(prompt, { web = false, maxTurns, model, timeoutMs = web ? 8 * 60_000 : model === 'opus' ? 8 * 60_000 : 4 * 60_000, bin, signal } = {}) {
   return new Promise((resolve, reject) => {
     const cwd = mkdtempSync(join(tmpdir(), 'wp-claude-'));
     const found = locate(bin);
@@ -124,7 +129,7 @@ export function runClaude(prompt, { web = false, maxTurns, timeoutMs = web ? 8 *
       reject(new Error(`Claude Code nicht gefunden. ${INSTALL_HELP}`));
       return;
     }
-    const child = launch(found, claudeArgs({ web, maxTurns }), { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    const child = launch(found, claudeArgs({ web, maxTurns, model }), { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '';
     let stderr = '';
     let finished = false;

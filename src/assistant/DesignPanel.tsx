@@ -4,7 +4,7 @@ import type { CatalogItem } from '../catalog/types';
 import { formatEuro } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
-import { applyFurnishing, guessRoomType, suggestFurnishing, type FurnishingSuggestion } from '../suggest/furnishing';
+import { applyFurnishing, guessRoomType, suggestedIn, suggestFurnishing, type FurnishingSuggestion } from '../suggest/furnishing';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
 import { addIkeaArticles } from '../catalog/ikeaSelection';
@@ -34,17 +34,21 @@ import {
   MAX_FIELD,
   PLACEHOLDERS,
   proposalTotal,
+  QUALITY_CHOICES,
   realProducts,
   RETAILER_CHOICES,
   retailerOf,
   searchLinks,
   STYLES,
   swapPick,
+  type DesignBrief,
   type DesignOption,
   type DesignProposal,
+  type DesignRoom,
   type DesignWishes,
   type RetailerChoice,
 } from './design';
+import { implausibleSize } from './designGuide';
 import { runDesign } from './designRun';
 import { useDesignStore } from './designStore';
 import { runPool } from './pool';
@@ -99,6 +103,9 @@ export function DesignPanel() {
   const [notFound, setNotFound] = useState<Map<string, NotFound>>(new Map());
   const [skipped, setSkipped] = useState(0);
   const [note, setNote] = useState<string | null>(null);
+  /** „Gefällt mir nicht“ (#350): room whose comment field is open, the comment, the room being redone. */
+  const [dislike, setDislike] = useState<{ roomId: string; text: string } | null>(null);
+  const [redoing, setRedoing] = useState<string | null>(null);
   const st = useDesignStore();
   const w = st.wishes;
   const project = useProjectStore((s) => s.project);
@@ -164,7 +171,7 @@ export function DesignPanel() {
     if (old && useFurnishStore.getState().preview === old) useFurnishStore.getState().setPreview(null);
   };
 
-  const ask = async () => {
+  const ask = async (redo?: { roomId: string; feedback: string }) => {
     if (!targets.length || st.asking) return;
     controller?.abort();
     searchCtl?.abort();
@@ -172,25 +179,33 @@ export function DesignPanel() {
     controller = ctl;
     st.set({ asking: true, error: null });
     setDesignProgress(null);
+    setRedoing(redo?.roomId ?? null);
     let made: DesignProposal | null = null;
     try {
-      const { proposal, failedRooms } = await runDesign({
+      const { proposal: fresh, failedRooms } = await runDesign({
         sample,
         project,
-        roomIds: targets.map((r) => r.id),
+        roomIds: redo ? [redo.roomId] : targets.map((r) => r.id),
         roomTypes,
         wishes: w,
         products,
+        ...(redo?.feedback ? { feedback: redo.feedback } : {}),
         signal: ctl.signal,
         onProgress: (done, total) => setDesignProgress({ done, total }),
       });
       if (failedRooms.length) useUiStore.getState().toast(`Für ${failedRooms.map(roomName).join(', ')} kam keine verwertbare Antwort – dafür bitte den Raum einzeln einrichten lassen.`, 'info');
+      // one room redone: it replaces its old version, the other rooms stay as they are
+      const old = useDesignStore.getState().proposal;
+      const proposal: DesignProposal =
+        redo && old ? { ...old, rooms: old.rooms.map((r) => (r.roomId === redo.roomId ? (fresh.rooms.find((x) => x.roomId === r.roomId) ?? r) : r)) } : fresh;
       clearPreview();
       setNotFound(new Map());
       setSkipped(0);
       setNote(null);
+      setDislike(null);
       st.set({ asking: false, proposal, preview: null });
-      made = proposal;
+      // the automatic product search then only runs for the redone room
+      made = redo ? { ...proposal, rooms: proposal.rooms.filter((r) => r.roomId === redo.roomId) } : proposal;
     } catch (e) {
       const code = (e as SampleError | undefined)?.code;
       if (code === 'cancelled') st.set({ asking: false });
@@ -201,6 +216,7 @@ export function DesignPanel() {
       } else st.set({ asking: false, error: code ? errorText(e) : 'Die Antwort enthielt keine verwertbaren Möbel – bitte erneut versuchen.' });
     } finally {
       if (controller === ctl) controller = null;
+      setRedoing(null);
     }
     // one step: plan with real products right away; placeholders stay only for pieces that are not found
     if (made && searchMode && w.searchReal) {
@@ -220,9 +236,13 @@ export function DesignPanel() {
     if (!proposal) return;
     const inPlan = proposal.rooms.filter((r) => rooms.some((x) => x.id === r.roomId));
     const typeOf = (r: (typeof inPlan)[number]) => r.type ?? roomTypes[r.roomId] ?? guessRoomType(roomName(r.roomId));
+    // a new preview replaces what an earlier, applied suggestion put into these rooms (#350) – never stacks on it
+    const replace = suggestedIn(project, inPlan.map((r) => r.roomId));
+    const gone = new Set(replace);
+    const base = replace.length ? { ...project, furniture: project.furniture.filter((f) => !gone.has(f.id)) } : project;
     // kitchen runs first (against their wall), the other furniture around them
-    const preview = furnishWithKitchens(
-      project,
+    const built = furnishWithKitchens(
+      base,
       inPlan.flatMap((r) => (r.kitchen ? [{ roomId: r.roomId, roomName: roomName(r.roomId), type: typeOf(r), kitchen: r.kitchen }] : [])),
       resolve,
       (draft) =>
@@ -232,10 +252,11 @@ export function DesignPanel() {
           own,
         ),
     );
+    const preview: FurnishingSuggestion = { ...built, replaces: replace };
     labelPreview(preview, proposal);
     useFurnishStore.getState().setPreview(preview);
     st.set({ preview });
-    if (!preview.items.length) useUiStore.getState().toast('Für diese Möbel wurde kein freier Platz gefunden.', 'info');
+    if (!preview.items.length) useUiStore.getState().toast('Für diese Möbel wurde kein freier Platz gefunden – die Gründe stehen beim Vorschlag.', 'info');
   };
 
   const take = () => {
@@ -266,12 +287,16 @@ export function DesignPanel() {
       if (searchMode === 'web' && f.shop === 'IKEA') {
         const { outcomes } = await addIkeaArticles(f.url, { model: true }).catch(() => ({ outcomes: [] }));
         const ok = outcomes.find((o) => o.ok && o.id);
-        if (ok?.id) {
+        const imported = ok?.id ? useCatalogStore.getState().items.find((c) => c.id === ok.id) : undefined;
+        // a product whose page height is only the seat or the top would stand squashed (#350): skipped
+        if (ok?.id && !(imported && implausibleSize(imported))) {
           out.push({ id: ok.id, why: f.why });
           continue;
         }
+        if (ok?.id) continue;
       }
       const item = foundToCatalog(f, placeholder);
+      if (implausibleSize(item)) continue;
       add.push(item);
       out.push({ id: item.id, why: f.why });
     }
@@ -436,12 +461,18 @@ export function DesignPanel() {
               </span>
             </label>
             <SelectField label="Händler" value={w.retailer} options={RETAILER_CHOICES} onChange={(v) => st.setWishes({ retailer: v })} />
+            <SelectField label="Qualität" value={w.quality ?? 'thorough'} options={QUALITY_CHOICES} onChange={(v) => st.setWishes({ quality: v })} />
+            <p className="muted small" data-testid="design-quality-hint">
+              {w.quality === 'fast'
+                ? 'Eine Runde: Claude plant jeden Raum nach Leitfaden und Regeln des Raumtyps, der Planer ergänzt Fehlendes.'
+                : `Zwei Runden: Claude plant jeden Raum nach Leitfaden, der Planer stellt auf, dann prüft Claude die Aufstellung mit einer Prüfliste und bessert nach.${sample.kind === 'local' ? ' Im lokalen Planer mit dem Modell Opus.' : ' Im Artefakt mit der höchsten Modellstufe.'}`}
+            </p>
             <p className="muted small" data-testid="design-own-count">
               {products.length ? `${products.length === 1 ? '1 eigenes Produkt' : `${products.length} eigene Produkte`} aus deiner Auswahl kommen in Frage, der Rest wird als Platzhalter geplant.` : 'Noch keine eigenen IKEA-/Möbelix-Produkte: Claude plant mit Platzhaltern und Suchlinks (Produkte übernimmst du unter Katalog › IKEA bzw. Möbelix).'}
             </p>
             <div className="btn-row">
               <button className="primary" disabled={st.asking || !!search} onClick={() => void ask()}>
-                {st.asking ? `Claude richtet ein…${designProgress && designProgress.total > 1 ? ` (${designProgress.done}/${designProgress.total} Räume)` : ''}` : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
+                {st.asking ? `Claude richtet ein…${designProgress && designProgress.total > 1 ? ` (${designProgress.done}/${designProgress.total} Schritte)` : ''}` : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
               </button>
               {st.asking && <button onClick={() => controller?.abort()}>Stopp</button>}
             </div>
@@ -459,8 +490,24 @@ export function DesignPanel() {
             {proposal.summary && <p>{proposal.summary}</p>}
             {proposal.rooms.map((r) => (
               <div key={r.roomId} className="design-room" data-testid="design-room">
-                <h5>{roomName(r.roomId)}</h5>
+                <h5>
+                  {roomName(r.roomId)} {r.reviewed && <Badge kind="muted" title="Claude hat die Aufstellung mit der Prüfliste nachgeprüft.">nachgeprüft</Badge>}
+                </h5>
                 {r.concept && <p className="muted">{r.concept}</p>}
+                {r.brief && <BriefView brief={r.brief} />}
+                {r.fixes && r.fixes.length > 0 && (
+                  <div className="design-fixes" data-testid="design-fixes">
+                    <strong className="small">Planer-Prüfung:</strong>
+                    <ul className="small">
+                      {r.fixes.map((f, i) => (
+                        <li key={i}>
+                          {f.kind === 'added' ? 'ergänzt' : 'weggelassen'}: {f.name} – {f.why}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <DislikeRow room={r} open={dislike?.roomId === r.roomId ? dislike.text : null} busy={st.asking || !!search} redoing={redoing === r.roomId} onOpen={() => setDislike({ roomId: r.roomId, text: '' })} onText={(text) => setDislike({ roomId: r.roomId, text })} onCancel={() => setDislike(null)} onRedo={(feedback) => void ask({ roomId: r.roomId, feedback })} />
                 <ul className="assistant-list">
                   {r.picks.map((p, i) => {
                     const key = `${r.roomId}:${i}`;
@@ -559,6 +606,11 @@ export function DesignPanel() {
               {w.budget > 0 && total.real + total.placeholder > w.budget && <span className="warning"> – über dem Budget von {formatEuro(w.budget)}</span>}
             </p>
             {proposal.dropped > 0 && <p className="muted">{proposal.dropped === 1 ? 'Ein genannter Eintrag war' : `${proposal.dropped} genannte Einträge waren`} nicht in den Listen – weggelassen.</p>}
+            {scope !== ALL && !proposal.rooms.some((r) => r.roomId === scope) && (
+              <p className="warning small" data-testid="design-scope-hint">
+                Dieser Vorschlag gilt für {proposal.rooms.map((r) => roomName(r.roomId)).join(', ')} – für „{roomName(scope)}“ bitte „Neu einrichten lassen“.
+              </p>
+            )}
             {!previewActive ? (
               <div className="btn-row">
                 <button disabled={!!search} onClick={showPreview}>
@@ -569,13 +621,25 @@ export function DesignPanel() {
               st.preview && (
                 <div className="assistant-preview" data-testid="design-preview">
                   <Badge kind="info">noch nicht übernommen</Badge>
-                  <p>{st.preview.items.length ? `${st.preview.items.length} Möbel kollisionsfrei aufgestellt.` : 'Kein freier Platz gefunden.'}</p>
+                  <p>{st.preview.items.length ? `${st.preview.items.length} Möbel kollisionsfrei aufgestellt.` : 'Kein freier Platz gefunden – die Gründe stehen unten.'}</p>
+                  {(st.preview.replaces?.length ?? 0) > 0 && (
+                    <p className="muted small" data-testid="design-replaces">
+                      Ersetzt {st.preview.replaces!.length === 1 ? 'ein Möbel' : `${st.preview.replaces!.length} Möbel`} aus dem letzten Vorschlag in diesen Räumen (im Plan ausgeblendet; selbst platzierte Möbel bleiben).
+                    </p>
+                  )}
                   {st.preview.rooms
                     .filter((x) => x.missing.length)
                     .map((x) => (
-                      <p key={x.roomId} className="warning">
-                        {x.roomName || 'Raum'}: kein freier Platz für {x.missing.join(', ')}
-                      </p>
+                      <div key={x.roomId} className="warning" data-testid="design-missing">
+                        <strong>{x.roomName || 'Raum'} – kein Platz für:</strong>
+                        <ul className="small">
+                          {(x.notes?.length ? x.notes : x.missing.map((name) => ({ name, why: 'kein freier Platz' }))).map((n, i) => (
+                            <li key={i}>
+                              {n.name}: {n.why}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
                   <div className="btn-row">
                     <button className="primary" disabled={!st.preview.items.length} onClick={take}>
@@ -688,6 +752,71 @@ function PickLine({ option, quantity, item, retailer }: { option: DesignOption; 
         </>
       )}
       {option.reason && <p>{option.reason}</p>}
+    </div>
+  );
+}
+
+function BriefView({ brief }: { brief: DesignBrief }) {
+  return (
+    <div className="design-brief" data-testid="design-brief">
+      <strong className="small">Leitfaden</strong>
+      <ul className="small">
+        {brief.purpose && <li>Zweck: {brief.purpose}</li>}
+        {brief.zones.length > 0 && <li>Zonen: {brief.zones.join(' · ')}</li>}
+        {brief.focus && <li>Blickfang: {brief.focus}</li>}
+        {brief.paths && <li>Laufwege: {brief.paths}</li>}
+        {brief.palette.length > 0 && <li>Farben: {brief.palette.join(', ')}</li>}
+        {brief.decor && <li>Deko: {brief.decor}</li>}
+      </ul>
+    </div>
+  );
+}
+
+/** „Gefällt mir nicht“ (#350): a short comment, then only this room is planned again. */
+function DislikeRow({
+  room,
+  open,
+  busy,
+  redoing,
+  onOpen,
+  onText,
+  onCancel,
+  onRedo,
+}: {
+  room: DesignRoom;
+  open: string | null;
+  busy: boolean;
+  redoing: boolean;
+  onOpen: () => void;
+  onText: (t: string) => void;
+  onCancel: () => void;
+  onRedo: (feedback: string) => void;
+}) {
+  if (redoing) return <p className="muted small">Claude plant den Raum neu …</p>;
+  if (open === null)
+    return (
+      <div className="btn-row">
+        <button className="small" disabled={busy} onClick={onOpen} data-testid="design-dislike">
+          Gefällt mir nicht
+        </button>
+      </div>
+    );
+  return (
+    <div className="design-dislike" data-room={room.roomId}>
+      <label className="field">
+        <span className="field-label">Was soll anders werden?</span>
+        <span className="field-input">
+          <input type="text" value={open} maxLength={MAX_FIELD} placeholder="z. B. weniger vollgestellt, Sofa zum Fenster, mehr Stauraum" onChange={(e) => onText(e.target.value)} />
+        </span>
+      </label>
+      <div className="btn-row">
+        <button className="primary small" disabled={busy} onClick={() => onRedo(open.trim() || 'gefällt nicht – bitte ein anderes, stimmigeres Konzept')}>
+          Raum neu planen
+        </button>
+        <button className="small" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </div>
     </div>
   );
 }

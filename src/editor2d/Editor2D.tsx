@@ -29,6 +29,7 @@ import { useImportStore } from '../import/importStore';
 import { DraftOverlay, hitTestDraft } from './DraftOverlay';
 import { LowerLevelOverlay } from './LowerLevelOverlay';
 import { FurnishPreviewOverlay } from './FurnishPreviewOverlay';
+import { useFurnishStore } from '../suggest/furnishStore';
 import { CheckFocusOverlay } from './CheckFocusOverlay';
 import { NarrowPassageOverlay } from './NarrowPassageOverlay';
 import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
@@ -107,6 +108,7 @@ export function Editor2D() {
 
   const derived = useMemo(() => derivePlan(project), [project]);
   const obstacles = useMemo(() => buildPlacementObstacles(derived), [derived]);
+  const replaced = useFurnishStore((s) => s.preview?.replaces);
   const conflicts = useMemo(() => {
     const m = new Map<string, 'error' | 'warn'>();
     for (const [id, c] of furnitureConflicts(project, derived, obstacles)) m.set(id, c.level);
@@ -926,6 +928,7 @@ export function Editor2D() {
             showDimensions
             conflicts={conflicts}
             rotateHandleFor={groupSel ? null : selection?.type === 'furniture' ? selection.id : null}
+            hidden={replaced}
           />
           {tool === 'select' && <GroupOverlay project={project} selectedIds={selectedIds} groupId={groupSel} px={px} />}
           {draft && <DraftOverlay draft={draft} selected={draftSel} px={px} />}

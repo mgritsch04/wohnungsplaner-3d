@@ -236,7 +236,7 @@ function LoadedGltf({ url, item, castShadow, receiveShadow }: { url: string; ite
       const skew = deskewAngle(footprintPoints(model));
       turned.rotation.y = skew;
       turned.updateMatrixWorld(true);
-      fit = fitModel(new THREE.Box3().setFromObject(turned).getSize(new THREE.Vector3()), item);
+      fit = fitModel(new THREE.Box3().setFromObject(turned).getSize(new THREE.Vector3()), { width: item.width, depth: item.depth, height: item.height });
       if (fit.turn) turned.rotation.y = skew + Math.PI / 2;
       turned.updateMatrixWorld(true);
     }
