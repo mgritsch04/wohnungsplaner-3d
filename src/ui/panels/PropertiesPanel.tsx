@@ -18,6 +18,7 @@ import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, ty
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
+import { DEFAULT_LAMP_KELVIN } from '../../view3d/lighting';
 import { runDeliveryCheck, useDeliveryStore } from '../../editor2d/deliveryStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
 import { CurtainStateSection, OpeningShadingSection } from './ShadingSection';
@@ -522,7 +523,20 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       </PanelGroup>
       {(f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape) === 'curtain' && <CurtainStateSection f={f} />}
       {f.category === 'lighting' && (
-        <PanelGroup groupKey="furniture.lamp" title="Lichtstrom">
+        <PanelGroup groupKey="furniture.lamp" title="Licht">
+          <CheckField
+            label="Lampe eingeschaltet"
+            checked={!f.lightOff}
+            title="Im Realismus-Modus leuchtet die Lampe abends und nachts (Schalter „Lampen“ im Menü „Mehr“). Ausgeschaltet bleibt sie dunkel."
+            onChange={(v) => upd((x) => void (v ? delete x.lightOff : (x.lightOff = true)))}
+          />
+          <label className="field">
+            <span className="field-label">
+              Lichtfarbe {f.kelvin ?? DEFAULT_LAMP_KELVIN} K ({(f.kelvin ?? DEFAULT_LAMP_KELVIN) < 3300 ? 'warm' : (f.kelvin ?? DEFAULT_LAMP_KELVIN) < 5000 ? 'neutral' : 'kalt'})
+              {f.kelvin === undefined ? ' – Annahme' : ''}
+            </span>
+            <input type="range" aria-label="Lichtfarbe der Lampe" min={2200} max={6500} step={100} value={f.kelvin ?? DEFAULT_LAMP_KELVIN} onChange={(e) => upd((x) => (x.kelvin = Number(e.target.value)))} />
+          </label>
           <NumberField
             label="Lichtstrom"
             value={f.lumen ?? (f.model.type === 'procedural' ? DEFAULT_LUMEN[f.model.shape] : undefined) ?? FALLBACK_LUMEN}
@@ -531,7 +545,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
             min={0}
             max={20000}
             step={50}
-            title="Lichtstrom der Lampe in Lumen (steht auf der Verpackung oder im Datenblatt). Für die Lux-Lichtkarte im Tab Projekt."
+            title="Lichtstrom der Lampe in Lumen (steht auf der Verpackung oder im Datenblatt). Bestimmt Helligkeit und Reichweite in 3D und die Lux-Lichtkarte im Tab Projekt."
             onChange={(v) => upd((x) => (x.lumen = Math.round(v)))}
           />
           <p className="muted small" data-testid="lamp-lumen-hint">

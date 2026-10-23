@@ -4,7 +4,9 @@ import { useGLTF } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Furniture, QualityMode } from '../model/schema';
 import { planRotationToWorldY, roundMm } from '../model/units';
-import { lookOf, ProceduralModel } from './ProceduralModel';
+import { LIGHT_SHAPES, lookOf, ProceduralModel } from './ProceduralModel';
+import { DEFAULT_LUMEN, FALLBACK_LUMEN } from '../model/lux';
+import { DEFAULT_LAMP_KELVIN } from './lighting';
 import { useAssetUrl } from '../persistence/useAssetUrl';
 import { baseBox, DRACO_PATH } from '../import/gltf';
 import { CLICK_THRESHOLD_PX, isClippedHit } from './pointer';
@@ -62,6 +64,11 @@ export const FurnitureObject = memo(
     const accent = item.kitchen?.frontColor;
     const look = lookOf(item.model);
     const castShadow = quality === 'realism' && item.height > 0.05;
+    // lamps (#420): brightness and reach from the lumen, light colour from the colour temperature, own switch
+    const lamp = useMemo(
+      () => (LIGHT_SHAPES.has(shape) ? { lumen: item.lumen ?? DEFAULT_LUMEN[shape] ?? FALLBACK_LUMEN, kelvin: item.kelvin ?? DEFAULT_LAMP_KELVIN, on: !item.lightOff } : undefined),
+      [shape, item.lumen, item.kelvin, item.lightOff],
+    );
 
     const open = useUiStore((s) => s.interiorOpen.includes(item.id));
     // a cabinet shown open (#85): only the procedural model, a GLB has no known inside
@@ -81,7 +88,7 @@ export const FurnitureObject = memo(
             : undefined
         }
       >
-      <ProceduralModel shape={shape} width={curtainW} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} interior={interior} quality={quality} castShadow={castShadow} />
+      <ProceduralModel shape={shape} width={curtainW} depth={item.depth} height={item.height} color={item.color} accent={accent} finish={item.finish} look={look} interior={interior} quality={quality} castShadow={castShadow} lamp={lamp} />
       </group>
     );
 

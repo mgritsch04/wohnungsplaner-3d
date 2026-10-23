@@ -146,3 +146,27 @@ export function kelvinToColor(kelvin: number): string {
   const c = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
   return `#${[r, g, b].map((v) => c(v).toString(16).padStart(2, '0')).join('')}`;
 }
+
+/** Lamp furniture in 3D (#420): what the lamp emits, from its luminous flux and colour temperature. */
+export interface LampSpec {
+  lumen: number;
+  kelvin: number;
+  /** Switched on (lights in the evening / at night as the lamp switch allows). */
+  on: boolean;
+}
+
+/** Typical colour temperature of a household bulb when none is given (warm white; an assumption). */
+export const DEFAULT_LAMP_KELVIN = 2700;
+/** Point-light intensity of an 800 lm (60 W-equivalent) bulb – the strength all lamps had before #420. */
+const INTENSITY_PER_800_LM = 6;
+
+/**
+ * Point light of a lamp: brightness proportional to the lumen, reach growing with the square root
+ * (like the distance at which the illuminance falls to a fixed value), colour from the temperature.
+ * `glow` is the colour of the glowing shade: the light colour softened, so a lampshade does not look orange.
+ */
+export function lampLight(spec: Pick<LampSpec, 'lumen' | 'kelvin'>): { intensity: number; distance: number; color: string; glow: string } {
+  const k = Math.max(0, spec.lumen) / 800;
+  const color = kelvinToColor(spec.kelvin);
+  return { intensity: INTENSITY_PER_800_LM * k, distance: Math.min(9, Math.max(3, 5 * Math.sqrt(k))), color, glow: mixHex(color, '#ffffff', 0.45) };
+}
