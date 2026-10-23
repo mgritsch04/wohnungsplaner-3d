@@ -15,6 +15,7 @@
  * reads and the JSON Claude answers with use room coordinates in cm (see coords.ts).
  * Rotations follow `Furniture.rotation` (radians; the local front is +y, see `rotationFacing`).
  */
+import type { FixtureKind } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 import type { RoomType } from '../suggest/furnishing';
 
@@ -55,6 +56,11 @@ export interface WallOpening {
   /** Window: lower edge and top above the floor (m). A glazed element to the floor has sill 0. */
   sill?: number;
   top?: number;
+  /**
+   * One walks through it: doors and passages, and a window to the floor (glazed door) when it is
+   * the only way into the room behind it (a balcony without a door). Ways start and end here.
+   */
+  passable: boolean;
 }
 
 /**
@@ -77,6 +83,12 @@ export interface WallInfo {
   openings: WallOpening[];
   /** Stretches without an opening, at least 0.6 m long, measured from `a` (m). */
   free: { t0: number; t1: number }[];
+  /** Thickness (m) of the model walls along it. */
+  thickness: number;
+  /** Height (m); a balcony parapet is about 1 m. */
+  height: number;
+  /** Rooms behind the wall in order along it; null = outside the flat (outer wall, staircase, neighbours). */
+  behind: (string | null)[];
 }
 
 /** Corner of the interior outline where two walls meet. Ek is where wall Wk ends. */
@@ -87,24 +99,48 @@ export interface CornerInfo {
   walls: [string, string];
   /** Interior angle over 180°: the corner sticks into the room (L-shaped room, bay shoulder); nothing stands in it. */
   reflex: boolean;
-  /** Distance to the nearest door or passage edge, measured along the two walls (m). */
+  /** Distance to the nearest door or passage edge, measured along the walls (m); Infinity without one. */
   doorDist: number;
-  /** Distance to the nearest window edge, measured along the two walls (m). */
+  /** Distance to the nearest window edge, measured along the walls (m); Infinity without one. */
   windowDist: number;
 }
 
-/** Route between two openings of a room that must stay walkable. */
+/**
+ * Way between two passable openings of a room. The furnished room must keep some way of this
+ * width between them (B1, B2), not necessarily this one; `length` is the measure for detours (B3).
+ */
 export interface Walkway {
   /** Opening labels (T1 …) at both ends. */
   from: string;
   to: string;
-  /** Shortest walk in the empty room (existing pieces count as obstacles), plan points. */
+  /**
+   * Shortest walk in the empty room (existing pieces count as obstacles), plan points from the
+   * middle of one opening to the other, keeping half the width to walls and obstacles.
+   */
   path: Vec2[];
   length: number;
-  /** Clear width to keep along the path: 0.9 m in halls and pass-through rooms, otherwise 0.7 m. */
+  /**
+   * Clear width: 0.9 m in halls and pass-through rooms, otherwise 0.7 m; less where the empty
+   * room itself is narrower (see `RoomAnalysis.notes`).
+   */
   width: number;
   /** Part of a route from the flat's entrance to another room (traffic through the room). */
   main: boolean;
+}
+
+/** Radiator, socket, switch, water or drain connection on a wall of the room. */
+export interface RoomFixture {
+  id: string;
+  kind: FixtureKind;
+  /** Wall label (W1 …) it sits on; null when it is not at a wall. */
+  wall: string | null;
+  /** Position of its centre along the wall from the wall start (m). */
+  t: number;
+  p: Vec2;
+  /** Width along the wall (m), height of the centre (sockets, connections) or of the lower edge (radiator). */
+  width: number;
+  elevation: number;
+  height?: number;
 }
 
 /** Area the user marked in the plan with a purpose (#416). */
@@ -141,9 +177,19 @@ export interface RoomAnalysis {
   entrance: boolean;
   /** Label of the door one comes in through: towards the entrance, in the entrance room the entrance door; null without doors. */
   mainDoor: string | null;
+  /**
+   * What one looks at when coming in through the main door: a point half a metre inside, the
+   * direction into the room and the wall straight ahead.
+   */
+  entryView: { door: string; at: Vec2; dir: Vec2; wall: string | null } | null;
+  /** Room type from the name; the flat concept decides the type used later. */
+  typeFromName: RoomType;
   /** Furniture already in the room (`existing`), by id: fitted bath, WC, an existing kitchen. */
   existing: string[];
   userZones: UserZone[];
+  fixtures: RoomFixture[];
+  /** What the analysis could not read cleanly, in everyday words (no way between two doors …). */
+  notes: string[];
 }
 
 /** Connection between two rooms through a door or passage. */
