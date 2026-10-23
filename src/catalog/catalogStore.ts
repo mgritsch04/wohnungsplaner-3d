@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { db } from '../persistence/db';
+import { normalizeShapeDims } from './shapeDims';
 import type { CatalogItem } from './types';
+
+/** Repairs flat items stored with mixed-up axes (curtain length as depth …). */
+export function normalizeItem(i: CatalogItem): CatalogItem {
+  if (i.model.type !== 'procedural') return i;
+  const d = normalizeShapeDims(i.model.shape, i);
+  return d.width === i.width && d.depth === i.depth && d.height === i.height ? i : { ...i, ...d };
+}
 
 const KEY = 'importedCatalog';
 
@@ -18,7 +26,7 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
   items: [],
   loaded: false,
   load: async () => {
-    const items = (await db.getMeta<CatalogItem[]>(KEY).catch(() => undefined)) ?? [];
+    const items = ((await db.getMeta<CatalogItem[]>(KEY).catch(() => undefined)) ?? []).map(normalizeItem);
     set({ items, loaded: true });
   },
   addItems: async (items) => {
