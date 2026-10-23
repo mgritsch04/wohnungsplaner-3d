@@ -23,6 +23,13 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('e2e')) {
   (window as unknown as Record<string, unknown>).__wp = { useProjectStore, useUiStore, useImportStore, useSourceAnalysis, usePerformanceStore, useCameraRig, useObjectMenuStore, useCatalogStore };
 }
 
+// offline shell for the shop mode (#361); not in the dev server and not in the Claude-artifact build
+if ('serviceWorker' in navigator && import.meta.env.PROD && import.meta.env.MODE !== 'artifact') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((e) => console.warn('Service Worker nicht registriert', e));
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary>
