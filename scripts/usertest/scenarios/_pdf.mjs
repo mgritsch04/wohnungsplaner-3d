@@ -18,6 +18,24 @@ export const circle = (cx, cy, r) =>
 export const fillRect = (x0, y0, x1, y1, grey = 0.85) => `${grey} g ${px(x0)} ${py(y0)} ${f((x1 - x0) * M)} ${f((y1 - y0) * M)} re f 0 g`;
 /** Text label (Helvetica) at a plan point. */
 export const text = (x, y, str, size = 10) => `BT /F1 ${size} Tf ${px(x)} ${py(y)} Td (${str}) Tj ET`;
+/** Ellipse (four béziers). */
+export const oval = (cx, cy, rx, ry) =>
+  `${px(cx + rx)} ${py(cy)} m ` +
+  `${px(cx + rx)} ${py(cy + K * ry)} ${px(cx + K * rx)} ${py(cy + ry)} ${px(cx)} ${py(cy + ry)} c ` +
+  `${px(cx - K * rx)} ${py(cy + ry)} ${px(cx - rx)} ${py(cy + K * ry)} ${px(cx - rx)} ${py(cy)} c ` +
+  `${px(cx - rx)} ${py(cy - K * ry)} ${px(cx - K * rx)} ${py(cy - ry)} ${px(cx)} ${py(cy - ry)} c ` +
+  `${px(cx + K * rx)} ${py(cy - ry)} ${px(cx + rx)} ${py(cy - K * ry)} ${px(cx + rx)} ${py(cy)} c S`;
+/** Rectangle with rounded corners (radius r), straight edges as lines, corners as béziers. */
+export function roundedRect(cx, cy, w, h, r) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
+  return (
+    `${px(x0 + r)} ${py(y0)} m ${px(x1 - r)} ${py(y0)} l ` +
+    `${px(x1 - r + K * r)} ${py(y0)} ${px(x1)} ${py(y0 + r - K * r)} ${px(x1)} ${py(y0 + r)} c ${px(x1)} ${py(y1 - r)} l ` +
+    `${px(x1)} ${py(y1 - r + K * r)} ${px(x1 - r + K * r)} ${py(y1)} ${px(x1 - r)} ${py(y1)} c ${px(x0 + r)} ${py(y1)} l ` +
+    `${px(x0 + r - K * r)} ${py(y1)} ${px(x0)} ${py(y1 - r + K * r)} ${px(x0)} ${py(y1 - r)} c ${px(x0)} ${py(y0 + r)} l ` +
+    `${px(x0)} ${py(y0 + r - K * r)} ${px(x0 + r - K * r)} ${py(y0)} ${px(x0 + r)} ${py(y0)} c h S`
+  );
+}
 export const poly = (pts) => pts.map((p, i) => `${px(p.x)} ${py(p.y)} ${i ? 'l' : 'm'}`).join(' ') + ' h S';
 
 /** Room 5 × 4 m, walls 20 cm (outline of each wall as two lines, like a CAD export). */

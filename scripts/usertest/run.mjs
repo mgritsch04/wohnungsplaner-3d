@@ -239,7 +239,7 @@ for (const step of scenario.steps) {
   try {
     res = await step.run(t);
   } catch (e) {
-    res = { status: 'fail', observed: `Abbruch: ${String(e.message ?? e).split('\n')[0]}` };
+    res = { status: 'fail', observed: `Abbruch: ${String(e.message ?? e).split('\n').slice(0, 12).join(' / ')}` };
   }
   if (errors.length > errBefore && res.status === 'ok') {
     res = { status: 'fail', observed: `${res.observed} – aber Fehler in der Konsole: ${errors.slice(errBefore).join(' | ')}` };
