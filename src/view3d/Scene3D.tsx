@@ -170,7 +170,7 @@ export function Scene3D() {
           {carried ? (
             <span>Du trägst „{carried}“ – umsehen zum Verschieben · Klick oder G: absetzen</span>
           ) : locked ? (
-            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · E (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · F: Objekt-Menü · P: Referenzfigur · Esc: Maus freigeben</span>
+            <span>WASD/Pfeiltasten: gehen · Maus: umsehen · Mausrad: zoomen (Z: zurück) · Shift: schneller · C: ducken an/aus · Klick: Möbel auswählen · F (oder Klick, O): Tür/Fenster öffnen/schließen · G: Möbel tragen · Q/E: Möbel drehen · Rechtsklick: Objekt-Menü · P: Referenzfigur · Esc: Maus freigeben</span>
           ) : (
             <span>In die Ansicht klicken, um die Maus zu fangen (oder mit gedrückter Maustaste umsehen). WASD zum Gehen, Mausrad zoomt, F öffnet/schließt Tür oder Fenster im Fadenkreuz.</span>
           )}
