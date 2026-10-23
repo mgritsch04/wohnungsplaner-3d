@@ -440,6 +440,11 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       const n = Math.max(2, Math.round(h / 0.36));
       const parts: Part[] = [box(-W, 0, -D, -W + t, h, D, color), box(W - t, 0, -D, W, h, D, color), box(-W, 0, -D, W, h, -D + 0.006, shade(color, 0.92))];
       const bookColors = ['#7b3f2f', '#2f4b6b', '#b59a5b', '#3f5f45', '#8c8c8c', '#a35d3c'];
+      // wide shelves (e.g. a 4×4 cube shelf) get vertical dividers, one cell about every 37 cm
+      const cols = w >= 1 ? Math.max(2, Math.round((w - t) / 0.37)) : 1;
+      const cell = (w - t) / cols;
+      for (let c = 1; c < cols; c++) parts.push(box(-W + c * cell, t, -D, -W + c * cell + t, h - t, D, color));
+      const booksEnd = cols > 1 ? -W + cell - 0.01 : -W + t + (w - 2 * t) * 0.65;
       for (let i = 0; i <= n; i++) {
         const y = Math.min(h - t, (i * (h - t)) / n);
         parts.push(box(-W + t, y, -D, W - t, y + t, D, color));
@@ -447,7 +452,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
           // a few books for scale and realism
           let x = -W + t + 0.02;
           let k = i;
-          while (x < W - t - 0.06 && x < -W + t + (w - 2 * t) * 0.65) {
+          while (x < W - t - 0.06 && x < booksEnd - 0.03) {
             const bw = 0.025 + ((k * 7) % 5) * 0.006;
             const bh = Math.min(0.3, (h - t) / n - t - 0.02) * (0.75 + ((k * 3) % 4) * 0.07);
             parts.push(box(x, y + t, -D + 0.03, x + bw, y + t + bh, Math.min(D - 0.01, -D + 0.03 + d * 0.8), bookColors[k % bookColors.length], { rough: 0.8 }));
