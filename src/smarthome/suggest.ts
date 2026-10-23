@@ -49,6 +49,8 @@ export interface SmartHomeSuggestion {
   cost: { min: number; max: number; unknown: number };
   /** wishes the planner cannot place yet (no device type for them) */
   later: { roomId: string; text: string }[];
+  /** Part of a whole-apartment concept (#375): shown in its own card, not in the room suggestion's list. */
+  concept?: true;
 }
 
 const COVER_GOAL = 0.9;

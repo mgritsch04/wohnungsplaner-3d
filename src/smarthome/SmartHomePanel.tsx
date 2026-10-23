@@ -18,6 +18,7 @@ import { suggestSmartHome } from './suggest';
 import { applySmartHomeSuggestion, useSmartSuggestStore } from './suggestStore';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { WifiSection } from './WifiPanel';
+import { ConceptSection } from './ConceptPanel';
 import { SPEEDS, useSelectedDeviceId, useSimStore, type PanelStep } from './simStore';
 import css from './SmartHomePanel.module.css';
 
@@ -107,6 +108,7 @@ function DevicesStep({ project, derived, room, setRoomId }: RoomProps) {
 
   return (
     <>
+      <ConceptSection project={project} />
       <SuggestSection project={project} room={room} />
       <AudioSection project={project} room={room} />
       <AudioCatalogSection project={project} room={room} />
@@ -199,7 +201,7 @@ function SuggestSection({ project, room }: { project: Project; room: Project['ro
       <button className="primary block" onClick={propose} disabled={!room} data-testid="sh-suggest">
         Vorschlag zeigen
       </button>
-      {preview && preview.items.length > 0 && (
+      {preview && !preview.concept && preview.items.length > 0 && (
         <div data-testid="sh-suggest-result">
           <ul className={css.list}>
             {preview.items.map((it) => (
