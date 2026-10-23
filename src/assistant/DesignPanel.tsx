@@ -9,7 +9,7 @@ import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
 import { addIkeaArticles } from '../catalog/ikeaSelection';
 import { errorText, HIDE_CODES, loadMcp, loadSample, missingClaude, type McpRuntime, type Sample, type SampleError } from './claude';
-import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, parseFound, replaceWithFound, type FoundProduct } from './productSearch';
+import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, ITEM_TIMEOUT_MS, MAX_AUTO_SEARCH, parseFound, replaceWithFound, searchTargets, TOTAL_TIMEOUT_MS, type FoundProduct, type SearchTarget } from './productSearch';
 import {
   buildDesignPrompt,
   MAX_FIELD,
@@ -76,6 +76,8 @@ export function DesignPanel() {
   const [browser, setBrowser] = useState(false);
   const [search, setSearch] = useState<{ done: number; total: number; current: string } | null>(null);
   const [notFound, setNotFound] = useState<Set<string>>(new Set());
+  const [skipped, setSkipped] = useState(0);
+  const [note, setNote] = useState<string | null>(null);
   const st = useDesignStore();
   const w = st.wishes;
   const project = useProjectStore((s) => s.project);
@@ -145,9 +147,11 @@ export function DesignPanel() {
     const offer = preselect(products, types, w.budget);
     const plan = summarizePlan(project, { roomTypes, focusRoomId: scope === ALL ? null : scope });
     controller?.abort();
+    searchCtl?.abort();
     const ctl = new AbortController();
     controller = ctl;
     st.set({ asking: true, error: null });
+    let made: DesignProposal | null = null;
     try {
       const raw = await sample.json(buildDesignPrompt(w, plan, offer), { signal: ctl.signal, modelTier: 'complex' });
       const proposal = parseDesignAnswer(
@@ -158,7 +162,10 @@ export function DesignPanel() {
       );
       clearPreview();
       setNotFound(new Set());
+      setSkipped(0);
+      setNote(null);
       st.set({ asking: false, proposal, preview: null });
+      made = proposal;
     } catch (e) {
       const code = (e as SampleError | undefined)?.code;
       if (code === 'cancelled') st.set({ asking: false });
@@ -169,6 +176,15 @@ export function DesignPanel() {
       } else st.set({ asking: false, error: code ? errorText(e) : 'Die Antwort enthielt keine verwertbaren Möbel – bitte erneut versuchen.' });
     } finally {
       if (controller === ctl) controller = null;
+    }
+    // one step: plan with real products right away; placeholders stay only for pieces that are not found
+    if (made && searchMode && w.searchReal) {
+      const { targets: found, skipped: rest } = searchTargets(made, (id) => {
+        const c = catalog.find((x) => x.id === id);
+        return c ? c.width * c.depth * c.height : 0;
+      });
+      setSkipped(rest);
+      void findReal(found);
     }
   };
 
@@ -235,41 +251,60 @@ export function DesignPanel() {
     return out;
   };
 
-  const findReal = async (targets: { roomId: string; index: number }[]) => {
+  const findReal = async (targets: SearchTarget[]) => {
     if (!searchMode || search || !targets.length) return;
     clearPreview();
     st.set({ preview: null });
     const ctl = new AbortController();
     searchCtl = ctl;
     const missed = new Set(notFound);
+    const deadline = Date.now() + TOTAL_TIMEOUT_MS;
+    setNote(null);
     try {
       for (const [n, t] of targets.entries()) {
         if (ctl.signal.aborted) break;
+        if (Date.now() > deadline) {
+          setNote('Die Suche wurde nach 20 Minuten beendet; übrige Platzhalter kannst du mit „Nachsuchen“ erneut versuchen.');
+          break;
+        }
         const current = useDesignStore.getState().proposal;
         const pick = current?.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
         const placeholder = pick?.placeholder ? PLACEHOLDERS.find((c) => c.id === pick.catalogId) : undefined;
         if (!current || !pick || !placeholder) continue;
         setSearch({ done: n, total: targets.length, current: pick.label });
+        // one piece may take at most ITEM_TIMEOUT_MS; the user's stop ends the whole search
+        const item = new AbortController();
+        const onStop = () => item.abort();
+        ctl.signal.addEventListener('abort', onStop);
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          item.abort();
+        }, ITEM_TIMEOUT_MS);
         try {
           const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId));
-          const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: ctl.signal, tools: browserTools(mcp!) } : { signal: ctl.signal, web: true });
+          const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true });
           const found = await toCatalog(parseFound(raw), placeholder);
           const latest = useDesignStore.getState().proposal;
           if (found.length && latest) st.set({ proposal: replaceWithFound(latest, t.roomId, t.index, found) });
           else missed.add(`${t.roomId}:${t.index}`);
         } catch (e) {
           const code = (e as SampleError | undefined)?.code;
-          if (code === 'cancelled') break;
+          if (code === 'cancelled' && !timedOut) break;
           if (code === 'tools_unavailable' || (code && HIDE_CODES.includes(code))) {
             setBrowser(false);
-            useUiStore.getState().toast('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC).', 'info');
+            setNote('Die Produktsuche ist hier nicht verfügbar (nur in der Claude-Desktop-App bzw. mit Claude Code am PC) – es bleiben Platzhalter mit Suchlink.');
             break;
           }
           missed.add(`${t.roomId}:${t.index}`);
           if (code === 'rate_limited') {
             useUiStore.getState().toast(errorText(e), 'info');
+            setNote('Claude-Kontingent erreicht – die übrigen Platzhalter bleiben stehen; später mit „Nachsuchen“ fortsetzen.');
             break;
           }
+        } finally {
+          clearTimeout(timer);
+          ctl.signal.removeEventListener('abort', onStop);
         }
       }
     } finally {
@@ -330,9 +365,18 @@ export function DesignPanel() {
             <p className="muted small" data-testid="design-own-count">
               {products.length ? `${products.length === 1 ? '1 eigenes Produkt' : `${products.length} eigene Produkte`} aus deiner Auswahl kommen in Frage, der Rest wird als Platzhalter geplant.` : 'Noch keine eigenen IKEA-/Möbelix-Produkte: Claude plant mit Platzhaltern und Suchlinks (Produkte übernimmst du unter Katalog › IKEA bzw. Möbelix).'}
             </p>
+            {searchMode ? (
+              <label className="small">
+                <input type="checkbox" checked={w.searchReal} onChange={(e) => st.setWishes({ searchReal: e.target.checked })} /> Gleich mit echten IKEA-/Möbelix-Produkten planen (Claude sucht im Shop, je Möbel etwa eine Minute, höchstens {MAX_AUTO_SEARCH} Stück)
+              </label>
+            ) : (
+              <p className="muted small" data-testid="design-no-search">
+                Ohne Helfer bzw. Claude-Desktop-App plant Claude nur mit deinen eigenen Produkten und Platzhaltern. Für echte Produkte: <code>npm run ikea-helper</code> starten oder das Artefakt in der Claude-Desktop-App öffnen.
+              </p>
+            )}
             <div className="btn-row">
-              <button className="primary" disabled={st.asking} onClick={() => void ask()}>
-                {st.asking ? 'Claude richtet ein…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
+              <button className="primary" disabled={st.asking || !!search} onClick={() => void ask()}>
+                {st.asking ? 'Claude richtet ein…' : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
               </button>
               {st.asking && <button onClick={() => controller?.abort()}>Stopp</button>}
             </div>
@@ -358,10 +402,10 @@ export function DesignPanel() {
                     return (
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
-                        {p.placeholder && notFound.has(key) && <p className="muted">Claude hat kein passendes Produkt mit vollständigen Angaben gefunden.</p>}
+                        {p.placeholder && notFound.has(key) && <p className="muted" data-testid="design-notfound">Kein passendes Produkt mit vollständigen Angaben gefunden – bleibt Platzhalter, Suchlink siehe oben.</p>}
                         {p.placeholder && searchMode && !search && (
                           <button className="small" onClick={() => void findReal([{ roomId: r.roomId, index: i }])}>
-                            Echtes Produkt suchen
+                            {notFound.has(key) ? 'Nochmal suchen' : 'Echtes Produkt suchen'}
                           </button>
                         )}
                         {p.alternatives.length > 0 && (
@@ -395,13 +439,13 @@ export function DesignPanel() {
                   search ? (
                     <>
                       <p>
-                        Claude sucht im Shop ({search.done + 1}/{search.total}): {search.current} …
+                        Suche {search.current} {search.done + 1}/{search.total} …
                       </p>
                       <button onClick={() => searchCtl?.abort()}>Suche stoppen</button>
                     </>
                   ) : (
                     <button className="primary" onClick={() => void findReal(placeholders.map(({ roomId, index }) => ({ roomId, index })))}>
-                      Echte Produkte suchen ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
+                      Nachsuchen ({placeholders.length === 1 ? '1 Platzhalter' : `${placeholders.length} Platzhalter`})
                     </button>
                   )
                 ) : (
@@ -411,6 +455,8 @@ export function DesignPanel() {
                     Claude Code fehlt noch? Windows: in PowerShell <code>irm https://claude.ai/install.ps1 | iex</code> (oder <code>npm install -g @anthropic-ai/claude-code</code>), neues Terminal öffnen, <code>claude</code> eingeben und einmal anmelden, dann <code>npm run ikea-helper</code> neu starten. Prüfen: <code>npm run ikea-helper -- --check</code>.
                   </p>
                 )}
+                {skipped > 0 && !search && <p className="muted small">{skipped === 1 ? 'Ein Platzhalter' : `${skipped} Platzhalter`} über der Obergrenze von {MAX_AUTO_SEARCH} Suchen – mit „Nachsuchen“ nachholen.</p>}
+                {note && <p className="warning small" role="status">{note}</p>}
                 {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}
               </div>
             )}

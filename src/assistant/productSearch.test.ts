@@ -10,7 +10,7 @@ import { addRectRoom } from '../model/operations';
 import { jsonFromText, localSample, type McpRuntime } from './claude';
 import { EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, realProducts, swapPick } from './design';
 import { summarizePlan } from './planSummary';
-import { browserTools, buildFindPrompt, foundId, foundToCatalog, parseFound, replaceWithFound, shopOf } from './productSearch';
+import { browserTools, buildFindPrompt, foundId, foundToCatalog, parseFound, replaceWithFound, searchTargets, shopOf } from './productSearch';
 
 const SOFA = PLACEHOLDERS.find((c) => c.id === 'generic-sofa-3')!;
 
@@ -210,5 +210,27 @@ process.stdin.on('end', () => process.stdout.write(JSON.stringify({ type: 'resul
         else process.env.WP_CLAUDE_BIN = old;
       }
     });
+  });
+
+  it('einstufige Suche: größte Platzhalter zuerst, Obergrenze, Rest bleibt Platzhalter', () => {
+    const p = createEmptyProject();
+    addRectRoom(p, { x: 0, y: 0, width: 4, depth: 4, name: 'Wohnzimmer', thickness: 0.12, height: 2.6 });
+    const plan = summarizePlan(p);
+    const r = parseDesignAnswer(
+      { rooms: [{ room: 'R1', items: [{ catalogId: 'generic-plant', label: 'Pflanze', search: 'Pflanze' }, { catalogId: 'generic-sofa-3', label: 'Sofa', search: 'Sofa' }, { catalogId: 'generic-armchair', label: 'Sessel', search: 'Sessel' }] }] },
+      plan,
+      [p.rooms[0].id],
+      [],
+    );
+    const size = (id: string) => {
+      const c = PLACEHOLDERS.find((x) => x.id === id)!;
+      return c.width * c.depth * c.height;
+    };
+    const all = searchTargets(r, size);
+    expect(all.skipped).toBe(0);
+    expect(all.targets.map((t) => r.rooms[0].picks[t.index].label)).toEqual(['Sofa', 'Sessel', 'Pflanze']);
+    const capped = searchTargets(r, size, 2);
+    expect(capped.targets.map((t) => r.rooms[0].picks[t.index].label)).toEqual(['Sofa', 'Sessel']);
+    expect(capped.skipped).toBe(1);
   });
 });

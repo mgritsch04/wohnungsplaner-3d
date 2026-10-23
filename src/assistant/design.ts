@@ -38,9 +38,11 @@ export interface DesignWishes {
   /** Upper limit in EUR for the whole proposal; 0 = none. */
   budget: number;
   retailer: RetailerChoice;
+  /** Search real products for the placeholders right after the proposal (#350); only where a search way exists. */
+  searchReal: boolean;
 }
 
-export const EMPTY_WISHES: DesignWishes = { interests: '', needs: '', wants: '', style: 'skandinavisch', colors: '', budget: 0, retailer: 'both' };
+export const EMPTY_WISHES: DesignWishes = { interests: '', needs: '', wants: '', style: 'skandinavisch', colors: '', budget: 0, retailer: 'both', searchReal: true };
 
 export const MAX_FIELD = 300;
 /** At most this many own products go into one request (keeps the prompt and the usage small). */

@@ -230,7 +230,7 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   expect(errors).toEqual([]);
 });
 
-test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter suchen (Browser der Desktop-App nachgebildet)', async ({ page }) => {
+test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, Nachsuchen für Fallbacks (Browser der Desktop-App nachgebildet)', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => {
@@ -240,6 +240,8 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter 
     const sample = {
       json: async (input: string, options?: { tools?: Tool[] }) => {
         await new Promise((r) => setTimeout(r, 30));
+        if (options?.tools) await new Promise((r) => setTimeout(r, 400));
+        if (options?.tools && /Monstera/.test(input)) return { products: [] };
         if (options?.tools) {
           // product search: open the search page through the page function, then report what was "read"
           const open = options.tools.find((t) => t.name === 'open_page')!;
@@ -254,7 +256,19 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter 
           };
         }
         const living = /(R\d+) „Wohnzimmer“/.exec(input)?.[1] ?? 'R1';
-        return { summary: 'Gemütlich.', rooms: [{ room: living, type: 'living', items: [{ catalogId: 'generic-armchair', quantity: 1, reason: 'Zum Lesen.', label: 'Lesesessel aus Cord', search: 'Sessel Cord' }] }] };
+        return {
+          summary: 'Gemütlich.',
+          rooms: [
+            {
+              room: living,
+              type: 'living',
+              items: [
+                { catalogId: 'generic-armchair', quantity: 1, reason: 'Zum Lesen.', label: 'Lesesessel aus Cord', search: 'Sessel Cord' },
+                { catalogId: 'generic-plant', quantity: 1, reason: 'Grün.', label: 'Monstera groß', search: 'Monstera' },
+              ],
+            },
+          ],
+        };
       },
     };
     const mcp = {
@@ -273,9 +287,10 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter 
   await panel.getByLabel('Umfang').selectOption({ label: 'Wohnzimmer' });
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
-  await expect(proposal).toContainText('Lesesessel aus Cord');
-  await proposal.getByRole('button', { name: 'Echte Produkte suchen (1 Platzhalter)' }).click();
-
+  // one step: the real product is found without a second click; the progress is shown meanwhile
+  await expect(panel.getByTestId('design-search')).toContainText(/Suche .* 1\/2/);
+  await page.screenshot({ path: 'test-results/design-350-progress.png' });
+  await expect(panel.getByRole('button', { name: 'Suche stoppen' })).toBeVisible();
   const pick = panel.getByTestId('design-pick').first();
   await expect(pick).toContainText('TESTSESSEL Cord');
   await expect(pick).toHaveAttribute('data-placeholder', 'no');
@@ -288,6 +303,12 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter 
   await expect(pick.getByTestId('design-alternatives')).toContainText('Lesesessel aus Cord');
   await expect(proposal).not.toContainText('Erfunden');
   await expect(panel.getByTestId('design-total')).toHaveText(/149,00/);
+  // fallback: the plant was not found – stays a marked placeholder with search link; "Nachsuchen" is offered
+  const plant = panel.getByTestId('design-pick').nth(1);
+  await expect(plant).toHaveAttribute('data-placeholder', 'yes');
+  await expect(plant.getByTestId('design-notfound')).toBeVisible();
+  await expect(plant.getByRole('link', { name: 'bei IKEA suchen' })).toBeVisible();
+  await expect(proposal.getByRole('button', { name: 'Nachsuchen (1 Platzhalter)' })).toBeVisible();
   const browser = await page.evaluate(() => (window as unknown as { __browser: string[] }).__browser);
   expect(browser).toEqual(['navigate https://www.ikea.com/at/de/search/?q=Sessel%20Cord', 'get_page_text', 'fremd abgelehnt']);
   await page.screenshot({ path: 'test-results/design-350-found.png' });
@@ -296,8 +317,8 @@ test('Einrichtungsvorschlag mit Claude (#350): echte Produkte statt Platzhalter 
   const before = (await getProject(page)).furniture.length;
   await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
   await panel.getByRole('button', { name: 'Übernehmen' }).click();
-  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 1);
-  const added = ((await getProject(page)) as Project).furniture.slice(before)[0];
+  await expect.poll(async () => (await getProject(page)).furniture.length).toBe(before + 2);
+  const added = ((await getProject(page)) as Project).furniture.slice(before).find((f) => f.name === 'TESTSESSEL Cord')!;
   expect(added).toMatchObject({ name: 'TESTSESSEL Cord', retailer: 'IKEA Österreich', productUrl: 'https://www.ikea.com/at/de/p/testsessel-cord-00000001/' });
   expect(errors).toEqual([]);
 });
