@@ -79,3 +79,10 @@ it('nur die Tischplatte nimmt das Produktfoto (#273, Stufe 2)', () => {
   }
   expect(buildParts('sofa', 2, 0.9, 0.85, '#8E9096').some((p) => p.textured)).toBe(false);
 });
+
+it('a wide shelf (cube shelf) has vertical dividers, a narrow one does not', () => {
+  const dividers = (w: number) =>
+    buildParts('shelf', w, 0.39, 1.47, '#f0eee9').filter((p) => p.s[1] > 1.3 && p.s[0] < 0.03 && Math.abs(p.p[0]) < w / 2 - 0.03).length;
+  expect(dividers(1.47)).toBe(3);
+  expect(dividers(0.8)).toBe(0);
+});
