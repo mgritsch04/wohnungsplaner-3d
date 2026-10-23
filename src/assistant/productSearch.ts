@@ -20,6 +20,23 @@ export const IKEA_RETAILER = 'IKEA Österreich';
 export const FOUND_SOURCE = 'Claude-Suche';
 export const MAX_FOUND = 3;
 const MAX_PAGE_TEXT = 9000;
+/** Limits of the one-step search: placeholders searched per run, time per piece and per run. */
+export const MAX_AUTO_SEARCH = 12;
+export const ITEM_TIMEOUT_MS = 180_000;
+export const TOTAL_TIMEOUT_MS = 20 * 60_000;
+
+export interface SearchTarget {
+  roomId: string;
+  index: number;
+}
+
+/** Placeholders to search, biggest pieces first (they shape the room); the rest stay placeholders. */
+export function searchTargets(p: DesignProposal, size: (catalogId: string) => number, max = MAX_AUTO_SEARCH): { targets: SearchTarget[]; skipped: number } {
+  const all = p.rooms.flatMap((r) => r.picks.map((pick, index) => ({ roomId: r.roomId, index, pick })).filter((x) => x.pick.placeholder));
+  const ordered = [...all].sort((a, b) => size(b.pick.catalogId) - size(a.pick.catalogId));
+  const take = ordered.slice(0, max);
+  return { targets: take.map(({ roomId, index }) => ({ roomId, index })), skipped: all.length - take.length };
+}
 
 /** Product or search pages Claude may open: IKEA Austria and Möbelix only. */
 export function shopOf(url: string): 'IKEA' | 'Möbelix' | null {
