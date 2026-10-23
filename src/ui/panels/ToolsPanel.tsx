@@ -6,6 +6,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUiStore, type Tool } from '../../store/uiStore';
 import { addLight } from '../actions';
 import { FIXTURE_KINDS, FIXTURE_LABEL } from '../../model/fixtures';
+import { guessAndPlaceSockets } from '../../installation/actions';
 import { useFixtureStore } from '../../installation/fixtureStore';
 import { CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 
@@ -209,6 +210,9 @@ function InstallationGroup({ count }: { count: number }) {
           </button>
         ))}
       </div>
+      <button className="block" data-testid="guess-sockets" onClick={() => guessAndPlaceSockets()} title="Schlägt Steckdosen anhand der Wände und Türen vor – nur auf Klick">
+        Steckdosen raten
+      </button>
       <p className="muted small">
         {placing
           ? `Jetzt im 2D-Plan auf oder neben eine Wand klicken – ${FIXTURE_LABEL[placing]} rastet an der Wand ein (Esc bricht ab).`

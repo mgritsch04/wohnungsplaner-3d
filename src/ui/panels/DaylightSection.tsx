@@ -3,6 +3,7 @@ import { COMPASS, DAYLIGHT_LABEL, compassName, compassOf, computeDaylight, sunSp
 import { derivePlan } from '../../model/derived';
 import { useProjectStore } from '../../store/projectStore';
 import { NumberField, Section } from '../fields';
+import { CompassRose, northSideLabel } from '../CompassRose';
 
 /** Compass direction of the plan's upper edge (#69, #93) plus the rough daylight estimate per room and sun hint per balcony. */
 export function DaylightSection() {
@@ -14,8 +15,23 @@ export function DaylightSection() {
 
   return (
     <Section title="Tageslicht & Himmelsrichtung">
+      <div className="compass-row">
+        <CompassRose north={north} testId="compass-panel" />
+        <p className="small" data-testid="north-summary">
+          <strong>Obere Plankante zeigt nach {compassName(compassOf(north))}</strong> ({north}°).
+          <br />
+          Norden liegt im Plan {northSideLabel(north)}.
+        </p>
+      </div>
+      <div className="button-row" role="group" aria-label="Obere Plankante zeigt nach">
+        {COMPASS.map((c, i) => (
+          <button key={c} className={north === i * 45 ? 'active' : undefined} title={compassName(c)} onClick={() => apply((d) => void (d.settings.northDirection = i * 45))}>
+            {c}
+          </button>
+        ))}
+      </div>
       <NumberField
-        label="Oben im Plan ist"
+        label="Oder genau (Grad)"
         value={north}
         digits={0}
         unit="°"
@@ -25,14 +41,6 @@ export function DaylightSection() {
         title="Kompassrichtung der oberen Plankante in Grad: 0 = Norden, 90 = Osten, 180 = Süden, 270 = Westen"
         onChange={(v) => apply((d) => void (d.settings.northDirection = Math.round(v) % 360))}
       />
-      <div className="button-row" role="group" aria-label="Himmelsrichtung oben im Plan">
-        {[0, 90, 180, 270].map((deg) => (
-          <button key={deg} className={north === deg ? 'active' : undefined} onClick={() => apply((d) => void (d.settings.northDirection = deg))}>
-            {compassName(COMPASS[deg / 45])}
-          </button>
-        ))}
-      </div>
-      <p className="muted small">Oben im Plan liegt {compassName(compassOf(north))} ({north}°).</p>
       {!hasRooms ? (
         <p className="muted small">Noch keine Räume.</p>
       ) : (

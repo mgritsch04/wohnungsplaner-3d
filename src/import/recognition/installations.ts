@@ -44,6 +44,10 @@ const WET_ROOM = /bad|wc|toilet|dusch|wasch|küche|kueche|hwr|hauswirtschaft|tec
 const WALL_REACH = 0.45;
 /** Radiator long side may stand at most this far from the wall face. */
 const RADIATOR_GAP = 0.25;
+/** Sockets and switches sit on the wall face, not in the room. */
+const SOCKET_REACH = 0.25;
+/** Clearance around a door / window in which no installation symbol is accepted. */
+const OPENING_MARGIN = 0.3;
 const MAX_PIECE = 2.4;
 const CLOSE = 0.03;
 
@@ -134,9 +138,10 @@ function classifyStraight(segs: FixtureSegment[]): Sym | null {
 /**
  * Installation symbols in the vector segments of a plan (metres). `walls` are the proposed wall
  * centre lines; a symbol must stand at one. `rooms` (interiors with names) only raise or lower
- * the confidence of water connections.
+ * the confidence of water connections. Shapes in or beside a door / window are leaves, frames or
+ * swing arcs, not installations (#371).
  */
-export function detectInstallations(segments: FixtureSegment[], walls: Wall[], rooms: { polygon: Vec2[]; name: string }[]): InstallationCandidate[] {
+export function detectInstallations(segments: FixtureSegment[], walls: Wall[], rooms: { polygon: Vec2[]; name: string }[], openings: { center: Vec2; width: number }[] = []): InstallationCandidate[] {
   if (!walls.length) return [];
   const pieces = segments.filter((s) => !s.areaFill && !s.faint && len(s) > 1e-4 && len(s) <= MAX_PIECE && !isWallFace(s, walls));
   const out: InstallationCandidate[] = [];
@@ -146,6 +151,8 @@ export function detectInstallations(segments: FixtureSegment[], walls: Wall[], r
     const sym = ring ? classifyRing(ring, segs.filter((s) => !s.curve)) : curve.length === 0 ? classifyStraight(segs) : null;
     if (!sym) continue;
     const gap = wallFaceDistance(sym.center, walls);
+    if (openings.some((o) => Math.hypot(o.center.x - sym.center.x, o.center.y - sym.center.y) < o.width / 2 + OPENING_MARGIN)) continue;
+    if ((sym.symbol === 'socket' || sym.symbol === 'switch') && gap > SOCKET_REACH) continue;
     if (sym.symbol === 'radiator') {
       // the long side runs along a wall at a small gap
       const w = walls.map((wl) => ({ wl, d: closestPointOnSegment(sym.center, wl.a, wl.b).distance - wl.thickness / 2 })).sort((p, q) => p.d - q.d)[0];

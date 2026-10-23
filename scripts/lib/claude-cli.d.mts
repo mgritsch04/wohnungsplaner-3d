@@ -3,3 +3,7 @@ export function claudeArgs(opts?: { web?: boolean; maxTurns?: number }): string[
 export function resultText(stdout: string): string;
 export function runClaude(prompt: string, opts?: { web?: boolean; maxTurns?: number; timeoutMs?: number; bin?: string; signal?: AbortSignal }): Promise<string>;
 export function claudeAvailable(bin?: string): Promise<boolean>;
+export const INSTALL_HELP: string;
+export type FoundClaude = { file: string; prefix: string[]; shell: boolean };
+export function findClaude(opts?: { platform?: string; env?: Record<string, string | undefined>; exists?: (p: string) => boolean; home?: string; nodePath?: string }): FoundClaude | null;
+export function checkClaude(bin?: string): Promise<{ ok: boolean; lines: string[] }>;

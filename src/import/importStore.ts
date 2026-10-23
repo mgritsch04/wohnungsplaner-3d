@@ -3,7 +3,15 @@ import type { DraftFixture, DraftInstallation, DraftOpening, DraftRoom, DraftWal
 
 export type DraftSelection = { type: 'wall' | 'opening' | 'room' | 'fixture' | 'installation'; id: string } | null;
 
+/** What the recognition may add beyond walls, openings and rooms – off unless G asks for it (#371, #372). */
+export interface RecognitionOptions {
+  detectSanitary: boolean;
+  detectInstallationSymbols: boolean;
+}
+
 interface ImportStore {
+  options: RecognitionOptions;
+  setOptions: (o: Partial<RecognitionOptions>) => void;
   draft: ReconstructionDraft | null;
   selected: DraftSelection;
   /** Progress of a running import/recognition (0..1) and its label. */
@@ -22,6 +30,8 @@ interface ImportStore {
 }
 
 export const useImportStore = create<ImportStore>((set, get) => ({
+  options: { detectSanitary: false, detectInstallationSymbols: false },
+  setOptions: (o) => set({ options: { ...get().options, ...o } }),
   draft: null,
   selected: null,
   progress: null,

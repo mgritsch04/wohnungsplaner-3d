@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { claudeArgs, resultText, runClaude } from '../../scripts/lib/claude-cli.mjs';
+import { checkClaude, claudeArgs, findClaude, INSTALL_HELP, resultText, runClaude } from '../../scripts/lib/claude-cli.mjs';
 import { isIkeaItem, isMoebelixItem } from '../catalog/ikeaSelection';
 import { createEmptyProject } from '../model/factory';
 import { addRectRoom } from '../model/operations';
@@ -163,5 +163,52 @@ process.stdin.on('end', () => process.stdout.write(JSON.stringify({ type: 'resul
     expect(text).toContain('Echo: Hallo Claude');
     expect(text).toContain('--allowedTools WebSearch');
     await expect(runClaude('x', { bin: join(dir, 'gibt-es-nicht') })).rejects.toThrow('nicht gefunden');
+  });
+
+  describe('Claude Code finden (Windows-Pfade gemockt)', () => {
+    const win = (files: string[], env: Record<string, string> = {}) => ({
+      platform: 'win32',
+      env: { USERPROFILE: 'C:\\Users\\x', APPDATA: 'C:\\Users\\x\\AppData\\Roaming', PATH: 'C:\\Windows;C:\\nodejs', ...env },
+      exists: (f: string) => files.includes(f),
+      home: 'C:\\Users\\x',
+      nodePath: 'C:\\nodejs\\node.exe',
+    });
+    it('nativer Installer: claude.exe in .local\\bin, ohne Shell', () => {
+      expect(findClaude(win(['C:\\Users\\x\\.local\\bin\\claude.exe']))).toEqual({ file: 'C:\\Users\\x\\.local\\bin\\claude.exe', prefix: [], shell: false });
+    });
+    it('npm-Starter claude.cmd wird auf cli.js über node aufgelöst', () => {
+      const dir = 'C:\\Users\\x\\AppData\\Roaming\\npm';
+      const r = findClaude(win([`${dir}\\claude.cmd`, `${dir}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`]));
+      expect(r).toEqual({ file: 'C:\\nodejs\\node.exe', prefix: [`${dir}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`], shell: false });
+    });
+    it('npm-Starter mit eingebauter claude.exe', () => {
+      const dir = 'C:\\nodejs';
+      const exe = `${dir}\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe`;
+      expect(findClaude(win([`${dir}\\claude.cmd`, exe]))?.file).toBe(exe);
+    });
+    it('nur claude.cmd ohne Paketordner: Shell-Notlösung', () => {
+      expect(findClaude(win(['C:\\nodejs\\claude.cmd']))?.shell).toBe(true);
+    });
+    it('nicht installiert: null; Hilfetext nennt die Installation', () => {
+      expect(findClaude(win([]))).toBeNull();
+      expect(INSTALL_HELP).toContain('install.ps1');
+      expect(INSTALL_HELP).toContain('claude');
+    });
+    it('Linux: PATH und ~/.local/bin', () => {
+      const env = { PATH: '/usr/bin' };
+      expect(findClaude({ platform: 'linux', env, exists: (f) => f === '/home/u/.local/bin/claude', home: '/home/u' })?.file).toBe('/home/u/.local/bin/claude');
+    });
+    it('Selbsttest meldet fehlendes Claude mit Anleitung', async () => {
+      const old = process.env.WP_CLAUDE_BIN;
+      process.env.WP_CLAUDE_BIN = '/gibt/es/nicht/claude';
+      try {
+        const r = await checkClaude();
+        expect(r.ok).toBe(false);
+        expect(r.lines.join('\n')).toContain('nicht gefunden');
+      } finally {
+        if (old === undefined) delete process.env.WP_CLAUDE_BIN;
+        else process.env.WP_CLAUDE_BIN = old;
+      }
+    });
   });
 });

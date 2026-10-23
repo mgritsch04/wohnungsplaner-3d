@@ -8,7 +8,7 @@ import { applyFurnishing, guessRoomType, suggestFurnishing, type FurnishingSugge
 import { useFurnishStore } from '../suggest/furnishStore';
 import { Badge, Section, SelectField } from '../ui/fields';
 import { addIkeaArticles } from '../catalog/ikeaSelection';
-import { errorText, HIDE_CODES, loadMcp, loadSample, type McpRuntime, type Sample, type SampleError } from './claude';
+import { errorText, HIDE_CODES, loadMcp, loadSample, missingClaude, type McpRuntime, type Sample, type SampleError } from './claude';
 import { browserAvailable, browserTools, buildFindPrompt, FOUND_SOURCE, foundToCatalog, parseFound, replaceWithFound, type FoundProduct } from './productSearch';
 import {
   buildDesignPrompt,
@@ -69,6 +69,8 @@ function labelPreview(preview: FurnishingSuggestion, proposal: DesignProposal) {
 export function DesignPanel() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [hidden, setHidden] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [missing, setMissing] = useState<'helper' | 'claude'>('helper');
   const [openAlt, setOpenAlt] = useState<string | null>(null);
   const [mcp, setMcp] = useState<McpRuntime | null>(null);
   const [browser, setBrowser] = useState(false);
@@ -87,7 +89,13 @@ export function DesignPanel() {
 
   useEffect(() => {
     let live = true;
-    void loadSample().then((s) => live && setSample(s));
+    void loadSample().then(async (s) => {
+      const why = s ? null : await missingClaude();
+      if (!live) return;
+      if (why) setMissing(why);
+      setSample(s);
+      setChecked(true);
+    });
     void loadMcp().then(async (m) => {
       const ok = await browserAvailable(m);
       if (live) {
@@ -100,7 +108,23 @@ export function DesignPanel() {
     };
   }, []);
 
-  if (!sample || hidden) return null;
+  if (hidden || !checked) return null;
+  if (!sample) {
+    return (
+      <div className="assistant-panel" data-testid="design-panel-unavailable">
+        <Section title="Einrichtungsvorschlag mit Claude" actions={<Badge kind="info">ganze Wohnung</Badge>}>
+          <p className="muted small">Claude richtet die ganze Wohnung (oder einen Raum) ein und sucht dafür echte IKEA-/Möbelix-Produkte. Dafür braucht der Planer eine Verbindung zu Claude – die fehlt gerade:</p>
+          {missing === 'helper' ? (
+            <p className="warning small">
+              Der lokale Helfer läuft nicht. Starte ihn in einem zweiten Terminal im Projektordner mit <code>npm run ikea-helper</code> und lade diese Seite neu (oder im Claude-Artefakt öffnen).
+            </p>
+          ) : (
+            <p className="warning small">Der Helfer läuft, findet aber Claude Code nicht. Installiere Claude Code und melde dich an (<code>claude</code> im Terminal), dann den Helfer neu starten und diese Seite neu laden.</p>
+          )}
+        </Section>
+      </div>
+    );
+  }
 
   const rooms = project.rooms;
   const scope = st.scope === ALL || rooms.some((r) => r.id === st.scope) ? st.scope : ALL;
@@ -383,6 +407,8 @@ export function DesignPanel() {
                 ) : (
                   <p className="muted small">
                     Echte Produkte statt Platzhalter sucht Claude in der Claude-Desktop-App (eingebauter Browser) oder im lokalen Planer mit Claude Code und „npm run ikea-helper“.
+                    <br />
+                    Claude Code fehlt noch? Windows: in PowerShell <code>irm https://claude.ai/install.ps1 | iex</code> (oder <code>npm install -g @anthropic-ai/claude-code</code>), neues Terminal öffnen, <code>claude</code> eingeben und einmal anmelden, dann <code>npm run ikea-helper</code> neu starten. Prüfen: <code>npm run ikea-helper -- --check</code>.
                   </p>
                 )}
                 {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}

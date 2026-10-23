@@ -1,3 +1,4 @@
+import { guessSockets } from './guessSockets';
 import { FIXTURE_ELEVATION, fixtureSize, RADIATOR_DEFAULT, snapFixtureToWall } from '../model/fixtures';
 import { newId } from '../model/ids';
 import type { Fixture, FixtureKind } from '../model/schema';
@@ -53,4 +54,18 @@ export function deleteFixture(id: string) {
   store().apply((d) => {
     d.fixtures = d.fixtures.filter((f) => f.id !== id);
   });
+}
+
+/** „Steckdosen raten“ (#374): propose sockets for the current plan and add them as one undo step. */
+export function guessAndPlaceSockets(): number {
+  const found = guessSockets(store().project);
+  if (!found.length) {
+    useUiStore.getState().toast('Keine Steckdosen zu raten – Räume fehlen, oder es gibt schon genug.', 'info');
+    return 0;
+  }
+  store().apply((d) => {
+    d.fixtures.push(...found);
+  });
+  useUiStore.getState().toast(`${found.length} Steckdose(n) geraten und als „geraten“ markiert – bitte prüfen. Rückgängig mit Strg+Z.`, 'success');
+  return found.length;
 }
