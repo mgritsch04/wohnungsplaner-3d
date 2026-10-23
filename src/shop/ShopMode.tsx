@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useProjectStore } from '../store/projectStore';
-import { buildingSpans, fitCheck, formatCm, formatMeters, type FitResult, type FreeSpan } from './shopMode';
+import { buildingSpans, fitCheck, formatCm, formatMeters, type FitResult, type FreeSpan } from './shopFit';
 import { loadChecked, progress, saveChecked, shoppingGroups } from './shopList';
 import './shop.css';
 
