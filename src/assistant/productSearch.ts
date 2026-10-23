@@ -9,6 +9,7 @@
  * www.ikea.com/at and www.moebelix.at may be opened. Everything Claude reports is checked here
  * (shop host, plausible size and price) before it becomes a catalogue entry.
  */
+import { isPanelPair, normalizeShapeDims } from '../catalog/shapeDims';
 import { z } from 'zod';
 import { normalizePackSize } from '../catalog/packSize';
 import { MOEBELIX_AT } from '../catalog/providers/registry';
@@ -157,6 +158,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst.`,
     ...(retailer === 'both' ? ['- Schau in BEIDEN Shops (IKEA und Möbelix). Gibt es in beiden passende Produkte, nimm mindestens eines von jedem Shop in die Liste.'] : []),
     '- Nur Angaben, die du auf der Produktseite gelesen hast: Name, Adresse der Produktseite, Preis in Euro, Breite/Tiefe/Höhe in cm. Nichts schätzen oder erfinden; fehlt eine Angabe, lass das Produkt weg.',
+    '- Maße immer als Breite (links-rechts), Tiefe (vorn-hinten) und Höhe (oben-unten): Bei Vorhängen/Gardinen ist die Länge bzw. Fallhöhe die Höhe_cm (z. B. 250), die Tiefe nur wenige cm; bei Paaren/Sets die Breite eines Stücks. Bei Teppichen sind Länge/Breite die Fläche und die Höhe die Flordicke (wenige mm); bei Bildern ist die Tiefe die Rahmendicke.',
     '- Multipacks: Wird das Produkt nur als Packung/Set mit mehreren Stück verkauft (z. B. „3er-Set“, „4 Stück“, „Packung à 6“), gib „price“ als Preis der GANZEN Packung an und „pack_size“ als Stück pro Packung; Maße gelten pro Stück. Wird es einzeln verkauft, lass „pack_size“ weg (oder 1).',
     '- Suchbegriffe: kurz und allgemein (Produktart plus höchstens ein Merkmal wie Material oder Farbe). Keine Maße, keine Modell-/Serienamen und keine Artikelnummern in den Suchbegriff; Modellnamen nur, wenn du sie auf einer Shopseite gelesen hast.',
     '- Passt kein Produkt genau, nimm das passendste verfügbare und beginne „why“ mit „Alternative: …, weil …“ (was weicht ab: Maße, Farbe, Stil). Gib nur „nichts gefunden“ zurück, wenn die Produktart im Shop nicht vorkommt.',
@@ -346,13 +348,15 @@ export function foundId(url: string): string {
 
 /** Catalogue entry for a found product; shape and colour come from the placeholder (no 3D model of the product). */
 export function foundToCatalog(f: FoundProduct, placeholder: CatalogItem, today = new Date().toISOString().slice(0, 10)): CatalogItem {
+  const shape = placeholder.model.type === 'procedural' ? placeholder.model.shape : undefined;
+  const flatDims = normalizeShapeDims(shape, { width: f.width, depth: f.depth, height: f.height });
+  // a pair of curtain panels is sold as one product: both hang side by side
+  if (shape === 'curtain' && isPanelPair(f.name)) flatDims.width = Math.round(flatDims.width * 2 * 1000) / 1000;
   return {
     id: foundId(f.url),
     name: f.name,
     category: placeholder.category,
-    width: f.width,
-    depth: f.depth,
-    height: f.height,
+    ...flatDims,
     ...(placeholder.elevation ? { elevation: placeholder.elevation } : {}),
     color: placeholder.color,
     model: structuredClone(placeholder.model),
