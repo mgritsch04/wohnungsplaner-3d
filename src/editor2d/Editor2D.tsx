@@ -38,6 +38,7 @@ import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
 import { Fixtures2D } from '../installation/Fixtures2D';
 import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
+import { LuxOverlay2D } from './LuxOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { calibrateUnderlay } from '../import/underlayTransform';
 import { groupBounds, groupCenter, groupName, moveGroupBy, rotateGroupPoses, selectedGroup, settleGroup, type GroupTurnResult } from '../model/groups';
@@ -914,6 +915,7 @@ export function Editor2D() {
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
           <WalkMarker px={px} />
           <WifiOverlay2D project={project} />
+          <LuxOverlay2D project={project} px={px} />
           {view.zoom >= ICON_MIN_ZOOM && <Fixtures2D project={project} px={px} />}
           {view.zoom >= ICON_MIN_ZOOM && <DevicesOverlay2D project={project} px={px} />}
           {view.zoom >= ICON_MIN_ZOOM && <NotePins2D project={project} derived={derived} px={px} />}

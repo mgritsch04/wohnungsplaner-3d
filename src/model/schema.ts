@@ -249,6 +249,8 @@ export const FurnitureSchema = z.object({
   groupId: z.string().min(1).optional(),
   /** Inner layout of a cabinet (#85); absent = not planned. */
   interior: InteriorSchema.optional(),
+  /** Luminous flux of a lamp in lumen (#360), e.g. from the packaging; absent = typical value of the lamp type is assumed. */
+  lumen: z.number().min(0).max(20000).optional(),
 });
 
 /**
