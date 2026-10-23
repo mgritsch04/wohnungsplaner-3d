@@ -54,9 +54,9 @@ describe('properties panel groups (#99)', () => {
 
   it('groups the furniture fields by topic; rarely used groups start collapsed', () => {
     select('furniture', furniture('generic-wardrobe-150').id);
-    expect([...toggles().keys()]).toEqual(['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis', 'Innenaufteilung', '3D-Modell', 'Produkt', 'Erweitert']);
+    expect([...toggles().keys()]).toEqual(['Objekt', 'Position', 'Maße', 'Aussehen', 'Preis', 'Innenaufteilung', '3D-Modell', 'Produkt', 'Lieferweg', 'Erweitert']);
     const state = Object.fromEntries([...toggles()].map(([t, b]) => [t, b.getAttribute('aria-expanded')]));
-    expect(state).toEqual({ Objekt: 'true', Position: 'true', 'Maße': 'true', Aussehen: 'true', Preis: 'true', Innenaufteilung: 'false', '3D-Modell': 'false', Produkt: 'false', Erweitert: 'false' });
+    expect(state).toEqual({ Objekt: 'true', Position: 'true', 'Maße': 'true', Aussehen: 'true', Preis: 'true', Innenaufteilung: 'false', '3D-Modell': 'false', Produkt: 'false', Lieferweg: 'false', Erweitert: 'false' });
     // fields of open groups are there, those of collapsed groups are not rendered
     expect(labels()).toEqual(expect.arrayContaining(['Name', 'Kategorie', 'X', 'Y', 'Drehung', 'Über Boden', 'Breite', 'Tiefe', 'Höhe', 'Farbe', 'Preis', 'Menge']));
     expect(labels()).not.toContain('Marke');

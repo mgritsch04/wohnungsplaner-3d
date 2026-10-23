@@ -16,6 +16,7 @@ import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, ty
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
+import { runDeliveryCheck, useDeliveryStore } from '../../editor2d/deliveryStore';
 import { selectedFurnitureIds, useUiStore } from '../../store/uiStore';
 import { InteriorSection } from './InteriorSection';
 import { PhotosSection } from '../../photos/PhotosSection';
@@ -683,6 +684,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
           </a>
         )}
       </PanelGroup>
+      <DeliveryGroup f={f} />
       <PanelGroup groupKey="furniture.advanced" title="Erweitert" defaultOpen={false}>
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
@@ -713,6 +715,25 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       </div>
       <p className="muted small padded">Tipp: Q/E dreht in 15°-Schritten, Pfeiltasten verschieben um 1 cm (Shift: 10 cm).</p>
     </div>
+  );
+}
+
+function DeliveryGroup({ f }: { f: Furniture }) {
+  const { furnitureId, result } = useDeliveryStore();
+  const mine = furnitureId === f.id ? result : null;
+  return (
+    <PanelGroup groupKey="furniture.delivery" title="Lieferweg" defaultOpen={false}>
+      <button className="block" onClick={() => runDeliveryCheck(f.id)} title="Prüft grob, ob das Möbel vom Eingang bis an seinen Platz getragen werden kann">
+        Lieferweg prüfen
+      </button>
+      {mine && (
+        <p className="small" data-testid="delivery-result" data-fits={mine.ok && mine.fits ? '1' : '0'} role="status">
+          {mine.ok ? mine.message : mine.reason}
+          {mine.ok && mine.bottleneck && mine.fits && <><br />{mine.bottleneck.label}</>}
+        </p>
+      )}
+      <p className="muted small">Schätzung: Türen und Gänge, Kippen/Hochkant grob; Treppen und Drehen um Ecken werden nicht geprüft.</p>
+    </PanelGroup>
   );
 }
 

@@ -35,6 +35,7 @@ import { KitchenTriangleOverlay } from './KitchenTriangleOverlay';
 import { NotePins2D } from '../planning/NotePins2D';
 import { SightlineOverlay } from './SightlineOverlay';
 import { ClearanceOverlay } from './ClearanceOverlay';
+import { DeliveryOverlay } from './DeliveryOverlay';
 import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
 import { Fixtures2D } from '../installation/Fixtures2D';
@@ -925,6 +926,7 @@ export function Editor2D() {
           <SightlineOverlay project={project} derived={derived} px={px} />
           {tool === 'select' && <ClearanceOverlay project={project} derived={derived} px={px} draggingIds={preview.clearanceIds} />}
           {tool === 'walkpath' && <WalkPathOverlay px={px} />}
+          <DeliveryOverlay px={px} />
           <WalkMarker px={px} />
           <WifiOverlay2D project={project} />
           <LuxOverlay2D project={project} px={px} />
