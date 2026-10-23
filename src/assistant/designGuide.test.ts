@@ -42,6 +42,18 @@ describe('design guide per room type (#350)', () => {
     expect(withWindow.add.map((a) => a.catalogId)).toContain('generic-curtain');
   });
 
+  it('bedroom: a retailer bed without 3D model yet also gets a mattress, a bed with mattress in its name does not', () => {
+    const base = findCatalogItem('generic-bed-160')!;
+    const items: Record<string, CatalogItem> = {
+      'ikea-bed': { ...base, id: 'ikea-bed', name: 'Bettgestell mit Lattenrost' },
+      'ikea-boxspring': { ...base, id: 'ikea-boxspring', name: 'Boxspringbett' },
+    };
+    const look = (id: string) => items[id] ?? lookup(id);
+    expect(completeRoom({ type: 'bedroom', picks: [pick('ikea-bed')], existing: [], area: 12, hasWindow: false, lookup: look }).add.map((a) => a.catalogId)).toContain('generic-mattress');
+    expect(completeRoom({ type: 'bedroom', picks: [pick('ikea-boxspring')], existing: [], area: 12, hasWindow: false, lookup: look }).add.map((a) => a.catalogId)).not.toContain('generic-mattress');
+    expect(completeRoom({ type: 'bedroom', picks: [pick('generic-bed-160')], existing: [], area: 12, hasWindow: false, lookup }).add.map((a) => a.catalogId)).not.toContain('generic-mattress');
+  });
+
   it('every room type has rules for the prompt', () => {
     for (const t of ['living', 'bedroom', 'kids', 'office', 'dining', 'bath', 'hall', 'utility', 'balcony'] as const) expect(guidePrompt(t).length, t).toBeGreaterThan(0);
   });
