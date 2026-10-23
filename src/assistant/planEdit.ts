@@ -21,6 +21,7 @@ import { derivePlan, type DerivedPlan } from '../model/derived';
 import type { Furniture, Project } from '../model/schema';
 import { add, closestPointOnSegment, dist, dot, normalize, perp, pointInPolygon, scale, sub, type Vec2 } from '../model/vec';
 import { guessRoomType, placeNear, roomIdAt, ROOM_TYPES, suggestFurnishing, type FurnishingSuggestion, type PlaceTarget, type RoomType } from '../suggest/furnishing';
+import { describeZone, isKeepFree, zoneCenter, zoneLabels, zoneRoomId } from '../model/zones';
 import { kitchenFaces } from './kitchenDesign';
 import { summarizeCatalog } from './planSummary';
 
@@ -52,6 +53,8 @@ export interface EditInput {
   roomKeys: Record<string, string>;
   /** M1 → furniture id */
   itemKeys: Record<string, string>;
+  /** Z1 → zone id (marked areas, #416) */
+  zoneKeys: Record<string, string>;
   /** K1 → ids of the kitchen modules of that run */
   kitchenKeys: Record<string, { roomId: string; ids: string[] }>;
   /** Room id → its walls, W1 = index 0 */
@@ -144,6 +147,8 @@ export function buildEditInput(project: Project, scope: string | null, roomTypes
   const kitchenKeys: EditInput['kitchenKeys'] = {};
   const walls: Record<string, EditWall[]> = {};
   const lines: string[] = [];
+  const zoneKeys: Record<string, string> = {};
+  const zoneKey = zoneLabels(project.zones ?? []);
   let n = 0;
   let k = 0;
   for (const id of roomIds) {
@@ -159,6 +164,13 @@ export function buildEditInput(project: Project, scope: string | null, roomTypes
       const parts = [`${m2(dist(w.a, w.b))} m`, w.windows.length ? `${w.windows.length === 1 ? '1 Fenster' : `${w.windows.length} Fenster`}` : null, w.doors.length ? `${w.doors.length === 1 ? '1 Tür' : `${w.doors.length} Türen`}` : null, neighbour ? `grenzt an ${keyOf.get(neighbour.id)} „${neighbour.name || 'Raum ohne Namen'}“` : null];
       lines.push(`  W${i + 1} (${w.side}): ${parts.filter(Boolean).join(', ')}`);
     });
+    for (const z of project.zones ?? []) {
+      if (zoneRoomId(project, derived, z) !== id) continue;
+      const zk = zoneKey.get(z.id)!;
+      zoneKeys[zk] = z.id;
+      const purpose = z.purpose.trim().replace(/\s+/g, ' ').slice(0, 200) || 'ohne Angabe';
+      lines.push(`  ${zk} „${purpose}“${isKeepFree(purpose) ? ' (frei lassen)' : ''}: ${describeZone(derived, z, id)}`);
+    }
     for (const run of kitchenRuns(project, derived, id)) {
       k++;
       kitchenKeys[`K${k}`] = { roomId: id, ids: run.map((f) => f.id) };
@@ -176,7 +188,7 @@ export function buildEditInput(project: Project, scope: string | null, roomTypes
     }
   }
   const header = roomIds.length === 1 && project.rooms.length > 1 ? `Gewählter Raum (die Wohnung hat ${project.rooms.length} Räume):` : `Wohnung mit ${project.rooms.length} Räumen:`;
-  return { text: `${header}\n${lines.join('\n')}`, roomKeys, itemKeys, kitchenKeys, walls, roomIds };
+  return { text: `${header}\n${lines.join('\n')}`, roomKeys, itemKeys, zoneKeys, kitchenKeys, walls, roomIds };
 }
 
 export function buildEditPrompt(instruction: string, input: EditInput, catalog: CatalogItem[]): string {
@@ -188,18 +200,18 @@ export function buildEditPrompt(instruction: string, input: EditInput, catalog: 
     '',
     input.text,
     '',
-    'Wände: W1, W2 … je Raum, mit Lage im Grundriss (oben = Norden). Möbel: M1, M2 …; Küchenzeilen: K1 …',
+    'Wände: W1, W2 … je Raum, mit Lage im Grundriss (oben = Norden). Möbel: M1, M2 …; markierte Bereiche: Z1 …; Küchenzeilen: K1 …',
     '',
     'Katalog für neue Möbel (nur diese ids; Format „id: Name, Breite×Tiefe×Höhe, Kategorie“):',
     summarizeCatalog(catalog),
     '',
     'Mögliche Änderungen ("op"):',
-    '- "move": Möbel umstellen. "item" = M…, optional "room" (R…, sonst bleibt der Raum), "wall" (W… des Zielraums) und/oder "near" ("window", "door" oder ein Möbel M…).',
+    '- "move": Möbel umstellen. "item" = M…, optional "room" (R…, sonst bleibt der Raum), "wall" (W… des Zielraums) und/oder "near" ("window", "door", ein Möbel M… oder ein Bereich Z…).',
     '- "remove": Möbel entfernen ("item").',
     '- "replace": Möbel durch ein Katalog-Möbel ersetzen ("item", "catalogId"); es kommt an dieselbe Stelle.',
     '- "add": Katalog-Möbel hinzufügen ("room", "catalogId", "quantity", optional "wall", "near").',
     '- "kitchen": Küchenzeile an eine andere Wand desselben Raums stellen ("run" = K…, "wall" = W…). Einzelne Küchenmodule nicht ändern.',
-    'Die App stellt die Möbel selbst kollisionsfrei auf; keine Koordinaten angeben. Möbel mit „fest“ nicht ändern.',
+    'Die App stellt die Möbel selbst kollisionsfrei auf; keine Koordinaten angeben. Möbel mit „fest“ nicht ändern. Bereiche mit „frei lassen“ nicht zustellen; Möbel für einen Bereich mit "near":"Z…" dorthin.',
     'Wände, Türen, Fenster und die Raumform kann die App nicht ändern: solche Wünsche kurz in "notPossible" nennen (was und warum), nichts erfinden.',
     `Höchstens ${MAX_CHANGES} Änderungen, jede mit "why" (ein kurzer Satz). Keine Marken, Händler oder Preise erfinden.`,
     '',
@@ -208,7 +220,7 @@ export function buildEditPrompt(instruction: string, input: EditInput, catalog: 
   ].join('\n');
 }
 
-export type EditNear = { kind: 'window' } | { kind: 'door' } | { kind: 'item'; furnitureId: string };
+export type EditNear = { kind: 'window' } | { kind: 'door' } | { kind: 'item'; furnitureId: string } | { kind: 'zone'; zoneId: string };
 
 export type EditChange =
   | { op: 'move'; furnitureId: string; roomId: string; wall?: number; near?: EditNear; why: string }
@@ -266,6 +278,8 @@ export function parseEditAnswer(raw: unknown, input: EditInput, project: Project
     const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
     if (s === 'window' || s === 'fenster') return { kind: 'window' };
     if (s === 'door' || s === 'tür') return { kind: 'door' };
+    const zone = input.zoneKeys[key(v)];
+    if (zone) return { kind: 'zone', zoneId: zone };
     const id = input.itemKeys[key(v)];
     return id ? { kind: 'item', furnitureId: id } : undefined;
   };
@@ -360,7 +374,7 @@ export function planEdits(project: Project, input: EditInput, answer: EditAnswer
   const byId = (id: string) => draft.furniture.find((f) => f.id === id);
   const lookup = (id: string) => catalog.find((c) => c.id === id) ?? findCatalogItem(id);
   const wallText = (roomId: string, i: number | undefined) => (i === undefined ? '' : ` an die Wand ${input.walls[roomId][i].side} (W${i + 1})`);
-  const nearText = (n?: EditNear) => (!n ? '' : n.kind === 'window' ? ' beim Fenster' : n.kind === 'door' ? ' bei der Tür' : ` bei „${byId(n.furnitureId)?.name ?? 'Möbel'}“`);
+  const nearText = (n?: EditNear) => (!n ? '' : n.kind === 'window' ? ' beim Fenster' : n.kind === 'door' ? ' bei der Tür' : n.kind === 'zone' ? ` in den Bereich „${project.zones?.find((z) => z.id === n.zoneId)?.purpose || 'ohne Angabe'}“` : ` bei „${byId(n.furnitureId)?.name ?? 'Möbel'}“`);
   const moving = new Set(answer.changes.flatMap((c) => (c.op === 'move' || c.op === 'replace' ? [c.furnitureId] : [])));
 
   const target = (roomId: string, wall?: number, n?: EditNear): PlaceTarget => {
@@ -370,6 +384,9 @@ export function planEdits(project: Project, input: EditInput, answer: EditAnswer
     if (n?.kind === 'item') {
       const o = byId(n.furnitureId);
       if (o) point = { x: o.x, y: o.y };
+    } else if (n?.kind === 'zone') {
+      const z = project.zones?.find((x) => x.id === n.zoneId);
+      if (z) return { ...(w ? { wall: { a: w.a, b: w.b } } : {}), near: zoneCenter(z), zoneId: z.id };
     } else if (n) {
       const pts = (w ? [w] : ws).flatMap((x) => (n.kind === 'window' ? x.windows : x.doors));
       const all = pts.length ? pts : ws.flatMap((x) => (n.kind === 'window' ? x.windows : x.doors));
@@ -388,7 +405,7 @@ export function planEdits(project: Project, input: EditInput, answer: EditAnswer
       const text = `„${f.name}“${roomIdAt(project, derived, f) !== c.roomId ? ` nach „${roomName}“` : ''}${wallText(c.roomId, c.wall)}${nearText(c.near)}`;
       if (!placed) return [{ ok: false, text, note: 'kein freier Platz gefunden, bleibt stehen', why: c.why }];
       Object.assign(f, { x: placed.furniture.x, y: placed.furniture.y, rotation: placed.furniture.rotation });
-      return [{ ok: true, text, ...(placed.onTarget ? {} : { note: 'an der Wand war kein Platz, steht jetzt an der nächsten freien Stelle' }), why: c.why }];
+      return [{ ok: true, text, ...(placed.onTarget ? {} : { note: 'am gewünschten Ort war kein Platz, steht jetzt an der nächsten freien Stelle' }), why: c.why }];
     });
 
   const sorted = [...answer.changes].sort((p, q) => ORDER.indexOf(p.op) - ORDER.indexOf(q.op));

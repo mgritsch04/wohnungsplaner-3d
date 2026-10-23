@@ -176,4 +176,21 @@ describe('Plan per Textanweisung ändern (#415)', () => {
     expect(tops[0].y).toBeGreaterThan(2);
     expect(noCollision(next)).toBe(true);
   });
+
+  it('Bereich als Ziel (#416): Sessel kommt in die markierte Leseecke', () => {
+    const p = flat();
+    p.zones = [{ id: 'zone-1', purpose: 'Leseplatz', points: [{ x: 0.2, y: 2.2 }, { x: 1.6, y: 2.2 }, { x: 1.6, y: 3.6 }, { x: 0.2, y: 3.6 }] }];
+    const input = buildEditInput(p, null);
+    expect(input.text).toMatch(/Z1 „Leseplatz“/);
+    const a = parseEditAnswer({ changes: [{ op: 'add', room: 'R1', catalogId: 'generic-armchair', near: 'Z1', why: 'Lesen' }] }, input, p, derivePlan(p), WISH_CATALOG);
+    expect(a.changes[0]).toMatchObject({ near: { kind: 'zone', zoneId: 'zone-1' } });
+    const plan = planEdits(p, input, a, { catalog: WISH_CATALOG });
+    expect(plan.results[0]).toMatchObject({ ok: true });
+    expect(plan.results[0].note).toBeUndefined();
+    const chair = plan.preview.items[0];
+    expect(chair.x).toBeGreaterThan(0.2);
+    expect(chair.x).toBeLessThan(1.6);
+    expect(chair.y).toBeGreaterThan(2.2);
+    expect(chair.y).toBeLessThan(3.6);
+  });
 });

@@ -950,6 +950,8 @@ export function suggestionTotal(s: FurnishingSuggestion): number {
 export interface PlaceTarget {
   wall?: { a: Vec2; b: Vec2 };
   near?: Vec2;
+  /** A marked area (#416) the piece should stand in. */
+  zoneId?: string;
 }
 
 /** Roles that stand free in the room rather than with the back against a wall. */
@@ -970,7 +972,8 @@ export function placeNear(project: Project, roomId: string, type: RoomType, item
   const draft = structuredClone(project);
   draft.furniture = draft.furniture.filter((f) => !skip.has(f.id));
   const edges = roomEdges(g.interior, derived);
-  const rc: RoomCtx = { draft, derived, obstacles: buildPlacementObstacles(derived), zones: openingZones(derived), roomId, type, interior: g.interior, edges, centroid: polygonCentroid(g.interior), rejects: new Set() };
+  const rc: RoomCtx = { draft, derived, obstacles: buildPlacementObstacles(derived), zones: openingZones(derived), roomId, type, interior: g.interior, edges, centroid: polygonCentroid(g.interior), rejects: new Set(), userZones: (project.zones ?? []).filter((z) => zoneRoomId(project, derived, z) === roomId) };
+  const own = rc.userZones.find((z) => z.id === target.zoneId);
   const wall = target.wall;
   const near = target.near ?? (wall ? scale(add(wall.a, wall.b), 0.5) : rc.centroid);
   const edgeEnd = (e: Edge) => add(e.a, scale(e.dir, e.length));
@@ -989,14 +992,25 @@ export function placeNear(project: Project, roomId: string, type: RoomType, item
   };
   const free = FREE_ROLES.has(roleOf({ ...item, tags: [] })) && !wall;
   const first = (poses: () => Iterable<Furniture>) => firstFit(rc, posed(poses()), { walkway: walkway(type) }) ?? firstFit(rc, posed(poses()));
+  if (own) {
+    // inside the wanted area first, then anywhere else in the room
+    rc.ownZone = own;
+    rc.zone = own.points;
+    const f = first(function* () {
+      yield* centerPoses(rc, asItem, near);
+      yield* wallPoses(asItem, ordered, station, item.elevation);
+    });
+    rc.zone = undefined;
+    if (f) return { furniture: f, onTarget: true };
+  }
   if (wanted.length) {
     const f = first(() => wallPoses(asItem, wanted, station, item.elevation));
-    if (f) return { furniture: f, onTarget: true };
+    if (f) return { furniture: f, onTarget: !own };
   }
   const f = first(function* () {
     if (free) yield* centerPoses(rc, asItem, near);
     yield* wallPoses(asItem, rest, station, item.elevation);
     if (!free) yield* centerPoses(rc, asItem, near);
   });
-  return f ? { furniture: f, onTarget: !wall } : null;
+  return f ? { furniture: f, onTarget: !wall && !own } : null;
 }
