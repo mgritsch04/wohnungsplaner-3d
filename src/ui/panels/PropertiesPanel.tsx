@@ -23,7 +23,7 @@ import { NotesSection } from '../../planning/NotesSection';
 import { RoomTasksSection } from '../../planning/TaskSections';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
-import { Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
+import { AngleSlider, Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 import { validateModel } from '../../model/validation';
 import { conflictSummary, issueLevel, placementIssues } from '../../model/placement';
 import { ArrangeControls } from './ArrangeControls';
@@ -519,6 +519,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         </div>
         <div className="field-row">
           <NumberField label="Drehung" value={radToDeg(f.rotation)} unit="°" min={-360} max={360} step={15} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
+          <AngleSlider label="Winkel (Regler)" testId="furniture-rotation-slider" value={radToDeg(f.rotation)} disabled={f.locked} onChange={(v) => setFurnitureRotation(f.id, degToRad(v))} />
           <NumberField label="Über Boden" value={f.elevation} factor={100} unit="cm" min={0} max={1000} onChange={(v) => upd((x) => (x.elevation = v))} />
         </div>
       </PanelGroup>
