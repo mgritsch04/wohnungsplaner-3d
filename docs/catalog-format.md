@@ -79,3 +79,8 @@ Ruft je Artikel die **öffentliche** Produktseite `https://www.ikea.com/at/de/p/
 GLB-Datei (`web-api.ikea.com/dimma/assets`, laut robots.txt erlaubt). Keine Suche, keine Konten,
 keine internen IKEA-APIs. Modelle/Bilder nur privat nutzen; der Ordner `ikea-import/` ist in
 `.gitignore`. Hinter einem Proxy (z. B. Cloud-Umgebung): `NODE_USE_ENV_PROXY=1` setzen.
+
+
+## Multipacks
+
+Optionales Feld `packSize` (CSV: `stueck_pro_packung`, ganze Zahl ≥ 2): Stück pro Packung. `price` ist dann der Preis der ganzen Packung; Budget und Einkaufsliste rechnen mit aufgerundeten Packungen. Fehlt das Feld, gilt 1.

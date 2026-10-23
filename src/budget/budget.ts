@@ -1,4 +1,5 @@
 import { categoryLabel } from '../catalog/types';
+import { packsNeeded } from '../catalog/packSize';
 import type { Furniture } from '../model/schema';
 
 /** Room an item stands in (by its centre), or null when it is outside every room. */
@@ -12,8 +13,16 @@ export interface BudgetLine {
   category: string;
   categoryLabel: string;
   retailer: string;
+  /** Pieces needed. */
   quantity: number;
+  /** Price of one unit as sold (a pack for multipacks, else one piece). */
   unitPrice: number | null;
+  /** Pieces per pack (1 = sold singly). */
+  packSize: number;
+  /** Packs to buy, rounded up (= quantity when sold singly). */
+  packs: number;
+  /** Price per piece (unitPrice / packSize); null = no price. */
+  piecePrice: number | null;
   total: number | null;
   priceStatus: 'confirmed' | 'estimate' | 'user' | 'missing';
   productUrl?: string;
@@ -48,6 +57,8 @@ export function computeBudget(all: Furniture[], roomOf?: RoomOf): BudgetSummary 
   const lines: BudgetLine[] = items.map((f) => {
     const unit = f.price ? f.price.amount : null;
     const room = roomOf?.(f) ?? null;
+    const packSize = f.price?.packSize ?? 1;
+    const packs = packsNeeded(f.quantity, packSize);
     return {
       id: f.id,
       name: f.name,
@@ -56,7 +67,10 @@ export function computeBudget(all: Furniture[], roomOf?: RoomOf): BudgetSummary 
       retailer: f.retailer?.trim() || 'Ohne Händler',
       quantity: f.quantity,
       unitPrice: unit,
-      total: unit === null ? null : round2(unit * f.quantity),
+      packSize,
+      packs,
+      piecePrice: unit === null ? null : round2(unit / packSize),
+      total: unit === null ? null : round2(unit * packs),
       priceStatus: f.price ? f.price.status : 'missing',
       productUrl: f.productUrl,
       generated: !!f.kitchen?.generated,
@@ -130,11 +144,12 @@ function csvCell(v: string | number | null | undefined): string {
 export function groupBudgetLines(lines: BudgetLine[], opts: { byRoom?: boolean } = {}): BudgetLine[] {
   const groups = new Map<string, BudgetLine>();
   for (const l of lines) {
-    const key = [l.category, l.name, l.size, l.retailer, l.unitPrice, l.priceStatus, l.productUrl ?? '', opts.byRoom ? (l.roomId ?? '') : ''].join('\u0000');
+    const key = [l.category, l.name, l.size, l.retailer, l.unitPrice, l.packSize, l.priceStatus, l.productUrl ?? '', opts.byRoom ? (l.roomId ?? '') : ''].join('\u0000');
     const g = groups.get(key);
     if (!g) groups.set(key, { ...l });
     else {
       g.quantity += l.quantity;
+      g.packs += l.packs;
       g.total = g.total === null || l.total === null ? null : round2(g.total + l.total);
     }
   }
@@ -147,10 +162,10 @@ export function groupBudgetLines(lines: BudgetLine[], opts: { byRoom?: boolean }
  * ends with a subtotal row.
  */
 export function budgetToCsv(b: BudgetSummary, opts: { byRoom?: boolean } = {}): string {
-  const cols = ['Kategorie', 'Artikel', 'Maße B × T × H (cm)', 'Händler', 'Menge', 'Einzelpreis EUR', 'Summe EUR', 'Preisstatus', 'Produktlink'];
+  const cols = ['Kategorie', 'Artikel', 'Maße B × T × H (cm)', 'Händler', 'Menge (Stück)', 'Stück pro Packung', 'Packungen', 'Preis pro Packung/Stück EUR', 'Stückpreis EUR', 'Summe EUR', 'Preisstatus', 'Produktlink'];
   const header = opts.byRoom ? ['Raum', ...cols] : cols;
-  const row = (l: BudgetLine) => [l.categoryLabel, l.name, l.size, l.retailer, String(l.quantity), l.unitPrice, l.total, STATUS_LABEL[l.priceStatus], l.productUrl ?? ''];
-  const blank = (label: string, total: number | null) => ['', label, '', '', '', null, total, '', ''];
+  const row = (l: BudgetLine) => [l.categoryLabel, l.name, l.size, l.retailer, String(l.quantity), String(l.packSize), String(l.packs), l.unitPrice, l.piecePrice, l.total, STATUS_LABEL[l.priceStatus], l.productUrl ?? ''];
+  const blank = (label: string, total: number | null) => ['', label, '', '', '', '', '', null, null, total, '', ''];
   const byName = (x: BudgetLine, y: BudgetLine) => x.categoryLabel.localeCompare(y.categoryLabel) || x.name.localeCompare(y.name);
   const out: (string | number | null)[][] = [];
   if (opts.byRoom) {

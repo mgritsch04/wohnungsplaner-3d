@@ -125,7 +125,7 @@ function PrintView() {
                 <tbody>
                   {lines.map((l) => (
                     <tr key={l.id}>
-                      <td className="num">{l.quantity}</td>
+                      <td className="num">{l.packSize > 1 ? `${l.quantity} (${l.packs} × ${l.packSize}er)` : l.quantity}</td>
                       <td>
                         {l.name}
                         <span className="muted"> · {l.categoryLabel}</span>

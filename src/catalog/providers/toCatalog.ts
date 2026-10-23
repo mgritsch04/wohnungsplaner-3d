@@ -11,6 +11,8 @@ export interface CompletedProduct {
   name: string;
   category: string;
   shape: string;
+  /** Pieces per pack when the page price is for a multipack (>= 2); absent = sold singly. */
+  packSize?: number;
 }
 
 /** Turn a reviewed product into a catalog entry. Price status reflects its origin. */
@@ -30,7 +32,7 @@ export function productToCatalogItem(c: CompletedProduct): CatalogItem {
     model: { type: 'procedural', shape: c.shape },
     price:
       p.price && p.price.currency === 'EUR'
-        ? { amount: p.price.amount, currency: 'EUR', status: 'user', recordedAt: p.retrievedAt.slice(0, 10) }
+        ? { amount: p.price.amount, currency: 'EUR', status: 'user', recordedAt: p.retrievedAt.slice(0, 10), ...(c.packSize && c.packSize > 1 ? { packSize: c.packSize } : {}) }
         : undefined,
     brand: p.brand ?? (provider.id === 'ikea-at' ? 'IKEA' : undefined),
     retailer: provider.id === 'generic' ? undefined : provider.label,

@@ -124,6 +124,12 @@ export function BudgetPanel() {
                       +
                     </button>
                   </span>
+                  {l.packSize > 1 && (
+                    <span className="muted small" data-testid="pack-info">
+                      {l.packs} {l.packs === 1 ? 'Packung' : 'Packungen'} à {l.packSize} Stk.
+                      {l.piecePrice !== null ? ` · ${formatEuro(l.piecePrice)}/Stk.` : ''}
+                    </span>
+                  )}
                   <span className="amount">
                     {l.total !== null ? formatEuro(l.total) : '—'}
                     <Badge kind={l.priceStatus === 'confirmed' ? 'ok' : l.priceStatus === 'user' ? 'info' : l.priceStatus === 'estimate' ? 'muted' : 'error'}>{priceStatusLabel(l.priceStatus)}</Badge>
@@ -178,7 +184,7 @@ export function BudgetPanel() {
                   <span>
                     {i.type === 'device' ? '📡 ' : ''}
                     {i.name}
-                    {i.quantity > 1 ? ` × ${i.quantity}` : ''}
+                    {i.packSize > 1 ? ` × ${i.quantity} (${i.packs} ${i.packs === 1 ? 'Packung' : 'Packungen'} à ${i.packSize})` : i.quantity > 1 ? ` × ${i.quantity}` : ''}
                   </span>
                   <select
                     value={ph.phase}

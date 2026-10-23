@@ -13,6 +13,9 @@ export interface ShopItem {
   id: string;
   name: string;
   quantity: number;
+  /** Multipack: packs to buy and pieces per pack (1 = sold singly). */
+  packs?: number;
+  packSize?: number;
   /** "B × T × H" in cm; empty for devices. */
   size: string;
   retailer: string;
@@ -32,7 +35,7 @@ export function shoppingGroups(project: Project): ShopGroup[] {
   const groups = new Map<string, ShopItem[]>();
   for (const room of budget.byRoom) groups.set(room.label, []);
   for (const l of budget.lines) {
-    groups.get(l.room)?.push({ id: l.id, name: l.name, quantity: l.quantity, size: l.size, retailer: l.retailer === 'Ohne Händler' ? '' : l.retailer });
+    groups.get(l.room)?.push({ id: l.id, name: l.name, quantity: l.quantity, ...(l.packSize > 1 ? { packs: l.packs, packSize: l.packSize } : {}), size: l.size, retailer: l.retailer === 'Ohne Händler' ? '' : l.retailer });
   }
   const out: ShopGroup[] = [...groups].filter(([, items]) => items.length > 0).map(([label, items]) => ({ label, items }));
   const devices = buildingDevices(project).map((d): ShopItem => ({ id: d.id, name: d.name || KIND_LABEL[d.kind], quantity: 1, size: '', retailer: '' }));

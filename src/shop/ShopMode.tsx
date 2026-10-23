@@ -189,9 +189,14 @@ function ListTab() {
                   <input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} />
                   <span className="shop-item-text">
                     <strong>
-                      {i.quantity > 1 ? `${i.quantity}× ` : ''}
+                      {i.packSize ? `${i.packs}× ` : i.quantity > 1 ? `${i.quantity}× ` : ''}
                       {i.name}
                     </strong>
+                    {i.packSize && (
+                      <small>
+                        {i.packs === 1 ? '1 Packung' : `${i.packs} Packungen`} à {i.packSize} Stück ({i.quantity} Stück gebraucht)
+                      </small>
+                    )}
                     {(i.size || i.retailer) && <small>{[i.size && `${i.size} cm`, i.retailer].filter(Boolean).join(' · ')}</small>}
                   </span>
                 </label>
