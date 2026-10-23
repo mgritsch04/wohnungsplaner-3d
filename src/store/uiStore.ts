@@ -10,7 +10,7 @@ export interface Selection {
 export type Tool = 'select' | 'wall' | 'room' | 'door' | 'window' | 'passage' | 'measure' | 'walkpath' | 'calibrate';
 export type ViewMode = '2d' | '3d' | 'split';
 export type CameraMode = 'orbit' | 'walk';
-export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'import';
+export type LeftTab = 'tools' | 'catalog' | 'kitchen' | 'furnish' | 'smarthome' | 'check' | 'import';
 export type RightTab = 'properties' | 'budget' | 'project';
 export type OtherLevels = 'below' | 'all' | 'none';
 
