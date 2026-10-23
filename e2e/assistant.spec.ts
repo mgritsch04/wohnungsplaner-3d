@@ -304,7 +304,7 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
   // one step: the real product is found without a second click; the progress is shown meanwhile
-  await expect(panel.getByTestId('design-search-progress')).toContainText('noch 2 von 2 offen');
+  await expect(panel.getByTestId('design-search-progress')).toContainText('0 von 2 fertig');
   await expect(panel.getByRole('button', { name: 'Suche stoppen' })).toBeVisible();
   await page.screenshot({ path: 'test-results/design-350-progress.png' });
   const pick = panel.getByTestId('design-pick').first();
@@ -319,12 +319,12 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await expect(pick.getByTestId('design-alternatives')).toContainText('Lesesessel aus Cord');
   await expect(proposal).not.toContainText('Erfunden');
   await expect(panel.getByTestId('design-total')).toHaveText(/149,00/);
-  // fallback: the plant was not found – stays a marked placeholder with search link; "Nachsuchen" is offered
+  // fallback: the plant was not found – stays a marked placeholder with search link; searching it again is offered
   const plant = panel.getByTestId('design-pick').nth(1);
   await expect(plant).toHaveAttribute('data-placeholder', 'yes');
   await expect(plant.getByTestId('design-notfound')).toBeVisible();
   await expect(plant.getByRole('link', { name: 'bei IKEA suchen' })).toBeVisible();
-  await expect(proposal.getByRole('button', { name: 'Nachsuchen (1 Platzhalter)' })).toBeVisible();
+  await expect(proposal.getByRole('button', { name: 'Nicht gefundene nochmal suchen (1)' })).toBeVisible();
   // what was not found, and why, is listed
   await expect(panel.getByTestId('design-notfound-list')).toContainText('Monstera groß (Wohnzimmer): kein passendes Produkt im Shop gefunden – nach 3 Versuchen');
   // the search asked again by itself (other search terms) before reporting „nicht gefunden“

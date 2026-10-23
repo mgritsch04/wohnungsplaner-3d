@@ -23,13 +23,12 @@ export const FOUND_SOURCE = 'Claude-Suche';
 export const MAX_FOUND = 3;
 const MAX_PAGE_TEXT = 9000;
 /**
- * Limits of the one-step search: placeholders searched per run, time per attempt and per run.
- * One attempt may take up to 5 minutes (web search plus 1–3 product pages; the local helper itself
- * allows 8) – the former 3 minutes cut off many searches that were about to finish.
+ * Time per attempt: one attempt may take up to 5 minutes (web search plus 1–3 product pages); in the
+ * later rounds of a run (searchRun.ts) a little more, still below the 8 minutes of the local helper.
+ * A run has no overall time limit any more: it goes on until every piece is found or settled.
  */
-export const MAX_AUTO_SEARCH = 12;
 export const ITEM_TIMEOUT_MS = 5 * 60_000;
-export const TOTAL_TIMEOUT_MS = 30 * 60_000;
+export const ITEM_TIMEOUT_LATE_MS = 7.5 * 60_000;
 /** Attempts per piece before „nicht gefunden“: the first plus two with other search terms. */
 export const SEARCH_ATTEMPTS = 3;
 /** Waiting time when the local helper is busy with other requests, and how often to wait at most. */
@@ -60,8 +59,8 @@ export function openPlaceholders(p: DesignProposal): (SearchTarget & { catalogId
   ]);
 }
 
-/** Placeholders to search, biggest pieces first (they shape the room); the rest stay placeholders. */
-export function searchTargets(p: DesignProposal, size: (catalogId: string) => number, max = MAX_AUTO_SEARCH): { targets: SearchTarget[]; skipped: number } {
+/** Placeholders to search, biggest pieces first (they shape the room); beyond `max` they stay placeholders. */
+export function searchTargets(p: DesignProposal, size: (catalogId: string) => number, max = Infinity): { targets: SearchTarget[]; skipped: number } {
   const all = openPlaceholders(p);
   const ordered = [...all].sort((a, b) => size(b.catalogId) - size(a.catalogId));
   const take = ordered.slice(0, max);
@@ -329,7 +328,8 @@ export async function searchWithRetry(
       }
       if (stopsSearch(e)) throw e;
       n++;
-      last = { reason: (e as { code?: string } | undefined)?.code === 'timeout' ? `Zeitlimit von ${Math.round(ITEM_TIMEOUT_MS / 60_000)} Minuten überschritten` : searchErrorReason(e), error: true };
+      const err = e as { code?: string; limitMs?: number } | undefined;
+      last = { reason: err?.code === 'timeout' ? `Zeitlimit von ${((err.limitMs ?? ITEM_TIMEOUT_MS) / 60_000).toLocaleString('de-AT')} Minuten überschritten` : searchErrorReason(e), error: true };
     }
     retry = { attempt: offset + n + 1, previous: last.reason };
   }
