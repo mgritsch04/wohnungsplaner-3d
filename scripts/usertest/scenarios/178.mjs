@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const panel = (t) => t.page.locator('.panel.left').getByTestId('smarthome-panel');
+const step = (t, id) => t.page.locator('.panel.left').getByTestId(`sh-step-${id}`).click();
 const device2d = (t, name) => t.page.locator(`[data-testid="device-2d"][data-device="${name}"]`);
 const ROOM = 'Wohnzimmer';
 const MOTION = `Bewegungsmelder ${ROOM}`;
@@ -71,7 +72,7 @@ export default {
       action: 'Bei „Art“ „Smarte Lampe“ wählen und wieder platzieren.',
       expected: 'Ein „L“ in der Raummitte.',
       async run(t) {
-        await panel(t).getByLabel('Art').selectOption({ label: 'Smarte Lampe' });
+        await panel(t).getByTestId('device-kind').and(t.page.locator('[data-kind="light"]')).click();
         await panel(t).getByTestId('device-add').click();
         const ok = await t.poll(async () => (await device2d(t, LAMP).count()) === 1);
         const p = await t.project();
@@ -90,9 +91,11 @@ export default {
       action: 'In der Geräteliste den Bewegungsmelder anklicken.',
       expected: 'Hersteller, Funk (Zigbee), Batterie, Reichweite 5 m, Winkel 120° mit Quellen-Links; bei „Haltezeit“ steht „Annahme“. Blauer Punkt am Melder dreht die Blickrichtung in 2D.',
       async run(t) {
+        await step(t, 'devices');
         await panel(t).getByTestId('device-row').filter({ hasText: 'Bewegungsmelder' }).click();
-        const det = panel(t).getByTestId('device-details');
+        const det = t.page.getByTestId('device-info'); // seit der Schrittleiste unter „Eigenschaften“ (rechts)
         await det.waitFor();
+        await det.locator('details summary').first().click().catch(() => undefined); // Produktdaten sind eingeklappt
         const text = (await det.innerText()).replace(/\s+/g, ' ');
         const range = await det.getByLabel('Reichweite').inputValue();
         const angle = await det.getByLabel(/Winkel/).inputValue().catch(() => '?');
@@ -122,9 +125,11 @@ export default {
       action: '„Automation anlegen“ klicken, bei „Nur wenn es dunkel ist“ den Haken entfernen.',
       expected: 'Unter „Automationen“ steht „…: Licht bei Bewegung“, die Lampe ist angehakt.',
       async run(t) {
-        await panel(t).getByTestId('device-details').getByTestId('automation-add').click();
+        await step(t, 'rules');
+        await panel(t).getByTestId('automation-add').click();
         const auto = panel(t).getByTestId('automation');
         await auto.first().waitFor();
+        await auto.first().locator('summary').click(); // Regel ist eingeklappt
         const name = await auto.first().getByLabel('Name').inputValue();
         const lampChecked = await auto.getByLabel(new RegExp(LAMP)).isChecked();
         await auto.getByLabel('Nur wenn es dunkel ist').uncheck();
@@ -141,6 +146,7 @@ export default {
       expected: 'Melder wird ausgefüllt und meldet „Bewegung“; Lampe geht an (gelber Schein in 2D, Licht in 3D); im Protokoll „Bewegung erkannt“ und „… an“.',
       async run(t) {
         const { page } = t;
+        await step(t, 'test');
         await panel(t).getByTestId('sim-person').click();
         await panel(t).getByTestId('sim-start').click();
         const box = await page.getByTestId('sim-person-2d').boundingBox();
@@ -151,6 +157,7 @@ export default {
         const on = await t.poll(async () => (await device2d(t, LAMP).getAttribute('data-on')) === 'true');
         const motion = await device2d(t, MOTION).getAttribute('data-on');
         const log = (await panel(t).getByTestId('sim-log').innerText().catch(() => '')).replace(/\s+/g, ' ');
+        await step(t, 'devices');
         const row = (await panel(t).getByTestId('device-row').filter({ hasText: 'Bewegungsmelder' }).innerText()).replace(/\s+/g, ' ');
         await closeUp3d(t, 'light', 2.6);
         return {
@@ -165,6 +172,7 @@ export default {
       expected: 'Nach etwa 1 Minute simulierter Zeit meldet der Melder „ruhig“; etwa 2 Minuten später geht die Lampe aus.',
       async run(t) {
         const { page } = t;
+        await step(t, 'test');
         const simT = async () => Number(((await panel(t).getByTestId('sim-clock').innerText()).match(/(\d+) s simuliert/) ?? [])[1]);
         const t0 = await simT();
         await panel(t).getByLabel('Tempo').selectOption({ label: '60× schneller' });
@@ -202,6 +210,7 @@ export default {
       action: 'Bei „Abdeckung durch Melder“ nachsehen.',
       expected: 'Für den Raum wird ein Prozentwert angezeigt, für Räume ohne Melder 0 %.',
       async run(t) {
+        await step(t, 'devices');
         const rows = panel(t).getByTestId('coverage');
         await rows.first().scrollIntoViewIfNeeded();
         const list = await rows.evaluateAll((els) => els.map((e) => ({ room: e.dataset.room, share: Number(e.dataset.share) })));
@@ -219,6 +228,7 @@ export default {
       action: '„Als Home-Assistant-YAML herunterladen“ klicken.',
       expected: 'Eine Datei „…-automations.yaml“ mit der Automation (Auslöser, Bedingung, Licht an, Warten, Licht aus).',
       async run(t) {
+        await step(t, 'rules');
         const download = t.page.waitForEvent('download');
         await panel(t).getByTestId('ha-export').click();
         const file = await download;
@@ -241,6 +251,7 @@ export default {
       expected: 'Geräte und Automation sind noch da; die Lampe ist im Plan wie vor der Simulation.',
       async run(t) {
         const { page } = t;
+        await step(t, 'test');
         await panel(t).getByTestId('sim-stop').click();
         await page.waitForTimeout(1500);
         await page.reload();

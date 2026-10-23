@@ -1,5 +1,5 @@
 // Küchen-Arbeitsdreieck (#82), GLB-Export (#87), Sitzen beim Begehen (#78), Startkarte (#102) – Testschritte aus dem Kommentar in #82.
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
 const left = (t) => t.page.locator('.panel.left');
 const right = (t) => t.page.locator('.panel.right');
@@ -136,6 +136,7 @@ export default {
         const d = await dl;
         const buf = await readFile(await d.path());
         t.glb = buf;
+        if (process.env.USERTEST_SAVE_GLB) await writeFile(process.env.USERTEST_SAVE_GLB, buf); // optional: Datei für einen externen glTF-Validator
         const kb = Math.round(buf.length / 1024);
         const magic = buf.subarray(0, 4).toString('ascii');
         return { status: d.suggestedFilename() === 'Beispielwohnung.glb' && magic === 'glTF' && buf.readUInt32LE(8) === buf.length && kb > 10 ? 'ok' : 'fail', observed: `Datei „${d.suggestedFilename()}“, ${kb} kB, Kopf „${magic}“, glTF-Version ${buf.readUInt32LE(4)}. Das Menü heißt jetzt „Mehr“ statt „Export ▾“.` };

@@ -123,5 +123,59 @@ export default {
         return { status: 'look', observed: 'Zeit auf 13:00 und 19:00 gestellt, Screenshots 130-13-uhr und 130-19-uhr aufgenommen. „Wie vorher“ braucht den Vergleich mit dem früheren Stand und ist eine Bildbeurteilung.' };
       },
     },
+    {
+      nr: 8,
+      action: 'Messung statt Augenmaß: im Schlafzimmer zur Wand mit der Tür schauen, Lampen aus / an mit geschlossener Tür / an mit offener Tür.',
+      expected: 'Mit geschlossener Tür ist es im Schlafzimmer nicht heller als ohne Lampe; mit offener Tür wird der Bereich vor der Tür sichtbar heller.',
+      async run(t) {
+        const { page } = t;
+        const p = await t.project();
+        const nodes = Object.fromEntries(p.nodes.map((n) => [n.id, n]));
+        const door = p.openings.find((o) => o.kind === 'door' && p.walls.some((w) => w.id === o.wallId && Math.abs(nodes[w.a].x - 5) < 0.2 && Math.abs(nodes[w.b].x - 5) < 0.2));
+        const lampItem = p.furniture.find((f) => f.catalogId === 'generic-floor-lamp');
+        // Stehlampe zurück in die Raummitte des Wohnzimmers, Tür-Seite im Blick der Kamera aus dem Schlafzimmer
+        await page.evaluate(({ id }) => window.__wp.useProjectStore.getState().apply((d) => { const f = d.furniture.find((q) => q.id === id); f.x = 2.5; f.y = 2.0; }), { id: lampItem.id });
+        const mean = async () => {
+          await page.waitForTimeout(3500);
+          const buf = await page.locator('[data-testid="scene3d"] canvas').screenshot();
+          return page.evaluate(async (b64) => {
+            const img = new Image();
+            img.src = 'data:image/png;base64,' + b64;
+            await img.decode();
+            const c = document.createElement('canvas');
+            c.width = img.width;
+            c.height = img.height;
+            const g = c.getContext('2d');
+            g.drawImage(img, 0, 0);
+            const d = g.getImageData(0, 0, c.width, c.height).data;
+            let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            return sum / (d.length / 4);
+          }, buf.toString('base64'));
+        };
+        const setLamps = async (v) => {
+          await page.getByRole('button', { name: 'Mehr', exact: true }).click();
+          await page.locator('#toolbar-menu-more').getByLabel('Lampen', { exact: true }).selectOption(v);
+          await page.keyboard.press('Escape');
+        };
+        const setDoor = (open) => page.evaluate(({ id, open }) => window.__wp.useProjectStore.getState().apply((d) => void (d.openings.find((o) => o.id === id).open = open)), { id: door.id, open });
+        await setTime(t, 23.5);
+        await setDoor(false);
+        // Kamera im Schlafzimmer (x > 5), Blick auf die Trennwand und die Tür
+        await t.lookAt({ x: 8.0, y: 1.5, z: 2.0 }, { x: 5.0, y: 1.0, z: door ? 2.0 : 2.0 });
+        await setLamps('off');
+        const off = await mean();
+        await t.shot('130-messung-lampen-aus');
+        await setLamps('on');
+        const closed = await mean();
+        await t.shot('130-messung-an-tuer-zu');
+        await setDoor(true);
+        const open = await mean();
+        await t.shot('130-messung-an-tuer-offen');
+        const f = (v) => v.toFixed(2);
+        const ok = closed <= off + 2.0 && open > closed + 10;
+        return { status: ok ? 'ok' : 'fail', observed: `Mittlere Helligkeit des 3D-Bildes (0–255), Kamera im Schlafzimmer, Blick zur Trennwand, 23:30: Lampen aus ${f(off)}; Lampen an, Tür zu ${f(closed)}; Lampen an, Tür offen ${f(open)}. Erwartet: zu ≈ aus, offen heller.` };
+      },
+    },
   ],
 };

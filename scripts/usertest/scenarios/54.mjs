@@ -144,8 +144,9 @@ export default {
         await page.evaluate(() => {
           window.__wp.useProjectStore.getState().apply((d) => {
             const st = d.furniture.find((f) => f.category === 'stairs');
-            st.x = 2.5;
-            st.y = 1.85;
+            st.x = 1.0;
+            st.y = 2.1;
+            st.depth = 3.0; // frei am oberen Ende: 50 cm bis zur Wand, damit man oben auf den Boden treten kann
             st.rotation = 0;
             d.furniture = [st];
           });
@@ -170,7 +171,10 @@ export default {
         await page.waitForTimeout(1500);
         await page.getByTestId('other-levels').selectOption('all');
         await page.waitForTimeout(1000);
-        await t.shot('Treppe in 3D');
+        await page.getByRole('button', { name: 'Schnitt' }).click();
+        await page.waitForTimeout(1200);
+        await t.shot('Treppe in 3D (Schnitt)');
+        await page.getByRole('button', { name: 'Schnitt' }).click();
         return { status: 'look', observed: 'Stufen, Geländer und das Loch in der Decke sind reine Optik; Bild liegt bei. (Gehen durch die Öffnung wird in Schritt 9/10 geprüft.)' };
       },
     },
@@ -182,7 +186,13 @@ export default {
         const { page } = t;
         await page.getByRole('button', { name: 'Begehen' }).click();
         await page.locator('.walk-overlay').waitFor();
-        const y0 = await t.poll(async () => ((await camY(t)) > 2.3 ? await camY(t) : null), 6000);
+        await page.waitForTimeout(800);
+        // Start ist die Raummitte (neben der Treppe); an den Fuß der Treppe stellen, Blick nach oben (−y im Plan)
+        await page.evaluate(() => window.__wp.three.camera.position.set(1.0, 1.52, 3.75));
+        await page.waitForTimeout(500);
+        const startPos = await page.evaluate(() => { const c = window.__wp.three.camera.position; return [c.x, c.y, c.z].map((v) => +v.toFixed(2)); });
+        const y0 = await camY(t);
+        t.startPos = startPos;
         // record eye height and active storey every 30 ms while walking
         await page.evaluate(() => {
           window.__rec = [];
@@ -207,7 +217,7 @@ export default {
         const yTop = await camY(t);
         const smooth = before.length >= 3 && rises;
         const btn = await bar(t).getByRole('button', { name: 'Obergeschoss' }).getAttribute('aria-pressed');
-        return { status: !(y0 && switched && smooth && btn === 'true') ? 'fail' : standing ? 'ok' : 'look', observed: `Start auf der Treppe (Augenhöhe ${y0 ? y0.toFixed(2) : '–'} m); mit W wechselt die Etage automatisch (${switched ? 'ja' : 'nein'}, Augenhöhe beim Wechsel ${yAtSwitch?.toFixed(2)} m auf die Höhe des Obergeschosses bezogen); vor dem Wechsel ${before.length} Messpunkte von ${before[0]?.toFixed(2)} bis ${before.at(-1)?.toFixed(2)} m, gleichmäßig ansteigend: ${smooth ? 'ja' : 'nein'}; oben steht man mit Augenhöhe ${yTop.toFixed(2)} m über dem Obergeschossboden (normal ≈ 1,52 m): ${standing ? 'ja' : 'nein'}; Etagen-Knopf „Obergeschoss“ aktiv: ${btn}.${standing ? '' : ' Oben endet die Treppe im Test an der Raumwand; Augenhöhe dort 12 cm unter der normalen: bitte beim Hinaufgehen selbst anschauen, ob man oben normal steht.'}` };
+        return { status: !(y0 && switched && smooth && btn === 'true') ? 'fail' : standing ? 'ok' : 'look', observed: `Start bei x/y/z ${t.startPos.join('/')} (Augenhöhe ${y0 ? y0.toFixed(2) : '–'} m); mit W wechselt die Etage automatisch (${switched ? 'ja' : 'nein'}, Augenhöhe beim Wechsel ${yAtSwitch?.toFixed(2)} m auf die Höhe des Obergeschosses bezogen); vor dem Wechsel ${before.length} Messpunkte von ${before[0]?.toFixed(2)} bis ${before.at(-1)?.toFixed(2)} m, gleichmäßig ansteigend: ${smooth ? 'ja' : 'nein'}; oben steht man mit Augenhöhe ${yTop.toFixed(2)} m über dem Obergeschossboden (normal ≈ 1,52 m): ${standing ? 'ja' : 'nein'}; Etagen-Knopf „Obergeschoss“ aktiv: ${btn}.${standing ? '' : ' Oben endet die Treppe im Test an der Raumwand; Augenhöhe dort 12 cm unter der normalen: bitte beim Hinaufgehen selbst anschauen, ob man oben normal steht.'}` };
       },
     },
     {

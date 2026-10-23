@@ -94,8 +94,9 @@ export default {
         await page.getByRole('button', { name: '3D', exact: true }).click();
         await page.getByRole('button', { name: 'Realismus', exact: true }).click();
         await page.waitForTimeout(2500);
-        await t.lookAt([w.x + 1.6, 1.4, w.y + 1.8], [w.x, 1, w.y]);
-        await page.waitForTimeout(1500);
+        await t.lookAt({ x: w.x - 1.6, y: 1.4, z: w.y - 1.8 }, { x: w.x, y: 1, z: w.y });
+        await page.waitForTimeout(4000);
+        await t.shot('Edelstahl-Schrank im Realismus');
         const mats = await page.evaluate((id) => {
           const out = [];
           window.__wp.three.scene.traverse((g) => {
