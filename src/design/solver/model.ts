@@ -91,6 +91,8 @@ export interface SoftRelation {
   rel: Relation;
   item: string;
   target: string | null;
+  /** Factor on the relation's cost (default 1). */
+  weight?: number;
 }
 
 export interface Model {
@@ -107,6 +109,12 @@ export interface Model {
 const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
 
 const DERIVED_FRONT_ROLES = new Set(['coffee-table', 'seat', 'rug']);
+/** Largest gap between a runner or mat and the piece it lies in front of. */
+const RUG_GAP = 0.05;
+const SCREENS = new Set(['tv', 'tv-board']);
+const VIEWERS = new Set(['sofa', 'armchair', 'bed']);
+/** Weight of „the seat looks at the screen“: a sofa with its back to the TV is never meant (C3). */
+const VIEWER_WEIGHT = 3;
 const small = (s: Spec) => Math.max(s.width, s.depth) <= 0.6 && s.base === 'floor';
 
 /** Kitchen run ids as relation targets: `kitchen` (first run), `kitchen1`, `kitchen2` … */
@@ -195,7 +203,9 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
         const n = nodes.get(rel.item);
         if (n && isTarget(rel.target) && (DERIVED_FRONT_ROLES.has(n.spec.role) || n.spec.base === 'rug' || (small(n.spec) && n.spec.wall !== 'always'))) {
           const defGap = n.spec.role === 'coffee-table' ? 0.45 : 0;
-          used = setRule(rel.item, rel.target, { kind: 'front', gap: rel.gap ?? defGap });
+          // a runner or mat lies right in front of its piece, whatever distance the programme names
+          const gap = n.spec.base === 'rug' ? Math.min(rel.gap ?? 0, RUG_GAP) : (rel.gap ?? defGap);
+          used = setRule(rel.item, rel.target, { kind: 'front', gap });
         }
         break;
       }
@@ -212,6 +222,8 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     }
     if (!used) soft.push({ rel, item: 'item' in rel ? rel.item : rel.items[0], target: 'target' in rel ? rel.target : null });
   }
+
+  soft.push(...viewerRelations(nodes, soft));
 
   // pieces that still have no parent but need one: curtains to the nearest window, small pieces onto a surface
   for (const n of nodes.values()) {
@@ -375,6 +387,33 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     }
   }
   return { ctx, program, units, nodes, soft, dropped, zones };
+}
+
+/**
+ * The seat looks at the screen. Claude names one direction („tv facing sofa“) and means both, so
+ * the other one is added, weighted. Without any relation between them the only sofa of the room
+ * faces the TV (C3).
+ */
+function viewerRelations(nodes: Map<string, Node>, soft: SoftRelation[]): SoftRelation[] {
+  const out: SoftRelation[] = [];
+  const facing = (a: string, b: string) => [...soft, ...out].some((s) => s.rel.kind === 'facing' && s.rel.item === a && s.rel.target === b);
+  const add = (viewer: string, screen: string) => {
+    if (!facing(viewer, screen)) out.push({ rel: { kind: 'facing', item: viewer, target: screen }, item: viewer, target: screen, weight: VIEWER_WEIGHT });
+  };
+  for (const s of soft) {
+    if (s.rel.kind !== 'facing') continue;
+    const a = nodes.get(s.rel.item);
+    const b = nodes.get(s.rel.target);
+    if (!a || !b) continue;
+    if (SCREENS.has(a.spec.role) && VIEWERS.has(b.spec.role)) add(b.id, a.id);
+    else if (VIEWERS.has(a.spec.role) && SCREENS.has(b.spec.role)) s.weight = Math.max(s.weight ?? 1, VIEWER_WEIGHT);
+  }
+  const sofas = [...nodes.values()].filter((n) => n.spec.role === 'sofa');
+  const screens = [...nodes.values()].filter((n) => SCREENS.has(n.spec.role));
+  const tv = screens.find((n) => n.spec.role === 'tv') ?? screens[0];
+  const linked = (a: Node) => screens.some((sc) => facing(a.id, sc.id) || facing(sc.id, a.id));
+  if (sofas.length === 1 && tv && !linked(sofas[0])) add(sofas[0].id, tv.id);
+  return out;
 }
 
 /** A new unit for a piece that lost its parent (the parent was left out): it is placed on its own. */

@@ -131,7 +131,7 @@ function deriveNode(m: Model, n: Node): void {
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation + Math.PI };
       } else if (s.base === 'rug') {
         // runner or mat in front of the piece; slid back towards it until it lies inside the room
-        const v0 = P.hd + r.gap + Math.min(s.width, s.depth) / 2 + (n.parent?.startsWith('kitchen') ? 0.15 : 0);
+        const v0 = P.hd + r.gap + Math.min(s.width, s.depth) / 2 + (n.parent?.startsWith('kitchen') ? 0.08 : 0);
         const options: Box[] = [];
         for (let back = 0; back <= v0 + 0.01; back += 0.05) options.push(rugBox(at(0, v0 - back), P.rotation, s.width, s.depth, true));
         n.box = options.find((b) => insideScore(m, b) === 0) ?? options[0];

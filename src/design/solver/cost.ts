@@ -7,7 +7,7 @@
  * The total splits into a part per unit (`unitCost`), a part per pair of units (`pairCost`) and
  * the walking grid (`gridCost`), so the search can recompute only what a move touches.
  */
-import { add, scale, type Vec2 } from '../../model/vec';
+import { add, closestPointOnSegment, scale, type Vec2 } from '../../model/vec';
 import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
 import { doorSeed, sideStrip, wallStrip } from './room';
@@ -131,11 +131,10 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
         }
       }
       for (const cp of n.comfort) c.soft += 0.3 * Math.min(1, outsideAmount(cp, ctx.poly));
-      // the reference walkway: keep it where that is easy (soft)
-      if (n.spec.shape !== 'plant') {
-        const reach = Math.hypot(n.box.hw, n.box.hd) + 0.45;
-        for (const p of walkSamples(m)) if (Math.abs(p.x - n.box.x) < reach && Math.abs(p.y - n.box.y) < reach && distToBox(p.x, p.y, n.box) < p.r) c.soft += 0.03;
-      }
+      // the reference walkway: keep it where that is easy (soft); a plant has no business there at all (D1)
+      const perSample = n.spec.shape === 'plant' ? 0.15 : 0.03;
+      const reach = Math.hypot(n.box.hw, n.box.hd) + 0.45;
+      for (const p of walkSamples(m)) if (Math.abs(p.x - n.box.x) < reach && Math.abs(p.y - n.box.y) < reach && distToBox(p.x, p.y, n.box) < p.r) c.soft += perSample;
     }
     if (floor || rug) {
       for (const z of ctx.keepFree) {
@@ -211,8 +210,39 @@ function designCost(m: Model, u: Unit, n: Node): number {
     for (const w of ctx.windows) if (overlapDepth(head, w.zone) > 0.05) s += 0.5;
     if (u.mode !== 'wall') s += 1.0;
   }
+  if (n.spec.shape === 'plant' && isFloor(n)) s += plantPlaceCost(m, n);
   return s;
 }
+
+/** D1: a plant stands in a corner, at a window or at a wall, never free in the room. */
+function plantPlaceCost(m: Model, n: Node): number {
+  const ctx = m.ctx;
+  const p = { x: n.box.x, y: n.box.y };
+  if (ctx.analysis.corners.some((c) => !c.reflex && Math.hypot(c.p.x - p.x, c.p.y - p.y) < 0.7)) return 0;
+  const on = (wi: number, t: number) => add(ctx.walls[wi].a, scale(ctx.walls[wi].dir, t));
+  if (ctx.windows.some((w) => closestPointOnSegment(p, on(w.wall, w.t0), on(w.wall, w.t1)).distance < 1.0)) return 0;
+  const gap = Math.min(...ctx.walls.map((w, i) => closestPointOnSegment(p, w.a, on(i, w.length)).distance)) - Math.max(n.box.hw, n.box.hd);
+  return gap < 0.35 ? 0 : 1.0;
+}
+
+/** C2: an armchair on its own looks at the seating group (sofa and coffee table), not at a wall. */
+function armchairCost(a: Unit, group: Unit): number {
+  const chair = a.main;
+  if (!chair || chair.spec.role !== 'armchair' || !isFloor(chair)) return 0;
+  const sofa = group.nodes.find((x) => x.spec.role === 'sofa' && isFloor(x));
+  const table = group.nodes.find((x) => x.spec.role === 'coffee-table');
+  const ref = sofa ?? table;
+  if (!ref) return 0;
+  const cx = table && sofa ? (sofa.box.x + table.box.x) / 2 : ref.box.x;
+  const cy = table && sofa ? (sofa.box.y + table.box.y) / 2 : ref.box.y;
+  const dx = cx - chair.box.x;
+  const dy = cy - chair.box.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.4) return 0;
+  const f = axisY(chair.box.rotation);
+  return 1.0 * Math.max(0, COS70 - (f.x * dx + f.y * dy) / len);
+}
+const COS70 = Math.cos((70 * Math.PI) / 180);
 
 // ---------------------------------------------------------------------------------------------
 // per pair of units
@@ -268,6 +298,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
     }
   }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
+  c.soft += armchairCost(u, v) + armchairCost(v, u);
   return c;
 }
 
@@ -318,6 +349,10 @@ function targetBox(m: Model, id: string): Box | null {
 }
 
 export function relationCost(m: Model, s: SoftRelation): number {
+  return (s.weight ?? 1) * plainRelationCost(m, s);
+}
+
+function plainRelationCost(m: Model, s: SoftRelation): number {
   const n = m.nodes.get(s.item);
   if (!n || !m.units[n.unit].active) return 0;
   const B = n.box;

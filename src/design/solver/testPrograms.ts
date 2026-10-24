@@ -85,7 +85,9 @@ export function randomProgram(a: RoomAnalysis, kind: Kind, seed: number): RoomPr
     const wall = [...a.walls].filter((w) => !w.openings.length && w.length >= 2.5).sort((p, q) => q.length - p.length)[0];
     if (wall) {
       const at = (t: number) => ({ x: wall.a.x + wall.dir.x * t, y: wall.a.y + wall.dir.y * t });
-      program.kitchen = [{ wall: wall.id, from: at(0), to: at(wall.length), modules: ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-oven', 'generic-k-drawer-60'].slice(0, wall.length >= 3.3 ? 5 : 4) }];
+      // a short wall does without the dishwasher, never without worktop
+      const modules = wall.length >= 3.3 ? ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-oven', 'generic-k-drawer-60'] : ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-drawer-60', 'generic-k-oven'];
+      program.kitchen = [{ wall: wall.id, from: at(0), to: at(wall.length), modules }];
     }
   }
   return program;

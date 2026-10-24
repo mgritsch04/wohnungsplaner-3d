@@ -105,19 +105,20 @@ Stufe 6  Produkte (bestehende Suche)  → echte Produkte, Neuaufstellung und Beg
 - **Abhängige Teile werden nicht optimiert, sondern abgeleitet:** Stühle um Tisch, Nachttische am Bett, Teppich unter Sitzgruppe oder Bett, Bild und Pendel darüber, Tischlampe und kleine Pflanze auf ihrer Ablage, Vorhang am Fenster, Matratze im Bett, Boxen im Regal. Sie wandern mit ihrem „Elternteil“. Optimiert werden nur Hauptstücke (Bett, Sofa, Tisch, Schrank, Regal, Sessel, Schreibtisch, große Pflanzen, Stehlampen, Küchenzeile als Block).
 - **Harte Regeln:** im Raum; Möbel einer vom Nutzer markierten Zone liegen in ihr, Sperrflächen („frei lassen“) bleiben leer; keine Überlappung (Pflanzen und Stehlampen zählen mit); zwischen allen Türen eines Raums bleibt ein Weg der verlangten Breite (`checkWalkways`; der Weg aus Stufe 0 ist die Referenz für Umwege, nicht die einzige erlaubte Linie; Teppiche zählen nicht); Türschwenk frei; vor Fenstern nichts über Brüstungshöhe (außer Vorhang); Bewegungsfläche vor jedem Möbel frei (Bewegungsflächen dürfen sich mit Wegen und untereinander überlappen, nicht mit Möbeln); Wandteile an Wand ohne Öffnung; jedes nutzbare Möbel von einer Tür aus erreichbar.
 - **Weiche Kosten (gewichtet):** Beziehungen aus dem Programm, Nähe zum Startplatz und zur Zone (Claudes Idee bleibt erhalten), Designer-Regeln (Bett-Kopfteil nicht unter Fenster, Schreibtisch seitlich zum Licht, Sofa nicht mit dem Rücken direkt vor der Zimmertür, Paare symmetrisch, Fluchten bündig, Mittelachsen, Gewicht im Raum verteilt, Blickfang vom Eingang sichtbar), bequeme statt minimale Abstände.
+- **Keine Warum-Momente (nach dem ersten Bildvergleich, #442):** Das Sofa schaut zum Fernseher, stark gewichtet; nennt Claude nur „tv facing sofa“, gilt die Gegenrichtung mit, ohne jede Beziehung schaut das einzige Sofa des Raums zum Fernseher. Eine Pflanze ohne Beziehung steht in einer Ecke, am Fenster oder an der Wand und nicht auf dem Weg zwischen den Türen. Ein Sessel für sich schaut zur Sitzgruppe. Läufer und Matten liegen direkt vor ihrem Möbel, egal welchen Abstand das Programm nennt. Die Pendelleuchte eines weggelassenen Tisches fällt mit weg.
 - **Verfahren:** 1. Startlösung aus Claudes Plätzen (auf nächste Wand bzw. 90°-Raster einrasten), zusätzlich eine Startlösung „Ankermöbel zuerst“ über Wand-Slots (Fallback, falls Claudes Plätze schlecht sind). 2. Reparatur harter Verstöße mit lokalen Zügen (entlang der Wand schieben, Wand wechseln, drehen, tauschen), nur übernehmen, was die Prüfung besteht. 3. Simulated Annealing mit diskreten und stetigen Zügen, geometrische Abkühlung (etwa 0,25 → 0,001), 2.000–5.000 Schritte je Raum, drei Starts mit festem Seed (wiederholbar). Ziel unter 300 ms je Raum, Belegungsraster 5 cm.
 - **Wenn etwas nicht passt:** kleinere Variante desselben Typs (Bett 160 → 140, Sofa 3 → 2, Schreibtisch 140 → 100), sonst weglassen mit Grund. Pflichtmöbel nie still weglassen, sondern als schwerer Befund an Stufe 5.
-- Küche: Zeile als Block an der Wand, die Claude wählt; Modulfolge aus dem Programm, vorhandene `kitchenDesign`-Logik für Oberschränke, Arbeitsplatte, Haube weiterverwenden; Türschwenk und Balkontür hart prüfen (behebt M2).
+- Küche: Zeile als Block an der Wand, die Claude wählt; Modulfolge aus dem Programm, vorhandene `kitchenDesign`-Logik für Oberschränke, Arbeitsplatte, Haube weiterverwenden; Türschwenk und Balkontür hart prüfen (behebt M2). Das Kochfeld setzt der Solver selbst (`kitchenTops.ts`): auf den Backofen, sonst auf einen Unterschrank mit 60 cm Arbeitsfläche zur Spüle und 30 cm Abstand zu Hochschrank und Wand, möglichst nicht unter ein Fenster; die Haube hängt darüber, außer dort ist ein Fenster.
 
 ### Stufe 4: Begehung (`src/design/review/`)
 Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperrt die Anzeige; M = mittel; L = leicht). Jeder Befund hat Text in Alltagssprache, Raum, betroffene Teile und Ort (für die Markierung im Plan).
 
 **A Funktion**
-- A1 (S) Pflichtmöbel des Raumtyps fehlen: Schlafzimmer Bett (+ Schrank oder Kommode ab 8 m²: M); Wohnzimmer Sitzplätze für mindestens 3; Küche Spüle, Kochfeld, Kühlschrank, Arbeitsfläche; Esszimmer Tisch und Stühle; Arbeitszimmer Schreibtisch und Stuhl; Gang/Vorraum Garderobe; Bad Waschtisch, WC oder Dusche/Wanne (Bestand zählt); WC: WC und Handwaschbecken (Handwaschbecken: M); Kinderzimmer Bett, Stauraum, Tisch; Balkon Sitzplatz ab 2 m².
+- A1 (S) Pflichtmöbel des Raumtyps fehlen: Schlafzimmer Bett (+ Schrank oder Kommode ab 8 m²: M); Wohnzimmer Sitzplätze für mindestens 3; Küche und jeder Raum mit Küchenzeile (Wohnküche) Spüle, Kochfeld, Kühlschrank, Arbeitsfläche (Unterschrank oder Geschirrspüler); Esszimmer Tisch und Stühle; Arbeitszimmer Schreibtisch und Stuhl; Gang/Vorraum Garderobe; Bad Waschtisch, WC oder Dusche/Wanne (Bestand zählt); WC: WC und Handwaschbecken (Handwaschbecken: M); Kinderzimmer Bett, Stauraum, Tisch; Balkon Sitzplatz ab 2 m².
 - A2 (M) Funktion ohne Grund doppelt in der Wohnung (Esstisch, Gästeschlafplatz, Küchenzeile, Fernseher).
 - A3 (S) Sanitärobjekt neu geplant (WC, Waschtisch, Dusche, Wanne), außer ausdrücklich gewünscht oder Handwaschbecken im WC.
-- A4 (M) Küche: Arbeitsfläche zwischen Spüle und Kochfeld unter 60 cm, Kochfeld unter 30 cm neben Hochschrank oder Wand, Arbeitsdreieck Kühlschrank–Spüle–Kochfeld unter 3,6 m oder über 7 m.
-- A5 (M) Ankermöbel nicht in seiner Zone (z. B. „Leseecke“ ohne Sessel am Fenster oder in der Ecke).
+- A4 (M) Küche: Arbeitsfläche zwischen Spüle und Kochfeld unter 60 cm, Kochfeld unter 30 cm neben Hochschrank oder Wand, Arbeitsdreieck Kühlschrank–Spüle–Kochfeld unter 3,6 m oder über 7 m. Eine reine Bestandsküche wird nicht bewertet.
+- A5 (M) Ankermöbel nicht in seiner Zone (z. B. „Leseecke“ ohne Sessel am Fenster oder in der Ecke; auf dem Balkon zählt der Stuhl als Sitz).
 
 **B Wege und Zugang**
 - B1 (S) Kein Durchkommen zwischen zwei Türen eines Raums (Balkontür zählt).
@@ -127,12 +128,12 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - B5 (M) Festes Möbel weniger als 50 cm hinter der Tür im Gehbereich.
 - B6 (M) Bewegungsfläche fehlt: vor Schrank unter 70 cm, neben dem Bett unter 50 cm (Doppelbett beidseitig), Stuhlzone am Schreibtisch unter 75 cm, vor der Küchenzeile unter 100 cm (unter 120 cm: L), vor WC und Waschtisch unter 55 cm.
 - B7 (M) Möbel ist nicht erreichbar.
-- B8 (L) Kein Fenster des Raums ist erreichbar.
+- B8 (L) Kein Fenster des Raums ist erreichbar (nicht auf dem Balkon).
 
 **C Anordnung**
 - C1 Bett: Kopfteil nicht an einer Wand oder Bett frei im Raum (M); Kopfteil unter dem Fenster (L); Doppelbett nur von einer Seite zugänglich (M).
 - C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L).
-- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M).
+- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S).
 - C4 Esstisch: Stühle nicht am Tisch (M); Stuhlzone auf mehr als einer Seite unter 75 cm (L); Pendel nicht über dem Tisch (L); Tisch im Arbeitsgang der Küche (M).
 - C5 Schreibtisch: Fenster direkt hinter dem Bildschirm oder im Rücken (L).
 - C6 (M) Hohes Möbel über 1,2 m frei im Raum (außer bewusst als Raumteiler geplant).
@@ -141,10 +142,10 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - C9 (M) Eingeklemmt: zwei feste Möbel enger als 20 cm, wo man sitzt oder durchgeht (Paare wie Nachttisch–Bett und Regal–Regal ausgenommen).
 
 **D Deko, Licht, Textil**
-- D1 Pflanze nicht in einer Ecke, nicht neben einem Möbel und nicht am Fenster (M); Pflanze im Wege-Schlauch (S im Gang, sonst M); große Pflanze in fensterlosem Raum (L: Schattenpflanze oder Kunstpflanze vorschlagen).
+- D1 Pflanze nicht in einer Ecke, nicht neben einem Möbel und nicht am Fenster (M); Pflanze im Wege-Schlauch (S, in jedem Raum); große Pflanze in fensterlosem Raum (L: Schattenpflanze oder Kunstpflanze vorschlagen).
 - D2 (M) Kleine Pflanze, Kräutertopf oder Box auf dem Boden statt auf Fensterbank, Regal oder Arbeitsplatte.
 - D3 (M) Tischlampe nicht auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal.
-- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe); Raum über 10 m² mit nur einer Lichtquelle.
+- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe; nicht auf dem Balkon); Raum über 10 m² mit nur einer Lichtquelle.
 - D5 (L) Teppich: Sitzgruppe steht nicht mit den Vorderfüßen darauf; Bettteppich ragt seitlich weniger als 40 cm heraus; Teppich im Türschwenk; Läufer nicht mittig im Gang.
 - D6 (L) Bild oder Spiegel: über Sofa/Bett nicht mittig (über 10 cm) oder nicht 40–90 % der Möbelbreite; über Fenster oder Tür; Badspiegel nicht über dem Waschtisch.
 - D7 (L) Vorhang schmaler als das Fenster; Schlafzimmer ohne Verdunkelung, wenn gewünscht.

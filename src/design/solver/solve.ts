@@ -15,6 +15,7 @@ import { gridCost, HARD, pairCost, resetRelations, unitCost, type Violation } fr
 import { refreshUnit, resizeNode } from './derive';
 import { wrapAngle } from './geom';
 import { smallerOptions } from './items';
+import { kitchenTops } from './kitchenTops';
 import { buildModel, detachUnit, runId, type Model, type Node, type Unit } from './model';
 import { Rng } from './rng';
 import { buildRoom, type FixedPiece } from './room';
@@ -247,10 +248,12 @@ function dropNode(st: State, n: Node, reason: string, dropped: DroppedItem[]): U
     for (let k = 0; k < out.length; k++) for (const x of u.nodes) if (x.parent === out[k].id && !out.includes(x)) out.push(x);
     return out;
   };
-  // pieces that can stand on their own (a cabinet beside the washer, a pendant above the runner) stay
+  // pieces that can stand on their own (a cabinet beside the washer, a pendant above the runner) stay;
+  // the pendant of a table goes with the table, it would hang over nothing
+  const tableLike = ['table', 'coffee-table'].includes(n.spec.role) || n.spec.category === 'desk';
   const detached: Unit[] = [];
   for (const child of u.nodes.filter((x) => x.parent === n.id)) {
-    const free = child.spec.base === 'ceiling' || child.spec.base === 'wall' || (child.spec.base === 'floor' && (child.rule?.kind === 'beside' || child.rule?.kind === 'front') && child.spec.role !== 'seat');
+    const free = (child.spec.base === 'ceiling' && !tableLike) || child.spec.base === 'wall' || (child.spec.base === 'floor' && (child.rule?.kind === 'beside' || child.rule?.kind === 'front') && child.spec.role !== 'seat');
     if (!free || u.main !== n) continue;
     const members = subtree(child);
     u.nodes = u.nodes.filter((x) => !members.includes(x));
@@ -397,6 +400,7 @@ function toLayout(st: State, dropped: DroppedItem[], seed: number): Layout {
         ...(n.run !== undefined ? { kitchenRun: n.run } : {}),
       });
     }
+    if (u.kitchen) items.push(...kitchenTops(m, u));
   }
   const vs = violations(st);
   let soft = st.total() - st.hard();

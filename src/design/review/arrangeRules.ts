@@ -66,7 +66,9 @@ export function checkTv(ctx: RoomCtx): void {
     if (sofa) {
       const to = sub(tv, sofa);
       const d = Math.hypot(to.x, to.y) - sofa.depth / 2;
-      if (angleBetween(sofa.front, to) > deg(30)) ctx.add('C3', 'M', `${ctx.label(tv)} hängt nicht gegenüber von ${ctx.label(sofa)}, man müsste den Kopf drehen.`, [tv, sofa], tv);
+      const angle = angleBetween(sofa.front, to);
+      if (angle > deg(80)) ctx.add('C3', 'S', `${ctx.label(tv)} hängt seitlich oder hinter ${ctx.label(sofa)}, vom Sofa aus sieht man nicht hin.`, [tv, sofa], tv);
+      else if (angle > deg(30)) ctx.add('C3', 'M', `${ctx.label(tv)} hängt nicht gegenüber von ${ctx.label(sofa)}, man müsste den Kopf drehen.`, [tv, sofa], tv);
       else if (d < 1.5 * diag - 0.01 || d > 2.5 * diag + 0.01)
         ctx.add('C3', 'M', `Zwischen Sofa und Fernseher liegen ${d.toFixed(1)} m, bei diesem Gerät sind ${(1.5 * diag).toFixed(1)} bis ${(2.5 * diag).toFixed(1)} m angenehm.`, [tv, sofa], tv);
     }

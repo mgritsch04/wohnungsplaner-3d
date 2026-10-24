@@ -1,0 +1,169 @@
+/**
+ * No „why?“ moments (#440, #442): what a person notices first when a layout makes no sense. The
+ * sofa looks at the TV, a plant stands in a corner or at a wall and not on the way, an armchair
+ * looks at the seating group, the kitchen gets its cooktop and hood, a runner lies right in front
+ * of the counter, the pendant of a table that was left out goes with it.
+ */
+import { describe, expect, it } from 'vitest';
+import type { Vec2 } from '../../model/vec';
+import { analyzeFlat } from '../analysis';
+import { TEST_FLATS } from '../fixtures/flats';
+import { RECORDED } from '../fixtures/recorded';
+import { rectRoom } from '../review/testkit';
+import type { Layout, PlacedItem, ProgramItem, Relation, RoomAnalysis, RoomProgram } from '../types';
+import { programFromRecorded } from './recordedProgram';
+import { existingPieces, solveRoom } from './solve';
+
+const front = (i: PlacedItem): Vec2 => ({ x: -Math.sin(i.rotation), y: Math.cos(i.rotation) });
+/** Angle (degrees) between the front of `from` and the direction to `to`. */
+function angleTo(from: PlacedItem, to: Vec2): number {
+  const f = front(from);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return (Math.acos(Math.max(-1, Math.min(1, (f.x * dx + f.y * dy) / Math.hypot(dx, dy)))) * 180) / Math.PI;
+}
+const byId = (l: Layout, id: string) => {
+  const it = l.items.find((i) => i.id === id);
+  if (!it) throw new Error(`${id} fehlt`);
+  return it;
+};
+
+function recorded(key: 'A' | 'B', name: string) {
+  const project = TEST_FLATS[key].build();
+  const room = analyzeFlat(project).rooms.find((r) => r.name === name)!;
+  const existing = existingPieces(project, room);
+  const program = programFromRecorded(RECORDED[key]!.programs[name], room, existing);
+  return { room, layout: solveRoom(room, program, { existing, seed: 7 }) };
+}
+
+const S = 0;
+const N = Math.PI;
+const item = (id: string, catalogId: string, hint?: [number, number, number]): ProgramItem => ({
+  id,
+  catalogId,
+  zone: 'z',
+  why: '',
+  ...(hint ? { hint: { x: hint[0], y: hint[1], rotation: hint[2] } } : {}),
+});
+const program = (room: RoomAnalysis, items: ProgramItem[], relations: Relation[] = []): RoomProgram => ({
+  roomId: room.roomId,
+  reading: '',
+  zones: [{ id: 'z', function: 'Wohnen', rect: { x0: 0, y0: 0, x1: room.size.x, y1: room.size.y }, why: '' }],
+  items,
+  relations,
+  walk: '',
+  check: [],
+});
+
+describe('the sofa looks at the TV', () => {
+  it('Claude names only „tv facing sofa“ (flat A): the sofa faces the TV, not away from it', () => {
+    const { layout } = recorded('A', 'Wohnzimmer');
+    expect(angleTo(byId(layout, 'sofa'), byId(layout, 'tv'))).toBeLessThan(30);
+  });
+
+  it('without any relation the only sofa of the room faces the TV, even with a start place facing away', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.5, 1.0, N]), item('board', 'generic-tv-sideboard', [2.5, 3.8, N]), item('tv', 'generic-tv')], [{ kind: 'above', item: 'tv', target: 'board' }]);
+    const layout = solveRoom(room, p, { seed: 3 });
+    expect(layout.unsolved).toEqual([]);
+    expect(angleTo(byId(layout, 'sofa'), byId(layout, 'tv'))).toBeLessThan(30);
+  });
+});
+
+describe('plants and armchairs', () => {
+  const room = rectRoom(5, 4, { doors: [{ wall: 'S', at: 4.3 }, { wall: 'W', at: 2 }], windows: [{ wall: 'N', at: 2.5 }] });
+
+  it('a plant without a relation stands in a corner, at a window or at a wall, not on the way between the doors', () => {
+    for (const seed of [1, 2, 3]) {
+      const p = program(room, [item('sofa', 'generic-sofa-3', [2.5, 0.6, S]), item('plant', 'generic-plant', [2.4, 2.2, S])]);
+      const layout = solveRoom(room, p, { seed });
+      const plant = byId(layout, 'plant');
+      const toWall = Math.min(plant.x, plant.y, room.size.x - plant.x, room.size.y - plant.y) - plant.width / 2;
+      expect(toWall, `seed ${seed}`).toBeLessThan(0.35);
+      for (const w of room.walkways) {
+        const [a, b] = w.path;
+        const t = Math.max(0, Math.min(1, ((plant.x - a.x) * (b.x - a.x) + (plant.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2)));
+        const d = Math.hypot(plant.x - (a.x + t * (b.x - a.x)), plant.y - (a.y + t * (b.y - a.y)));
+        expect(d, `seed ${seed}: Pflanze im Weg ${w.from}–${w.to}`).toBeGreaterThan(plant.width / 2 + 0.25);
+      }
+    }
+  });
+
+  it('an armchair on its own looks at the sofa and the coffee table', () => {
+    const p = program(
+      room,
+      [item('sofa', 'generic-sofa-3', [2.5, 0.6, S]), item('coffee', 'generic-coffee-table'), item('armchair', 'generic-armchair', [4.3, 1.4, S])],
+      [{ kind: 'front-of', item: 'coffee', target: 'sofa', gap: 0.45 }],
+    );
+    const layout = solveRoom(room, p, { seed: 5 });
+    const sofa = byId(layout, 'sofa');
+    const coffee = byId(layout, 'coffee');
+    expect(angleTo(byId(layout, 'armchair'), { x: (sofa.x + coffee.x) / 2, y: (sofa.y + coffee.y) / 2 })).toBeLessThan(70);
+  });
+});
+
+describe('kitchen', () => {
+  it('the cooktop goes on the oven and the hood above it (flats A and B)', () => {
+    for (const [key, name] of [
+      ['A', 'Küche'],
+      ['B', 'Wohnküche'],
+    ] as const) {
+      const { layout } = recorded(key, name);
+      const cook = byId(layout, 'kitchen1-cooktop');
+      const oven = layout.items.find((i) => i.catalogId === 'generic-k-oven')!;
+      expect(cook.parent, name).toBe(oven.id);
+      expect(Math.hypot(cook.x - oven.x, cook.y - oven.y)).toBeLessThan(0.01);
+      expect(cook.elevation).toBeCloseTo(0.9);
+      const hood = byId(layout, 'kitchen1-hood');
+      expect(hood.parent).toBe(cook.id);
+      expect(hood.elevation).toBeGreaterThan(1.4);
+    }
+  });
+
+  const runRoom = (windowAt: number) => rectRoom(4, 3, { doors: [{ wall: 'S', at: 2 }], windows: [{ wall: 'N', at: windowAt, width: 1.0 }] });
+  const withRun = (room: RoomAnalysis, modules: string[]): RoomProgram => ({ ...program(room, []), kitchen: [{ wall: 'W1', from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, modules }] });
+  const windowSpan = (room: RoomAnalysis) => room.walls[0].openings.find((o) => o.kind === 'window')!;
+
+  it('without an oven the cooktop takes a base module with 60 cm worktop to the sink, not under the window', () => {
+    const room = runRoom(1.6);
+    const layout = solveRoom(room, withRun(room, ['generic-k-fridge', 'generic-k-base-60', 'generic-k-sink-80', 'generic-k-drawer-60', 'generic-k-base-60', 'generic-k-base-40']), { seed: 1 });
+    const cook = byId(layout, 'kitchen1-cooktop');
+    const host = byId(layout, cook.parent!);
+    const sink = layout.items.find((i) => i.catalogId === 'generic-k-sink-80')!;
+    expect(host.catalogId).toMatch(/base|drawer/);
+    expect(Math.abs(host.x - sink.x) - (host.width + sink.width) / 2).toBeGreaterThanOrEqual(0.59);
+    const win = windowSpan(room);
+    expect(cook.x - cook.width / 2 >= win.t1 || cook.x + cook.width / 2 <= win.t0).toBe(true);
+    expect(byId(layout, 'kitchen1-hood').parent).toBe(cook.id);
+  });
+
+  it('a cooktop under a window gets no hood', () => {
+    const room = runRoom(2.5);
+    const layout = solveRoom(room, withRun(room, ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-oven']), { seed: 1 });
+    const cook = byId(layout, 'kitchen1-cooktop');
+    const win = windowSpan(room);
+    expect(cook.x + cook.width / 2 > win.t0 && cook.x - cook.width / 2 < win.t1).toBe(true);
+    expect(layout.items.some((i) => i.id === 'kitchen1-hood')).toBe(false);
+  });
+
+  it('a runner lies right in front of the counter (flat A: Claude says 50 cm, meant is the walking strip)', () => {
+    const { layout } = recorded('A', 'Küche');
+    const runner = byId(layout, 'runner');
+    const run = layout.items.filter((i) => i.kitchenRun === 0 && i.elevation < 0.05);
+    // the run stands at the east wall: its front is the smallest x of the modules' fronts
+    const runFront = Math.min(...run.map((i) => i.x - i.depth / 2));
+    const runnerEast = runner.x + Math.min(runner.width, runner.depth) / 2;
+    expect(runFront - runnerEast).toBeGreaterThanOrEqual(0);
+    expect(runFront - runnerEast).toBeLessThan(0.2);
+  });
+});
+
+describe('what is left out', () => {
+  it('the pendant of a table that does not fit is left out with it', () => {
+    const room = rectRoom(2.2, 1.6, { doors: [{ wall: 'S', at: 1.1 }] });
+    const p = program(room, [item('table', 'generic-dining-table-6', [1.1, 0.8, S]), item('pendant', 'generic-pendant')], [{ kind: 'above', item: 'pendant', target: 'table' }]);
+    const layout = solveRoom(room, p, { seed: 1 });
+    expect(layout.items.map((i) => i.id)).not.toContain('pendant');
+    expect(layout.dropped.find((d) => d.id === 'pendant')?.reason).toMatch(/gehört zu/);
+  });
+});

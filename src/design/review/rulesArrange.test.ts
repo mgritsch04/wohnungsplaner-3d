@@ -50,6 +50,11 @@ describe('C3 Fernseher', () => {
     expect(has(tvRoom(put('generic-tv', { x: 4.95, y: 2.0, face: 'W', elevation: 0.45 })), 'C3', /gegenüber/)).toBe(true);
     expect(has(tvRoom(put('generic-tv', { x: 2.5, y: 0.21, face: 'S', elevation: 0.45, parent: 'b' }), put('generic-tv-sideboard', { id: 'b', x: 2.5, y: 0.21, face: 'S' })), 'C3', /gegenüber|angenehm/)).toBe(false);
   });
+  it('beside or behind the sofa is severe: from the sofa one cannot watch', () => {
+    const behind = tvRoom(put('generic-tv', { x: 1.0, y: 3.95, face: 'N', elevation: 0.45 }));
+    expect(behind.findings.find((f) => f.rule === 'C3')?.severity).toBe('S');
+    expect(behind.passed).toBe(false);
+  });
   it('too close is medium', () => {
     expect(has(tvRoom(put('generic-tv', { x: 2.5, y: 2.0, face: 'S', elevation: 0.5 })), 'C3', /angenehm/)).toBe(true);
   });
