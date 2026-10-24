@@ -70,6 +70,27 @@ describe('the sofa looks at the TV', () => {
   });
 });
 
+describe('what stands on the TV lowboard', () => {
+  it('a lamp and a plant stand at the ends of the lowboard, beside the TV hung over it, not in front of the screen', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const p = program(
+      room,
+      [item('sofa', 'generic-sofa-3', [2.5, 1.0, N]), item('board', 'generic-tv-sideboard', [2.5, 3.8, N]), item('tv', 'generic-tv'), item('lamp', 'generic-table-lamp'), item('plant', 'generic-plant-small')],
+      [{ kind: 'above', item: 'tv', target: 'board' }, { kind: 'on', item: 'lamp', target: 'board' }, { kind: 'on', item: 'plant', target: 'board' }],
+    );
+    const layout = solveRoom(room, p, { seed: 3 });
+    const board = byId(layout, 'board');
+    const tv = byId(layout, 'tv');
+    const along = (i: PlacedItem) => (i.x - board.x) * Math.cos(board.rotation) + (i.y - board.y) * Math.sin(board.rotation);
+    for (const id of ['lamp', 'plant']) {
+      const piece = byId(layout, id);
+      // beside the screen along the board (its middle outside the screen), at the board's end
+      expect(Math.abs(along(piece) - along(tv))).toBeGreaterThan(tv.width / 2);
+      expect(Math.abs(Math.abs(along(piece)) - (board.width - piece.width) / 2)).toBeLessThan(0.01);
+    }
+  });
+});
+
 describe('plants and armchairs', () => {
   const room = rectRoom(5, 4, { doors: [{ wall: 'S', at: 4.3 }, { wall: 'W', at: 2 }], windows: [{ wall: 'N', at: 2.5 }] });
 

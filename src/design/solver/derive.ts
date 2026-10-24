@@ -125,14 +125,19 @@ function hangFree(m: Model, n: Node, b: Box): boolean {
  * hanging over the parent between `z0` and `z1` reaches (the TV over the sideboard): what stands
  * on the piece goes in front of it, not into it. `-Infinity` when nothing hangs there.
  */
-function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number): number {
+function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number, u0 = -Infinity, u1 = Infinity): number {
   const f = axisY(P.rotation);
+  const side = axisX(P.rotation);
   let v = -Infinity;
   for (const sib of m.nodes.values()) {
     if (sib === n || sib.parent !== n.parent || sib.spec.base !== 'wall' || sib.rule?.kind !== 'above') continue;
     const pose = wallAbove(m, sib, P, z0, sib.rule.height);
     if (Math.min(z1, pose.elevation + sib.spec.height) - Math.max(z0, pose.elevation) <= 0.005) continue;
-    for (const c of boxCorners(pose.box)) v = Math.max(v, (c.x - P.x) * f.x + (c.y - P.y) * f.y);
+    const corners = boxCorners(pose.box);
+    // beside it, not under it: nothing to step in front of
+    const along = corners.map((c) => (c.x - P.x) * side.x + (c.y - P.y) * side.y);
+    if (Math.max(...along) <= u0 + 0.005 || Math.min(...along) >= u1 - 0.005) continue;
+    for (const c of corners) v = Math.max(v, (c.x - P.x) * f.x + (c.y - P.y) * f.y);
   }
   return v;
 }
@@ -149,14 +154,18 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
   // the pieces that take another branch of the `on` rule do not share the row
   const inRow = (s: Node) => s.spec.role !== 'mattress' && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
   const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
-  if (sibs.length < 2) return null;
+  // a screen hanging over the piece takes its middle: what stands on it goes to the ends (#443)
+  const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && s.spec.role === 'tv');
+  if (sibs.length < 2 && !screenAbove) return null;
   sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
-  const total = sibs.reduce((v, s) => v + s.spec.width, 0) + ON_GAP * (sibs.length - 1);
+  const widths = sibs.reduce((v, s) => v + s.spec.width, 0);
+  const total = widths + ON_GAP * (sibs.length - 1);
   if (total > 2 * P.hw) return null;
-  let u = -total / 2;
+  const gap = screenAbove && sibs.length > 1 ? (2 * P.hw - widths) / (sibs.length - 1) : ON_GAP;
+  let u = screenAbove ? -P.hw : -total / 2;
   for (const s of sibs) {
     if (s === n) return u + s.spec.width / 2;
-    u += s.spec.width + ON_GAP;
+    u += s.spec.width + gap;
   }
   return null;
 }
@@ -320,15 +329,17 @@ function deriveNode(m: Model, n: Node): void {
         n.elevation = p.elevation + 0.03 + row * 0.38;
         return;
       }
-      const u = onRow(m, n, P, parentNode) ?? -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
+      const row = onRow(m, n, P, parentNode);
+      const u = row ?? -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
       const lim = Math.max(0, P.hw - s.width / 2);
       // on a table the chairs tuck in at the edges: what stands on it goes in the middle
       const table = parentNode?.spec.category === 'table';
+      const side = clamp(r.count === 1 && !table && row === null ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim);
       // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
       // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
-      const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height) + 0.01) + s.depth / 2;
+      const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height, side - s.width / 2, side + s.width / 2) + 0.01) + s.depth / 2;
       const v = table ? Math.max(0, back) : Math.max(back, -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
-      const c = at(clamp(r.count === 1 && !table ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim), Math.min(v, P.hd));
+      const c = at(side, Math.min(v, P.hd));
       n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
       n.elevation = p.top;
       return;
