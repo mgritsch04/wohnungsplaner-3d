@@ -35,6 +35,17 @@ describe('A Funktion', () => {
     expect(rulesOf(living([put('generic-sofa-3', { x: 2.5, y: 3.5, face: 'N' })]))).not.toContain('A1');
     expect(rulesOf(living([put('generic-armchair', { x: 2.5, y: 3.5, face: 'N' })]), 'S')).toContain('A1');
   });
+  it('A1 living room: the chairs at a table in the same room seat guests too, once there is a sofa or armchair', () => {
+    const living = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows: [{ wall: 'N', at: 2.5 }] }), type: 'living', items });
+    const table = [put('generic-dining-table-4', { x: 3.5, y: 1.2, face: 'S' }), put('generic-chair', { x: 3.1, y: 0.45, face: 'S' }), put('generic-chair', { x: 3.9, y: 1.95, face: 'N' })];
+    // Garçonnière: armchair for reading, table for two
+    expect(rulesOf(living([put('generic-armchair', { x: 0.6, y: 3.3, face: 'N' }), ...table]))).not.toContain('A1');
+    // chairs alone do not make a living room
+    const bare = living(table);
+    expect(bare.findings.some((f) => f.rule === 'A1' && f.severity === 'S' && /Sofa oder Sessel/.test(f.text))).toBe(true);
+    // one armchair and one chair are still too few
+    expect(rulesOf(living([put('generic-armchair', { x: 0.6, y: 3.3, face: 'N' }), table[0], table[1]]), 'S')).toContain('A1');
+  });
   it('A1 kitchen needs sink, hob, fridge and worktop; fitted pieces count', () => {
     const k = (ids: string[], existing: string[] = []) =>
       review({
@@ -244,10 +255,28 @@ describe('B Wege und Zugang', () => {
     expect(r(1.7).findings.find((f) => f.rule === 'B6')?.severity).toBe('L');
     expect(r(1.5).findings.find((f) => f.rule === 'B6')?.severity).toBe('M');
   });
-  it('B6 WC and washbasin: 55 cm', () => {
-    const r = (d: number) => review({ room: rectRoom(1.6, d, { doors: [{ wall: 'O', at: d / 2, width: 0.7, swingsIn: false }] }), type: 'bath', items: [], existing: [put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' })] });
-    expect(rulesOf(r(1.6))).not.toContain('B6');
-    expect(rulesOf(r(0.95), 'M')).toContain('B6');
+  it('B6 WC and washbasin: 55 cm in front of them for anything the proposal puts there', () => {
+    const wc = put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' });
+    const r = (y: number) => review({ room: rectRoom(1.6, 2, { doors: [{ wall: 'O', at: 1, width: 0.7, swingsIn: false }] }), type: 'bath', items: [put('generic-sideboard', { x: 0.8, y, face: 'N', width: 0.8, depth: 0.3 })], existing: [wc] });
+    // front edge of the WC near 0.54 m: a cabinet from 1.15 m leaves 60 cm, one from 0.85 m only 30 cm
+    expect(rulesOf(r(1.3))).not.toContain('B6');
+    expect(rulesOf(r(1.0), 'M')).toContain('B6');
+  });
+  it('B6 Bestand that only meets the wall or other Bestand is no finding of the proposal', () => {
+    const tight = (existing: ReturnType<typeof put>[]) => review({ room: rectRoom(1.6, 0.95, { doors: [{ wall: 'O', at: 0.47, width: 0.7, swingsIn: false }] }), type: 'bath', items: [], existing });
+    // the fitted WC 41 cm from the wall: as built, nothing to change
+    expect(rulesOf(tight([put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' })]))).not.toContain('B6');
+    // a fitted kitchen opposite a wall at 90 cm: the same
+    const galley = review({ room: rectRoom(3, 1.5, { doors: [{ wall: 'W', at: 0.75 }] }), type: 'kitchen', items: [], existing: [put('generic-k-base-60', { x: 1.5, y: 0.3, face: 'S' })] });
+    expect(rulesOf(galley)).not.toContain('B6');
+    // a planned kitchen in the same place is reported
+    const planned = review({ room: rectRoom(3, 1.5, { doors: [{ wall: 'W', at: 0.75 }] }), type: 'kitchen', items: [put('generic-k-base-60', { x: 1.5, y: 0.3, face: 'S' })] });
+    expect(rulesOf(planned, 'M')).toContain('B6');
+  });
+  it('B4 and B5 Bestand in the swing or behind the door is no finding of the proposal', () => {
+    expect(rulesOf(review({ room: room(), type: 'other', items: [], existing: [put('generic-wardrobe-100', { x: 0.9, y: 3.0, face: 'N' })] }))).not.toContain('B4');
+    const behind = review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5, swingsIn: false }] }), type: 'other', items: [], existing: [put('generic-shelf-80', { x: 1.5, y: 2.7, face: 'S' })] });
+    expect(rulesOf(behind)).not.toContain('B5');
   });
   it('B7 a piece enclosed by others is not reachable', () => {
     const ring = [
