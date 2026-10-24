@@ -16,7 +16,8 @@ interface Case {
 
 function cases(): Case[] {
   const out: Case[] = [];
-  for (const key of Object.keys(RECORDED) as FlatKey[]) {
+  // A and B as titled; C–F (recorded with the prompts of concept/) are for the solver to take on next
+  for (const key of ['A', 'B'] as FlatKey[]) {
     const project = TEST_FLATS[key].build();
     const flat = analyzeFlat(project);
     for (const [name, raw] of Object.entries(RECORDED[key]!.programs)) {

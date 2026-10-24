@@ -30,6 +30,31 @@ Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinate
   - Teppiche, Vorhänge und Hängendes zählen nicht.
 - Ein Raum mit mehr als vier Türen (Gang, Vorraum) bekommt Wege von der Haupttür zu jeder anderen Tür. Bleiben die frei, erreicht jede Tür jede andere.
 
+## Stufe 1 und 2 benutzen (`concept/`)
+
+- `runConcept({ sample, project, analysis, flatSketch, roomSketch, wishes })` fragt das Wohnkonzept und danach je Raum das Raumprogramm, drei Räume gleichzeitig. Ergebnis: `FlatConcept`, `RoomProgram[]`, je Raum die offenen Probleme und Hinweise, ausgefallene Räume mit Grund.
+- Jede Antwort wird geprüft. Findet die Prüfung Probleme, fragt der Ablauf einmal nach (`repairPrompt`: Aufgabe, letzte Antwort, Fehlerliste) und nimmt die bessere der beiden Antworten.
+- Zeitlimit je Anfrage: Opus 12, Sonnet 5 Minuten. Nach Zeitüberschreitung oder unlesbarer Antwort wird einmal neu gefragt, nach Nutzungslimit oder Abbruch nicht.
+- Modell: „gründlich“ nimmt Opus für Wohn-, Schlaf-, Kinder-, Arbeits-, Ess- und Küchenräume und für größere Durchgangszimmer, Sonnet für kleine Räume; „schnell“ nimmt überall Sonnet (`programModel`).
+- Prüfung Wohnkonzept (`parseFlatConcept`):
+  - jeder Raum genau einmal, mit gültigem Typ
+  - jeder Wunsch hat eine Funktion
+  - Esstisch, Gästeschlafplatz und Küchenzeile nur in einem Raum
+  - Schlafzimmer mit „Schlafen“, Kochen irgendwo
+  - kein neues Sanitär außer dem Handwaschbecken im WC ohne Becken
+- Prüfung Raumprogramm (`parseRoomProgram`):
+  - catalogIds aus der Liste, Zonen und Startplätze im Raum, Blickrichtung lesbar
+  - Pflichtteile von Raumtyp und Funktionen da (`needs.ts`); sie bekommen `required`
+  - kein Esstisch oder Gästebett, das laut Konzept in einen anderen Raum gehört
+  - Küchenzeile nur, wo gekocht wird und noch keine Küche steht, mit Spüle und Kühlschrank, passend zur Wand
+  - Bestand, den Claude noch einmal aufschreibt, fällt still heraus. Beziehungen zu ihm (Spiegel über dem Waschtisch) werden zu `wall` an seiner Wand.
+- Beziehungen (`relations.ts`): Claude schreibt `[teil, wort, ziel, wert in cm]`. Wörter außerhalb des Vokabulars werden nach dem Ziel zugeordnet:
+  - Stuhl `next-to` Tisch wird `around`, sonst `left-of`/`right-of` aus den Startplätzen
+  - `on` einer Wand mit Fenster wird die Fensterbank, ein Vorhang an der Wand wird `window … over`
+  - `against` wird `wall`, Ecke `E3` wird `corner`
+  - Was nicht passt (Türen als Ziel), fällt mit Hinweis weg; der Startplatz trägt die Idee weiter.
+- Tests mit den aufgezeichneten Antworten (`fixtures/recorded/`) und einer Fake-Antwort-Funktion; `concept/testFlats.ts` baut die Eingaben der Testwohnungen.
+
 ## Stufe 4 benutzen (`review/`)
 
 - `reviewRoom({ analysis, type, layout, existing?, program?, palette?, catalog?, options? })` gibt ein `RoomReview` zurück: Befunde (Regel A1 … E5, Schwere, Text in Alltagssprache, betroffene Teile, Ort im Plan), Punkte nach `score.ts`, `passed` und die Kennzahlen (Belegung, Weglänge leer und eingerichtet, nicht aufgestellte Teile).

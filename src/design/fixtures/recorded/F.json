@@ -1,0 +1,2529 @@
+{
+ "source": "Lauf T2 vom 23.10.2026 mit Testwohnung F: unveränderte Antworten von Claude (Opus für Haupträume, Sonnet für kleine Räume) auf die Prompts aus src/design/concept/. Je Anfrage die gültige Antwort (nach höchstens einer Reparatur-Runde).",
+ "concept": {
+  "living": "Hier lebt jemand, der ganztags im Homeoffice in Zimmer 2 arbeitet und abends in der großen, hellen Wohnküche abschaltet: Serien auf dem Sofa, Yoga auf der frei gehaltenen Fläche, Pflanzen am Fenster und auf der Loggia. Am Wochenende wird für Gäste gekocht, und an einer langen Tafel sitzen 6 bis 8 Personen, während der Gastgeber an der Einbauküche dabeibleibt. Das Schlafzimmer ist ein ruhiger Rückzugsort mit eigenem Leseplatz, einem eigenen Bad mit Wanne und dem Schrankraum gleich daneben.",
+  "style": {
+   "idea": "Ein heller Loft mit Beton, schwarzem Stahl und warmem Holz, bei dem Cognac-Leder und viel Grün das Industrielle wohnlich machen.",
+   "materials": [
+    "Beton bzw. Betonoptik (Spachtelputz, Fliesen)",
+    "schwarzer Stahl, pulverbeschichtet",
+    "geöltes Eichenholz, massiv",
+    "Cognac-Leder",
+    "Leinen in Naturtönen",
+    "Glas mit schwarzen Profilen",
+    "Terrakotta- und Betontöpfe für Pflanzen"
+   ],
+   "palette": [
+    {
+     "name": "Kalkweiß",
+     "hex": "#f2efe9"
+    },
+    {
+     "name": "Betongrau",
+     "hex": "#9a9a96"
+    },
+    {
+     "name": "Schwarz",
+     "hex": "#2b2b2b"
+    },
+    {
+     "name": "Warmes Holz",
+     "hex": "#a87a4f"
+    },
+    {
+     "name": "Cognac-Leder",
+     "hex": "#9c5b32"
+    }
+   ]
+  },
+  "functions": [
+   {
+    "function": "Kochen",
+    "room": "Wohnküche",
+    "why": "Die Einbauküche steht schon dort und bleibt, wie sie ist; der Koch ist mitten bei den Gästen.",
+    "wishes": [
+     1
+    ]
+   },
+   {
+    "function": "Essen",
+    "room": "Wohnküche",
+    "why": "Nur in der Wohnküche (31,2 m²) ist Platz für eine ausziehbare Tafel für 6 bis 8 Personen nahe der Küche, und das nur einmal in der Wohnung.",
+    "wishes": [
+     1,
+     5
+    ]
+   },
+   {
+    "function": "Sitzen/Fernsehen",
+    "room": "Wohnküche",
+    "why": "Die Wohnküche ist der einzige Wohnraum. Sofa und Fernseher gibt es nur hier, damit keine zweite Fernsehecke entsteht.",
+    "wishes": [
+     3,
+     6
+    ]
+   },
+   {
+    "function": "Yoga",
+    "room": "Wohnküche",
+    "why": "Die markierte Fläche Z1 bleibt frei, liegt hell an den Süd- und Westfenstern und hat neben dem Sofa genug Luft.",
+    "wishes": [
+     2,
+     7
+    ]
+   },
+   {
+    "function": "Helle, offene Raumwirkung",
+    "room": "Wohnküche",
+    "why": "Der größte Raum hat Fenster nach Süden und Westen. Deshalb gibt es dort wenige, niedrige Möbel, die Fenster bleiben frei und die Wand ist kalkweiß.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Arbeiten/PC",
+    "room": "Zimmer 2",
+    "why": "Ein eigener, abschließbarer Raum mit Westfenster für ganztägiges Arbeiten mit zwei Monitoren, getrennt vom Wohnen.",
+    "wishes": [
+     4
+    ]
+   },
+   {
+    "function": "Schlafen",
+    "room": "Schlafzimmer",
+    "why": "Größter ruhiger Raum mit Ostfenster für Morgenlicht, direkt am Schrankraum und an Bad 2.",
+    "wishes": []
+   },
+   {
+    "function": "Lesen",
+    "room": "Schlafzimmer",
+    "why": "Hier hat der Nutzer den Bereich Z2 als Leseplatz markiert.",
+    "wishes": []
+   },
+   {
+    "function": "Kleidung",
+    "room": "Schrankraum",
+    "why": "Der fensterlose Raum direkt am Schlafzimmer eignet sich ideal als begehbarer Schrank, so bleibt das Schlafzimmer frei von Schränken.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Garderobe/Schuhe",
+    "room": "Vorraum",
+    "why": "Jacken und Schuhe bleiben direkt an der Wohnungstür und kommen nicht in die Wohnräume.",
+    "wishes": []
+   },
+   {
+    "function": "Vorräte/Stauraum",
+    "room": "Speis",
+    "why": "Die Speis liegt direkt an der Küche und entlastet die Einbauküche, wenn für Gäste eingekauft wird.",
+    "wishes": [
+     1
+    ]
+   },
+   {
+    "function": "Wäsche",
+    "room": "Bad 1",
+    "why": "Neben Dusche, WC und Waschtisch bleibt Platz für eine Waschmaschine. Das Bad ist vom Vorraum aus erreichbar, ohne durchs Schlafzimmer zu gehen.",
+    "wishes": []
+   },
+   {
+    "function": "Körperpflege",
+    "room": "Bad 2",
+    "why": "Das Bad mit Wanne und Fenster gehört zum Schlafzimmer. Bad 1 ist zusätzlich das Gäste-Bad.",
+    "wishes": []
+   },
+   {
+    "function": "Gäste-WC/Gästebad",
+    "room": "Bad 1",
+    "why": "Gäste erreichen es über den Vorraum, ohne durch das private Schlafzimmer zu müssen.",
+    "wishes": [
+     1
+    ]
+   },
+   {
+    "function": "Draußen sitzen",
+    "room": "Loggia",
+    "why": "Die Loggia ist der einzige Freiraum, erreichbar über die Wohnküche, für einen Kaffee oder einen Aperitif mit Gästen.",
+    "wishes": [
+     1
+    ]
+   },
+   {
+    "function": "Pflanzen",
+    "room": "Loggia",
+    "why": "Die geschützte Loggia nimmt viele Pflanzen auf. Nach Norden gerichtet passen Schattenpflanzen wie Farne, Efeu und Funkien.",
+    "wishes": [
+     9
+    ]
+   }
+  ],
+  "rooms": [
+   {
+    "room": "Vorraum",
+    "type": "hall",
+    "role": "Ankommen und Verteilen: Hier werden Jacken und Schuhe abgelegt, alle Türen bleiben frei erreichbar.",
+    "functions": [
+     "Garderobe/Schuhe"
+    ],
+    "anchors": [
+     "Garderobe aus schwarzem Stahlrohr mit Eichenablage und Haken an der längsten türfreien Wand",
+     "flacher Schuhschrank (Tiefe max. 30 cm) mit großem Spiegel darüber"
+    ],
+    "accent": "#2b2b2b",
+    "avoid": [
+     "Möbel im Weg zwischen den fünf Türen",
+     "tiefe Schränke, die den Durchgang enger machen",
+     "dunkle Wandfarbe ohne Fenster"
+    ]
+   },
+   {
+    "room": "Zimmer 2",
+    "type": "office",
+    "role": "Ganztags-Arbeitsplatz mit Tageslicht, technisch gut ausgestattet und ruhig.",
+    "functions": [
+     "Arbeiten/PC"
+    ],
+    "anchors": [
+     "Schreibtisch 180×80 aus Eiche mit schwarzem Stahlgestell, höhenverstellbar, seitlich zum Westfenster, mit zwei Monitoren an einem Monitorarm",
+     "ergonomischer Bürostuhl",
+     "offenes Stahlregal für Ordner und Technik"
+    ],
+    "accent": "#9a9a96",
+    "avoid": [
+     "Fernseher",
+     "Gästebett oder Schlafsofa",
+     "Bildschirme mit dem Rücken zum Fenster (Blendung)"
+    ]
+   },
+   {
+    "room": "Bad 1",
+    "type": "bath",
+    "role": "Kompaktes Gästebad mit Dusche, gleichzeitig Platz für die Wäsche.",
+    "functions": [
+     "Gäste-WC/Gästebad",
+     "Wäsche"
+    ],
+    "anchors": [
+     "Waschmaschine mit Wäschetrockner darüber in einer Säule aus Holzlatten",
+     "schwarze Handtuchleiste und Ablage aus Stahl"
+    ],
+    "accent": "#2b2b2b",
+    "avoid": [
+     "zusätzliches Waschbecken",
+     "Verschieben von Dusche, WC oder Waschtisch",
+     "Hochschränke vor der Dusche"
+    ]
+   },
+   {
+    "room": "Schlafzimmer",
+    "type": "bedroom",
+    "role": "Ruhiger Rückzugsort mit Morgenlicht und Leseecke, der Weg zu Schrankraum und Bad 2 bleibt frei.",
+    "functions": [
+     "Schlafen",
+     "Lesen"
+    ],
+    "anchors": [
+     "Doppelbett 160 mit gepolstertem Kopfteil in Leinen an der ruhigen Wand, mit Abstand zu den Türen",
+     "Lesesessel aus Cognac-Leder mit schwarzer Stehleuchte im Bereich Z2"
+    ],
+    "accent": "#9c5b32",
+    "avoid": [
+     "Kleiderschränke (die stehen im Schrankraum)",
+     "Schreibtisch oder Fernseher",
+     "Möbel im Durchgang vom Vorraum zu Schrankraum und Bad 2"
+    ]
+   },
+   {
+    "room": "Schrankraum",
+    "type": "utility",
+    "role": "Begehbarer Schrank für die ganze Kleidung, damit das Schlafzimmer ruhig bleibt.",
+    "functions": [
+     "Kleidung"
+    ],
+    "anchors": [
+     "offenes Schranksystem aus schwarzen Stahlschienen mit Böden aus Eiche, über Eck",
+     "Ganzkörperspiegel mit guter Beleuchtung"
+    ],
+    "accent": "#a87a4f",
+    "avoid": [
+     "Türen an den Schränken, die im 2,19-m-Raum nicht aufgehen",
+     "Bett oder Gästebett",
+     "Gerümpel und Vorräte"
+    ]
+   },
+   {
+    "room": "Wohnküche",
+    "type": "living",
+    "role": "Das helle Herz der Wohnung: Kochen, Tafeln mit Gästen, Serien schauen und Yoga, ein Bereich geht in den nächsten über.",
+    "functions": [
+     "Kochen",
+     "Essen",
+     "Sitzen/Fernsehen",
+     "Yoga",
+     "Helle, offene Raumwirkung"
+    ],
+    "anchors": [
+     "Esstisch aus massiver Eiche 200×100, ausziehbar auf 280 cm, mit schwarzem Stahlgestell nahe der Einbauküche, dazu schwarze Stühle und eine Bank",
+     "Sofa aus Cognac-Leder, Blick zum Fernseher auf einem niedrigen Lowboard aus Eiche",
+     "frei gehaltene Yogafläche Z1 am Fenster, Matte im Lowboard verstaut"
+    ],
+    "accent": "#9c5b32",
+    "avoid": [
+     "Möbel auf der Fläche Z1",
+     "Umbau oder Erweiterung der Einbauküche",
+     "zweiter Esstisch oder Couchtisch auf dem Weg zu Speis und Loggia",
+     "schwere Vorhänge vor den Süd- und Westfenstern"
+    ]
+   },
+   {
+    "room": "Speis",
+    "type": "utility",
+    "role": "Vorratskammer und Stauraum für Geschirr, das man nur für Gäste braucht.",
+    "functions": [
+     "Vorräte/Stauraum"
+    ],
+    "anchors": [
+     "Regal aus Stahl mit Holzböden auf beiden Seiten, raumhoch",
+     "Ablage für Getränkekisten am Boden"
+    ],
+    "accent": "#9a9a96",
+    "avoid": [
+     "Waschmaschine",
+     "Möbel, die tiefer als 40 cm sind und die Tür blockieren"
+    ]
+   },
+   {
+    "room": "Bad 2",
+    "type": "bath",
+    "role": "Das private Bad am Schlafzimmer mit Wanne und Tageslicht zum Entspannen.",
+    "functions": [
+     "Körperpflege"
+    ],
+    "anchors": [
+     "schmales Regal aus Holzlatten für Handtücher",
+     "eine Pflanze am Südfenster, die Feuchtigkeit verträgt"
+    ],
+    "accent": "#a87a4f",
+    "avoid": [
+     "Verschieben von Wanne, WC oder Waschtisch",
+     "zusätzliches Waschbecken",
+     "Waschmaschine"
+    ]
+   },
+   {
+    "room": "Loggia",
+    "type": "balcony",
+    "role": "Grünes Außenzimmer an der Wohnküche für Kaffee, einen Aperitif mit Gästen und viele Pflanzen.",
+    "functions": [
+     "Draußen sitzen",
+     "Pflanzen"
+    ],
+    "anchors": [
+     "Bistrotisch mit zwei Stühlen aus schwarzem Stahl an der Schmalseite",
+     "Pflanzenregal mit Töpfen aus Beton und Terrakotta und Schattenpflanzen entlang der langen Wand"
+    ],
+    "accent": "#9a9a96",
+    "avoid": [
+     "Lounge-Möbel, für die die 159 cm Tiefe nicht reicht",
+     "Gerümpel und Abstellgut",
+     "Pflanzen, die volle Sonne brauchen (Nordlage)"
+    ]
+   }
+  ]
+ },
+ "programs": {
+  "Zimmer 2": {
+   "reading": "Zimmer 2 bekommt sein Licht nur über das Westfenster F1 (y=105–245). Die einzige Tür T1 liegt im Südosten der Ostwand. Es gibt also keinen Durchgangsweg, nur den Zugangsweg von der Tür nach Westen zum Arbeitsplatz. Die lange, geschlossene Nordwand ist die ruhige Seite und hält Schreibtisch und Regale. Wer hereinkommt, blickt nach Westen auf das helle Fenster mit Leinenvorhang und der großen Pflanze daneben, der Schreibtisch aus Eiche steht rechts davon im Streiflicht.",
+   "zones": [
+    {
+     "id": "arbeiten",
+     "function": "Arbeiten/PC",
+     "rect": [
+      0,
+      0,
+      200,
+      165
+     ],
+     "why": "In der Nordwestecke am Fenster. Das Licht fällt von links auf den Tisch, also seitlich zum Bildschirm, und es gibt keine Blendung. Die geschlossene Nordwand gibt Halt im Rücken der Bildschirme. Die Stuhlzone von 75 cm vor dem Tisch reicht bis y=155."
+    },
+    {
+     "id": "ablage",
+     "function": "Arbeiten/PC (Ordner und Technik)",
+     "rect": [
+      210,
+      0,
+      379,
+      120
+     ],
+     "why": "Auf der restlichen Nordwand, in derselben Flucht wie der Schreibtisch. Vom Bürostuhl aus ist sie mit einer Drehung und zwei Schritten erreichbar, und davor bleiben 90 cm frei. Die hohen Regale stehen an der Wand und weit weg von Tür und Fenster."
+    },
+    {
+     "id": "fensterecke",
+     "function": "Arbeiten/PC (Stimmung und Grün)",
+     "rect": [
+      0,
+      245,
+      60,
+      359
+     ],
+     "why": "Das Wandstück neben dem Fenster und die Südwestecke sind die Plätze für Großpflanze und Stehlampe. Beides steht seitlich am Fenster und nicht davor, und man sieht es beim Hereinkommen als Blickfang."
+    }
+   ],
+   "items": [
+    {
+     "id": "desk",
+     "catalogId": "generic-desk",
+     "zone": "arbeiten",
+     "x": 100,
+     "y": 40,
+     "facing": "S",
+     "label": "Schreibtisch 180×80, Platte aus geölter Eiche massiv, schwarzes pulverbeschichtetes Stahlgestell, elektrisch höhenverstellbar, Monitorarm mit zwei Monitoren, Kabelwanne",
+     "color": "#a87a4f",
+     "why": "Ankermöbel. Er steht mit der Rückseite an der geschlossenen Nordwand, 10 cm vom Westfenster abgerückt. Das Fenster liegt links vom Sitzenden, die Monitore schauen nach Süden, also quer zum Licht: keine Blendung und kein Gegenlicht. Auch hochgefahren steht der Tisch nicht vor dem Fenster.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-desk-small"
+     ]
+    },
+    {
+     "id": "chair",
+     "catalogId": "generic-office-chair",
+     "zone": "arbeiten",
+     "x": 100,
+     "y": 115,
+     "facing": "N",
+     "label": "Ergonomischer Bürostuhl, schwarzes Gestell, Netzrücken, Sitz in Cognac-Leder",
+     "color": "#2b2b2b",
+     "why": "Er steht mittig vor dem Tisch. Bis y=155 bleibt Platz zum Zurückrollen, und der Bezug bringt das Cognac-Leder aus dem Wohnkonzept hierher.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf1",
+     "catalogId": "generic-shelf-80",
+     "zone": "ablage",
+     "x": 259,
+     "y": 15,
+     "facing": "S",
+     "label": "Offenes Stahlregal schwarz pulverbeschichtet mit Eichenböden, für Ordner",
+     "color": "#2b2b2b",
+     "why": "Ankermöbel der Ablage. Es steht an der Nordwand neben dem Schreibtisch und ist vom Stuhl aus schnell erreichbar. Ordner kommen auf Griffhöhe.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-wall-shelf"
+     ]
+    },
+    {
+     "id": "shelf2",
+     "catalogId": "generic-shelf-80",
+     "zone": "ablage",
+     "x": 339,
+     "y": 15,
+     "facing": "S",
+     "label": "Zweites Stahlregal gleicher Bauart, für Technik (Drucker, Router, Dockingstation) und Boxen",
+     "color": "#2b2b2b",
+     "why": "Es steht in einer Flucht mit dem ersten Regal und schließt die Ecke W1/W2. Die Technik ist damit gebündelt und kommt nicht auf den Schreibtisch. Die Steckdose liegt an der Ecke.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-utility-shelf"
+     ]
+    },
+    {
+     "id": "box1",
+     "catalogId": "generic-storage-box",
+     "zone": "ablage",
+     "x": 339,
+     "y": 15,
+     "facing": "S",
+     "label": "Aufbewahrungsbox aus Leinen, naturfarben, im unteren Regalfach für Kabel und Kleinkram",
+     "color": "#f2efe9",
+     "why": "Kabelsalat verschwindet aus dem Blick, das hält den Raum ruhig.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "arbeiten",
+     "x": 130,
+     "y": 175,
+     "facing": "S",
+     "label": "Flachgewebter Teppich 160×230, Wolle/Leinen in Betongrau meliert, flach genug für Stuhlrollen",
+     "color": "#9a9a96",
+     "why": "Er dämpft den Schall im harten Loft-Raum, damit Videocalls ruhig klingen. Er liegt unter Stuhl und vorderer Tischkante und bringt die Akzentfarbe Betongrau. Der Türschwenk bleibt frei.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "arbeiten",
+     "x": 190,
+     "y": 180,
+     "facing": "S",
+     "label": "Pendelleuchte aus schwarzem Stahl, Kuppelschirm, warmweiß dimmbar",
+     "color": "#2b2b2b",
+     "why": "Grundlicht mittig im Raum. Sie hängt nicht über dem Bildschirm, damit es keine Spiegelung gibt.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "desklamp",
+     "catalogId": "generic-table-lamp",
+     "zone": "arbeiten",
+     "x": 30,
+     "y": 25,
+     "facing": "S",
+     "label": "Schreibtischlampe mit Gelenkarm, schwarzer Stahl, warmweiß, steht links vorne auf dem Tisch",
+     "color": "#2b2b2b",
+     "why": "Zonenlicht für dunkle Wintertage. Sie steht auf der Fensterseite, damit das Licht aus derselben Richtung kommt wie das Tageslicht und die schreibende Hand keinen Schatten wirft.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "floorlamp",
+     "catalogId": "generic-floor-lamp",
+     "zone": "fensterecke",
+     "x": 20,
+     "y": 338,
+     "facing": "O",
+     "label": "Stehlampe aus schwarzem Stahl mit Leinenschirm, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Stimmungslicht in der Südwestecke. Sie lässt den Raum abends weich ausleuchten und steht weit weg von Tür und Fenster.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "plant1",
+     "catalogId": "generic-plant",
+     "zone": "fensterecke",
+     "x": 25,
+     "y": 275,
+     "facing": "O",
+     "label": "Große Strelitzie im Betontopf",
+     "color": "#9a9a96",
+     "why": "Der Blickfang beim Hereinkommen. Sie steht seitlich am Fenster im besten Licht und bringt Grün in den Arbeitsalltag.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-plant-small"
+     ]
+    },
+    {
+     "id": "plant2",
+     "catalogId": "generic-plant-small",
+     "zone": "arbeiten",
+     "x": 15,
+     "y": 175,
+     "facing": "O",
+     "label": "Kleine Grünpflanze im Terrakottatopf auf der Fensterbank",
+     "color": "#a87a4f",
+     "why": "Grün im Blickfeld, wenn man vom Bildschirm aufschaut. Sie ist niedrig und steht auf der Fensterbank, also nicht auf dem Boden.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "curtain1",
+     "catalogId": "generic-curtain",
+     "zone": "arbeiten",
+     "x": 5,
+     "y": 175,
+     "facing": "O",
+     "label": "Leinenvorhang naturfarben, halbtransparent, an schwarzer Stahlstange",
+     "color": "#f2efe9",
+     "why": "Er streut die Nachmittagssonne aus Westen, damit sie nicht blendet, und dämpft den Schall. Er ist genauso breit wie das Fenster.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "picture1",
+     "catalogId": "generic-picture-large",
+     "zone": "arbeiten",
+     "x": 170,
+     "y": 357,
+     "facing": "N",
+     "label": "Wandbild 100×70, Schwarzweiß-Architekturfoto im schwarzen Stahlrahmen",
+     "color": "#2b2b2b",
+     "why": "Ein einziges Bild auf der freien Südwand. Es schmückt die lange leere Wand, und die Bildmitte hängt auf 150 cm.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-picture"
+     ]
+    }
+   ],
+   "relations": [
+    [
+     "desk",
+     "wall",
+     "W1",
+     10,
+     190
+    ],
+    [
+     "chair",
+     "around",
+     "desk"
+    ],
+    [
+     "shelf1",
+     "wall",
+     "W1",
+     219,
+     299
+    ],
+    [
+     "shelf2",
+     "corner",
+     "W1",
+     "W2"
+    ],
+    [
+     "shelf1",
+     "align",
+     "shelf2"
+    ],
+    [
+     "box1",
+     "on",
+     "shelf2"
+    ],
+    [
+     "desklamp",
+     "on",
+     "desk"
+    ],
+    [
+     "rug",
+     "near",
+     "chair",
+     80
+    ],
+    [
+     "floorlamp",
+     "corner",
+     "W3",
+     "W4"
+    ],
+    [
+     "plant1",
+     "window",
+     "F1",
+     "beside"
+    ],
+    [
+     "plant2",
+     "on",
+     "F1"
+    ],
+    [
+     "curtain1",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "picture1",
+     "wall",
+     "W3",
+     120,
+     220
+    ]
+   ],
+   "walk": "Durch T1 kommt man nach Westen in den Raum. Der Türschwenk (x=299–379, y=235–315) ist ganz frei. Danach ist der Boden von x=210 bis zur Ostwand und von y=120 bis zur Südwand offen, das sind gut 2 m freie Fläche ohne Möbel. Man geht in einer Linie quer durch den Raum zum Stuhl, 165 cm breit zwischen Regalvorderkante und Südwand. Vor den Regalen bleiben 90 cm frei (y=30–120). Hinter dem zurückgerollten Stuhl liegen noch über 2 m bis zur Südwand. Fensterbank, Vorhang und Pflanze erreicht man von Osten über die freie Teppichfläche.",
+   "check": [
+    "Türschwenk T1 frei: die nächsten Möbel sind die Regale (bis y=30) und der Teppich (bis x=210), beide weit außerhalb des Viertelkreises.",
+    "Schreibtisch seitlich zum Fenster: die Monitore zeigen nach Süden, das Fenster liegt im Westen links vom Sitzenden. Kein Bildschirm steht mit dem Rücken zum Fenster, und es gibt keine Spiegelung im Display.",
+    "Vor F1 steht nichts über 90 cm: der Tisch endet bei y=80, das Fenster beginnt bei y=105, auch hochgefahren bleibt es frei. Auf der Fensterbank steht nur die kleine Pflanze, davor hängt nur der Vorhang.",
+    "Stuhlzone 75 cm vor dem Tisch frei (y=80–155).",
+    "Vor den Regalen 90 cm frei. Die hohen Regale (190 cm) stehen an der Wand und nicht frei im Raum.",
+    "Zwischen Tisch (bis x=190) und Regal (ab x=219) liegen 29 cm Luft, also mehr als 20 cm.",
+    "Pflanze seitlich am Fenster, Stehlampe in einer echten Ecke. Beides steht nicht im Weg und nicht vor dem Fenster.",
+    "Licht in drei Ebenen, alles warmweiß: Pendel als Grundlicht, Schreibtischlampe als Zonenlicht, Stehlampe als Stimmungslicht.",
+    "Nicht im Raum: Fernseher, Gästebett, Schlafsofa. Leseplatz und Yoga sind in anderen Räumen geplant.",
+    "Farben aus der Palette: Eiche, Schwarz, Betongrau als Akzent im Teppich, Kalkweiß-Leinen, Cognac am Stuhl. Jedes Teil gibt es nur einmal mit eigenem Zweck, außer den zwei Regalen in einer Flucht. Der Blickfang beim Eintreten ist das Fenster mit der Strelitzie.",
+    "Würde man das so einrichten? Ja: ein ruhiger, aufgeräumter Arbeitsplatz im besten Licht. Die Technik ist an einer Wand gebündelt, und die freie Fläche lässt den kleinen Raum großzügig wirken."
+   ]
+  },
+  "Vorraum": {
+   "reading": "Der Vorraum ist ein reines Verteilerzimmer: Die Wohnungstür T1 liegt im Norden, vier weitere Türen führen nach Osten, Süden und Westen, und die Wege fächern sich diagonal auf. Die längste türfreie Fläche ist die Westwand (y 0–235), die nicht auf dem Hauptweg zu Bad, Schlafzimmer und Wohnküche liegt. Tageslicht gibt es nicht, deshalb helle Wände, ein Spiegel und warmes Licht. Beim Hereinkommen blickt man nach Süden auf die Wand mit T4, wo links der Tür ein großes Bild als Blickfang hängt.",
+   "zones": [
+    {
+     "id": "garderobe",
+     "function": "Garderobe/Schuhe",
+     "rect": [
+      0,
+      45,
+      40,
+      225
+     ],
+     "why": "Längste türfreie Wand (West) direkt neben dem Eingang. Die Zone ist nur 40 cm tief, deshalb bleibt der Hauptweg zu T5 und T4 frei.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "blick",
+     "function": "Blickfang und Licht",
+     "rect": [
+      0,
+      330,
+      110,
+      359
+     ],
+     "why": "Die freie Südwand links von T4 wird beim Hereinkommen gesehen. Dort hängt nur ein Bild, dazu eine Pflanze in der Ecke.",
+     "userZone": "Z2"
+    }
+   ],
+   "items": [
+    {
+     "id": "coat",
+     "catalogId": "generic-coat-rack",
+     "zone": "garderobe",
+     "x": 5,
+     "y": 95,
+     "facing": "O",
+     "label": "Garderobenleiste aus schwarzem Stahl mit Eichenablage und Haken",
+     "color": "#2b2b2b",
+     "why": "Ankermöbel: Die Haken hängen als Wandgarderobe direkt neben dem Eingang und nehmen keinen Platz im Weg weg.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shoe",
+     "catalogId": "generic-shoe-cabinet",
+     "zone": "garderobe",
+     "x": 15,
+     "y": 180,
+     "facing": "O",
+     "label": "Flacher Schuhschrank, schwarz, Eichenplatte",
+     "color": "#2b2b2b",
+     "why": "Nur 30 cm tief, darum bleibt der Durchgang zu T5 breit. Schuhe stehen direkt unter der Garderobe.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-mirror",
+     "zone": "garderobe",
+     "x": 2,
+     "y": 180,
+     "facing": "O",
+     "label": "Großer Spiegel mit schwarzem Stahlrahmen",
+     "color": "#2b2b2b",
+     "why": "Der Spiegel macht den fensterlosen Raum heller und dient dem letzten Blick vor dem Gehen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp",
+     "catalogId": "generic-table-lamp",
+     "zone": "garderobe",
+     "x": 15,
+     "y": 165,
+     "facing": "O",
+     "label": "Kleine Tischlampe, Betonfuß, Leinenschirm",
+     "color": "#f2efe9",
+     "why": "Stimmungslicht auf dem Schuhschrank, warmweiß.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "garderobe",
+     "x": 170,
+     "y": 190,
+     "facing": "S",
+     "label": "Pendelleuchte, schwarzer Stahl",
+     "color": "#2b2b2b",
+     "why": "Grundlicht für den Vorraum, eine Leuchte bei gut 10 m². Sie hängt hoch genug über dem Weg.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "picture",
+     "catalogId": "generic-picture-large",
+     "zone": "blick",
+     "x": 55,
+     "y": 357,
+     "facing": "N",
+     "label": "Großes Wandbild in Beton- und Cognac-Tönen",
+     "color": "#9c5b32",
+     "why": "Blickfang gegenüber der Wohnungstür. Es hängt neben T4 und nicht über der Tür.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-picture"
+     ]
+    },
+    {
+     "id": "plant",
+     "catalogId": "generic-plant",
+     "zone": "blick",
+     "x": 25,
+     "y": 334,
+     "facing": "N",
+     "label": "Große Grünpflanze im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Grün in der echten Südwestecke, außerhalb der Wege und der Türschwenkbereiche. Sie hängt farblich mit dem Bild zusammen.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-plant-small"
+     ]
+    }
+   ],
+   "relations": [
+    [
+     "coat",
+     "wall",
+     "W4",
+     55,
+     135
+    ],
+    [
+     "shoe",
+     "wall",
+     "W4",
+     140,
+     220
+    ],
+    [
+     "mirror",
+     "above",
+     "shoe",
+     100
+    ],
+    [
+     "lamp",
+     "on",
+     "shoe"
+    ],
+    [
+     "picture",
+     "wall",
+     "W3",
+     5,
+     105
+    ],
+    [
+     "plant",
+     "corner",
+     "W3",
+     "W4"
+    ]
+   ],
+   "walk": "Von T1 geht man frei diagonal zu allen Türen. Der Bereich am T1-Schwenk (Viertelkreis 100 cm um (94,0)) bleibt leer. Nach Osten zu T2 und T3 ist der Weg ohne Möbel, nach Süden zu T4 ebenfalls. Auf der Westseite sind nur 30 cm Schuhschrank und 10 cm Garderobe belegt, deshalb bleiben zwischen Schrank und Raummitte rund 250 cm. Dort läuft der Weg zu T5 mit mehr als 90 cm Breite.",
+   "check": [
+    "Garderobe (Muss-Teil) vorhanden, an der längsten türfreien Wand W4 (y 0–235).",
+    "Schuhschrank 30 cm tief, vor ihm bleiben weit über 80 cm frei.",
+    "T1-Schwenk (x 94–194, y 0–100) ist leer, ebenso die Schwenkbereiche von T2–T5 (außen aufschlagend).",
+    "Wege T1→T2, T3, T4, T5 sind jeweils mindestens 90 cm breit frei.",
+    "Pflanze in echter Ecke und nicht vor einer Tür (T5 beginnt 44 cm entfernt). Bild nicht über Tür oder Fenster.",
+    "Eine Deckenleuchte bei 10,3 m², Tischlampe nur auf dem Schuhschrank, alles warmweiß.",
+    "Farben aus der Palette (Schwarz, Cognac, Kalkweiß), Verbote beachtet: keine Möbel zwischen den Türen, keine tiefen Schränke, keine dunkle Wandfarbe."
+   ]
+  },
+  "Bad 1": {
+   "reading": "Das Gästebad hat kein Fenster. Das Licht kommt deshalb von Spiegel- und Deckenlicht, das Grundlicht muss warmweiß sein. Dusche, Waschtisch und WC sind fest, und die Tür geht links unten auf. Beim Hereinkommen blickt man nach Osten auf die geschlossene Wand W2 mit der schwarzen Handtuchleiste neben dem Duschglas. Das ist der Blickfang. Die Waschsäule aus Holzlatten steht ruhig in der Südwestecke, außerhalb des Türschwenks und neben dem WC.",
+   "zones": [
+    {
+     "id": "waschplatz",
+     "function": "Waschtisch/Spiegel",
+     "rect": [
+      0,
+      0,
+      100,
+      110
+     ],
+     "why": "Der Waschtisch ist fest. Die Nordwestecke mit dem Spiegel ist der ruhige Platz für das Händewaschen. Davor bleibt der Weg frei.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "dusche",
+     "function": "Duschen/Handtücher",
+     "rect": [
+      150,
+      0,
+      228,
+      219
+     ],
+     "why": "Dusche und WC sind fest. An der freien Ostwand hängen die Handtücher in Reichweite der Duschtür. Davor liegt die Badematte.",
+     "userZone": "Z2"
+    },
+    {
+     "id": "waesche",
+     "function": "Wäsche",
+     "rect": [
+      80,
+      150,
+      148,
+      219
+     ],
+     "why": "Die Südwand neben dem WC ist die einzige freie Wand, die nicht im Türschwenk liegt. Waschmaschine und Trockner stehen dort als Säule in einem Holzlattengehäuse, die Wäsche bleibt geschlossen.",
+     "userZone": "Z3"
+    }
+   ],
+   "items": [
+    {
+     "id": "waschsaeule",
+     "catalogId": "generic-washer",
+     "zone": "waesche",
+     "x": 112,
+     "y": 189,
+     "facing": "N",
+     "label": "Waschmaschine mit Wäschetrockner darüber in einer Säule aus geölten Eichenlatten (ca. 200 cm hoch)",
+     "color": "#a87a4f",
+     "why": "Ankermöbel: Die Säule steht an der Südwand zwischen Türschwenk und WC. Die Front zeigt in den Raum, und davor bleiben etwa 70 cm Platz zum Beladen.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "spiegel",
+     "catalogId": "generic-bath-mirror",
+     "zone": "waschplatz",
+     "x": 54,
+     "y": 2,
+     "facing": "S",
+     "label": "Badspiegel mit schmalem schwarzem Stahlrahmen",
+     "color": "#2b2b2b",
+     "why": "Der Spiegel hängt über dem Waschtisch. Er bringt Licht und lässt das fensterlose Bad größer wirken.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "handtuchleiste",
+     "catalogId": "generic-coat-rack",
+     "zone": "dusche",
+     "x": 222,
+     "y": 135,
+     "facing": "W",
+     "label": "Handtuchleiste aus schwarzem pulverbeschichtetem Stahl mit Haken",
+     "color": "#2b2b2b",
+     "why": "Sie hängt neben dem Duschausstieg an der Ostwand, wo man sie sofort greift. Sie ist der Blickfang beim Hereinkommen.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "ablage",
+     "catalogId": "generic-wall-shelf",
+     "zone": "dusche",
+     "x": 184,
+     "y": 209,
+     "facing": "N",
+     "label": "Ablage aus schwarzem Stahl über dem WC",
+     "color": "#2b2b2b",
+     "why": "Sie bietet Platz für Gästehandtücher und Pflegeprodukte, ohne den Boden zu belegen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "box",
+     "catalogId": "generic-storage-box",
+     "zone": "dusche",
+     "x": 184,
+     "y": 209,
+     "facing": "N",
+     "label": "Aufbewahrungsbox aus Leinen mit Gästehandtüchern",
+     "color": "#d8cfbf",
+     "why": "Die Box hält Gästehandtücher griffbereit und passt mit dem Leinen zum Konzept.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "matte",
+     "catalogId": "generic-bath-mat",
+     "zone": "dusche",
+     "x": 183,
+     "y": 117,
+     "facing": "S",
+     "label": "Badematte aus Baumwolle in Betongrau",
+     "color": "#9a9a96",
+     "why": "Sie liegt vor der Dusche, saugt Wasser auf und liegt nicht im Türschwenk.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "leuchte",
+     "catalogId": "generic-pendant",
+     "zone": "waschplatz",
+     "x": 120,
+     "y": 110,
+     "facing": "S",
+     "label": "Deckenleuchte aus schwarzem Stahl, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Sie ist das Grundlicht für das fensterlose Bad. Mit dem Spiegellicht ergeben sich zwei Lichtebenen.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "waschsaeule",
+     "wall",
+     "W3",
+     82,
+     142
+    ],
+    [
+     "handtuchleiste",
+     "wall",
+     "W2",
+     95,
+     175
+    ],
+    [
+     "ablage",
+     "wall",
+     "W3",
+     144,
+     224
+    ],
+    [
+     "box",
+     "on",
+     "ablage"
+    ],
+    [
+     "spiegel",
+     "above",
+     "B3",
+     140
+    ]
+   ],
+   "walk": "Man kommt durch die Tür bei y=135–215, der Schwenk bleibt frei. Von dort läuft man etwa 110 cm breit über die freie Mitte zum Waschtisch und weiter zur Dusche. Zwischen Duschfront und WC bleiben etwa 75 cm. Vor der Waschsäule sind es etwa 70 cm bis zur Mitte des Raums. Vor dem Waschtisch sind es mehr als 60 cm.",
+   "check": [
+    "Der Türschwenk (Radius 80 cm um (0,135)) ist frei. Die Waschsäule beginnt bei x=82 und liegt außerhalb des Bogens.",
+    "Dusche, WC und Waschtisch bleiben unverändert, und es gibt keinen Hochschrank vor der Dusche.",
+    "Zwischen Waschsäule (bis x=142) und WC (ab x=165,5) sind es gut 23 cm, also mehr als 20 cm.",
+    "Vor dem WC bleiben etwa 75 cm, vor dem Waschtisch mehr als 60 cm.",
+    "Die Handtuchleiste hängt an der Ostwand ab y=95 und stößt nicht an die Dusche. Das Duschglas bleibt frei.",
+    "Die Badematte liegt vor der Dusche und nicht im Türschwenk.",
+    "Es gibt keine Pflanzen und keine Dubletten, nur das Nötige. Sitzen, Kochen, Schlafen und weitere Funktionen stehen in anderen Räumen.",
+    "Farben aus der Palette: Eichenholz, Schwarz, Betongrau, Kalkweiß-Leinen."
+   ]
+  },
+  "Schrankraum": {
+   "reading": "Der Schrankraum ist ein reiner Innenraum ohne Fenster, 219 × 219 cm, mit nur einer Tür in der Südwand. Sie schlägt nach innen auf, ihr Viertelkreis (x 74–154, y 139–219) bleibt frei. Wer eintritt, blickt nach Norden auf die lange Schrankwand aus Stahl und Eiche, das ist der Blickfang. Die Nord- und Westwand sind frei und nehmen das offene Schranksystem über Eck auf. Die Ostwand trägt Kommode und Spiegel. Licht gibt es nur künstlich, deshalb braucht der Spiegel gutes Frontlicht.",
+   "zones": [
+    {
+     "id": "schrank",
+     "function": "Kleidung hängen und legen (offenes Schranksystem über Eck)",
+     "rect": [
+      0,
+      0,
+      200,
+      210
+     ],
+     "why": "Nord- und Westwand sind die ruhigen, geschlossenen Wände ohne Tür. Der Tiefenversatz von 60 cm lässt in der Mitte 111 cm Gang und vor der Nordwand 80 cm und mehr zum Aussuchen.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "ankleide",
+     "function": "Kommode, Ganzkörperspiegel, Ankleiden",
+     "rect": [
+      160,
+      62,
+      219,
+      219
+     ],
+     "why": "Die Ostwand ist frei. Dort liegen Faltwäsche, Schmuck und Lampe, darunter hängt der Spiegel mit Licht von vorne und von oben. Die Tür schlägt westlich von x=154 auf und kommt dem Spiegel nicht in die Quere.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "schrank-nord",
+     "catalogId": "generic-wardrobe-200",
+     "zone": "schrank",
+     "x": 100,
+     "y": 30,
+     "facing": "S",
+     "label": "Offenes Schranksystem 200 cm: schwarze Stahlschienen, Eichenböden, Kleiderstange, ohne Türen",
+     "color": "#a87a4f",
+     "why": "Ankermöbel an der Nordwand, direkt im Blick beim Hereinkommen. Ohne Türen, damit nichts im engen Raum aufschlagen muss. Hier hängt die lange Garderobe.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-wardrobe-150",
+      "generic-wardrobe-100"
+     ]
+    },
+    {
+     "id": "schrank-west",
+     "catalogId": "generic-wardrobe-150",
+     "zone": "schrank",
+     "x": 30,
+     "y": 135,
+     "facing": "O",
+     "label": "Offenes Schranksystem 150 cm, Eckanschluss: Stahlschienen, Eichenböden, Fächer und Stangen",
+     "color": "#a87a4f",
+     "why": "Zweiter Schenkel über Eck, bündig zur Front des Nordschranks. Vor dem Schrank sind es bis zur Tür 14 cm Luft, die Tür selbst schlägt erst ab x=74 auf.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-wardrobe-100"
+     ]
+    },
+    {
+     "id": "kommode",
+     "catalogId": "generic-dresser",
+     "zone": "ankleide",
+     "x": 195,
+     "y": 105,
+     "facing": "W",
+     "label": "Kommode aus geöltem Eichenholz mit Schubladen für Wäsche und Strick",
+     "color": "#a87a4f",
+     "why": "Schubladen für Gefaltetes ergänzen die Stangen. Die Oberfläche trägt Lampe und Pflanze. Vor der Kommode sind es rund 110 cm bis zur Westwand, damit 80–90 cm freier Stand bleiben.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "spiegel",
+     "catalogId": "generic-mirror",
+     "zone": "ankleide",
+     "x": 217,
+     "y": 185,
+     "facing": "W",
+     "label": "Ganzkörperspiegel mit schwarzem Stahlrahmen",
+     "color": "#2b2b2b",
+     "why": "Direkt an der freien Ostwand, ausserhalb des Türschwenks. Der Stand davor liegt im Bereich x 160–215, bei geschlossener Tür kann man bis zur Raummitte zurücktreten.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lampe",
+     "catalogId": "generic-table-lamp",
+     "zone": "ankleide",
+     "x": 195,
+     "y": 85,
+     "facing": "W",
+     "label": "Tischlampe, schwarzer Stahl, warmweisses Licht",
+     "color": "#2b2b2b",
+     "why": "Zonenlicht und Stimmungslicht auf der Kommode, das den Spiegel von der Seite mit warmem Licht versorgt.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pflanze",
+     "catalogId": "generic-plant-small",
+     "zone": "ankleide",
+     "x": 195,
+     "y": 125,
+     "facing": "W",
+     "label": "Kleine Grünpflanze im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Ein Hauch Grün auf der Kommode macht den Schrankraum wohnlich, ohne den Boden zu verstellen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendel",
+     "catalogId": "generic-pendant",
+     "zone": "ankleide",
+     "x": 130,
+     "y": 125,
+     "facing": "S",
+     "label": "Pendelleuchte in schwarzem Stahl, warmweisses Licht",
+     "color": "#2b2b2b",
+     "why": "Grundlicht in einem Raum ohne Fenster, nahe genug am Spiegel für gutes Licht von vorn und oben. Eine einzige Leuchte reicht bei 4,8 m².",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "schrank-nord",
+     "wall",
+     "W1",
+     0,
+     200
+    ],
+    [
+     "schrank-west",
+     "wall",
+     "W4",
+     60,
+     210
+    ],
+    [
+     "schrank-nord",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "schrank-west",
+     "align",
+     "schrank-nord"
+    ],
+    [
+     "kommode",
+     "wall",
+     "W2",
+     65,
+     145
+    ],
+    [
+     "spiegel",
+     "wall",
+     "W2",
+     155,
+     215
+    ],
+    [
+     "lampe",
+     "on",
+     "kommode"
+    ],
+    [
+     "pflanze",
+     "on",
+     "kommode"
+    ],
+    [
+     "spiegel",
+     "near",
+     "pendel",
+     110
+    ]
+   ],
+   "walk": "Von der Tür geht man nach Norden in die Raummitte: zwischen Westschrank (Front bei x=60) und Kommode (Front bei x=171) bleiben 111 cm. Vor dem Nordschrank sind es 80 cm und mehr bis zur Tür, vor dem Westschrank rund 90–110 cm. Die Tür schlägt im Viertelkreis x 74–154, y 139–219 auf und lässt sich ganz öffnen. Am Spiegel steht man bei geschlossener Tür bequem, die Raummitte dient als Ankleidefläche.",
+   "check": [
+    "Türschwenk x 74–154, y 139–219: kein Möbel, keine Lampe, keine Pflanze darin",
+    "Weg von der Tür bis zur Raummitte mindestens 90 cm",
+    "Abstand vor Schränken und Kommode 80–110 cm",
+    "Nichts doppelt und nichts ohne Grund: Pendel als einziges Grundlicht, Tischlampe als Zonenlicht",
+    "Hohe Möbel (Schränke 200–220 cm) stehen an der Wand, keine freistehenden",
+    "Keine Türen an den Schränken, die im engen Raum aufgehen müssten",
+    "Palette: Eiche #a87a4f, schwarzer Stahl #2b2b2b, Terrakotta #9c5b32",
+    "Kein Bett, kein Gerümpel, keine Vorräte",
+    "Rest-Spalt im NO (19 × 60 cm) bleibt bewusst frei, damit der Schrank bündig in der Ecke sitzt und nichts Krummes entsteht"
+   ]
+  },
+  "Schlafzimmer": {
+   "reading": "Der Raum ist ein Durchgangszimmer. Von T3 (Vorraum) im Nordwesten führen zwei Wege weiter: an der Nordseite entlang zu T1 (Schrankraum) und durch die Mitte nach Süden zu T2 (Bad 2). Ein durchgehender Streifen von etwa 106 cm zwischen x=208 und x=314 sowie der Nordstreifen bis y≈120 bleiben deshalb leer. Licht kommt nur am Morgen durch F1 in der Ostwand. Die einzige lange geschlossene Wand ist die Westwand unterhalb von T3, also die ruhige Bettwand. Wer durch T3 hereinkommt, blickt nach Osten auf das Fenster mit dem Leseplatz aus Cognac-Leder davor.",
+   "zones": [
+    {
+     "id": "schlafen",
+     "function": "Schlafen",
+     "rect": [
+      0,
+      110,
+      208,
+      408
+     ],
+     "why": "Die Westwand ist zwischen y=104 und y=408 geschlossen und weit weg von T1. Das Bett liegt mit dem Kopf nach Westen, man schaut zum Fenster im Osten und wacht mit der Morgensonne auf. Der Bereich bleibt westlich des Mittelgangs und südlich des Nordwegs."
+    },
+    {
+     "id": "lesen",
+     "function": "Lesen",
+     "rect": [
+      314,
+      114,
+      454,
+      294
+     ],
+     "why": "Diese Ecke hat der Nutzer markiert. Sie liegt direkt am Fenster F1 mit dem hellsten Tageslicht und östlich des Mittelgangs, also außerhalb aller Wege. Hier wird man beim Hereinkommen als erstes hingezogen.",
+     "userZone": "Z2"
+    }
+   ],
+   "items": [
+    {
+     "id": "bed",
+     "catalogId": "generic-bed-160",
+     "zone": "schlafen",
+     "x": 104,
+     "y": 250,
+     "facing": "O",
+     "label": "Polsterbett 160×200 mit hohem Kopfteil in Leinen, Betongrau",
+     "color": "#9a9a96",
+     "why": "Das Ankermöbel. Das Kopfteil steht an der geschlossenen Westwand mit Abstand zu T3, man schaut zum Fenster und bekommt das Morgenlicht. Zum Nordweg bleiben 60 cm frei, zur Südwand 75 cm. So kommt man von beiden Seiten ins Bett, und das Fußende bei x=208 lässt den Mittelgang frei.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-bed-140"
+     ]
+    },
+    {
+     "id": "ns1",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 145,
+     "facing": "O",
+     "label": "Nachttisch aus geölter Eiche, massiv",
+     "color": "#a87a4f",
+     "why": "Linker Teil des Paars am Bett. Er steht nördlich des Bettes und bleibt mit y≥124 außerhalb des Türschwenks von T3 und des Nordwegs."
+    },
+    {
+     "id": "ns2",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 355,
+     "facing": "O",
+     "label": "Nachttisch aus geölter Eiche, massiv",
+     "color": "#a87a4f",
+     "why": "Spiegelgleich zu ns1 auf der Südseite. Daneben bleiben 75 cm frei zum Aufstehen."
+    },
+    {
+     "id": "chair",
+     "catalogId": "generic-armchair",
+     "zone": "lesen",
+     "x": 400,
+     "y": 195,
+     "facing": "S",
+     "label": "Lesesessel aus Cognac-Leder mit Gestell aus schwarzem Stahl",
+     "color": "#9c5b32",
+     "why": "Das Ankermöbel der Leseecke. Mit 85 cm ist er niedriger als die Brüstung, er darf also am Fenster stehen. Das Tageslicht fällt von links ein, man schaut auf die Pflanze an der Fensterlaibung. Von T3 aus ist er der Blickfang in der Akzentfarbe.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "floorlamp",
+     "catalogId": "generic-floor-lamp",
+     "zone": "lesen",
+     "x": 337,
+     "y": 195,
+     "facing": "S",
+     "label": "Leselampe mit Bogenarm aus schwarzem Stahl, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Zonenlicht zum Lesen am Abend. Sie steht rechts neben dem Sessel, 120 cm vom Fenster entfernt und mit x≥319 noch vor der Kante des Mittelgangs."
+    },
+    {
+     "id": "lamp1",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 145,
+     "facing": "O",
+     "label": "Tischlampe, Fuß aus schwarzem Metall, Schirm aus Leinen, dimmbar",
+     "color": "#2b2b2b",
+     "why": "Stimmungslicht und Leselicht im Bett. Sie bildet ein Paar mit lamp2."
+    },
+    {
+     "id": "lamp2",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 355,
+     "facing": "O",
+     "label": "Tischlampe, Fuß aus schwarzem Metall, Schirm aus Leinen, dimmbar",
+     "color": "#2b2b2b",
+     "why": "Gegenstück zu lamp1, damit beide Bettseiten eigenes Licht haben."
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "schlafen",
+     "x": 230,
+     "y": 204,
+     "facing": "S",
+     "label": "Deckenpendel aus schwarzem Stahl, mattes Glas, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Grundlicht in der Raummitte. Die Unterkante liegt bei 220 cm, man geht also bequem darunter durch."
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "schlafen",
+     "x": 140,
+     "y": 250,
+     "facing": "S",
+     "label": "Wollteppich 160×230 in Naturweiß mit grober Struktur",
+     "color": "#f2efe9",
+     "why": "Er liegt unter den unteren zwei Dritteln des Bettes und schaut seitlich gut 30 cm hervor, man steht morgens also warm auf. Er bleibt außerhalb des Türschwenks von T3 und ragt nur flach 12 cm in den Mittelgang."
+    },
+    {
+     "id": "picture",
+     "catalogId": "generic-picture-large",
+     "zone": "schlafen",
+     "x": 2,
+     "y": 250,
+     "facing": "O",
+     "label": "Wandbild 100×70, Kohlezeichnung mit Erdtönen, schmaler schwarzer Rahmen",
+     "color": "#2b2b2b",
+     "why": "Es hängt mittig über dem Kopfteil und ist mit 100 cm etwa zwei Drittel so breit wie das Bett. Die Bildmitte liegt bei 150 cm. Der Schwarzton nimmt das Stahlthema auf."
+    },
+    {
+     "id": "curtain1",
+     "catalogId": "generic-curtain",
+     "zone": "lesen",
+     "x": 456,
+     "y": 134,
+     "facing": "W",
+     "label": "Vorhang aus Leinen, naturweiß, blickdicht gefüttert",
+     "color": "#f2efe9",
+     "why": "Nördlicher Vorhangschal. Offen bündelt er sich neben dem Fenster und lässt das Morgenlicht voll herein, geschlossen dunkelt er ab."
+    },
+    {
+     "id": "curtain2",
+     "catalogId": "generic-curtain",
+     "zone": "lesen",
+     "x": 456,
+     "y": 274,
+     "facing": "W",
+     "label": "Vorhang aus Leinen, naturweiß, blickdicht gefüttert",
+     "color": "#f2efe9",
+     "why": "Südlicher Vorhangschal. Zusammen mit curtain1 sind es 280 cm, also deutlich mehr als die 160 cm des Fensters."
+    },
+    {
+     "id": "plant",
+     "catalogId": "generic-plant",
+     "zone": "lesen",
+     "x": 434,
+     "y": 309,
+     "facing": "W",
+     "label": "Große Pflanze im Terrakottatopf, z. B. Strelitzie",
+     "color": "#9c5b32",
+     "why": "Seitlich am Fenster, wo sie viel Licht bekommt. Sie ist das Grün, auf das man vom Lesesessel schaut, und füllt die Nische zur Südwand, ohne einen Weg zu berühren."
+    },
+    {
+     "id": "plantsmall",
+     "catalogId": "generic-plant-small",
+     "zone": "lesen",
+     "x": 446,
+     "y": 204,
+     "facing": "W",
+     "label": "Kleine Pflanze im Betontopf auf der Fensterbank",
+     "color": "#9a9a96",
+     "why": "Mit Grün auf Augenhöhe beim Lesen. Sie steht auf der Fensterbank, nicht auf dem Boden."
+    }
+   ],
+   "relations": [
+    [
+     "bed",
+     "wall",
+     "W4",
+     167,
+     333
+    ],
+    [
+     "ns1",
+     "pair",
+     "ns2",
+     "bed"
+    ],
+    [
+     "lamp1",
+     "on",
+     "ns1"
+    ],
+    [
+     "lamp2",
+     "on",
+     "ns2"
+    ],
+    [
+     "picture",
+     "above",
+     "bed",
+     115
+    ],
+    [
+     "rug",
+     "under-all",
+     "bed"
+    ],
+    [
+     "chair",
+     "window",
+     "F1",
+     "front"
+    ],
+    [
+     "floorlamp",
+     "right-of",
+     "chair",
+     5
+    ],
+    [
+     "curtain1",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "curtain2",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "plant",
+     "window",
+     "F1",
+     "beside"
+    ],
+    [
+     "plant",
+     "near",
+     "chair",
+     130
+    ],
+    [
+     "plantsmall",
+     "on",
+     "F1"
+    ]
+   ],
+   "walk": "Durch T3 betritt man den Nordstreifen, der von y=0 bis etwa y=120 über die ganze Breite frei ist. Der Türschwenk von T3 endet bei y=104, der erste Nachttisch beginnt erst bei y=124. Dieser Streifen ist der Hauptweg nach Osten zu T1 in den Schrankraum. Nach Süden zu T2 (Bad 2) geht man durch den Mittelgang zwischen dem Fußende des Bettes (x=208) und der Leselampe (x=319). Er ist 111 cm breit und von x≈210 bis 300 komplett frei. Unten führt er direkt in die Türöffnung von T2 bei x=174–254, davor bleibt der Streifen südlich des Bettes 75 cm frei. Von T3 zu T2 ist das ein kleiner Umweg über den Mittelgang statt der Diagonale. Die Diagonale würde aber durch das Bett führen, und es gibt keine andere geschlossene Wand für ein Doppelbett mit Zugang von beiden Seiten. Von T1 zu T2 läuft der Weg ebenfalls durch den Mittelgang. Den Lesesessel erreicht man vom Mittelgang aus, das Bett von Norden (60 cm bis zum Weg) und von Süden (75 cm).",
+   "check": [
+    "T1 und T2 schlagen nach außen auf. Der Schwenkbereich von T3 (Viertelkreis um (0,24), r=80) ist leer, der nördliche Nachttisch beginnt erst bei y=124. Der Teppich liegt bei x≥60 und y≥135, also ebenfalls außerhalb.",
+    "Der Weg T1–T3 läuft im Nordstreifen y=0–120. Dort steht nichts, er ist über 90 cm breit.",
+    "Die Wege zu T2 laufen durch den Mittelgang x=208–319 (111 cm). Nur der flache Teppichrand ragt 12 cm hinein. Der Umweg gegenüber der Diagonale beträgt etwa 0,6 m.",
+    "Das Kopfteil steht an der geschlossenen Westwand, nicht unter dem Fenster. Zu T3 sind es etwa 60 cm Abstand, zu T2 über 75 cm.",
+    "Neben dem Bett sind nördlich 60 cm bis zum Weg frei und südlich 75 cm bis zur Wand. Das Bett ist also von beiden Seiten zugänglich.",
+    "Die Nachttische stehen als Paar je 2 cm neben dem Bett. Auf jedem steht eine dimmbare Tischlampe, kein Möbel blockiert den Ausstieg.",
+    "Der Sessel ist 85 cm hoch und damit niedriger als die Brüstung (90 cm). Stehlampe und große Pflanze stehen nicht vor dem Fenster, sondern neben dem Sessel bzw. seitlich am Fenster.",
+    "Die Vorhänge sind zusammen 280 cm breit, also breiter als das 160 cm breite Fenster.",
+    "Das Bild ist 100 cm breit, etwa zwei Drittel der Bettbreite, hängt mittig über dem Bett mit der Bildmitte bei etwa 150 cm. Über Türen und Fenster hängt nichts.",
+    "Licht in drei Ebenen: Pendel als Grundlicht, Leselampe als Zonenlicht, dimmbare Nachttischlampen als Stimmungslicht, alles warmweiß.",
+    "Was nicht hierher gehört, fehlt: keine Kleiderschränke, kein Schreibtisch, kein Fernseher, nichts im Durchgang zu Schrankraum und Bad 2. Hohe Möbel über 1,2 m gibt es nicht.",
+    "Blickfang beim Hereinkommen durch T3: Cognac-Sessel, schwarze Leuchte und Grün vor dem hellen Fenster. Alle Farben stammen aus der Palette, jedes Teil hat einen Grund."
+   ]
+  },
+  "Wohnküche": {
+   "reading": "Alle drei Türen liegen in der Osthälfte: T1 oben, T2 an der Ostwand und T3 zur Loggia. Dort laufen die Wege, und das Fernsehen kann nur an der freien Ostwand W2 stattfinden. Die Westhälfte ist ruhig und hell: Im Norden steht die Einbauküche, am Westfenster F2 liegt die Yogafläche Z1, und das bodentiefe Glas F1 im Süden bringt Licht von Süden und vom späten Nachmittag. Wer durch T1 hereinkommt, schaut nach Süden auf die Loggiatür, das Glaselement und das freie Wandstück östlich von T3. Dort gehört der Blickfang hin.",
+   "zones": [
+    {
+     "id": "kochen",
+     "function": "Kochen (Bestand)",
+     "rect": [
+      0,
+      0,
+      360,
+      185
+     ],
+     "why": "Die Einbauküche an W1 bleibt, davor 120 cm Arbeitsgang. Er bleibt nach Osten über x=360–500 (y=0–90) offen zu T1, damit man mit Einkäufen kurz zur Küche kommt."
+    },
+    {
+     "id": "essen",
+     "function": "Essen",
+     "rect": [
+      191,
+      185,
+      371,
+      349
+     ],
+     "why": "Direkt vor dem Arbeitsgang: Der Gastgeber steht an der Spüle und hat die Tafel einen Schritt hinter sich. Die Rücken der Nordstühle grenzen an den Küchengang (120 cm frei), die Südstühle haben bis W3 110 cm Platz. Die Zone liegt westlich vom Sofa und abseits aller Türwege."
+    },
+    {
+     "id": "sitzen",
+     "function": "Sitzen/Fernsehen",
+     "rect": [
+      371,
+      90,
+      461,
+      355
+     ],
+     "why": "Das Sofa steht frei mit dem Rücken zur Tafel und trennt Essen und Wohnen wie im Loft. Es schaut nach Osten auf die einzige freie Fernsehwand. Der Durchgang von T1 nach T2 und T3 läuft vor dem Sofa entlang und bleibt deshalb aus der Zone heraus."
+    },
+    {
+     "id": "medien",
+     "function": "Fernsehwand",
+     "rect": [
+      637,
+      150,
+      679,
+      330
+     ],
+     "why": "Die Ostwand W2 ist zwischen y=0 und 339 frei. Lowboard und Fernseher stehen mittig gegenüber dem Sofa und bleiben nördlich vom Schwenkbereich von T2."
+    },
+    {
+     "id": "yoga",
+     "function": "Yoga",
+     "rect": [
+      10,
+      124,
+      190,
+      304
+     ],
+     "why": "Fläche vom Nutzer, am Westfenster mit Abendlicht. Hier steht nichts, die Matte liegt im Lowboard.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "gruen",
+     "function": "Pflanzen am Fenster",
+     "rect": [
+      0,
+      304,
+      105,
+      459
+     ],
+     "why": "In der Südwestecke zwischen F2 und F1 kommt Licht von zwei Seiten. Hier ist eine ruhige grüne Ecke, die zur Loggia überleitet."
+    },
+    {
+     "id": "blickfang",
+     "function": "Blickfang beim Hereinkommen",
+     "rect": [
+      495,
+      409,
+      679,
+      459
+     ],
+     "why": "Das freie Wandstück von W3 östlich von T3 und die Ecke E2 sieht man von T1 aus geradeaus. Der Weg von T2 nach T3 bleibt nördlich davon."
+    }
+   ],
+   "items": [
+    {
+     "id": "table",
+     "catalogId": "generic-dining-table-6",
+     "zone": "essen",
+     "x": 281,
+     "y": 267,
+     "facing": "N",
+     "label": "Esstisch aus massiver, geölter Eiche mit schwarzem Stahl-Kufengestell, ausziehbar",
+     "color": "#a87a4f",
+     "why": "Er ist das Ankermöbel der Tafel, längs zur Küche gestellt, damit der Gastgeber dabei bleibt. Im Katalog gibt es nur 180×90; für 8 Gäste wird er abends nach Westen in die dann ungenutzte Yogafläche ausgezogen.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-dining-table-4"
+     ]
+    },
+    {
+     "id": "c1",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 214,
+     "y": 211,
+     "facing": "S",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Nordseite, Rücken zum Küchengang"
+    },
+    {
+     "id": "c2",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 269,
+     "y": 211,
+     "facing": "S",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Nordseite, Mitte"
+    },
+    {
+     "id": "c3",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 324,
+     "y": 211,
+     "facing": "S",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Nordseite, 24 cm Abstand zum Sofarücken"
+    },
+    {
+     "id": "c4",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 214,
+     "y": 323,
+     "facing": "N",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Südseite mit Blick zur Küche und zum Gastgeber"
+    },
+    {
+     "id": "c5",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 269,
+     "y": 323,
+     "facing": "N",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Südseite, Mitte"
+    },
+    {
+     "id": "c6",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 324,
+     "y": 323,
+     "facing": "N",
+     "label": "Stuhl aus schwarzem Stahlrohr, Sitz aus Eiche",
+     "color": "#2b2b2b",
+     "why": "Südseite; Platz 7 und 8 kommen bei Gästen als Klappstühle von der Loggia dazu"
+    },
+    {
+     "id": "pend_table",
+     "catalogId": "generic-pendant",
+     "zone": "essen",
+     "x": 281,
+     "y": 267,
+     "facing": "N",
+     "label": "Pendelleuchte aus schwarzem Stahl, warmweiß, dimmbar",
+     "color": "#2b2b2b",
+     "why": "Zonenlicht über der Tafel, 70 cm über der Tischplatte"
+    },
+    {
+     "id": "sofa",
+     "catalogId": "generic-sofa-3",
+     "zone": "sitzen",
+     "x": 416,
+     "y": 240,
+     "facing": "O",
+     "label": "3-Sitzer aus Cognac-Leder mit schwarzem Stahlfuß",
+     "color": "#9c5b32",
+     "why": "Ankermöbel und Farbakzent. Es steht frei, der Rücken schließt bündig an die Stirnseite des Esstischs an und bildet den Raumteiler. Die Vorderseite liegt 210 cm vor dem Fernseher.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-sofa-2"
+     ]
+    },
+    {
+     "id": "lowboard",
+     "catalogId": "generic-tv-sideboard",
+     "zone": "medien",
+     "x": 658,
+     "y": 240,
+     "facing": "W",
+     "label": "Niedriges Lowboard aus geölter Eiche mit Klappen, darin Yogamatte und Kabel",
+     "color": "#a87a4f",
+     "why": "Ankermöbel der Fernsehwand. Es ist nur 45 cm hoch, hält die Wand ruhig und verstaut die Matte für Z1.",
+     "anchor": true
+    },
+    {
+     "id": "tv",
+     "catalogId": "generic-tv",
+     "zone": "medien",
+     "x": 675,
+     "y": 240,
+     "facing": "W",
+     "label": "Fernseher 55 Zoll, schwarz, an der Wand über dem Lowboard",
+     "color": "#2b2b2b",
+     "why": "Mittig gegenüber dem Sofa, 210 cm Abstand (1,5-fache Diagonale), Unterkante 60 cm"
+    },
+    {
+     "id": "lamp_floor",
+     "catalogId": "generic-floor-lamp",
+     "zone": "sitzen",
+     "x": 416,
+     "y": 107,
+     "facing": "O",
+     "label": "Bogenleuchte aus schwarzem Stahl mit Leinenschirm, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Zonenlicht für Serienabende an der Nordseite des Sofas. Der Durchgang Küche–T1 bleibt 90 cm breit."
+    },
+    {
+     "id": "lamp_table",
+     "catalogId": "generic-table-lamp",
+     "zone": "medien",
+     "x": 658,
+     "y": 163,
+     "facing": "W",
+     "label": "Kleine Tischlampe mit Betonfuß, warmweiß",
+     "color": "#9a9a96",
+     "why": "Stimmungslicht auf dem Lowboard neben dem Fernseher und weiches Gegenlicht beim Fernsehen"
+    },
+    {
+     "id": "pend_living",
+     "catalogId": "generic-pendant",
+     "zone": "sitzen",
+     "x": 516,
+     "y": 240,
+     "facing": "S",
+     "label": "Deckenpendel aus schwarzem Stahl, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Grundlicht für Wohnbereich und Durchgang, hängt hoch bis 210 cm"
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "sitzen",
+     "x": 516,
+     "y": 240,
+     "facing": "S",
+     "label": "Flachgewebter Teppich aus Wolle und Jute in Betongrau",
+     "color": "#9a9a96",
+     "why": "Die vorderen Sofafüße stehen darauf, er fasst den Wohnbereich und wird begangen. Er bleibt außerhalb aller Türschwenks."
+    },
+    {
+     "id": "cur1",
+     "catalogId": "generic-curtain",
+     "zone": "yoga",
+     "x": 3,
+     "y": 179,
+     "facing": "O",
+     "label": "Leichter Leinenschal, naturweiß",
+     "color": "#f2efe9",
+     "why": "Filtert die Westsonne, die sonst den Fernseher blendet; nicht schwer"
+    },
+    {
+     "id": "cur2",
+     "catalogId": "generic-curtain",
+     "zone": "yoga",
+     "x": 3,
+     "y": 249,
+     "facing": "O",
+     "label": "Leichter Leinenschal, naturweiß",
+     "color": "#f2efe9",
+     "why": "Zweiter Schal: zusammen 280 cm, breiter als F2 (160 cm)"
+    },
+    {
+     "id": "herbs",
+     "catalogId": "generic-plant-small",
+     "zone": "yoga",
+     "x": 12,
+     "y": 214,
+     "facing": "O",
+     "label": "Kräuter im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Pflanzen am Fenster auf der Fensterbank von F2, nicht auf dem Boden von Z1"
+    },
+    {
+     "id": "plant1",
+     "catalogId": "generic-plant",
+     "zone": "gruen",
+     "x": 25,
+     "y": 434,
+     "facing": "O",
+     "label": "Strelitzie im großen Betontopf",
+     "color": "#9a9a96",
+     "why": "Echte Ecke E3 zwischen den beiden Fenstern, macht den Übergang zur Loggia grün"
+    },
+    {
+     "id": "plant2",
+     "catalogId": "generic-plant",
+     "zone": "gruen",
+     "x": 25,
+     "y": 329,
+     "facing": "O",
+     "label": "Monstera im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Seitlich an F2, gleich südlich von Z1. Mit plant1 eine grüne Gruppe in der Ecke"
+    },
+    {
+     "id": "plant3",
+     "catalogId": "generic-plant",
+     "zone": "blickfang",
+     "x": 654,
+     "y": 434,
+     "facing": "W",
+     "label": "Ficus im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Ecke E2, im Blick beim Hereinkommen, außerhalb des Schwenks von T2"
+    },
+    {
+     "id": "picture",
+     "catalogId": "generic-picture-large",
+     "zone": "blickfang",
+     "x": 545,
+     "y": 457,
+     "facing": "N",
+     "label": "Großes Wandbild, abstrakt in Cognac, Schwarz und Kalkweiß, schwarzer Stahlrahmen",
+     "color": "#9c5b32",
+     "why": "Blickfang, den man durch T1 geradeaus sieht, auf dem freien Wandstück neben T3. Bildmitte auf 150 cm"
+    }
+   ],
+   "relations": [
+    [
+     "c1",
+     "around",
+     "table"
+    ],
+    [
+     "c2",
+     "around",
+     "table"
+    ],
+    [
+     "c3",
+     "around",
+     "table"
+    ],
+    [
+     "c4",
+     "around",
+     "table"
+    ],
+    [
+     "c5",
+     "around",
+     "table"
+    ],
+    [
+     "c6",
+     "around",
+     "table"
+    ],
+    [
+     "table",
+     "center"
+    ],
+    [
+     "pend_table",
+     "above",
+     "table",
+     145
+    ],
+    [
+     "lowboard",
+     "wall",
+     "W2",
+     150,
+     330
+    ],
+    [
+     "tv",
+     "above",
+     "lowboard",
+     60
+    ],
+    [
+     "tv",
+     "facing",
+     "sofa",
+     210
+    ],
+    [
+     "lamp_floor",
+     "left-of",
+     "sofa",
+     10
+    ],
+    [
+     "lamp_table",
+     "on",
+     "lowboard"
+    ],
+    [
+     "rug",
+     "under-front",
+     "sofa"
+    ],
+    [
+     "pend_living",
+     "above",
+     "rug",
+     210
+    ],
+    [
+     "cur1",
+     "window",
+     "F2",
+     "over"
+    ],
+    [
+     "cur2",
+     "window",
+     "F2",
+     "over"
+    ],
+    [
+     "herbs",
+     "on",
+     "F2"
+    ],
+    [
+     "plant1",
+     "corner",
+     "W3",
+     "W4"
+    ],
+    [
+     "plant2",
+     "window",
+     "F2",
+     "beside"
+    ],
+    [
+     "plant3",
+     "corner",
+     "W2",
+     "W3"
+    ],
+    [
+     "picture",
+     "wall",
+     "W3",
+     495,
+     595
+    ]
+   ],
+   "kitchen": [],
+   "walk": "Durch T1 kommt man in den Schwenkbereich, der frei bleibt, und hat das Wandbild mit dem Ficus vor sich. Rechts liegt der 90–135 cm breite Durchgang zur Küche (y=0–90 neben der Stehlampe). Geradeaus führt ein 176 cm breiter Gang zwischen Sofa und Lowboard nach Süden, über den Teppich, ohne Couchtisch auf dem Weg. Bei y≈340 biegt man nach Osten zu T2 ab (Lowboard endet bei y=330) oder geht nach Südwesten zu T3. Dort bleibt zwischen Sofaende (y=354) und W3 105 cm frei, und der Schwenk von T3 ist frei. Von T2 nach T3 geht es quer durch das freie Band y=340–459. Die Tafel erreicht man von Norden über den Küchengang (120 cm) und von Süden über das 110 cm breite Band vor F1. Die Yogafläche Z1 grenzt westlich an die Tafel und bleibt leer.",
+   "check": [
+    "Z1 (x=10–190, y=124–304) ist leer. Tisch und Stühle beginnen bei x=191, plant2 bei y=304, die Vorhänge hängen bei x=0–6, die Kräuter stehen auf der Fensterbank.",
+    "Küche: 120 cm Arbeitsgang bis y=185 bleibt frei, die Nordstühle beginnen genau bei y=185. Der Gang ist nach Osten zu T1 offen.",
+    "T1-Schwenk (x=500–590, y=0–90): leer, die Stehlampe steht bei x≤434.",
+    "T2-Schwenk (x=609–679, y=339–409): leer. Das Lowboard endet bei y=330, plant3 beginnt bei y=409.",
+    "T3-Schwenk (r=100 um 455/459): Sofaecke (461/354) 105 cm, Teppichecke (455/355) 104 cm, Südstuhl 154 cm entfernt.",
+    "Wege T1→T2, T1→T3 und T2→T3 haben überall mindestens 90 cm, meist 105–176 cm, ohne nennenswerten Umweg.",
+    "Fernseher: 210 cm von Sofa-Vorderseite (x=461) bis Bildschirm (x=671), also das 1,5-fache von 140 cm Diagonale. Er sitzt mittig auf der Sofaachse y=240.",
+    "Hinter den Stühlen: Norden 120 cm bis zur Küchenfront, Süden 110 cm bis W3. Die Stuhlkante liegt 24,5 cm vom Sofarücken entfernt.",
+    "Esstisch und Sofarücken stoßen bündig aneinander, als bewusster Raumteiler. Die Lücke von 20 cm hätte den Fernsehabstand unter das 1,5-fache gedrückt.",
+    "Bewusst ohne Couchtisch: Er stünde im Weg zu Speis und Loggia und würde den Gang auf 77 cm verengen.",
+    "Vor Fenstern: an F2 nur Vorhänge und die kleine Pflanze auf der Fensterbank, große Pflanzen seitlich. Vor F1 steht nichts, die Südstühle sind 110 cm entfernt.",
+    "Pflanzen stehen nur in echten Ecken (E2, E3), seitlich an F2 oder auf der Fensterbank, keine im Weg.",
+    "Licht in drei Ebenen, alles warmweiß: Deckenpendel als Grundlicht, Pendel über dem Tisch und Stehlampe als Zonenlicht, Tischlampe auf dem Lowboard als Stimmungslicht. Keine Lampe auf dem Esstisch.",
+    "Vorhänge auf F2: zwei leichte Leinenschals mit zusammen 280 cm, breiter als 160 cm. Keine schweren Vorhänge auf den Süd- und Westfenstern.",
+    "Wandbild nicht über Tür oder Fenster: x=495–595, T3 endet bei x=455.",
+    "Gäste: Der Tisch hat 6 Plätze. Für 8 wird er nach Westen in die abends freie Yogafläche ausgezogen und zwei Klappstühle von der Loggia kommen dazu. Kein zweiter Tisch, keine Änderung an der Einbauküche.",
+    "Palette eingehalten: Eiche #a87a4f, Cognac #9c5b32 als Akzent, Schwarz #2b2b2b, Betongrau #9a9a96, Kalkweiß #f2efe9."
+   ]
+  },
+  "Speis": {
+   "reading": "Die Speis ist ein schmaler Kammerraum (128×179 cm) mit nur einer Tür im Westen. Sie schlägt nach außen auf, im Raum gibt es also keinen Schwenkbereich. Die Wände im Norden, Osten und Süden sind geschlossen und eignen sich als Stellflächen. Das einzige Licht kommt von der Decke. Beim Hereinkommen blickt man nach Osten auf die Stirnwand mit den Getränkekisten, zwischen zwei raumhohen Regalen hindurch.",
+   "zones": [
+    {
+     "id": "regale",
+     "function": "Vorräte/Stauraum",
+     "rect": [
+      38,
+      0,
+      128,
+      45
+     ],
+     "why": "Nordseite des Raums, 45 cm tief, Regal mit Holzböden in der Ecke. Die Tür bei y=59–129 bleibt frei.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "regale-sued",
+     "function": "Stauraum für Gästegeschirr",
+     "rect": [
+      38,
+      134,
+      128,
+      179
+     ],
+     "why": "Gegenüberliegendes Regal an der Südwand. Dazwischen bleibt ein Gang von 89 cm.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "kisten",
+     "function": "Getränkekisten",
+     "rect": [
+      98,
+      51,
+      128,
+      127
+     ],
+     "why": "Stirnwand im Osten, am Ende des Gangs. Die Kisten stehen am Boden und stören keinen Weg.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "regal-n",
+     "catalogId": "generic-utility-shelf",
+     "zone": "regale",
+     "x": 83,
+     "y": 22.5,
+     "facing": "S",
+     "label": "Stahlregal schwarz, Böden aus geöltem Eichenholz, raumhoch",
+     "color": "#2b2b2b",
+     "why": "Ankermöbel, nach Konzept raumhohes Regal. Es steht in der Nordostecke, 45 cm tief und damit tiefer als 40 cm erlaubt wäre, aber die Tür liegt weit weg und wird nicht blockiert.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-shelf-80"
+     ]
+    },
+    {
+     "id": "regal-s",
+     "catalogId": "generic-utility-shelf",
+     "zone": "regale-sued",
+     "x": 83,
+     "y": 156.5,
+     "facing": "N",
+     "label": "Stahlregal schwarz, Holzböden, spiegelt das Nordregal",
+     "color": "#2b2b2b",
+     "why": "Zweites Regal auf der Gegenseite für Gästegeschirr und Vorräte. Mit dem Regal im Norden entsteht ein ruhiger, symmetrischer Gang.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-shelf-80"
+     ]
+    },
+    {
+     "id": "kiste1",
+     "catalogId": "generic-storage-box",
+     "zone": "kisten",
+     "x": 113,
+     "y": 70,
+     "facing": "W",
+     "label": "Kistenablage am Boden, Betongrau, für Getränkekisten",
+     "color": "#9a9a96",
+     "why": "Bodenablage für Getränkekisten an der Stirnwand, in der Akzentfarbe Betongrau.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "kiste2",
+     "catalogId": "generic-storage-box",
+     "zone": "kisten",
+     "x": 113,
+     "y": 108,
+     "facing": "W",
+     "label": "Kistenablage am Boden, Betongrau, für Getränkekisten",
+     "color": "#9a9a96",
+     "why": "Zweite Ablage bündig neben der ersten, sodass eine durchgehende Kistenreihe entsteht.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendel",
+     "catalogId": "generic-pendant",
+     "zone": "kisten",
+     "x": 60,
+     "y": 94,
+     "facing": "S",
+     "label": "Pendelleuchte schwarz, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Grundlicht, mittig über dem Gang. Beide Regale sind so gut ausgeleuchtet. Es ist die einzige Leuchte, die der kleine Raum braucht.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "regal-n",
+     "corner",
+     "W1",
+     "W2"
+    ],
+    [
+     "regal-s",
+     "corner",
+     "W3",
+     "W2"
+    ],
+    [
+     "regal-n",
+     "align",
+     "regal-s"
+    ],
+    [
+     "kiste1",
+     "wall",
+     "W2",
+     51,
+     89
+    ],
+    [
+     "kiste2",
+     "wall",
+     "W2",
+     89,
+     127
+    ],
+    [
+     "pendel",
+     "near",
+     "regal-n",
+     80
+    ]
+   ],
+   "walk": "Man tritt durch die Tür in der Westwand (y=59–129) ein, die nach außen aufschlägt. Der Gang zwischen den Regalen ist 89 cm breit (y=45–134) und führt bis zur Stirnwand mit den Kisten. Der Gang ist frei. Vor den Regalen steht man im Gang selbst, 89 cm Platz reichen zum Greifen und Bücken. Im Westen bleiben 38 cm neben den Regalen frei.",
+   "check": [
+    "Der Türschwenk liegt außerhalb des Raums, im Raum gibt es nichts zu blockieren.",
+    "Der Gang ist 89 cm breit und damit mindestens 70 cm.",
+    "Die Tür bei y=59–129 ist frei: Das Nordregal reicht bis y=45, das Südregal ab y=134.",
+    "Beide Regale stehen an geschlossenen Wänden und sind raumhoch (180 cm). Sie sind nur von vorn zugänglich.",
+    "Die Regale sind 45 cm tief, also tiefer als 40 cm. Sie stehen aber an der Ostseite, weit von der Tür, und blockieren sie nicht.",
+    "Die Getränkekisten stehen am Boden an der Ostwand und sind vom Gang aus erreichbar.",
+    "Keine Pflanzen, keine Waschmaschine, keine weiteren Möbel: Das gehört in andere Räume.",
+    "Die Pendelleuchte ist warmweiß, steht mittig im Gang und liegt nicht im Türschwenk."
+   ]
+  },
+  "Bad 2": {
+   "reading": "Das Bad ist ein schmaler Schlauch mit Tageslicht von Süden: Das Fenster sitzt über der Wanne und ist beim Hereinkommen durch T1 der Blickfang. Die Nordwest-Seite gehört der aufschlagenden Tür, und das WC steht ruhig an der Westwand. Frei bleibt nur die Nordost-Ecke neben dem Waschtisch, dort kommt das Handtuchregal hin. Alles andere ist durch den Bestand gesetzt, deshalb wird hier wenig, aber stimmig ergänzt.",
+   "zones": [
+    {
+     "id": "baden",
+     "function": "Baden und Handtücher",
+     "rect": [
+      149,
+      0,
+      319,
+      179
+     ],
+     "why": "Die Wanne unter dem Südfenster ist das Herz des Raums. Das Holzregal steht in der freien Nordost-Ecke, ein paar Schritte von der Wanne, also griffbereit beim Aussteigen."
+    },
+    {
+     "id": "waschen",
+     "function": "Körperpflege am Waschtisch",
+     "rect": [
+      150,
+      0,
+      289,
+      103
+     ],
+     "why": "Waschtisch mit Spiegel an der Nordwand und Badematte davor. Die Matte dient zugleich als Aussteigeplatz an der Wanne."
+    },
+    {
+     "id": "wc",
+     "function": "WC",
+     "rect": [
+      0,
+      94,
+      129,
+      179
+     ],
+     "why": "Das WC bleibt an der Westwand. Davor sind rund 95 cm frei, darüber kommt ein kleines Wandregal."
+    },
+    {
+     "id": "weg",
+     "function": "Weg von T1 zu Wanne und WC (Freifläche)",
+     "rect": [
+      34,
+      0,
+      150,
+      115
+     ],
+     "why": "Türschwenk und Durchgang bleiben frei, hier steht nichts."
+    }
+   ],
+   "items": [
+    {
+     "id": "handtuchregal",
+     "catalogId": "generic-shelf-80",
+     "zone": "baden",
+     "x": 304,
+     "y": 42,
+     "facing": "W",
+     "label": "Schmales Regal aus geölten Eichenlatten für Handtücher, an der Ostwand",
+     "color": "#a87a4f",
+     "why": "Ankermöbel: hohes Möbel an der geschlossenen Ostwand, im Blickfeld beim Hereinkommen und direkt am Wannenkopf. Das warme Holz setzt den Akzent gegen Beton und Stahl. Zum Waschtisch und zur Wanne bleiben mehr als 20 cm Abstand.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-bath-cabinet"
+     ]
+    },
+    {
+     "id": "pflanze",
+     "catalogId": "generic-plant-small",
+     "zone": "baden",
+     "x": 194,
+     "y": 170,
+     "facing": "N",
+     "label": "Feuchtigkeitsliebende Pflanze (Efeutute oder Bogenhanf) im Terrakottatopf auf der Fensterbank",
+     "color": "#9c5b32",
+     "why": "Sie steht am Südfenster, das Licht ist hell und die Luft feucht, also ideal. Als kleine Pflanze bleibt sie auf der Bank, ist unter der Fensteroberkante und blockiert nichts."
+    },
+    {
+     "id": "spiegel",
+     "catalogId": "generic-bath-mirror",
+     "zone": "waschen",
+     "x": 204,
+     "y": 2,
+     "facing": "S",
+     "label": "Badspiegel 60×70 mit schmalem schwarzem Stahlrahmen",
+     "color": "#2b2b2b",
+     "why": "Er hängt über dem Waschtisch und wiederholt das schwarze Stahlprofil des Fensters. Er wirkt auch als Blickfang beim Eintreten."
+    },
+    {
+     "id": "wandregal",
+     "catalogId": "generic-wall-shelf",
+     "zone": "wc",
+     "x": 10,
+     "y": 134,
+     "facing": "O",
+     "label": "Wandregal aus Eiche über dem WC für Papier und Kerze",
+     "color": "#a87a4f",
+     "why": "Es nutzt die Wand über dem WC als Ablage, ohne Boden zu belegen. Das Eichenholz wiederholt das Material des Handtuchregals."
+    },
+    {
+     "id": "matte",
+     "catalogId": "generic-bath-mat",
+     "zone": "waschen",
+     "x": 200,
+     "y": 75,
+     "facing": "S",
+     "label": "Badematte aus Baumwolle in Betongrau",
+     "color": "#9a9a96",
+     "why": "Sie liegt vor Waschtisch und Wanne und fängt Wasser beim Aussteigen. Sie liegt außerhalb des Türschwenks, und das Betongrau passt zum Fliesenton."
+    },
+    {
+     "id": "deckenlicht",
+     "catalogId": "generic-pendant",
+     "zone": "weg",
+     "x": 185,
+     "y": 78,
+     "facing": "S",
+     "label": "Schwarze Stahl-Pendelleuchte als Grundlicht, warmweiß",
+     "color": "#2b2b2b",
+     "why": "Ein einziges Grundlicht reicht für 5,7 m². Es hängt über der freien Fläche zwischen Waschtisch und Wanne, mit mindestens 2,2 m Unterkante, also ohne Kopfstoß und außerhalb des Türschwenks."
+    }
+   ],
+   "relations": [
+    [
+     "handtuchregal",
+     "wall",
+     "W2",
+     2,
+     82
+    ],
+    [
+     "spiegel",
+     "wall",
+     "W1",
+     174,
+     234
+    ],
+    [
+     "spiegel",
+     "above",
+     "B2",
+     110
+    ],
+    [
+     "wandregal",
+     "wall",
+     "W4",
+     94,
+     174
+    ],
+    [
+     "wandregal",
+     "above",
+     "B3",
+     130
+    ],
+    [
+     "pflanze",
+     "on",
+     "F1"
+    ],
+    [
+     "matte",
+     "near",
+     "B1",
+     80
+    ]
+   ],
+   "walk": "Von T1 geht man nach Süden in den freien Streifen zwischen Türschwenk, WC und Waschtisch. Die Fläche ist am Ausgang des Schwenks rund 100 cm breit. Zum WC sind es von der Tür bis zur WC-Front etwa 95 cm Platz nach Osten. Zum Waschtisch und zur Wanne geht man über die Badematte, dort sind es etwa 57 cm zwischen Waschtischfront und Wannenrand (Bestand). Das Handtuchregal steht frei erreichbar am Wannenkopf.",
+   "check": [
+    "Türschwenk x34–114, y0–80 ist komplett frei, weder Möbel noch Pflanze noch Lampe stehen darin.",
+    "Handtuchregal (x289–319, y2–82) hat 55 cm zum Waschtisch und etwa 21 cm zur Wanne, also mehr als 20 cm.",
+    "Vor dem WC bleiben gut 90 cm bis zur Wanne frei; das Wandregal sitzt darüber auf 130 cm Unterkante.",
+    "Vor dem Fenster steht nur die kleine Pflanze auf der Bank (Oberkante ca. 190 cm, Fenster bis 220 cm); kein hohes Möbel.",
+    "Kein Vorhang: Die Wanne steht direkt unter dem Fenster, ein bodenlanger Vorhang würde in der Wanne hängen und feucht werden.",
+    "Hohes Möbel (190 cm) steht an der Wand, nicht frei im Raum.",
+    "Licht: ein Grundlicht (Pendel), Zonenlicht über den Spiegel; keine Tischlampen, Stimmungslicht über die dimmbare Pendelleuchte. Weitere Leuchten wären bei 5,7 m² doppelt.",
+    "Es gibt keine Doppelungen und nichts Verbotenes (kein Waschbecken, keine Waschmaschine, keine Verschiebung von Wanne, WC oder Waschtisch).",
+    "Materialien und Farben stammen aus der Palette: Eiche #a87a4f, Schwarz #2b2b2b, Betongrau #9a9a96, Terrakotta/Cognac #9c5b32."
+   ]
+  },
+  "Loggia": {
+   "reading": "Die Loggia ist ein schmaler Streifen mit Brüstung nach Süden und Glaselement zur Wohnküche im Norden, also Nordlage ohne direkte Sonne, ideal für Schattenpflanzen. Die Tür T1 im Osten schlägt nach außen auf und beansprucht dort den Boden bis etwa y=100. Der ruhige Teil liegt am Westende, weit weg von der Tür. Beim Hereinkommen blickt man über die Brüstung nach Süden und sieht dabei die Pflanzenreihe vor dem Bistro im Hintergrund.",
+   "zones": [
+    {
+     "id": "bistro",
+     "function": "Draußen sitzen",
+     "rect": [
+      38,
+      78,
+      182,
+      159
+     ],
+     "why": "Schmalseite im Westen, so weit wie möglich von der Tür und deren Schwenkbereich. Der Platz ist ruhig, mit Blick über die Brüstung. Das Glaselement bleibt frei einsehbar.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "pflanzenregal",
+     "function": "Pflanzen",
+     "rect": [
+      0,
+      0,
+      30,
+      80
+     ],
+     "why": "Die Nordwestecke ist die einzige Wand ohne Glas, Tür oder Schwenkbereich, an der ein hohes Regal stehen darf. Daneben beginnt das Glaselement erst bei x=54.",
+     "userZone": "Z2"
+    },
+    {
+     "id": "pflanzenreihe",
+     "function": "Pflanzen",
+     "rect": [
+      192,
+      108,
+      428,
+      159
+     ],
+     "why": "Niedrige Kübel (90 cm) bleiben unter der Brüstung (100 cm) und stehen an der langen Südwand. Die Zone liegt außerhalb des Türschwenks (bis y=100) und lässt einen Gehstreifen frei.",
+     "userZone": "Z2"
+    }
+   ],
+   "items": [
+    {
+     "id": "table",
+     "catalogId": "generic-balcony-table",
+     "zone": "bistro",
+     "x": 95,
+     "y": 110,
+     "facing": "N",
+     "label": "Klappbarer Bistrotisch Ø 60, schwarzer Stahl, pulverbeschichtet",
+     "color": "#2b2b2b",
+     "why": "Ankermöbel des Sitzplatzes. Der kleine Tisch passt gut in die 159 cm Tiefe und reicht für Kaffee oder einen Aperitif zu zweit.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "chair1",
+     "catalogId": "generic-balcony-chair",
+     "zone": "bistro",
+     "x": 40,
+     "y": 110,
+     "facing": "O",
+     "label": "Klappbarer Stuhl, schwarzer Stahl",
+     "color": "#2b2b2b",
+     "why": "Westplatz mit Blick zur Tür und in die Wohnküche.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "chair2",
+     "catalogId": "generic-balcony-chair",
+     "zone": "bistro",
+     "x": 150,
+     "y": 110,
+     "facing": "W",
+     "label": "Klappbarer Stuhl, schwarzer Stahl",
+     "color": "#2b2b2b",
+     "why": "Gegenüber dem ersten Stuhl, damit zwei Personen einander ansehen und zugleich über die Brüstung blicken.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf",
+     "catalogId": "generic-shelf-80",
+     "zone": "pflanzenregal",
+     "x": 15,
+     "y": 40,
+     "facing": "O",
+     "label": "Pflanzenregal aus schwarzem Stahl in der Nordwestecke",
+     "color": "#2b2b2b",
+     "why": "Ankermöbel der Pflanzenzone. Das hohe Regal steht an einer geschlossenen Wand und nicht vor dem Glas. Seine Töpfe bringen Höhe und Grün an den Rand der Loggia.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shelfplant1",
+     "catalogId": "generic-plant-small",
+     "zone": "pflanzenregal",
+     "x": 15,
+     "y": 22,
+     "facing": "O",
+     "label": "Farn im Terrakottatopf",
+     "color": "#9c5b32",
+     "why": "Schattenpflanze für die Nordlage. Kleine Pflanzen gehören auf ein Regal und nicht auf den Boden.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "shelfplant2",
+     "catalogId": "generic-plant-small",
+     "zone": "pflanzenregal",
+     "x": 15,
+     "y": 58,
+     "facing": "O",
+     "label": "Efeutute im Betontopf",
+     "color": "#9a9a96",
+     "why": "Zweite Schattenpflanze. Beton und Terrakotta wechseln sich ab, das hält die Palette zusammen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "planter1",
+     "catalogId": "generic-planter",
+     "zone": "pflanzenreihe",
+     "x": 225,
+     "y": 135,
+     "facing": "N",
+     "label": "Pflanzkübel aus Beton mit Schattenpflanze (Farn)",
+     "color": "#9a9a96",
+     "why": "Er steht an der Brüstung (nur 90 cm hoch, also darunter) und führt die Pflanzen vom Regal bis zur Tür fort.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "planter2",
+     "catalogId": "generic-planter",
+     "zone": "pflanzenreihe",
+     "x": 285,
+     "y": 135,
+     "facing": "N",
+     "label": "Pflanzkübel in Terrakotta mit Schattenpflanze (Monstera)",
+     "color": "#9c5b32",
+     "why": "Er ist Teil der Reihe und liegt klar außerhalb des Türschwenks. Der Wechsel der Töpfe belebt die Reihe.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "planter3",
+     "catalogId": "generic-planter",
+     "zone": "pflanzenreihe",
+     "x": 405,
+     "y": 137,
+     "facing": "N",
+     "label": "Pflanzkübel aus Beton mit Grünpflanze in der Südostecke",
+     "color": "#9a9a96",
+     "why": "Er steht in der echten Ecke E2, unter dem Schwenkbereich der Tür (y≤100), und rahmt den Blickfang beim Hereinkommen.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "table",
+     "center"
+    ],
+    [
+     "chair1",
+     "around",
+     "table"
+    ],
+    [
+     "chair2",
+     "around",
+     "table"
+    ],
+    [
+     "shelf",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "shelfplant1",
+     "on",
+     "shelf"
+    ],
+    [
+     "shelfplant2",
+     "on",
+     "shelf"
+    ],
+    [
+     "planter1",
+     "wall",
+     "W3",
+     202,
+     248
+    ],
+    [
+     "planter2",
+     "wall",
+     "W3",
+     262,
+     308
+    ],
+    [
+     "planter3",
+     "corner",
+     "W3",
+     "W2"
+    ]
+   ],
+   "walk": "Von T1 geht man nach Westen durch den freien Streifen zwischen Nordwand und Kübelreihe (y≈0 bis 110). Er ist 110 cm breit und führt am Glaselement vorbei zum Bistro. Die Tür schlägt über x=304–404 bis y=100 auf, dort steht nichts. Hinter den Stühlen bleiben 38 cm zur Westwand, aber der Platz davor ist über die Nordseite erreichbar.",
+   "check": [
+    "Schwenkbereich von T1 (x 304–404, y 0–100) bleibt frei, der nächste Kübel beginnt bei y=112",
+    "Glaselement F1 (x 54–254): davor nichts, was höher als die Brüstung (100 cm) wäre; Tisch (72 cm), Stühle (82–86 cm) und Kübel (90 cm) liegen alle darunter",
+    "Das hohe Regal (190 cm) steht in der Ecke an der geschlossenen Wand und deckt F1 nicht ab",
+    "Gehstreifen mindestens 70 cm (hier etwa 110 cm) von der Tür zum Sitzplatz",
+    "Zwischen Stuhl 2 (bis x=173) und Kübel 1 (ab x=202) liegen etwa 29 cm, also über 20 cm",
+    "Pflanzen: Schattenpflanzen für die Nordlage, kleine Pflanzen auf dem Regal, große in Kübeln in der Ecke und an der Brüstung; keine freie Pflanze im Raum",
+    "Nicht geplant: Lounge-Möbel (159 cm Tiefe reichen nicht), Gerümpel, Sonnenpflanzen",
+    "Palette: Schwarz für den Stahl, Betongrau (#9a9a96) als Akzent bei den Betontöpfen, Cognac/Terrakotta bei den Töpfen",
+    "Kein Teppich, denn der Außenteppich passt nicht in die 159 cm Tiefe, ohne den Weg zu stören; keine Leuchten, weil das Licht aus der Wohnküche durch F1 kommt"
+   ]
+  }
+ }
+}

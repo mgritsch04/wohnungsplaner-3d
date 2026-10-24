@@ -1,0 +1,3388 @@
+{
+ "source": "Lauf T2 vom 23.10.2026 mit Testwohnung C: unveränderte Antworten von Claude (Opus für Haupträume, Sonnet für kleine Räume) auf die Prompts aus src/design/concept/. Je Anfrage die gültige Antwort (nach höchstens einer Reparatur-Runde).",
+ "concept": {
+  "living": "Hier lebt eine vierköpfige Familie mit zwei Kindern (6 und 9 Jahre). Unter der Woche ist viel los: Hausaufgaben, Spielen und an zwei Tagen Homeoffice. Am Wochenende wird gemeinsam gekocht, am großen Tisch gebastelt und gespielt, und abends sitzen alle vier zusammen auf dem Sofa. Ab und zu kommen Gäste zum Essen, selten übernachtet jemand. Pflanzen und ein Kräuterbalkon bringen Grün in die Wohnung.",
+  "style": {
+   "idea": "Ein warmes Familiennest aus Walnussholz, cremefarbenen Textilien und Terrakotta-Akzenten, in dem robuste Ordnung und Gemütlichkeit zusammengehen.",
+   "materials": [
+    "geöltes Walnuss- und Eichenholz",
+    "Wollbouclé und Leinen",
+    "Terrakotta-Keramik und Tontöpfe",
+    "Rattan und Korbgeflecht",
+    "kalkfarben gestrichene Wände",
+    "waschbare Baumwoll-Teppiche"
+   ],
+   "palette": [
+    {
+     "name": "Creme",
+     "hex": "#efe6d6"
+    },
+    {
+     "name": "Walnuss",
+     "hex": "#6f4e37"
+    },
+    {
+     "name": "Terrakotta",
+     "hex": "#c46f4c"
+    },
+    {
+     "name": "Salbei",
+     "hex": "#8a9a7b"
+    },
+    {
+     "name": "Ocker-Sand",
+     "hex": "#c9a36a"
+    }
+   ]
+  },
+  "functions": [
+   {
+    "function": "Sitzen/Fernsehen",
+    "room": "Wohn-Essraum",
+    "why": "Mit 34 m² ist das der einzige Raum, in dem ein Ecksofa für alle vier Platz hat. Es ist der einzige Fernsehplatz der Wohnung.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Essen",
+    "room": "Wohn-Essraum",
+    "why": "Ein Tisch für 6 braucht etwa 180×90 cm plus Platz für die Stühle. Das geht nur hier, direkt neben der Küchentür.",
+    "wishes": [
+     4
+    ]
+   },
+   {
+    "function": "Brettspiele",
+    "room": "Wohn-Essraum",
+    "why": "Gespielt wird am großen Esstisch. Die Spiele liegen griffbereit im Sideboard daneben.",
+    "wishes": [
+     1
+    ]
+   },
+   {
+    "function": "Basteln mit den Kindern",
+    "room": "Wohn-Essraum",
+    "why": "Der Esstisch hat eine robuste Holzplatte und ist nah an der Küchenspüle. Bastelkisten stehen im Sideboard, ein zweiter Tisch ist nicht nötig.",
+    "wishes": [
+     2
+    ]
+   },
+   {
+    "function": "Spielecke",
+    "room": "Wohn-Essraum",
+    "why": "Die Kinder spielen in Sichtweite der Eltern auf einem Teppich in der Ecke beim Westfenster, abseits der Wege zu Küche und Balkon.",
+    "wishes": [
+     10,
+     7
+    ]
+   },
+   {
+    "function": "Pflanzen",
+    "room": "Wohn-Essraum",
+    "why": "Vier Fenster nach Norden und Westen geben genug Licht für große Grünpflanzen, die den Raum gliedern.",
+    "wishes": [
+     9
+    ]
+   },
+   {
+    "function": "Lesen",
+    "room": "Wohn-Essraum",
+    "why": "Zum Vorlesen und Schmökern dient die Sofaecke mit Stehleuchte. Ein eigener Leseplatz wäre überflüssig.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Gästeschlafplatz",
+    "room": "Wohn-Essraum",
+    "why": "Das Ecksofa hat eine Schlaffunktion. Weil selten jemand übernachtet, reicht dieser eine Schlafplatz, und alle Zimmer bleiben voll genutzt.",
+    "wishes": []
+   },
+   {
+    "function": "Kochen am Wochenende",
+    "room": "Küche",
+    "why": "Die Küche bleibt, wie sie ist. Ein Wandregal für Gewürze und Kochbücher genügt als Ergänzung.",
+    "wishes": [
+     3
+    ]
+   },
+   {
+    "function": "Arbeiten/PC",
+    "room": "Elternschlafzimmer",
+    "why": "Für 2 Tage pro Woche reicht ein ruhiger Schreibtisch am Nordfenster. Dort ist es tagsüber still, weit weg vom Familientrubel.",
+    "wishes": [
+     6
+    ]
+   },
+   {
+    "function": "Schlafen Eltern",
+    "room": "Elternschlafzimmer",
+    "why": "Das ruhige Zimmer liegt nach Norden und hat Platz für ein 160er-Bett mit Nachttischen.",
+    "wishes": []
+   },
+   {
+    "function": "Kleidung Eltern",
+    "room": "Elternschlafzimmer",
+    "why": "Ein Kleiderschrank an der langen Wand gegenüber dem Bett.",
+    "wishes": []
+   },
+   {
+    "function": "Schlafen und Hausaufgaben Kind 9 Jahre",
+    "room": "Kinderzimmer 1",
+    "why": "Das Nordzimmer hat gleichmäßiges, blendfreies Licht und passt zu einem Schulkind mit Schreibtisch.",
+    "wishes": [
+     5
+    ]
+   },
+   {
+    "function": "Spielfläche und Spielzeugstauraum Kind 9 Jahre",
+    "room": "Kinderzimmer 1",
+    "why": "Das Bett steht an der Wand, so bleibt die Mitte frei. Ein niedriges Regalsystem mit Kisten nimmt die Spielsachen auf.",
+    "wishes": [
+     5,
+     7
+    ]
+   },
+   {
+    "function": "Kleidung Kind 9 Jahre",
+    "room": "Kinderzimmer 1",
+    "why": "Ein eigener Schrank im eigenen Zimmer.",
+    "wishes": []
+   },
+   {
+    "function": "Schlafen und Malen Kind 6 Jahre",
+    "room": "Kinderzimmer 2",
+    "why": "Das helle Südzimmer ist breiter (408 cm) und lässt neben Bett und mitwachsendem Schreibtisch viel Boden zum Spielen frei.",
+    "wishes": [
+     5
+    ]
+   },
+   {
+    "function": "Spielfläche und Spielzeugstauraum Kind 6 Jahre",
+    "room": "Kinderzimmer 2",
+    "why": "Ein großer Spielteppich und Rollkisten unter einem Regal. Ein jüngeres Kind spielt noch viel auf dem Boden.",
+    "wishes": [
+     5,
+     7
+    ]
+   },
+   {
+    "function": "Kleidung Kind 6 Jahre",
+    "room": "Kinderzimmer 2",
+    "why": "Ein eigener Schrank im eigenen Zimmer.",
+    "wishes": []
+   },
+   {
+    "function": "Garderobe/Schuhe",
+    "room": "Vorraum",
+    "why": "Der 288 cm breite Flur trägt an einer Wand eine flache Garderobe mit Sitzbank. Der Weg zu acht Türen bleibt frei.",
+    "wishes": []
+   },
+   {
+    "function": "Vorräte/Stauraum",
+    "room": "Abstellraum",
+    "why": "Hier sind Vorräte, Putzzeug und die gerade nicht benutzten Spielsachen und Bastelvorräte. Sie werden ab und zu mit den Kinderzimmern getauscht.",
+    "wishes": [
+     7
+    ]
+   },
+   {
+    "function": "Körperpflege",
+    "room": "Bad",
+    "why": "Wanne, Dusche und Waschtisch sind vorhanden.",
+    "wishes": []
+   },
+   {
+    "function": "Wäsche",
+    "room": "Bad",
+    "why": "Mit 10,4 m² und Wasseranschluss hat das Bad Platz für Waschmaschine und Trockner als Turm.",
+    "wishes": []
+   },
+   {
+    "function": "Toilette/Händewaschen",
+    "room": "WC",
+    "why": "Separates WC mit vorhandenem Waschtisch, auch für Besuch gut erreichbar.",
+    "wishes": []
+   },
+   {
+    "function": "Draußen sitzen",
+    "room": "Balkon",
+    "why": "Der Südbalkon ist schmal (139 cm). Ein Klapptisch mit zwei Stühlen reicht für Kaffee in der Sonne.",
+    "wishes": []
+   },
+   {
+    "function": "Kräutergarten",
+    "room": "Balkon",
+    "why": "Die Südsonne ist ideal für Kräuter und Tomaten, die beim Wochenend-Kochen geerntet werden.",
+    "wishes": [
+     9,
+     3
+    ]
+   }
+  ],
+  "rooms": [
+   {
+    "room": "Wohn-Essraum",
+    "type": "living",
+    "role": "Das Familienzentrum, in dem gegessen, gespielt, gebastelt und abends gekuschelt wird.",
+    "functions": [
+     "Sitzen/Fernsehen",
+     "Essen",
+     "Brettspiele",
+     "Basteln mit den Kindern",
+     "Spielecke",
+     "Pflanzen",
+     "Lesen",
+     "Gästeschlafplatz"
+    ],
+    "anchors": [
+     "Ecksofa mit Schlaffunktion in Cremebouclé für vier, gegenüber dem Fernseher",
+     "Massivholz-Esstisch Walnuss 180×90 für 6 nahe der Küchentür",
+     "Niedriges Sideboard mit Fächern für Brettspiele und Bastelkisten als Grenze zur Spielecke"
+    ],
+    "accent": "#c46f4c",
+    "avoid": [
+     "Möbel im Weg zwischen Vorraum, Küche und Balkon",
+     "zweiter Tisch nur zum Basteln",
+     "Glas-Couchtisch mit scharfen Kanten",
+     "offene Regale voller Kleinteile auf Kinderhöhe"
+    ]
+   },
+   {
+    "room": "Küche",
+    "type": "kitchen",
+    "role": "Die bestehende Küche, in der am Wochenende gemeinsam gekocht wird.",
+    "functions": [
+     "Kochen am Wochenende"
+    ],
+    "anchors": [
+     "Bestehende Küchenzeile unverändert",
+     "Wandregal Walnuss für Gewürze und Kochbücher"
+    ],
+    "accent": "#c9a36a",
+    "avoid": [
+     "Esstisch oder Essplatz",
+     "Umbau der Küchenzeile",
+     "zusätzliche Hochschränke, die das Fenster verstellen"
+    ]
+   },
+   {
+    "room": "Elternschlafzimmer",
+    "type": "bedroom",
+    "role": "Der ruhige Rückzugsort der Eltern, der zwei Tage pro Woche als Homeoffice dient.",
+    "functions": [
+     "Schlafen Eltern",
+     "Kleidung Eltern",
+     "Arbeiten/PC"
+    ],
+    "anchors": [
+     "Doppelbett 160×200 mit gepolstertem Kopfteil an der ruhigen Innenwand",
+     "Kleiderschrank mit Holzfronten an der langen Wand",
+     "Schreibtisch 120×60 mit Bürostuhl am Nordfenster"
+    ],
+    "accent": "#8a9a7b",
+    "avoid": [
+     "Fernseher",
+     "Spielsachen",
+     "Wäscheständer"
+    ]
+   },
+   {
+    "room": "Kinderzimmer 1",
+    "type": "kids",
+    "role": "Das Zimmer des 9-jährigen Kindes, mit Platz zum Lernen, Schlafen und Spielen.",
+    "functions": [
+     "Schlafen und Hausaufgaben Kind 9 Jahre",
+     "Spielfläche und Spielzeugstauraum Kind 9 Jahre",
+     "Kleidung Kind 9 Jahre"
+    ],
+    "anchors": [
+     "Bett 90×200 mit Bettkästen an der Längswand",
+     "Schreibtisch 120×60 mit Leuchte am Nordfenster",
+     "Niedriges Regalsystem mit Kisten für Spielsachen"
+    ],
+    "accent": "#8a9a7b",
+    "avoid": [
+     "Hochbett, das die Spielfläche verschattet",
+     "Fernseher",
+     "Möbel mitten im Raum"
+    ]
+   },
+   {
+    "room": "Kinderzimmer 2",
+    "type": "kids",
+    "role": "Das helle Zimmer des 6-jährigen Kindes, mit viel freiem Boden zum Spielen.",
+    "functions": [
+     "Schlafen und Malen Kind 6 Jahre",
+     "Spielfläche und Spielzeugstauraum Kind 6 Jahre",
+     "Kleidung Kind 6 Jahre"
+    ],
+    "anchors": [
+     "Bett 90×200 mit Rausfallschutz an der Wand",
+     "Mitwachsender Kinderschreibtisch am Südfenster",
+     "Großer Spielteppich mit Rollkisten unter einem niedrigen Regal"
+    ],
+    "accent": "#c46f4c",
+    "avoid": [
+     "hohe, kippgefährdete Regale ohne Wandbefestigung",
+     "Erwachsenenmöbel",
+     "zweiter Gästeschlafplatz"
+    ]
+   },
+   {
+    "room": "Vorraum",
+    "type": "hall",
+    "role": "Ein langer, freier Verteilerflur mit geordneter Garderobe am Eingang.",
+    "functions": [
+     "Garderobe/Schuhe"
+    ],
+    "anchors": [
+     "Flache Garderobe mit Sitzbank und Schuhfächern neben der Wohnungstür",
+     "Hakenleiste auf Kinderhöhe für Jacken und Rucksäcke"
+    ],
+    "accent": "#6f4e37",
+    "avoid": [
+     "Möbel vor den acht Türen",
+     "tiefe Schränke, die den Weg verengen",
+     "Spielsachen am Boden"
+    ]
+   },
+   {
+    "room": "Bad",
+    "type": "bath",
+    "role": "Das Familienbad für die Pflege und gleichzeitig der Platz für die Wäsche.",
+    "functions": [
+     "Körperpflege",
+     "Wäsche"
+    ],
+    "anchors": [
+     "Waschmaschine und Trockner als Turm",
+     "Schmales Handtuch- und Wäscheregal"
+    ],
+    "accent": "#c9a36a",
+    "avoid": [
+     "Verschieben oder Ergänzen von Wanne, Dusche oder Waschtisch",
+     "Holzmöbel ohne Feuchteschutz"
+    ]
+   },
+   {
+    "room": "Abstellraum",
+    "type": "utility",
+    "role": "Lager für Vorräte, Putzzeug und Spielsachen, die gerade nicht im Umlauf sind.",
+    "functions": [
+     "Vorräte/Stauraum"
+    ],
+    "anchors": [
+     "Schwerlastregal vom Boden bis zur Decke mit beschrifteten Kisten"
+    ],
+    "accent": "#efe6d6",
+    "avoid": [
+     "Waschmaschine",
+     "Möbel, die die Tür blockieren"
+    ]
+   },
+   {
+    "room": "WC",
+    "type": "bath",
+    "role": "Das separate WC für die Familie und für Besuch.",
+    "functions": [
+     "Toilette/Händewaschen"
+    ],
+    "anchors": [
+     "Kleines Wandregal über dem WC für Handtücher und eine Pflanze"
+    ],
+    "accent": "#c46f4c",
+    "avoid": [
+     "zusätzliches Handwaschbecken (Waschtisch ist schon da)",
+     "Verschieben von WC oder Waschtisch"
+    ]
+   },
+   {
+    "room": "Balkon",
+    "type": "balcony",
+    "role": "Der sonnige Südbalkon für den Morgenkaffee und den Kräutergarten.",
+    "functions": [
+     "Draußen sitzen",
+     "Kräutergarten"
+    ],
+    "anchors": [
+     "Klappbarer Holz-Bistrotisch mit zwei Stühlen",
+     "Pflanzkästen und Terrakottatöpfe für Kräuter am Geländer"
+    ],
+    "accent": "#c46f4c",
+    "avoid": [
+     "Lounge-Möbel, die den schmalen Durchgang zustellen",
+     "Stauraum-Gerümpel"
+    ]
+   }
+  ]
+ },
+ "programs": {
+  "Wohn-Essraum": {
+   "reading": "Der Raum ist ein L mit drei Türen. Die Balkontür T1 liegt im Norden, die Vorraumtür T2 und der Küchendurchgang T3 im Südwesten des Fortsatzes. Alle Wege laufen deshalb als ein Band von T1 schräg nach Südwesten und dann bei x≈245–335 nach Süden zu T2 und T3. Westlich dieses Bandes liegt die helle Fensterseite mit F1, F4 und F3, nahe der Küche. Östlich davon liegt der ruhige Teil an der geschlossenen Wand W2 zum Elternschlafzimmer, das ist die einzige lange Wand für den Fernseher. Wer durch T2 hereinkommt, schaut nach Westen auf den Esstisch vor der Wand zwischen F4 und F3.",
+   "zones": [
+    {
+     "id": "spielen",
+     "function": "Spielecke, Brettspiele/Bastelkisten im Sideboard",
+     "rect": [
+      0,
+      0,
+      240,
+      205
+     ],
+     "why": "Hellste Ecke mit Licht von F1 und F4, eine Sackgasse ohne Durchgangsverkehr. Das Sideboard an der Südkante grenzt sie vom Essplatz ab.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "essen",
+     "function": "Essen, Basteln, Brettspiele",
+     "rect": [
+      0,
+      205,
+      240,
+      480
+     ],
+     "why": "Nahe am Küchendurchgang T3, Tageslicht von Westen. Die Wand zwischen F4 und F3 (y 255–455) trägt das Bild und ist der Blickfang von T2 aus. Bis zum Wegband östlich bleiben 80 cm hinter den Stühlen.",
+     "userZone": "Z2"
+    },
+    {
+     "id": "sitzen",
+     "function": "Sitzen/Fernsehen, Gästeschlafplatz",
+     "rect": [
+      340,
+      200,
+      679,
+      399
+     ],
+     "why": "Ruhige Ostseite an der geschlossenen Wand W2. Das Sofa steht mit dem Rücken zum Wegband und bildet so die Raumgrenze, der Fernseher hängt blendfrei an W2.",
+     "userZone": "Z3"
+    },
+    {
+     "id": "lesen",
+     "function": "Lesen, Pflanzen",
+     "rect": [
+      510,
+      95,
+      679,
+      200
+     ],
+     "why": "Am Fenster F2, gutes Leselicht und Blick zum Balkon. Liegt außerhalb des Türschwenks von T1 und gehört zur Sitzinsel.",
+     "userZone": "Z4"
+    }
+   ],
+   "items": [
+    {
+     "id": "table",
+     "catalogId": "generic-dining-table-6",
+     "zone": "essen",
+     "x": 120,
+     "y": 320,
+     "facing": "O",
+     "label": "Massivholz-Esstisch Walnuss geölt 180×90, abgerundete Kanten",
+     "color": "#6f4e37",
+     "why": "Ankermöbel der Familie. Die lange Achse läuft Nord-Süd parallel zur Fensterwand: so bleiben je 75–80 cm bis zur Wand und bis zum Weg, und es ist kurz zur Küche.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-dining-table-4"
+     ]
+    },
+    {
+     "id": "ch1",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 49,
+     "y": 260,
+     "facing": "O",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Westseite, Platz 1 von 6"
+    },
+    {
+     "id": "ch2",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 49,
+     "y": 320,
+     "facing": "O",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Westseite, Platz 2"
+    },
+    {
+     "id": "ch3",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 49,
+     "y": 380,
+     "facing": "O",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Westseite, Platz 3"
+    },
+    {
+     "id": "ch4",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 191,
+     "y": 260,
+     "facing": "W",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Ostseite, Platz 4"
+    },
+    {
+     "id": "ch5",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 191,
+     "y": 320,
+     "facing": "W",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Ostseite, Platz 5"
+    },
+    {
+     "id": "ch6",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 191,
+     "y": 380,
+     "facing": "W",
+     "label": "Stuhl Eiche geölt, Sitz Papierkordel",
+     "color": "#c9a36a",
+     "why": "Ostseite, Platz 6 für Gäste"
+    },
+    {
+     "id": "sideboard",
+     "catalogId": "generic-sideboard",
+     "zone": "spielen",
+     "x": 120,
+     "y": 182,
+     "facing": "N",
+     "label": "Niedriges Sideboard Walnuss, Fächer mit Türen für Brettspiele und Bastelkisten",
+     "color": "#6f4e37",
+     "why": "Ankermöbel und Grenze zur Spielecke. Die Türen zeigen zur Spielecke mit 80 cm frei davor, der Rücken steht 25 cm vor dem Tischende. Geschlossene Fächer, also keine offenen Kleinteile auf Kinderhöhe.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-dresser"
+     ]
+    },
+    {
+     "id": "sofa",
+     "catalogId": "generic-sofa-3",
+     "zone": "sitzen",
+     "x": 385,
+     "y": 290,
+     "facing": "O",
+     "label": "Schlafsofa 3-Sitzer Wollbouclé creme, ausziehbar, tiefe Sitze für vier",
+     "color": "#efe6d6",
+     "why": "Ankermöbel gegenüber dem Fernseher und zugleich Gästebett. Das gewünschte Ecksofa 260×180 passt nicht: mit der Sitzrichtung zum Fernseher an W2 bräuchte es 260 cm Nord-Süd, frei sind nur 220 cm zwischen dem Wegband von T1 und der Wand W3. Deshalb ein tiefer 3-Sitzer plus Sessel.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-sofa-2"
+     ]
+    },
+    {
+     "id": "coffee",
+     "catalogId": "generic-coffee-table",
+     "zone": "sitzen",
+     "x": 505,
+     "y": 290,
+     "facing": "W",
+     "label": "Couchtisch Walnuss massiv, abgerundete Ecken, leicht verschiebbar",
+     "color": "#6f4e37",
+     "why": "45 cm vor dem Sofa, ohne scharfe Kanten und ohne Glas. Wird zur Seite gerückt, wenn das Schlafsofa ausgezogen ist."
+    },
+    {
+     "id": "tvboard",
+     "catalogId": "generic-tv-sideboard",
+     "zone": "sitzen",
+     "x": 658,
+     "y": 290,
+     "facing": "W",
+     "label": "TV-Lowboard Walnuss, geschlossene Klappen",
+     "color": "#6f4e37",
+     "why": "Mittig an der geschlossenen Wand W2 gegenüber dem Sofa, Technik verschwindet hinter Klappen"
+    },
+    {
+     "id": "tv",
+     "catalogId": "generic-tv",
+     "zone": "sitzen",
+     "x": 660,
+     "y": 290,
+     "facing": "W",
+     "label": "Fernseher 55\"",
+     "color": "#2b2b2b",
+     "why": "Etwa 215 cm Abstand zur Sofavorderkante, das ist das 1,5-Fache der Diagonale. Kein Gegenlicht, weil die Fenster seitlich liegen."
+    },
+    {
+     "id": "rug_sofa",
+     "catalogId": "generic-rug-200",
+     "zone": "sitzen",
+     "x": 515,
+     "y": 249,
+     "facing": "N",
+     "label": "Waschbarer Baumwollteppich 200×300 creme mit Ockerrand",
+     "color": "#efe6d6",
+     "why": "Fasst Sofa, Couchtisch und Sessel zu einer Insel. Die vorderen Füße von Sofa und Sessel stehen darauf, der Türschwenk von T1 bleibt frei."
+    },
+    {
+     "id": "armchair",
+     "catalogId": "generic-armchair",
+     "zone": "lesen",
+     "x": 595,
+     "y": 151,
+     "facing": "S",
+     "label": "Lesesessel Walnussgestell, Leinenpolster terrakotta",
+     "color": "#c46f4c",
+     "why": "Vierter Sitzplatz der Sitzrunde und Leseplatz mit Licht von F2. Die Sitzhöhe liegt unter der Brüstung, der Akzent in Terrakotta zieht den Blick."
+    },
+    {
+     "id": "lamp_floor",
+     "catalogId": "generic-floor-lamp",
+     "zone": "lesen",
+     "x": 530,
+     "y": 140,
+     "facing": "S",
+     "label": "Leselampe, Leinenschirm, warmweiß",
+     "color": "#c9a36a",
+     "why": "Zonenlicht rechts neben dem Sessel, nicht vor dem Fenster und außerhalb von Türschwenk und Weg"
+    },
+    {
+     "id": "ceiling",
+     "catalogId": "generic-pendant",
+     "zone": "sitzen",
+     "x": 505,
+     "y": 290,
+     "facing": "S",
+     "label": "Deckenleuchte Rattan, flach abgehängt, warmweiß",
+     "color": "#c9a36a",
+     "why": "Grundlicht für die Sitzinsel und die Raummitte"
+    },
+    {
+     "id": "lamp_tv",
+     "catalogId": "generic-table-lamp",
+     "zone": "sitzen",
+     "x": 658,
+     "y": 215,
+     "facing": "W",
+     "label": "Tischlampe Keramikfuß creme, gedimmt",
+     "color": "#efe6d6",
+     "why": "Stimmungslicht beim Fernsehen am Abend, steht seitlich vom Bildschirm"
+    },
+    {
+     "id": "pendant_dining",
+     "catalogId": "generic-pendant",
+     "zone": "essen",
+     "x": 120,
+     "y": 320,
+     "facing": "S",
+     "label": "Pendelleuchte Terrakotta-Keramik, warmweiß",
+     "color": "#c46f4c",
+     "why": "Zonenlicht über dem Esstisch zum Essen und Basteln. Von T2 aus Teil des Blickfangs."
+    },
+    {
+     "id": "art",
+     "catalogId": "generic-picture-large",
+     "zone": "essen",
+     "x": 2,
+     "y": 320,
+     "facing": "O",
+     "label": "Wandbild 100×70, abstrakte Formen in Terrakotta, Ocker und Salbei",
+     "color": "#c46f4c",
+     "why": "Blickfang beim Hereinkommen durch T2. Hängt mittig über dem Esstisch auf der geschlossenen Wand zwischen F4 und F3, Bildmitte auf 150 cm."
+    },
+    {
+     "id": "lamp_sb",
+     "catalogId": "generic-table-lamp",
+     "zone": "spielen",
+     "x": 175,
+     "y": 182,
+     "facing": "N",
+     "label": "Tischlampe Rattanschirm",
+     "color": "#c9a36a",
+     "why": "Stimmungslicht auf dem Sideboard, beleuchtet Spielecke und Tischende"
+    },
+    {
+     "id": "rug_play",
+     "catalogId": "generic-rug-160",
+     "zone": "spielen",
+     "x": 120,
+     "y": 80,
+     "facing": "O",
+     "label": "Waschbarer Baumwollteppich salbei",
+     "color": "#8a9a7b",
+     "why": "Weiche, waschbare Spielfläche vor den Sideboardfächern. Liegt außerhalb jedes Wegs."
+    },
+    {
+     "id": "plant1",
+     "catalogId": "generic-plant",
+     "zone": "essen",
+     "x": 25,
+     "y": 594,
+     "facing": "O",
+     "label": "Große Zimmerpflanze im Terrakottatopf",
+     "color": "#8a9a7b",
+     "why": "Füllt die freie Ecke E5 neben F3 am Küchenzugang und bringt Grün in den Blick von T2"
+    },
+    {
+     "id": "plant2",
+     "catalogId": "generic-plant",
+     "zone": "lesen",
+     "x": 340,
+     "y": 25,
+     "facing": "S",
+     "label": "Große Zimmerpflanze im Korb",
+     "color": "#8a9a7b",
+     "why": "Freie Wand zwischen F1 und Balkontür, viel Licht, leitet zum Kräuterbalkon über. Außerhalb von Türschwenk und Weg."
+    },
+    {
+     "id": "herb1",
+     "catalogId": "generic-plant-small",
+     "zone": "spielen",
+     "x": 225,
+     "y": 5,
+     "facing": "S",
+     "label": "Kleine Pflanze im Tontopf",
+     "color": "#8a9a7b",
+     "why": "Fensterbank F1 über der Spielecke, nicht auf dem Boden"
+    },
+    {
+     "id": "herb2",
+     "catalogId": "generic-plant-small",
+     "zone": "essen",
+     "x": 5,
+     "y": 515,
+     "facing": "O",
+     "label": "Kleine Pflanze im Tontopf",
+     "color": "#8a9a7b",
+     "why": "Fensterbank F3 nahe Tisch und Küche"
+    },
+    {
+     "id": "curtain1a",
+     "catalogId": "generic-curtain",
+     "zone": "spielen",
+     "x": 175,
+     "y": 3,
+     "facing": "S",
+     "label": "Leinenvorhang creme",
+     "color": "#efe6d6",
+     "why": "F1 ist 160 cm breit, darum zwei Bahnen"
+    },
+    {
+     "id": "curtain1b",
+     "catalogId": "generic-curtain",
+     "zone": "spielen",
+     "x": 275,
+     "y": 3,
+     "facing": "S",
+     "label": "Leinenvorhang creme",
+     "color": "#efe6d6",
+     "why": "Zweite Bahn für F1"
+    },
+    {
+     "id": "curtain2",
+     "catalogId": "generic-curtain",
+     "zone": "lesen",
+     "x": 615,
+     "y": 3,
+     "facing": "S",
+     "label": "Leinenvorhang creme",
+     "color": "#efe6d6",
+     "why": "F2 hinter dem Lesesessel"
+    },
+    {
+     "id": "curtain3",
+     "catalogId": "generic-curtain",
+     "zone": "essen",
+     "x": 3,
+     "y": 515,
+     "facing": "O",
+     "label": "Leinenvorhang creme",
+     "color": "#efe6d6",
+     "why": "F3, dämpft die Abendsonne"
+    },
+    {
+     "id": "curtain4",
+     "catalogId": "generic-curtain",
+     "zone": "spielen",
+     "x": 3,
+     "y": 185,
+     "facing": "O",
+     "label": "Leinenvorhang creme",
+     "color": "#efe6d6",
+     "why": "F4, dämpft die Abendsonne"
+    }
+   ],
+   "relations": [
+    [
+     "table",
+     "center"
+    ],
+    [
+     "ch1",
+     "around",
+     "table"
+    ],
+    [
+     "ch2",
+     "around",
+     "table"
+    ],
+    [
+     "ch3",
+     "around",
+     "table"
+    ],
+    [
+     "ch4",
+     "around",
+     "table"
+    ],
+    [
+     "ch5",
+     "around",
+     "table"
+    ],
+    [
+     "ch6",
+     "around",
+     "table"
+    ],
+    [
+     "pendant_dining",
+     "above",
+     "table",
+     145
+    ],
+    [
+     "art",
+     "wall",
+     "W6",
+     270,
+     370
+    ],
+    [
+     "sideboard",
+     "near",
+     "table",
+     140
+    ],
+    [
+     "lamp_sb",
+     "on",
+     "sideboard"
+    ],
+    [
+     "tvboard",
+     "wall",
+     "W2",
+     200,
+     380
+    ],
+    [
+     "tv",
+     "on",
+     "tvboard"
+    ],
+    [
+     "tv",
+     "facing",
+     "sofa",
+     215
+    ],
+    [
+     "coffee",
+     "front-of",
+     "sofa",
+     45
+    ],
+    [
+     "rug_sofa",
+     "under-front",
+     "sofa"
+    ],
+    [
+     "lamp_floor",
+     "right-of",
+     "armchair",
+     5
+    ],
+    [
+     "ceiling",
+     "above",
+     "coffee",
+     205
+    ],
+    [
+     "lamp_tv",
+     "on",
+     "tvboard"
+    ],
+    [
+     "plant1",
+     "corner",
+     "W5",
+     "W6"
+    ],
+    [
+     "plant2",
+     "wall",
+     "W1",
+     315,
+     365
+    ],
+    [
+     "herb1",
+     "on",
+     "F1"
+    ],
+    [
+     "herb2",
+     "on",
+     "F3"
+    ],
+    [
+     "curtain1a",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "curtain1b",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "curtain2",
+     "window",
+     "F2",
+     "over"
+    ],
+    [
+     "curtain3",
+     "window",
+     "F3",
+     "over"
+    ],
+    [
+     "curtain4",
+     "window",
+     "F4",
+     "over"
+    ]
+   ],
+   "walk": "Durch die Balkontür T1 geht man 90 cm geradeaus. Dann führt ein 90 cm breites Band schräg nach Südwesten zwischen Pflanze und Sitzinsel (Unterkante bei x 430 auf y≈127, Sofa ab y 185) und weiter nach Süden bei x 245–335, entlang der Sofarückseite (5 cm Luft) und der Essplatzseite (28 cm Luft zu den Stühlen). Unten teilt es sich zu T2 (x 229–319, Türschwenk frei) und schräg zu T3, beides ohne Möbel. Der Umweg gegenüber dem Plan beträgt etwa 0,5 m. Von diesem Band betritt man im Osten die Sitzinsel zwischen Sofa (Front x 430) und Couchtisch (45 cm) und den Sessel am Fenster, im Westen die Stuhlreihen (80 cm hinter den Ostseiten-Stühlen) und um das Tischende herum die Spielecke vor dem Sideboard.",
+   "check": [
+    "Alle drei Wege 90 cm breit frei: T1→T2 und T1→T3 über das Band x 245–335, T2→T3 durch den leeren Fortsatz. Nur der Sofateppich berührt den Weg mit einer flachen Ecke.",
+    "Türschwenk T1 (Viertelkreis bis 90 cm um (420,0)) frei: Teppich beginnt bei y 99, Pflanze bei x ≤365, Stehlampe 153 cm vom Angelpunkt.",
+    "Türschwenk T2 (x 229–319, y 430–520) und Durchgang T3 frei; der südliche Oststuhl endet bei y 403, x 217.",
+    "Vor den Fenstern nichts über 90 cm: Sessel (85) vor F2, Stühle (86) teils vor F4, Sideboard (80) bei F4. Große Pflanzen und Stehlampe stehen daneben.",
+    "Esstisch: 75 cm bis zur Westwand, 80 cm von der Ostkante bis zum Weg; das Tischende liegt etwa 2 m vom Küchendurchgang.",
+    "Sideboard: 80 cm frei vor den Türen in der Spielecke, 25 cm Abstand zum Tischende, geschlossene Fächer statt offener Kleinteile.",
+    "Fernseher an W2 rund 215 cm vor der Sofafront, das 1,5-Fache von 140 cm Diagonale, ohne Gegenlicht.",
+    "Couchtisch 45 cm vor dem Sofa, Walnuss mit runden Ecken, kein Glas. Er lässt sich wegschieben: ausgezogen reicht das Bett bis etwa x 630, das Lowboard steht ab x 637.",
+    "Teppich: die vorderen Füße von Sofa und Sessel liegen darauf, keiner liegt im Türschwenk.",
+    "Licht in drei Ebenen, alles warmweiß: Grundlicht über die Rattan-Deckenleuchte, Zonenlicht über das Pendel am Esstisch und die Leselampe, Stimmungslicht über die Tischlampen auf Sideboard und Lowboard. Keine Lampe auf dem Esstisch.",
+    "Blickfang von T2: Walnusstisch mit Terrakotta-Pendel und Wandbild auf der geschlossenen Wand zwischen F4 und F3. Das Bild hängt nicht über einem Fenster.",
+    "Vorhänge mindestens fensterbreit: F1 mit zwei Bahnen, F2, F3 und F4 mit je einer Bahn von 140 cm.",
+    "Abweichung vom Auftrag: Statt Ecksofa ein tiefes 3-Sitzer-Schlafsofa plus Terrakotta-Sessel. Das Ecksofa würde den Weg von der Balkontür blockieren, die vier Sitzplätze bleiben trotzdem.",
+    "Kein zweiter Basteltisch, kein offenes Kleinteilregal und nichts im Hauptweg zwischen Vorraum, Küche und Balkon."
+   ]
+  },
+  "Küche": {
+   "reading": "Die Küche ist ein Raum ohne Durchgang. Man betritt sie nur durch den 100 cm breiten Durchgang T1 ganz rechts an der Nordwand und blickt dabei auf die geschlossene Südwand W3. Tageslicht kommt nur von Westen durch F1 (Brüstung 90 cm). Damit ist die Westwand der natürliche Platz zum Spülen. Die Südwand ist die längste ruhige Wand für Kochen und Kühlen. Die Nordwand links vom Durchgang und die Ostwand zum Bad bleiben frei, sodass die Mitte des Raums als großzügige Fläche zum gemeinsamen Kochen offen bleibt.",
+   "zones": [
+    {
+     "id": "spuelen",
+     "function": "Spülen, Vorbereiten, Geschirr (Küchenzeile West)",
+     "rect": [
+      0,
+      0,
+      60,
+      199
+     ],
+     "why": "Die Spüle steht unter dem Fenster F1. Wer spült, hat Tageslicht und Blick nach draußen. Der Geschirrspüler sitzt direkt neben der Spüle. Hohe Teile kommen hier nicht hin, damit das Fenster frei bleibt.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "kochen",
+     "function": "Kochen am Wochenende, Backen, Kühlen (Küchenzeile Süd)",
+     "rect": [
+      0,
+      199,
+      319,
+      259
+     ],
+     "why": "Die Südwand ist 319 cm lang und hat keine Öffnung, sie trägt die Hauptarbeitszeile. Diese Zeile sieht man beim Hereinkommen als Erstes. Der Kühlschrank ist das einzige hohe Teil und steht am Ostende, weit weg vom Fenster.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "regal",
+     "function": "Gewürze und Kochbücher (Walnuss-Wandregal)",
+     "rect": [
+      299,
+      0,
+      319,
+      194
+     ],
+     "why": "Die Ostwand ist frei und liegt seitlich neben dem Laufweg vom Durchgang. Die Regale sind nur 20 cm tief und hängen in Griffhöhe. Vom Kochfeld und vom Kühlschrank aus erreicht man sie mit zwei Schritten, und von der Arbeitszeile aus sieht man sie gut.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "shelf_spice",
+     "catalogId": "generic-wall-shelf",
+     "zone": "regal",
+     "x": 309,
+     "y": 150,
+     "facing": "W",
+     "label": "Wandregal aus geöltem Walnuss, 80 cm, mit Reling für Gewürzgläser",
+     "color": "#6f4e37",
+     "why": "Das Gewürzregal hängt dem Kochfeld am nächsten, auf etwa 140 bis 150 cm Höhe. Die Gläser stehen dort in Augenhöhe, aber außerhalb der Reichweite der Kinder.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf_books",
+     "catalogId": "generic-wall-shelf",
+     "zone": "regal",
+     "x": 309,
+     "y": 60,
+     "facing": "W",
+     "label": "Wandregal aus geöltem Walnuss, 80 cm, für Kochbücher und zwei Terrakotta-Töpfe",
+     "color": "#6f4e37",
+     "why": "Das zweite Regal fluchtet mit dem Gewürzregal. Es hält die Familienkochbücher, die am Wochenende gemeinsam aufgeschlagen werden. Zusammen bilden die beiden Regale eine warme Walnussfläche an der sonst leeren Badwand.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "kochen",
+     "x": 170,
+     "y": 115,
+     "facing": "S",
+     "label": "Rattan-Pendelleuchte Ø 40, warmweiß 2700 K, Unterkante auf etwa 210 cm",
+     "color": "#c9a36a",
+     "why": "Grundlicht mitten über der freien Kochfläche. Das Rattan nimmt das Ocker der Akzentfarbe auf. Bei 210 cm Unterkante läuft man bequem darunter durch.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp",
+     "catalogId": "generic-table-lamp",
+     "zone": "kochen",
+     "x": 30,
+     "y": 229,
+     "facing": "N",
+     "label": "Kleine Tischleuchte mit Terrakotta-Keramikfuß und Leinenschirm, warmweiß",
+     "color": "#c46f4c",
+     "why": "Stimmungslicht für Abende in der Küche. Die Leuchte steht in der Arbeitsplattenecke über dem Eckschrank. Diese Ecke ist zum Arbeiten ohnehin schlecht nutzbar, so geht keine Arbeitsfläche verloren.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "herb",
+     "catalogId": "generic-plant-small",
+     "zone": "spuelen",
+     "x": 12,
+     "y": 182,
+     "facing": "O",
+     "label": "Basilikum im Tontopf auf der tiefen Fensterbank",
+     "color": "#8a9a7b",
+     "why": "Ein einzelner Kräutertopf für die Hand beim Kochen; der Kräutergarten bleibt auf dem Balkon. Der Topf steht am Südrand der 30 cm tiefen Fensterbank und damit nicht hinter dem Wasserhahn.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "runner",
+     "catalogId": "generic-runner",
+     "zone": "kochen",
+     "x": 170,
+     "y": 150,
+     "facing": "N",
+     "label": "Waschbarer Baumwoll-Läufer 80×200, Terrakotta mit cremefarbenem Rand, rutschfeste Unterseite",
+     "color": "#c46f4c",
+     "why": "Der Läufer liegt mittig im Arbeitsgang vor der Südzeile, von 110 bis 190 cm Raumtiefe und von 70 bis 270 cm in der Breite. Er ist warm unter den Füßen, wenn man am Wochenende länger steht, und kann in die Waschmaschine. Er bleibt 9 cm vor der Zeile und kommt so weder der Backofenklappe noch dem Sockel in die Quere.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "shelf_spice",
+     "wall",
+     "W2",
+     110,
+     190
+    ],
+    [
+     "shelf_books",
+     "wall",
+     "W2",
+     20,
+     100
+    ],
+    [
+     "shelf_books",
+     "align",
+     "shelf_spice"
+    ],
+    [
+     "herb",
+     "on",
+     "F1"
+    ]
+   ],
+   "kitchen": [
+    {
+     "wall": "W4",
+     "from": [
+      0,
+      0
+     ],
+     "to": [
+      0,
+      180
+     ],
+     "modules": [
+      "generic-k-base-40",
+      "generic-k-dishwasher",
+      "generic-k-sink-80"
+     ]
+    },
+    {
+     "wall": "W3",
+     "from": [
+      0,
+      259
+     ],
+     "to": [
+      300,
+      259
+     ],
+     "modules": [
+      "generic-k-base-60",
+      "generic-k-drawer-60",
+      "generic-k-oven",
+      "generic-k-base-60",
+      "generic-k-fridge"
+     ]
+    }
+   ],
+   "walk": "Man kommt durch T1 (x 155 bis 255) herein und geht geradeaus nach Süden. Bis zur Front der Südzeile bei y=199 ist der Weg frei. Rechts liegt die Westzeile mit ihrer Front bei x=60, dazwischen bleibt eine Fläche von 259 × 199 cm frei. Der Arbeitsgang vor der Südzeile ist also deutlich breiter als die geforderten 120 cm, und vor der Spülzeile bleiben ebenfalls mehr als 120 cm. Zwei bis vier Personen können gleichzeitig schnippeln, rühren und spülen, ohne sich zu blockieren. Die Kinder können sich mit an die Ecke stellen. Vom Durchgang zum Kühlschrank sind es etwa zwei Meter in gerader Linie, vom Kühlschrank zum Kochfeld 60 cm Arbeitsplatte und vom Kochfeld zur Spüle der Weg über die Ecke. Die Wandregale an der Ostwand hängen neben dem Laufweg, nicht in ihm.",
+   "check": [
+    "Durchgang T1 hat kein Türblatt, also gibt es keinen Schwenkbereich. Vor der Öffnung steht nichts, die Nordwand bleibt auf ganzer Länge frei.",
+    "Vor dem Fenster F1 steht nur die Spülenzeile mit 86 cm, also unter der Brüstung von 90 cm. Spülenmitte y=140, Fenstermitte y=134. Hochschrank und Kühlschrank stehen nicht am Fenster.",
+    "Arbeitsfläche zwischen Spüle und Kochfeld: Passblende (19 cm), Eckschrank (60 cm) und Schubladenschrank (60 cm), zusammen über 60 cm. Neben dem Kochfeld liegen links 60 cm und rechts 60 cm bis zum Kühlschrank als Abstellfläche.",
+    "Ecke Südwest: Die Westzeile endet bei y=180, die Südzeile beginnt mit dem Eck-Unterschrank. Die 19 cm dazwischen schließt eine Passblende, die Arbeitsplatte läuft durch. Das Gerät in der Ecke ist kein Elektrogerät, sodass sich keine Türen gegenseitig blockieren.",
+    "Zwischen Kühlschrank und Ostwand bleiben 19 cm (Südzeile endet bei x=300). Die Kühlschranktür mit Anschlag rechts lässt sich deshalb weiter als 90° öffnen, und die Gemüseschubladen kommen ganz heraus.",
+    "Die Geschirrspülerklappe öffnet nach Osten bis x=120, die Backofenklappe nach Norden bis y=139. Beide Flächen sind frei. Der Läufer ist nur 1 cm hoch und rutschfest.",
+    "Arbeitsgang vor beiden Zeilen ist über 120 cm breit, alle Schränke sind von vorne mit 80 bis 90 cm Platz und mehr erreichbar.",
+    "Die Wandregale sind 20 cm tief und hängen auf Griffhöhe an der Ostwand neben dem Laufweg. Sie stoßen nicht mit dem 185 cm hohen Kühlschrank zusammen: das untere Regal endet bei y=190, der Kühlschrank beginnt bei y=194.",
+    "Licht in drei Ebenen: Die Rattan-Pendelleuchte gibt Grundlicht. Arbeitslicht kommt von der Unterbaubeleuchtung der Oberschränke, die die App setzt, und am Spülplatz vom Fenster. Die Tischleuchte in der Plattenecke gibt Stimmungslicht, alles warmweiß.",
+    "Bewusst weggelassen: kein Vorhang über der Spüle wegen Spritzwasser und weil die Fensterbank als Ablage dienen soll. Kein Essplatz, keine Barhocker, kein zusätzlicher Hochschrank und keine großen Pflanzen, das gehört laut Konzept in den Wohn-Essraum, den Abstellraum oder auf den Balkon.",
+    "Blickfang beim Hereinkommen: die Südzeile, akzentuiert mit Ocker-Sand #c9a36a, darüber die Rattanleuchte. Links im Blick liegen die Walnussregale mit Terrakotta-Töpfen. Alle Farben stammen aus der Palette."
+   ]
+  },
+  "Elternschlafzimmer": {
+   "reading": "Das Elternschlafzimmer ist ein ruhiges Rechteck. Licht kommt nur durch das Nordfenster F1, das etwas links von der Mitte sitzt. Die einzige Tür T1 liegt in der Südwestecke und schlägt nach innen auf. Wer hereinkommt, blickt nach Norden auf das Fenster, hat links die lange, freie Westwand und rechts die ruhige Ostwand zum Kinderzimmer 1. Abends schlafen die Kinder dort schon, während im Wohn-Essraum hinter der Westwand noch Betrieb ist. Deshalb kommt das Bett mit dem Kopfteil an die Ostwand. Der Kleiderschrank kommt an die Westwand, der Schreibtisch in die helle Nordostecke direkt neben das Fenster.",
+   "zones": [
+    {
+     "id": "schlafen",
+     "function": "Schlafen Eltern",
+     "rect": [
+      140,
+      112,
+      348,
+      399
+     ],
+     "why": "An der ruhigen Ostwand zum Kinderzimmer, weg von Tür und Wohnraum. Hier ist Platz für das Bett mit je 60 cm Zugang auf beiden Seiten.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "arbeiten",
+     "function": "Arbeiten/PC",
+     "rect": [
+      246,
+      0,
+      348,
+      135
+     ],
+     "why": "Direkt östlich neben F1: Tageslicht kommt von links, der Bildschirm steht vor der geschlossenen Nordwand, und zwei Homeoffice-Tage bleiben in einer klar abgegrenzten Ecke.",
+     "userZone": "Z2"
+    },
+    {
+     "id": "kleidung",
+     "function": "Kleidung Eltern",
+     "rect": [
+      0,
+      85,
+      140,
+      300
+     ],
+     "why": "Die lange Westwand ist ohne Öffnung. Der Schrank endet nördlich vom Türschwenk, und davor bleiben 80 cm Ankleidefläche bis zum Fußende des Betts. Dieser Streifen ist zugleich der Weg von der Tür.",
+     "userZone": "Z3"
+    }
+   ],
+   "items": [
+    {
+     "id": "bed",
+     "catalogId": "generic-bed-160",
+     "zone": "schlafen",
+     "x": 244,
+     "y": 256,
+     "facing": "W",
+     "label": "Doppelbett 160×200 aus geöltem Walnuss mit hohem gepolstertem Kopfteil in salbeigrünem Wollbouclé",
+     "color": "#8a9a7b",
+     "why": "Ankermöbel. Das Kopfteil steht an der ruhigen, geschlossenen Ostwand. Das Bett ist von Norden und Süden zugänglich, und sein Kopfteil ist von der Tür aus schräg rechts der Blickfang.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-bed-140"
+     ]
+    },
+    {
+     "id": "wardrobe",
+     "catalogId": "generic-wardrobe-200",
+     "zone": "kleidung",
+     "x": 30,
+     "y": 190,
+     "facing": "O",
+     "label": "Kleiderschrank 200 cm mit Schiebetüren in Walnussfurnier, Innenausstattung für zwei",
+     "color": "#6f4e37",
+     "why": "Ankermöbel an der langen Westwand mit viel Stauraum für zwei Erwachsene. Die Schiebetüren schwenken nicht in den 80-cm-Gang zum Bett.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-wardrobe-150"
+     ]
+    },
+    {
+     "id": "desk",
+     "catalogId": "generic-desk-small",
+     "zone": "arbeiten",
+     "x": 296,
+     "y": 30,
+     "facing": "S",
+     "label": "Schreibtisch 100×60 aus geölter Eiche, schlichte Wangen",
+     "color": "#c9a36a",
+     "why": "Ankermöbel mit dem Rücken an der Nordwand, 2 cm neben dem Fenster: Licht von links, nicht im Gegenlicht. 100 cm statt 120 cm, damit Stuhlzone und Bettzugang nebeneinander Platz haben.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "chair",
+     "catalogId": "generic-office-chair",
+     "zone": "arbeiten",
+     "x": 296,
+     "y": 97,
+     "facing": "N",
+     "label": "Bürostuhl mit cremefarbenem Wollbezug und Holzarmlehnen",
+     "color": "#efe6d6",
+     "why": "Ergonomisch sitzen an zwei Homeoffice-Tagen. Der Stuhl steht in der 75-cm-Stuhlzone vor dem Tisch.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-chair"
+     ]
+    },
+    {
+     "id": "ns1",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 329,
+     "y": 359,
+     "facing": "W",
+     "label": "Nachttisch aus Walnuss mit Schublade",
+     "color": "#6f4e37",
+     "why": "Ablage auf der Südseite des Betts, als Paar mit ns2.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "ns2",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 329,
+     "y": 153,
+     "facing": "W",
+     "label": "Nachttisch aus Walnuss mit Schublade",
+     "color": "#6f4e37",
+     "why": "Ablage auf der Nordseite des Betts, spiegelgleich zu ns1.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp1",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 329,
+     "y": 359,
+     "facing": "W",
+     "label": "Tischlampe mit Terrakotta-Keramikfuß und Leinenschirm, dimmbar, warmweiß",
+     "color": "#c46f4c",
+     "why": "Leselicht und abends dimmbares Stimmungslicht auf der Südseite.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp2",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 329,
+     "y": 153,
+     "facing": "W",
+     "label": "Tischlampe mit Terrakotta-Keramikfuß und Leinenschirm, dimmbar, warmweiß",
+     "color": "#c46f4c",
+     "why": "Leselicht für die zweite Betthälfte, so lässt sich getrennt zu Bett gehen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "desklamp",
+     "catalogId": "generic-table-lamp",
+     "zone": "arbeiten",
+     "x": 330,
+     "y": 22,
+     "facing": "S",
+     "label": "Schreibtischleuchte aus Messing und Eiche, schwenkbar, warmweiß",
+     "color": "#c9a36a",
+     "why": "Zonenlicht für Wintertage und den Abend. Sie steht rechts am Tisch und ergänzt das Tageslicht, das von links kommt.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "wallshelf",
+     "catalogId": "generic-wall-shelf",
+     "zone": "arbeiten",
+     "x": 296,
+     "y": 10,
+     "facing": "S",
+     "label": "Wandbord aus Eiche über dem Schreibtisch, mit Rattan-Ablagekörben",
+     "color": "#c9a36a",
+     "why": "Unterlagen und Ladekabel sind nach dem Homeoffice-Tag mit einem Griff verstaut, die Schreibfläche bleibt frei.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "schlafen",
+     "x": 244,
+     "y": 256,
+     "facing": "S",
+     "label": "Waschbarer Baumwollteppich in Creme mit feinem Ocker-Rand",
+     "color": "#efe6d6",
+     "why": "Weicher, warmer Boden beim Aufstehen auf beiden Seiten. 160×230 quer unter dem Bett, weil 200×300 hier nicht in den Raum passt.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "curtain1",
+     "catalogId": "generic-curtain",
+     "zone": "arbeiten",
+     "x": 174,
+     "y": 3,
+     "facing": "S",
+     "label": "Verdunkelnder Leinenvorhang in Creme, bodenlang",
+     "color": "#efe6d6",
+     "why": "Er dunkelt zum Schlafen ab und dämpft das Licht am Bildschirm. Mit 140 cm ist er so breit wie F1.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "picture",
+     "catalogId": "generic-picture-large",
+     "zone": "schlafen",
+     "x": 346,
+     "y": 256,
+     "facing": "W",
+     "label": "Wandbild 100×70, ruhige Landschaft in Salbei, Terrakotta und Sand, Walnussrahmen",
+     "color": "#c46f4c",
+     "why": "Mit dem Salbei-Kopfteil bildet es den Blickfang an der Ostwand. Mit 100 cm hat es etwa zwei Drittel der Bettbreite, die Bildmitte liegt auf 150 cm.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-picture"
+     ]
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "kleidung",
+     "x": 174,
+     "y": 200,
+     "facing": "S",
+     "label": "Deckenleuchte mit Schirm aus Rattangeflecht, warmweiß",
+     "color": "#c9a36a",
+     "why": "Grundlicht mitten im Raum. Sie hängt über der freien Fläche zwischen Schrank und Bett und blendet nicht ins Bett.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "floorlamp",
+     "catalogId": "generic-floor-lamp",
+     "zone": "kleidung",
+     "x": 22,
+     "y": 22,
+     "facing": "S",
+     "label": "Stehleuchte mit Leinenschirm und Walnussfuß, dimmbar",
+     "color": "#efe6d6",
+     "why": "Stimmungslicht in der freien Nordwestecke neben Fenster und Schrank. Abends ist sie beim Hereinkommen das warme Licht geradeaus.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-mirror",
+     "zone": "kleidung",
+     "x": 130,
+     "y": 397,
+     "facing": "N",
+     "label": "Ganzkörperspiegel mit schmalem Walnussrahmen",
+     "color": "#6f4e37",
+     "why": "An der Südwand gleich östlich der Tür und außerhalb des Türschwenks. Beim Anziehen am Schrank steht man davor mit gut 1 m Abstand.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "bed",
+     "wall",
+     "W2"
+    ],
+    [
+     "wardrobe",
+     "wall",
+     "W4",
+     90,
+     290
+    ],
+    [
+     "desk",
+     "corner",
+     "W1",
+     "W2"
+    ],
+    [
+     "chair",
+     "front-of",
+     "desk",
+     5
+    ],
+    [
+     "ns1",
+     "pair",
+     "ns2",
+     "bed"
+    ],
+    [
+     "lamp1",
+     "on",
+     "ns1"
+    ],
+    [
+     "lamp2",
+     "on",
+     "ns2"
+    ],
+    [
+     "desklamp",
+     "on",
+     "desk"
+    ],
+    [
+     "wallshelf",
+     "above",
+     "desk",
+     120
+    ],
+    [
+     "rug",
+     "under-all",
+     "bed"
+    ],
+    [
+     "curtain1",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "picture",
+     "above",
+     "bed",
+     115
+    ],
+    [
+     "floorlamp",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "mirror",
+     "wall",
+     "W3",
+     100,
+     160
+    ]
+   ],
+   "walk": "Man tritt im Südwesten ein. Die Tür öffnet ganz, ihr Viertelkreis bis y=319 und x=94 bleibt leer. Nach einem Schritt nach rechts geht man im 80 cm breiten Streifen zwischen Schrankfront (x=60) und Bettende (x=140) nach Norden. Dort weitet sich der Raum zur Fensterzone, die bis auf den Vorhang frei ist. Über einen 130 cm tiefen freien Bereich geht es nach Osten zum Schreibtisch. Die Nordseite des Betts erreicht man über einen mindestens 60 cm breiten Streifen zwischen Stuhlzone und Bett. Die Südseite erreicht man direkt von der Tür aus über einen 60 cm breiten Streifen entlang der Südwand.",
+   "check": [
+    "Türschwenk T1 (Viertelkreis 80 cm um 94/399) ist frei: Schrank endet bei y=290, Spiegel beginnt bei x=100, Bett und Teppich liegen östlich von x=140.",
+    "Weg Tür → Schrank → Fenster → Schreibtisch ist durchgehend mindestens 80 cm breit (Raum ohne Durchgang, Mindestmaß 70 cm).",
+    "Vor dem Kleiderschrank liegen 80 cm bis zum Bettende. Dank Schiebetüren steht nichts in diesem Freiraum.",
+    "Das Bett ist beidseitig zugänglich: Süden 60,5 cm (y=338,5–399), Norden mindestens 60 cm bis zur Stuhlzone. Die Nachttische stehen als Paar direkt am Kopfteil.",
+    "Das Kopfteil steht an der geschlossenen Ostwand, nicht unter dem Fenster, auf der ruhigen Seite zum Kinderzimmer.",
+    "Der Schreibtisch steht seitlich neben F1 (x=246–346). Licht kommt von links, der Bildschirm steht vor der Nordwand und nicht vor dem Fenster.",
+    "Stuhlzone 75 cm (y=60–135): Nur der nördliche Nachttisch ragt an seiner Ecke etwa 3 cm hinein. Bewusst knapp gehalten, damit südlich vom Bett 60 cm frei bleiben.",
+    "Vor dem Fenster (x=104–244) steht nichts über der Brüstung, nur der Vorhang. Die Stehleuchte steht seitlich in der Nordwestecke.",
+    "Licht in drei Ebenen, alles warmweiß: Rattan-Deckenleuchte als Grundlicht, Nachttisch- und Schreibtischlampen als Zonenlicht, dimmbare Stehleuchte als Stimmungslicht.",
+    "Der Teppich ragt seitlich 32,5 cm unter dem Bett heraus, etwas weniger als die gewünschten 40 cm. Der 200×300-Teppich würde über die Südwand hinausreichen. Der kleinere liegt außerhalb von Türschwenk und Weg.",
+    "Das Bild hängt mittig über dem Bett, ist mit 100 cm etwa zwei Drittel der Bettbreite und hat seine Mitte auf 150 cm. Über Fenster und Tür hängt nichts.",
+    "Der Vorhang ist 140 cm breit, genau wie F1.",
+    "Hohe Möbel (Schrank 220 cm, Stehleuchte) stehen an Wänden. Nichts steht frei im Raum.",
+    "Fernseher, Spielsachen, Wäscheständer und Pflanzen fehlen bewusst. Pflanzen gehören in den Wohn-Essraum.",
+    "Die Farben kommen aus der Palette: Salbei als Akzent an Kopfteil und Bild, Walnuss für Schrank und Nachttische, Terrakotta an den Lampen, Creme bei den Textilien, Ocker-Sand bei Eiche und Rattan."
+   ]
+  },
+  "Kinderzimmer 1": {
+   "reading": "Das Zimmer ist ein ruhiges Rechteck mit 319 × 399 cm. Das Licht kommt allein vom Nordfenster F1 in der Mitte der Nordwand. Die Tür T1 liegt ganz im Südwesten und schlägt nach Westen und Norden herein. Von dort führt der einzige Weg diagonal nach Norden und Nordosten in den Raum. Durch das Zimmer läuft also kein Durchgangsweg, und es gibt zwei lange, geschlossene Wände. Die Westwand W4 grenzt an das Elternschlafzimmer, die Ostwand W2 ist eine Außenwand. Wer hereinkommt, blickt geradeaus auf das Fenster. Links stehen das niedrige Spielregal mit dem Wandbild, rechts hinten sind der Schreibtisch und das Bett zu sehen.",
+   "zones": [
+    {
+     "id": "lernen",
+     "function": "Hausaufgaben Kind 9 Jahre",
+     "rect": [
+      174,
+      0,
+      319,
+      150
+     ],
+     "why": "Die Nordostecke liegt direkt neben dem Fenster. Das Kind sitzt mit Blick nach Osten zur Wand, das Tageslicht fällt von links auf das Heft, was für Rechtshänder richtig ist. Bildschirm oder Heft stehen nicht vor dem Fenster, und die Ecke ist ruhig und abseits der Tür."
+    },
+    {
+     "id": "schlafen",
+     "function": "Schlafen Kind 9 Jahre",
+     "rect": [
+      154,
+      190,
+      319,
+      399
+     ],
+     "why": "Die Südostecke ist am weitesten vom Fenster entfernt und liegt geschützt hinter dem Türflügel. Das Kopfteil steht an der geschlossenen Südwand, die Längsseite an der Ostwand. Die Westseite des Betts bleibt frei, so kommt man hinein und kann die Bettkästen herausziehen. Vom Bett aus schaut das Kind zum Fenster."
+    },
+    {
+     "id": "spielen",
+     "function": "Spielfläche und Spielzeugstauraum Kind 9 Jahre",
+     "rect": [
+      0,
+      0,
+      174,
+      315
+     ],
+     "why": "Das ist die größte freie Bodenfläche im Raum. Sie liegt hell vor dem Fenster und gleich beim Hereinkommen. Das niedrige Regal steht in der Nordwestecke, also direkt neben dem Teppich. Die Spielsachen liegen damit dort, wo gespielt wird."
+    },
+    {
+     "id": "kleidung",
+     "function": "Kleidung Kind 9 Jahre",
+     "rect": [
+      0,
+      160,
+      150,
+      315
+     ],
+     "why": "Der Schrank steht an der Westwand, bündig neben dem Regal und nördlich vom Türschwenk. Seine Zone teilt er mit der Spielfläche: Die Fläche vor den Schranktüren ist zugleich Teppichfläche. Hohe Möbel stehen so gesammelt an einer Wand, und man erreicht den Schrank gleich nach der Tür."
+    }
+   ],
+   "items": [
+    {
+     "id": "bed",
+     "catalogId": "generic-bed-90",
+     "zone": "schlafen",
+     "x": 271,
+     "y": 296,
+     "facing": "N",
+     "label": "Einzelbett 90×200 aus geöltem Walnuss mit zwei Bettkästen, Bettwäsche in Creme-Leinen",
+     "color": "#6f4e37",
+     "why": "Das ist das Ankermöbel. Es steht mit der Längsseite an der Ostwand und mit dem Kopfteil an der geschlossenen Südwand. Das Kind schläft geschützt und weit weg von Tür und Fenster. Die Bettkästen öffnen zur freien Westseite.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "ns",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 202,
+     "y": 380,
+     "facing": "N",
+     "label": "Nachttisch aus Eiche mit Schublade",
+     "color": "#c9a36a",
+     "why": "Er steht bündig links neben dem Kopfteil, also auf der Einstiegsseite. Dort haben Wecker, Buch und Leselampe Platz. Es gibt nur einen Nachttisch, weil die andere Bettseite an der Wand liegt."
+    },
+    {
+     "id": "lamp_ns",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 202,
+     "y": 380,
+     "facing": "N",
+     "label": "Tischlampe mit Terrakotta-Keramikfuß und Leinenschirm, warmweiß dimmbar",
+     "color": "#c46f4c",
+     "why": "Sie ist Zonenlicht zum Vorlesen und abends zugleich Stimmungslicht."
+    },
+    {
+     "id": "desk",
+     "catalogId": "generic-desk",
+     "zone": "lernen",
+     "x": 284,
+     "y": 70,
+     "facing": "W",
+     "label": "Schreibtisch 140×70 aus geölter Eiche, Platte robust und abwischbar (gewünscht waren 120×60)",
+     "color": "#c9a36a",
+     "why": "Das ist das Ankermöbel. Der Tisch steht quer zum Nordfenster an der Ostwand, das Licht kommt von der Seite. Er bietet genug Fläche für Hefte und Bastelsachen und wächst mit dem Kind mit.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-desk-small"
+     ]
+    },
+    {
+     "id": "chair",
+     "catalogId": "generic-office-chair",
+     "zone": "lernen",
+     "x": 215,
+     "y": 70,
+     "facing": "O",
+     "label": "Höhenverstellbarer Kinder-Schreibtischstuhl, Bezug Salbei",
+     "color": "#8a9a7b",
+     "why": "Davor bleiben 75 cm Stuhlzone. Die Sitzhöhe lässt sich an das 9-jährige Kind anpassen."
+    },
+    {
+     "id": "lamp_desk",
+     "catalogId": "generic-table-lamp",
+     "zone": "lernen",
+     "x": 300,
+     "y": 115,
+     "facing": "W",
+     "label": "Gelenk-Schreibtischleuchte, Walnuss und Messing, warmweiß",
+     "color": "#6f4e37",
+     "why": "Sie ist das Zonenlicht für die Hausaufgaben. Sie steht hinten rechts, damit die Schreibhand keinen Schatten wirft."
+    },
+    {
+     "id": "shelf_desk",
+     "catalogId": "generic-wall-shelf",
+     "zone": "lernen",
+     "x": 317,
+     "y": 70,
+     "facing": "W",
+     "label": "Wandregal aus Walnuss über dem Schreibtisch für Schulbücher und Ordner",
+     "color": "#6f4e37",
+     "why": "Das Schulmaterial bleibt griffbereit und liegt nicht auf der Tischfläche."
+    },
+    {
+     "id": "lowshelf",
+     "catalogId": "generic-sideboard",
+     "zone": "spielen",
+     "x": 22,
+     "y": 80,
+     "facing": "O",
+     "label": "Niedriges offenes Regal 160×45×80 aus Eiche mit Fächern für Kisten",
+     "color": "#c9a36a",
+     "why": "Das ist das Ankermöbel der Spielzone. Mit 80 cm Höhe kommt das Kind selbst an alles heran, und die Ablage oben dient zum Ausstellen von Bauwerken. Das Regal steht in der Nordwestecke, gleich neben Fenster und Teppich.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-tv-sideboard",
+      "generic-shelf-cube"
+     ]
+    },
+    {
+     "id": "box1",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 22,
+     "y": 30,
+     "facing": "O",
+     "label": "Korbkiste aus Rattan",
+     "color": "#c9a36a",
+     "why": "In den Kisten wird nach Spielart sortiert. So geht Aufräumen schnell, und die Fächer sehen ruhig aus."
+    },
+    {
+     "id": "box2",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 22,
+     "y": 80,
+     "facing": "O",
+     "label": "Stoffkiste in Terrakotta",
+     "color": "#c46f4c",
+     "why": "Sie bringt einen Farbakzent ins Regal und nimmt zum Beispiel Lego auf."
+    },
+    {
+     "id": "box3",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 22,
+     "y": 130,
+     "facing": "O",
+     "label": "Stoffkiste in Salbei",
+     "color": "#8a9a7b",
+     "why": "Hier ist Platz für Spiele und Figuren. Die Akzentfarbe des Zimmers taucht damit auch im Regal auf."
+    },
+    {
+     "id": "pic",
+     "catalogId": "generic-picture-large",
+     "zone": "spielen",
+     "x": 1,
+     "y": 80,
+     "facing": "O",
+     "label": "Illustrierte Weltkarte in Salbei, Ocker und Terrakotta",
+     "color": "#8a9a7b",
+     "why": "Sie ist der Blickfang über dem niedrigen Regal und passt zum Lernalter. Man sieht sie beim Hereinkommen schräg links."
+    },
+    {
+     "id": "wardrobe",
+     "catalogId": "generic-wardrobe-150",
+     "zone": "kleidung",
+     "x": 30,
+     "y": 235,
+     "facing": "O",
+     "label": "Kleiderschrank 150 cm, kalkweiß-creme lackiert, Griffe aus Walnuss",
+     "color": "#efe6d6",
+     "why": "Das hohe Möbel steht an der Wand, bündig neben dem Regal und vor dem Türschwenk. Die helle Front lässt den Schrank in den kalkfarbenen Wänden zurücktreten. Davor bleiben 90 cm frei.",
+     "fallbacks": [
+      "generic-wardrobe-100",
+      "generic-dresser"
+     ]
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "spielen",
+     "x": 140,
+     "y": 200,
+     "facing": "S",
+     "label": "Waschbarer Baumwollteppich in Creme mit Salbei-Rand",
+     "color": "#efe6d6",
+     "why": "Er ist eine warme, weiche Spielfläche vor dem Regal. Er endet 84 cm vor der Türangel und liegt damit außerhalb des Türschwenks. Zugleich dient er als Vorleger an der Einstiegsseite des Betts."
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "spielen",
+     "x": 160,
+     "y": 200,
+     "facing": "S",
+     "label": "Rattan-Pendelleuchte, warmweiß",
+     "color": "#c9a36a",
+     "why": "Sie ist das Grundlicht in der Raummitte über der Spielfläche."
+    },
+    {
+     "id": "curtain",
+     "catalogId": "generic-curtain",
+     "zone": "spielen",
+     "x": 164,
+     "y": 3,
+     "facing": "S",
+     "label": "Leinenvorhang in Salbei, abdunkelnd gefüttert",
+     "color": "#8a9a7b",
+     "why": "Er dunkelt zum Schlafen ab und ist der weiche Farbakzent der Fensterwand, auf die man beim Hereinkommen blickt."
+    },
+    {
+     "id": "plant",
+     "catalogId": "generic-plant-small",
+     "zone": "spielen",
+     "x": 120,
+     "y": 10,
+     "facing": "S",
+     "label": "Grünlilie im Terrakotta-Tontopf",
+     "color": "#c46f4c",
+     "why": "Eine kleine, robuste Pflanze, um die sich das Kind selbst kümmern kann. Sie steht auf der Fensterbank und nicht auf dem Spielboden."
+    }
+   ],
+   "relations": [
+    [
+     "bed",
+     "corner",
+     "W2",
+     "W3"
+    ],
+    [
+     "ns",
+     "left-of",
+     "bed",
+     0
+    ],
+    [
+     "lamp_ns",
+     "on",
+     "ns"
+    ],
+    [
+     "desk",
+     "corner",
+     "W1",
+     "W2"
+    ],
+    [
+     "chair",
+     "around",
+     "desk"
+    ],
+    [
+     "lamp_desk",
+     "on",
+     "desk"
+    ],
+    [
+     "shelf_desk",
+     "above",
+     "desk",
+     110
+    ],
+    [
+     "lowshelf",
+     "wall",
+     "W4",
+     0,
+     160
+    ],
+    [
+     "box1",
+     "on",
+     "lowshelf"
+    ],
+    [
+     "box2",
+     "on",
+     "lowshelf"
+    ],
+    [
+     "box3",
+     "on",
+     "lowshelf"
+    ],
+    [
+     "pic",
+     "above",
+     "lowshelf",
+     115
+    ],
+    [
+     "wardrobe",
+     "wall",
+     "W4",
+     160,
+     310
+    ],
+    [
+     "wardrobe",
+     "align",
+     "lowshelf"
+    ],
+    [
+     "rug",
+     "near",
+     "lowshelf",
+     125
+    ],
+    [
+     "pendant",
+     "above",
+     "rug",
+     210
+    ],
+    [
+     "curtain",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "plant",
+     "on",
+     "F1"
+    ]
+   ],
+   "walk": "Nach der Tür geht man in einem 130–164 cm breiten Streifen zwischen Schrank (Vorderkante bei x=60) und Bett beziehungsweise Nachttisch (ab x=182) nach Norden. Der Teppich liegt flach auf diesem Weg. Rechts gelangt man an der 70 cm breiten Westseite des Betts entlang zum Einstieg und zu den Bettkästen. Geradeaus kommt man über die Spielfläche zum Fenster und zum Regal, schräg rechts zum Schreibtischstuhl. Vor dem Schrank bleiben 90 cm frei, vor dem Regal 80 cm. Der Türschwenk (Viertelkreis 80 cm um 94/399) bleibt ganz frei.",
+   "check": [
+    "Türschwenk T1 frei: Der Schrank endet bei y=310 (95 cm von der Angel), der Teppich bei y=315 (84 cm), der Nachttisch beginnt erst bei x=181.",
+    "Weg von der Tür in den Raum: mindestens 130 cm breit, also deutlich über 70 cm.",
+    "Das Bett steht mit dem Kopfteil an der geschlossenen Südwand und nicht unter dem Fenster, die Längsseite liegt an der Längswand W2. Auf der Einstiegsseite sind 70 cm frei, damit lassen sich die Bettkästen ganz ausziehen.",
+    "Der Schreibtisch steht quer zum Fenster an W2, das Licht kommt von links. Die Stuhlzone von 75 cm reicht bis x=174. Zwischen Tisch und Bett liegen 54 cm, sie sind sauber getrennt.",
+    "Vor dem Fenster steht nichts über 90 cm Brüstungshöhe, nur Teppich, Vorhang und die Pflanze auf der Fensterbank. Der Stuhl steht seitlich in der Ecke zurückgesetzt.",
+    "Die hohen Möbel stehen an der Wand: Der Schrank (220 cm) an W4, das Regal schließt bündig an. Mitten im Raum steht nichts, ein Hochbett gibt es nicht, einen Fernseher auch nicht.",
+    "Vor dem Schrank sind 90 cm frei, vor dem niedrigen Regal 80 cm, beides liegt auf der Spielfläche.",
+    "Licht in drei Ebenen, alles warmweiß: Rattan-Pendel als Grundlicht, Schreibtischleuchte als Zonenlicht, dimmbare Nachttischlampe zum Vorlesen und als Stimmungslicht.",
+    "Der Vorhang ist 140 cm breit und deckt das 140 cm breite Fenster.",
+    "Das Bild hängt über dem Regal und nicht über Fenster oder Tür. Seine Mitte liegt bei etwa 150 cm, damit ist es der einzige Blickfang des Zimmers.",
+    "Die Pflanze ist klein, steht auf der Fensterbank und nicht auf dem Boden.",
+    "Nicht doppelt geplant: Sitzen, Lesen, Basteln mit den Eltern und Gäste bleiben im Wohn-Essraum. Hier steht nur, was das 9-jährige Kind für sich braucht.",
+    "Abweichung: Den gewünschten Schreibtisch 120×60 gibt es nicht im Katalog. Geplant ist 140×70, er passt in die Ecke. Der kleinere Tisch 100×60 ist als Ersatz hinterlegt."
+   ]
+  },
+  "Vorraum": {
+   "reading": "Der Vorraum ist ein langer, fensterloser Verteiler mit acht Türen, daher kommt das Licht nur von der Decke. Beim Hereinkommen durch die Wohnungstür (T3) schaut man den ganzen Flur nach Westen entlang. Die ruhigsten freien Wände sind die Nordwand östlich von T2 (x 814–1039) und das Mittelstück x 454–734. Alle Türen außer T3, T4 und T5 schlagen nach außen auf. Deshalb bleibt die Mitte frei, und die Garderobe sitzt gleich links neben der Wohnungstür an der Nordwand. Dort ist die Wand 225 cm lang, und der Türschwenk von T3 beginnt erst bei y=64.",
+   "zones": [
+    {
+     "id": "garderobe",
+     "function": "Garderobe/Schuhe",
+     "rect": [
+      815,
+      0,
+      1039,
+      62
+     ],
+     "why": "Freie Nordwand direkt neben der Wohnungstür. Sie liegt über dem Schwenkbereich von T3 (ab y=64) und nicht auf den Hauptwegen. Auf dem Weg hinaus greift man Jacke und Schuhe, auf dem Weg herein legt man sie ab.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "flur",
+     "function": "Läufer und Blickfang im Flur",
+     "rect": [
+      480,
+      0,
+      710,
+      128
+     ],
+     "why": "Ruhiges Wandstück zwischen T1 und T2. Hier bekommt der lange Gang Wärme und Licht, ohne dass etwas im Weg steht. Möbel stehen hier nicht, nur ein Läufer und Wandschmuck."
+    }
+   ],
+   "items": [
+    {
+     "id": "shoeA",
+     "catalogId": "generic-shoe-cabinet",
+     "zone": "garderobe",
+     "x": 994,
+     "y": 15,
+     "facing": "S",
+     "label": "Schmaler Schuhschrank in geöltem Walnuss mit Kippfächern, Ankermöbel der Garderobe",
+     "color": "#6f4e37",
+     "why": "Ankermöbel direkt neben der Wohnungstür. Mit 30 cm Tiefe lässt er den Gang breit genug, und an der Wand daneben ist Platz für den Spiegel.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shoeB",
+     "catalogId": "generic-shoe-cabinet",
+     "zone": "garderobe",
+     "x": 914,
+     "y": 15,
+     "facing": "S",
+     "label": "Zweiter Schuhschrank in Walnuss, bündig neben dem ersten",
+     "color": "#6f4e37",
+     "why": "Vier Personen und gelegentlich Gäste brauchen Schuhfächer. Zusammen mit dem ersten ergibt sich eine ruhige Schrankreihe von 160 cm.",
+     "fallbacks": []
+    },
+    {
+     "id": "seat",
+     "catalogId": "generic-chair",
+     "zone": "garderobe",
+     "x": 851.5,
+     "y": 26,
+     "facing": "S",
+     "label": "Stuhl mit Rattangeflecht als Sitzplatz zum Schuheanziehen",
+     "color": "#c9a36a",
+     "why": "Eine Sitzbank gibt es im Katalog nicht. Der Rattanstuhl direkt am Schrank ersetzt sie, damit Kinder und Gäste sich zum Schuheanziehen hinsetzen können. Er liegt mit 52 cm Tiefe nahe an der Wand und lässt 20 cm Abstand zu T2.",
+     "fallbacks": []
+    },
+    {
+     "id": "rackKid",
+     "catalogId": "generic-coat-rack",
+     "zone": "garderobe",
+     "x": 914,
+     "y": 5,
+     "facing": "S",
+     "label": "Hakenleiste auf Kinderhöhe für Jacken und Rucksäcke (Walnuss)",
+     "color": "#6f4e37",
+     "why": "Die Haken sitzen so tief, dass die Kinder (6 und 9) ihre Jacken und Rucksäcke selbst aufhängen können.",
+     "fallbacks": []
+    },
+    {
+     "id": "rackAdult",
+     "catalogId": "generic-coat-rack",
+     "zone": "garderobe",
+     "x": 994,
+     "y": 5,
+     "facing": "S",
+     "label": "Hakenleiste für Erwachsenenjacken und Gästemäntel (Walnuss)",
+     "color": "#6f4e37",
+     "why": "Zweite Hakenleiste höher über dem ersten Schrank, damit die langen Mäntel der Eltern und Gäste nicht auf den Schuhen hängen.",
+     "fallbacks": []
+    },
+    {
+     "id": "keyShelf",
+     "catalogId": "generic-wall-shelf",
+     "zone": "garderobe",
+     "x": 851.5,
+     "y": 10,
+     "facing": "S",
+     "label": "Wandregal für Schlüssel, Post und Mützen (Walnuss)",
+     "color": "#6f4e37",
+     "why": "Kleinkram wie Schlüssel und Post hat so einen festen Platz in Reichweite der Tür. Das Regal hängt über dem Stuhl und über der Kinderhakenleiste.",
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-mirror",
+     "zone": "garderobe",
+     "x": 1037.5,
+     "y": 32,
+     "facing": "W",
+     "label": "Langer Wandspiegel mit schmalem Walnussrahmen neben der Wohnungstür",
+     "color": "#6f4e37",
+     "why": "Der letzte Blick vor dem Hinausgehen. Der Spiegel hängt auf dem freien Wandstück y 2–62 neben der Tür, außerhalb des Türschwenks. Er macht den Eingang heller.",
+     "fallbacks": []
+    },
+    {
+     "id": "pendG",
+     "catalogId": "generic-pendant",
+     "zone": "garderobe",
+     "x": 914,
+     "y": 20,
+     "facing": "S",
+     "label": "Pendelleuchte mit Leinenschirm, warmweiß, über der Garderobe",
+     "color": "#efe6d6",
+     "why": "Zonenlicht für die Garderobe. Ohne Fenster muss man Schuhe und Jacken auch abends gut sehen.",
+     "fallbacks": []
+    },
+    {
+     "id": "runner",
+     "catalogId": "generic-runner",
+     "zone": "flur",
+     "x": 594,
+     "y": 64,
+     "facing": "O",
+     "label": "Waschbarer Baumwoll-Läufer in Ocker-Sand, rutschfest, mittig im Gang",
+     "color": "#c9a36a",
+     "why": "Dämpft Schritte und Lärm im langen Flur. Er liegt mittig auf dem freien Stück zwischen T1 und T2, hält 24 cm Abstand zu beiden Wänden und liegt in keinem Türschwenk.",
+     "fallbacks": []
+    },
+    {
+     "id": "pendF",
+     "catalogId": "generic-pendant",
+     "zone": "flur",
+     "x": 594,
+     "y": 64,
+     "facing": "S",
+     "label": "Pendelleuchte mit Leinenschirm, Grundlicht für den Flurmittelteil",
+     "color": "#efe6d6",
+     "why": "Grundlicht über dem Läufer. Mit der Garderobenleuchte gibt es zwei Lichtpunkte auf 18 m², und die Leuchte hängt mit 200 cm Unterkante über Kopfhöhe.",
+     "fallbacks": []
+    },
+    {
+     "id": "pic",
+     "catalogId": "generic-picture-large",
+     "zone": "flur",
+     "x": 594,
+     "y": 1.5,
+     "facing": "S",
+     "label": "Wandbild in Terrakotta-Tönen mit Walnussrahmen",
+     "color": "#c46f4c",
+     "why": "Blickfang, den man beim Hereinkommen den langen Flur entlang sieht. Das Bild hängt mittig über dem Läufer auf dem freien Wandstück zwischen T1 und T2, nicht über einer Tür.",
+     "fallbacks": [
+      "generic-picture"
+     ]
+    }
+   ],
+   "relations": [
+    [
+     "shoeA",
+     "wall",
+     "W1",
+     954,
+     1034
+    ],
+    [
+     "shoeB",
+     "right-of",
+     "shoeA",
+     0
+    ],
+    [
+     "shoeB",
+     "align",
+     "shoeA"
+    ],
+    [
+     "seat",
+     "right-of",
+     "shoeB",
+     0
+    ],
+    [
+     "rackAdult",
+     "above",
+     "shoeA",
+     165
+    ],
+    [
+     "rackKid",
+     "above",
+     "shoeB",
+     110
+    ],
+    [
+     "keyShelf",
+     "above",
+     "seat",
+     145
+    ],
+    [
+     "pendG",
+     "above",
+     "shoeB",
+     190
+    ],
+    [
+     "mirror",
+     "wall",
+     "W2",
+     2,
+     62
+    ],
+    [
+     "runner",
+     "under-all",
+     "runner"
+    ],
+    [
+     "pendF",
+     "above",
+     "runner",
+     200
+    ],
+    [
+     "pic",
+     "wall",
+     "W1",
+     544,
+     644
+    ]
+   ],
+   "walk": "Von der Wohnungstür T3 geht man frei in den Raum hinein: Der Türschwenk (x 939–1039, y 64–164) bleibt komplett leer. Die Garderobe liegt dahinter an der Nordwand, y 0–52. Danach bleiben mindestens 90 cm bis zum Weg zwischen T2 und T3 und zur Südseite. Der Weg zu T4 und T5 (Südwand) bleibt in voller Breite frei, die Schwenkbereiche von T4 und T5 sind leer. Nach Westen führt der Hauptweg durch den 128 cm breiten Gang. Der Läufer liegt 24 cm von beiden Wänden und lässt Platz zum Gehen, T1, T2, T6, T7 und T8 haben freie Zonen davor.",
+   "check": [
+    "Türschwenk T3 (x 939–1039, y 64–164): leer. Schuhschränke bei y 0–30 und Stuhl bei y 0–52 liegen außerhalb.",
+    "Türschwenk T4 (x 939–1009, y 218–288) und T5 (x 779–849, y 218–288): leer, nichts davor.",
+    "T1, T2, T6, T7, T8 schlagen nach außen auf: nichts steht davor. Der Stuhl hält 20 cm Abstand zu T2 (x 814).",
+    "Hauptwege 90 cm breit: im Gang 128 cm Breite, kein Möbel höher als 1 cm in der Mitte (nur der Läufer). In der Garderobenzone bleiben nach dem Stuhl (52 cm tief) noch über 90 cm bis zur Südwand.",
+    "Tiefe Schränke: keine. Die Schuhschränke sind nur 30 cm tief, die Hakenleisten 10 cm.",
+    "Möbel mit 20 cm Abstand oder bündig: Schuhschränke und Stuhl stehen bündig in einer Reihe.",
+    "Hakenleisten: Kinderleiste 110 cm, Erwachsenenleiste 165 cm. Wandregal ab 145 cm kollidiert nicht mit der Kinderleiste (110–130).",
+    "Licht in zwei Ebenen: Grundlicht über dem Läufer, Zonenlicht an der Garderobe. Beide warmweiß. Es sind höchstens zwei Leuchten auf 18 m², also unter der Grenze.",
+    "Nicht hierher gehörende Dinge (Pflanzen, Spielsachen, Sofa) sind weggelassen. Nichts ist doppelt, außer dem Schuhschrankpaar und den beiden Hakenleisten, die jeweils ihren Zweck haben.",
+    "Würde jemand das so einrichten? Ja: Garderobe direkt an der Tür, Spiegel zum Hinausgehen, Läufer und Bild als ruhiger Blickfang im langen Gang."
+   ]
+  },
+  "Bad": {
+   "reading": "Ein schmales, tiefes Bad: Beim Hereinkommen durch T1 blickt man nach Süden auf das Fenster F1 zwischen Wanne und Dusche, rechts steht der Waschtisch. Die Tür schwenkt nach innen, daher bleibt ihr Viertelkreis in der Nordwest-Ecke leer. Die einzige große freie Wand ist die Nordwand östlich der Tür und das Stück Westwand zwischen Tür und Wanne. Dort sitzen die Wäscheseite (Waschmaschine) und das Regal, so dass Nassbereich und Wäschelogistik der Familie getrennt, aber kurz erreichbar bleiben.",
+   "zones": [
+    {
+     "id": "waesche",
+     "function": "Wäsche waschen",
+     "rect": [
+      0,
+      85,
+      150,
+      165
+     ],
+     "why": "Freies Stück Westwand zwischen Türschwenk und Wanne; Waschmaschine mit 90 cm Platz davor, Wäsche läuft Richtung Regal",
+     "userZone": "Z1"
+    },
+    {
+     "id": "handtuch",
+     "function": "Handtuch- und Wäscheregal",
+     "rect": [
+      105,
+      0,
+      205,
+      50
+     ],
+     "why": "Freie Nordwand östlich der Türangel, dicht an Waschtisch und Maschine, hohes Möbel an der Wand",
+     "userZone": "Z2"
+    },
+    {
+     "id": "pflege",
+     "function": "Körperpflege (Waschtisch, Dusche)",
+     "rect": [
+      150,
+      50,
+      308,
+      339
+     ],
+     "why": "Bestand Waschtisch und Dusche; Ostwand frei für Handtuchhaken, Matte vor der Dusche",
+     "userZone": "Z3"
+    },
+    {
+     "id": "baden",
+     "function": "Baden",
+     "rect": [
+      0,
+      165,
+      130,
+      339
+     ],
+     "why": "Bestand Wanne; Matte davor, Bild darüber als Blickfang",
+     "userZone": "Z4"
+    }
+   ],
+   "items": [
+    {
+     "id": "washer",
+     "catalogId": "generic-washer",
+     "zone": "waesche",
+     "x": 30,
+     "y": 115,
+     "facing": "O",
+     "label": "Waschmaschine in Creme, Platz für aufgesetzten Trockner (Turm)",
+     "color": "#efe6d6",
+     "why": "Ankermöbel Wäsche: an der freien Westwand außerhalb des Türschwenks, Front frei zum Raum. Ein Trockner würde als Turm obendrauf kommen.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf",
+     "catalogId": "generic-utility-shelf",
+     "zone": "handtuch",
+     "x": 155,
+     "y": 23,
+     "facing": "S",
+     "label": "Schmales Handtuch- und Wäscheregal, feuchtefest beschichtet in Ocker-Sand",
+     "color": "#c9a36a",
+     "why": "Ankermöbel Handtücher/Wäsche: feuchteunempfindlich statt Holz, an der Nordwand neben Tür und Waschtisch",
+     "anchor": true,
+     "fallbacks": [
+      "generic-bath-cabinet"
+     ]
+    },
+    {
+     "id": "box1",
+     "catalogId": "generic-storage-box",
+     "zone": "handtuch",
+     "x": 125,
+     "y": 23,
+     "facing": "S",
+     "label": "Korbbox in Terrakotta für Schmutzwäsche hell",
+     "color": "#c46f4c",
+     "why": "Wäsche vorsortieren, Kinder können selbst einwerfen",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "box2",
+     "catalogId": "generic-storage-box",
+     "zone": "handtuch",
+     "x": 185,
+     "y": 23,
+     "facing": "S",
+     "label": "Korbbox in Rattan für Schmutzwäsche dunkel",
+     "color": "#c9a36a",
+     "why": "Zweite Box zum Sortieren, Rattan bringt die Korbmaterialien ins Bad",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "hooks",
+     "catalogId": "generic-coat-rack",
+     "zone": "pflege",
+     "x": 302,
+     "y": 180,
+     "facing": "W",
+     "label": "Handtuchhaken, wasserfest lackiert in Walnuss",
+     "color": "#6f4e37",
+     "why": "Je ein Haken pro Familienmitglied zwischen Waschtisch und Dusche, Handtücher trocknen in Reichweite",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-bath-mirror",
+     "zone": "pflege",
+     "x": 306,
+     "y": 94,
+     "facing": "W",
+     "label": "Badspiegel 60×70",
+     "color": "#efe6d6",
+     "why": "Gehört über den Waschtisch",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "picture",
+     "catalogId": "generic-picture-large",
+     "zone": "baden",
+     "x": 2,
+     "y": 254,
+     "facing": "O",
+     "label": "Kunstdruck hinter Glas in Ocker-, Creme- und Salbeitönen",
+     "color": "#c9a36a",
+     "why": "Blickfang beim Hereinkommen über der Wanne, feuchtetaugliches Glas",
+     "anchor": false,
+     "fallbacks": [
+      "generic-picture"
+     ]
+    },
+    {
+     "id": "matS",
+     "catalogId": "generic-bath-mat",
+     "zone": "pflege",
+     "x": 263,
+     "y": 219,
+     "facing": "N",
+     "label": "Waschbare Baumwollmatte in Salbei",
+     "color": "#8a9a7b",
+     "why": "Rutschfest vor der Dusche, nicht im Türschwenk, maschinenwaschbar",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "matT",
+     "catalogId": "generic-bath-mat",
+     "zone": "baden",
+     "x": 108,
+     "y": 254,
+     "facing": "O",
+     "label": "Waschbare Baumwollmatte in Terrakotta",
+     "color": "#c46f4c",
+     "why": "Trockener Stand beim Ausstieg aus der Wanne, Terrakotta-Akzent",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "pflege",
+     "x": 160,
+     "y": 190,
+     "facing": "S",
+     "label": "Deckenleuchte, warmweiß, feuchtraumgeeignet, Opalglas",
+     "color": "#efe6d6",
+     "why": "Grundlicht in der Raummitte, außerhalb des Türschwenks; Zusatzlicht kommt über den Spiegel",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "washer",
+     "wall",
+     "W4",
+     85,
+     145
+    ],
+    [
+     "shelf",
+     "wall",
+     "W1",
+     110,
+     200
+    ],
+    [
+     "box1",
+     "on",
+     "shelf"
+    ],
+    [
+     "box2",
+     "on",
+     "shelf"
+    ],
+    [
+     "hooks",
+     "wall",
+     "W2",
+     140,
+     220
+    ],
+    [
+     "mirror",
+     "above",
+     "B2",
+     110
+    ],
+    [
+     "picture",
+     "above",
+     "B1",
+     100
+    ],
+    [
+     "matS",
+     "front-of",
+     "B3",
+     5
+    ],
+    [
+     "matT",
+     "front-of",
+     "B1",
+     5
+    ]
+   ],
+   "walk": "Durch T1 (x 14–94) geht man nach Süden; der Türviertelkreis bleibt leer. Zwischen Waschmaschine (bis x=60) und Regal/Waschtisch liegt eine offene Fläche von rund 200 cm Breite. Von dort kommt man in etwa 140 cm Breite zwischen Wanne (bis x=75) und Dusche (ab x=218) zum Fenster. Vor der Waschmaschine bleiben 90 cm frei, vor dem Regal über 80 cm, vor dem Waschtisch über 100 cm.",
+   "check": [
+    "Türschwenk (Kreis um (94,0), r=80): Waschmaschine-Ecke (60,85) liegt 91 cm von der Angel entfernt, Regal beginnt bei x=110: frei",
+    "Wege: überall mindestens 90 cm, Weg zu Waschtisch, Dusche, Wanne und Fenster offen",
+    "Fenster F1: nichts davor, keine Pflanze, kein Vorhang nötig",
+    "Waschmaschine hat 24 cm Abstand zur Wanne und 90 cm Platz vor sich",
+    "Regal und Haken sind feuchtefest oder lackiert, kein ungeschütztes Holz",
+    "Spiegel hängt über dem Waschtisch (B2), Bild über der Wanne, nichts über Tür oder Fenster",
+    "Matten liegen vor Wanne und Dusche, nicht im Türschwenk",
+    "Palette: Creme, Walnuss, Terrakotta, Salbei, Ocker-Sand (Akzent); Pflanzen, Kochen, Sitzen und Spielen sind bewusst in anderen Räumen",
+    "Nichts doppelt: eine Deckenleuchte für 10,4 m²; Trockner passt nicht als eigener Katalogeintrag, daher nur als Aufsatz vorgesehen"
+   ]
+  },
+  "Kinderzimmer 2": {
+   "reading": "Das Zimmer ist ein ruhiges, fast quadratisches Rechteck mit nur einer Tür in der Nordwestecke. Das Türblatt schlägt nach Westen auf und liegt geöffnet an der Linie x=94. Es gibt also keinen Durchgangsweg, nur den Eintritt von Norden. Wer hereinkommt, schaut direkt nach Süden auf das 140 cm breite Fenster F1, und das Südlicht fällt tief in die Raummitte. Die geschlossene Ostwand und die Nordwand östlich der Tür bilden die ruhige, geschützte Schlafseite. Die Westwand an der Tür bleibt der Zugangsweg, die helle Mitte vor dem Fenster wird die Spielfläche.",
+   "zones": [
+    {
+     "id": "schlafen",
+     "function": "Schlafen Kind 6 Jahre",
+     "rect": [
+      203,
+      0,
+      408,
+      155
+     ],
+     "why": "Geschützte Nordostecke, weg von Tür und Fenster. Das Kopfteil steht an der geschlossenen Ostwand, die Längsseite an der Nordwand, und der Rausfallschutz sitzt auf der offenen Südseite. Der 60 cm breite Streifen vor dem Bett gehört zum Zustieg.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "kleidung",
+     "function": "Kleidung Kind 6 Jahre",
+     "rect": [
+      101,
+      0,
+      201,
+      60
+     ],
+     "why": "Der Schrank steht gleich neben der Tür an der Nordwand, außerhalb des Türschwenks. Kleidung liegt damit am Eingang und nicht in der Spielfläche. Die 90 cm vor dem Schrank bleiben als Teil der freien Bodenfläche offen.",
+     "userZone": "Z2"
+    },
+    {
+     "id": "malen",
+     "function": "Malen Kind 6 Jahre",
+     "rect": [
+      0,
+      204,
+      110,
+      339
+     ],
+     "why": "Der Schreibtisch steht in der Südwestecke direkt links neben dem Fenster. Das Licht kommt beim Sitzen von links, gut für Rechtshänder, und der Stuhlbereich ist 75 cm tief. Die Ecke ist ruhig und vom Spielteppich getrennt.",
+     "userZone": "Z3"
+    },
+    {
+     "id": "spielen",
+     "function": "Spielfläche und Spielzeugstauraum Kind 6 Jahre",
+     "rect": [
+      136,
+      159,
+      408,
+      339
+     ],
+     "why": "Das hellste Stück Boden vor dem Fenster, und man sieht es als Erstes beim Hereinkommen. Das niedrige Regal mit den Rollkisten steht an der geschlossenen Ostwand, der große Teppich liegt davor. Aufräumen klappt so in Kinderhöhe.",
+     "userZone": "Z4"
+    }
+   ],
+   "items": [
+    {
+     "id": "bed",
+     "catalogId": "generic-bed-90",
+     "zone": "schlafen",
+     "x": 305.5,
+     "y": 47.5,
+     "facing": "W",
+     "label": "Kinderbett 90×200 aus geöltem Walnuss mit Rausfallschutz an der offenen Längsseite, wandbefestigt",
+     "color": "#6f4e37",
+     "why": "Ankermöbel. Das Kopfteil steht an der geschlossenen Ostwand, die Längsseite an der Wand gibt Geborgenheit. Das Bett steht weit weg vom Fenster und nicht in der Blickachse der Tür.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "ns",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 389,
+     "y": 118,
+     "facing": "W",
+     "label": "Niedriger Nachttisch aus Eiche mit offenem Fach für Bücher und Kuscheltier",
+     "color": "#c9a36a",
+     "why": "Steht am Kopfende auf der Zustiegsseite. Das Kind erreicht Wasserflasche und Nachtlicht im Liegen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp_ns",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 389,
+     "y": 118,
+     "facing": "W",
+     "label": "Dimmbare Keramik-Nachtleuchte in Terrakotta, warmweiß 2200 K",
+     "color": "#c46f4c",
+     "why": "Stimmungslicht und Nachtlicht zum Einschlafen. Steht auf dem Nachttisch.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "pic",
+     "catalogId": "generic-picture-large",
+     "zone": "schlafen",
+     "x": 305.5,
+     "y": 0,
+     "facing": "S",
+     "label": "Tierposter in leichtem Rahmen mit Acrylglas, Salbei und Creme",
+     "color": "#8a9a7b",
+     "why": "Hängt mittig über der Bettlängsseite, rund zwei Drittel so breit wie das Bett. Die Bildmitte liegt bei etwa 150 cm. Acrylglas, weil es über dem Kinderbett nicht splittert.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-picture"
+     ]
+    },
+    {
+     "id": "wardrobe",
+     "catalogId": "generic-wardrobe-100",
+     "zone": "kleidung",
+     "x": 151,
+     "y": 30,
+     "facing": "S",
+     "label": "Kinderkleiderschrank 100 cm aus Eiche, Fronten kalkweiß mit Walnussgriffen, kippsicher an der Wand verschraubt",
+     "color": "#efe6d6",
+     "why": "Ankermöbel für die Kleidung. Steht neben der Tür außerhalb des Schwenkbereichs, weil das geöffnete Türblatt bei x=94 endet. Der Schrank ist an der Wand verschraubt, davor bleiben 90 cm frei.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-dresser"
+     ]
+    },
+    {
+     "id": "desk",
+     "catalogId": "generic-desk-small",
+     "zone": "malen",
+     "x": 50,
+     "y": 309,
+     "facing": "N",
+     "label": "Mitwachsender Kinderschreibtisch 100×60 aus Eiche, höhenverstellbar und mit neigbarer Platte",
+     "color": "#c9a36a",
+     "why": "Ankermöbel am Südfenster. Er steht seitlich neben dem Fenster und nicht davor, das Tageslicht fällt von links auf das Malpapier.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "chair",
+     "catalogId": "generic-chair",
+     "zone": "malen",
+     "x": 50,
+     "y": 258,
+     "facing": "S",
+     "label": "Mitwachsender Kinderstuhl aus geöltem Walnuss mit verstellbarer Sitz- und Fußplatte",
+     "color": "#6f4e37",
+     "why": "Wächst mit dem Schreibtisch mit. Dahinter bleiben 75 cm Stuhlbereich frei.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "lamp_desk",
+     "catalogId": "generic-table-lamp",
+     "zone": "malen",
+     "x": 20,
+     "y": 300,
+     "facing": "N",
+     "label": "Schreibtischleuchte mit Gelenkarm, Creme, warmweiß, blendfrei",
+     "color": "#efe6d6",
+     "why": "Zonenlicht für Malen und Basteln an dunklen Nachmittagen. Steht links auf der Fensterseite, damit die Malhand keinen Schatten wirft.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "wshelf",
+     "catalogId": "generic-wall-shelf",
+     "zone": "malen",
+     "x": 50,
+     "y": 339,
+     "facing": "N",
+     "label": "Wandbord 80 cm aus Walnuss mit Terrakotta-Töpfen für Stifte und Pinsel",
+     "color": "#6f4e37",
+     "why": "Hält Malzeug griffbereit, ohne die Tischfläche zuzustellen. Hängt in Kinderreichweite über dem Schreibtisch.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf",
+     "catalogId": "generic-tv-sideboard",
+     "zone": "spielen",
+     "x": 387,
+     "y": 249,
+     "facing": "W",
+     "label": "Niedriges offenes Spielzeugregal 180 cm aus Eiche und Walnuss, 45 cm hoch, mit Unterfächern für Rollkisten, wandbefestigt",
+     "color": "#6f4e37",
+     "why": "Ankermöbel der Spielzone. Es ist niedrig und kippt nicht, steht an der geschlossenen Ostwand, und das Kind erreicht alles selbst. Die Oberfläche dient als Ablage für Lieblingsstücke.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-sideboard"
+     ]
+    },
+    {
+     "id": "box1",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 351,
+     "y": 199,
+     "facing": "W",
+     "label": "Rollkiste aus Korbgeflecht mit Rollen, Bausteine",
+     "color": "#c9a36a",
+     "why": "Grobes Spielzeug schnell aufräumen. Die Kiste rollt unter das Regal und wird zum Spielen auf den Teppich gezogen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "box2",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 351,
+     "y": 249,
+     "facing": "W",
+     "label": "Rollkiste aus Korbgeflecht mit Rollen, Fahrzeuge",
+     "color": "#c9a36a",
+     "why": "Eine Kiste je Spielzeugart, damit das Kind selbst sortieren kann.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "box3",
+     "catalogId": "generic-storage-box",
+     "zone": "spielen",
+     "x": 351,
+     "y": 299,
+     "facing": "W",
+     "label": "Rollkiste aus Korbgeflecht mit Rollen, Verkleidung und Puppen",
+     "color": "#c9a36a",
+     "why": "Füllt die dritte Regalachse. Die Front sieht ruhig und einheitlich aus.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-rug-160",
+     "zone": "spielen",
+     "x": 251,
+     "y": 245,
+     "facing": "W",
+     "label": "Waschbarer Baumwoll-Spielteppich 160×230, Terrakotta mit cremefarbenem Rautenmuster",
+     "color": "#c46f4c",
+     "why": "Großer, warmer Spielboden im hellsten Teil des Raums, direkt vor dem Regal. Er ist der Blickfang beim Hereinkommen und liegt weit weg vom Türschwenk.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "curtain",
+     "catalogId": "generic-curtain",
+     "zone": "spielen",
+     "x": 204,
+     "y": 339,
+     "facing": "N",
+     "label": "Leinenvorhang 140×250 in Creme mit Verdunkelungsfutter",
+     "color": "#efe6d6",
+     "why": "Dunkelt zum Einschlafen und für den Mittagsschlaf im Sommer ab. Er ist so breit wie das Fenster, und Leinen passt zur Wohnung.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "plant",
+     "catalogId": "generic-plant-small",
+     "zone": "spielen",
+     "x": 204,
+     "y": 324,
+     "facing": "N",
+     "label": "Grünlilie im Tontopf, ungiftig",
+     "color": "#8a9a7b",
+     "why": "Ein kleines Stück Grün auf der Fensterbank, ungiftig und robust. Das Kind kann sie selbst gießen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "ceiling",
+     "catalogId": "generic-pendant",
+     "zone": "spielen",
+     "x": 204,
+     "y": 170,
+     "facing": "S",
+     "label": "Deckenleuchte mit Rattanschirm, warmweiß, dimmbar",
+     "color": "#c9a36a",
+     "why": "Grundlicht mittig an der Decke. Sie leuchtet Spielfläche, Schrank und Bett gleichmäßig aus.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "bed",
+     "corner",
+     "W1",
+     "W2"
+    ],
+    [
+     "ns",
+     "left-of",
+     "bed",
+     2
+    ],
+    [
+     "lamp_ns",
+     "on",
+     "ns"
+    ],
+    [
+     "pic",
+     "above",
+     "bed",
+     115
+    ],
+    [
+     "wardrobe",
+     "wall",
+     "W1",
+     101,
+     201
+    ],
+    [
+     "desk",
+     "corner",
+     "W3",
+     "W4"
+    ],
+    [
+     "chair",
+     "around",
+     "desk"
+    ],
+    [
+     "lamp_desk",
+     "on",
+     "desk"
+    ],
+    [
+     "wshelf",
+     "above",
+     "desk",
+     125
+    ],
+    [
+     "shelf",
+     "wall",
+     "W2",
+     159,
+     339
+    ],
+    [
+     "box1",
+     "near",
+     "shelf",
+     50
+    ],
+    [
+     "box2",
+     "near",
+     "shelf",
+     50
+    ],
+    [
+     "box3",
+     "near",
+     "shelf",
+     50
+    ],
+    [
+     "box1",
+     "align",
+     "box2"
+    ],
+    [
+     "box2",
+     "align",
+     "box3"
+    ],
+    [
+     "rug",
+     "front-of",
+     "shelf",
+     0
+    ],
+    [
+     "curtain",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "plant",
+     "on",
+     "F1"
+    ]
+   ],
+   "kitchen": [],
+   "walk": "Durch die Tür T1 geht man an der Westwand entlang nach Süden. Der Streifen zwischen Westwand und Schrankseite ist etwa 100 cm breit und führt ohne Hindernis bis zur Malecke. Das geöffnete Türblatt liegt bei x=94 frei neben der Schrankseite. Vor dem Schrank bleiben 90 cm frei, und dieser offene Boden zwischen x=100 und 203 verbindet Eingang, Bett und Teppich. Ans Bett kommt man über den 60 cm breiten Zustiegsstreifen auf seiner Südseite, vorbei am Nachttisch am Kopfende. Von dort geht es direkt auf den Spielteppich und zum niedrigen Regal an der Ostwand. Zwischen Stuhlrücken (y≈232) und Schrankfront bleibt der Boden frei. Zwischen Malecke und Teppich liegen rund 40 cm Boden, damit ein Kind am Tisch und eines auf dem Teppich sich nicht in die Quere kommen.",
+   "check": [
+    "Türschwenk T1 (Viertelkreis 80 cm um (94,0)) ist ganz frei. Der Schrank beginnt bei x=101, kein Teppich und keine Lampe liegen im Schwenk.",
+    "Der Zugang von der Tür ist mindestens 70 cm breit, real etwa 100 cm entlang W4. Es gibt keinen Durchgangsweg, weil der Raum nur eine Tür hat.",
+    "Das Bett steht mit dem Kopfteil an der geschlossenen Ostwand, nicht unter dem Fenster und nicht in der Blickachse der Tür. Daneben bleibt ein 60 cm breiter Zustieg. Der Rausfallschutz sitzt an der offenen Seite.",
+    "Vor dem Schrank sind 90 cm frei (y=60–150). Er ist über 1,2 m hoch, steht an der Wand und ist kippsicher verschraubt.",
+    "Der Schreibtisch steht seitlich neben dem Fenster, das Licht kommt von links. Der Stuhlbereich ist 75 cm tief, und ohne Bildschirm gibt es keine Blendung.",
+    "Vor dem Fenster liegt nur Flaches (Teppich, Rollkisten 25 cm). Der Vorhang ist mit 140 cm genau so breit wie das Fenster, die Pflanze steht klein auf der Fensterbank.",
+    "Es gibt keine hohen, frei stehenden oder kippgefährdeten Regale. Das Spielzeugregal ist 45 cm hoch und wandbefestigt.",
+    "Nachttisch und Regal stehen 20 cm auseinander. Rollkisten und Teppich liegen bündig vor dem Regal.",
+    "Licht in drei Ebenen, alles warmweiß: Rattan-Deckenleuchte als Grundlicht, Schreibtischleuchte als Zonenlicht, dimmbare Nachtleuchte als Stimmungslicht.",
+    "Bild über dem Bett: 100 cm breit, rund zwei Drittel der Bettlänge, mittig darüber, Bildmitte bei 150 cm, mit Acrylglas.",
+    "Blickfang beim Hereinkommen ist der Terrakotta-Teppich im Fensterlicht. Alle Farben stammen aus der Palette, nichts ist doppelt.",
+    "Was nicht hierher gehört, fehlt: kein zweiter Schlafplatz, keine Erwachsenenmöbel, kein Sofa und kein Fernseher. Die Raummitte bleibt als freier Spielboden offen."
+   ]
+  },
+  "Abstellraum": {
+   "reading": "Ein schmaler Abstellraum mit nur einer Tür in der Nordwand (x 39–109), die nach außen zum Vorraum aufschlägt. Im Raum gibt es deshalb keinen Türschwenk. Ost-, Süd- und Westwand sind geschlossen und ganz frei für Stauraum. Beim Hereinkommen blickt man auf die Südwand. Dort steht das Schwerlastregal mit den beschrifteten Kisten als Blickfang. Die Mitte bleibt als Zugangsfläche frei.",
+   "zones": [
+    {
+     "id": "lager",
+     "function": "Vorräte/Stauraum",
+     "rect": [
+      58,
+      134,
+      148,
+      179
+     ],
+     "why": "Das Schwerlastregal steht an der Südwand, gegenüber der Tür. Es ist das Erste, was man sieht, und der Zugriff ist von der Tür aus gerade.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "putzen",
+     "function": "Putzzeug",
+     "rect": [
+      0,
+      70,
+      45,
+      130
+     ],
+     "why": "Der Putzschrank steht an der freien Westwand, seitlich vom Weg. Besen und Staubsauger sind dort griffbereit, ohne die Tür oder das Regal zu verstellen.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "regal",
+     "catalogId": "generic-utility-shelf",
+     "zone": "lager",
+     "x": 103,
+     "y": 156.5,
+     "facing": "N",
+     "label": "Schwerlastregal Walnuss-Optik, bis 180 cm, für beschriftete Kisten",
+     "color": "#6f4e37",
+     "why": "Ankermöbel: Das Regal steht an der Südwand in der Ostecke und ist das Ziel beim Hereinkommen. Davor bleiben rund 134 cm Gangtiefe.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-shelf-80"
+     ]
+    },
+    {
+     "id": "kiste1",
+     "catalogId": "generic-storage-box",
+     "zone": "lager",
+     "x": 80,
+     "y": 156,
+     "facing": "N",
+     "label": "Kiste „Vorräte“ aus Korbgeflecht, beschriftet",
+     "color": "#c9a36a",
+     "why": "Ordnung mit System: Vorräte stehen in einer Kiste auf Griffhöhe.",
+     "anchor": false
+    },
+    {
+     "id": "kiste2",
+     "catalogId": "generic-storage-box",
+     "zone": "lager",
+     "x": 126,
+     "y": 156,
+     "facing": "N",
+     "label": "Kiste „Spielsachen“ in Terrakotta, beschriftet",
+     "color": "#c46f4c",
+     "why": "Spielsachen, die gerade nicht im Umlauf sind, bleiben in der Kiste. Die Terrakotta-Farbe macht die Kiste für die Kinder leicht zu finden.",
+     "anchor": false
+    },
+    {
+     "id": "putzschrank",
+     "catalogId": "generic-broom-cabinet",
+     "zone": "putzen",
+     "x": 22.5,
+     "y": 100,
+     "facing": "E",
+     "label": "Putzschrank in Creme für Besen, Mopp und Staubsauger",
+     "color": "#efe6d6",
+     "why": "Der Schrank steht an der Westwand und hält Putzzeug geschlossen und trocken. Er ist hoch, steht daher an der Wand und blockiert die Tür nicht.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-shelf-80"
+     ]
+    },
+    {
+     "id": "deckenlicht",
+     "catalogId": "generic-pendant",
+     "zone": "lager",
+     "x": 78,
+     "y": 90,
+     "facing": "S",
+     "label": "Pendelleuchte, warmweiß, Rattan-Schirm",
+     "color": "#c9a36a",
+     "why": "Grundlicht für den ganzen Raum. Sie hängt mittig über dem Gang und leuchtet die Regalfront gleichmäßig aus.",
+     "anchor": false
+    }
+   ],
+   "relations": [
+    [
+     "regal",
+     "corner",
+     "W3",
+     "W2"
+    ],
+    [
+     "kiste1",
+     "on",
+     "regal"
+    ],
+    [
+     "kiste2",
+     "on",
+     "regal"
+    ],
+    [
+     "putzschrank",
+     "wall",
+     "W4",
+     70,
+     130
+    ]
+   ],
+   "walk": "Die Tür schlägt nach außen auf, im Raum gibt es also keinen Schwenkbereich. Man tritt bei x 39–109 ein. Zwischen Putzschrank (Ostkante x 45) und Ostwand bleiben etwa 103 cm Breite. Vor dem Regal bleiben von y 134 bis zur Tür rund 130 cm Tiefe. Beide Möbel sind von vorne ganz erreichbar, und der Gang bleibt über 70 cm breit.",
+   "check": [
+    "Tür T1 schlägt nach außen auf, im Raum liegt nichts im Schwenkbereich.",
+    "Regal 90×45 in der Ecke W3/W2 (x 58–148, y 134–179). Davor sind rund 130 cm frei, mehr als die geforderten 80–90 cm.",
+    "Putzschrank 45×60 an der Westwand (x 0–45, y 70–130). Zwischen Schrank und Ostwand bleiben 103 cm, mehr als die geforderten 70 cm.",
+    "Der Abstand zwischen Putzschrank (y bis 130) und Regal (y ab 134) liegt in der Ecke, dort geht niemand durch. Beide Möbel sind von der Mitte aus frei zugänglich.",
+    "Das hohe Regal (180 cm) und der hohe Schrank (180 cm) stehen an Wänden und nicht frei im Raum.",
+    "Es gibt keine Waschmaschine und keine Möbel, die die Tür blockieren, wie im Konzept verlangt.",
+    "Es sind keine Pflanzen, kein Teppich und keine Deko eingeplant. Das passt zu einem Lager und hält den Raum schlicht.",
+    "Die Boxen sind nur zwei, damit das Regal nicht überladen wirkt. Weitere Kisten kann die Familie selbst ergänzen.",
+    "Eine Deckenleuchte für 2,6 m² reicht und entspricht der Regel „höchstens eine je 6 m²“."
+   ]
+  },
+  "WC": {
+   "reading": "Das WC ist ein schmaler Schlauch (139 × 179 cm): Die Tür T1 liegt mittig in der Nordwand und schlägt nach außen auf, im Raum ist also kein Schwenkbereich zu beachten. Beim Hereinkommen blickt man nach Süden auf das kleine Fenster F1 und den Waschtisch. WC (Ostwand) und Waschtisch (Südwand) sind fest. Frei bleiben die Westwand und die Fläche zwischen Tür und Waschtisch. Das Licht kommt von Süden, die ruhige Seite ist die Westwand.",
+   "zones": [
+    {
+     "id": "wc",
+     "function": "Toilette mit Handtuch-Regal",
+     "rect": [
+      85,
+      70,
+      139,
+      150
+     ],
+     "why": "Bereich um das feste WC an der Ostwand. Das Wandregal darüber nutzt die freie Wandhöhe und braucht keine Bodenfläche.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "waschen",
+     "function": "Händewaschen",
+     "rect": [
+      0,
+      100,
+      70,
+      179
+     ],
+     "why": "Waschtisch an der Südwand unter dem Fenster. Davor liegt die Badematte, an der Westwand hängt ein Bild.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "regal",
+     "catalogId": "generic-wall-shelf",
+     "zone": "wc",
+     "x": 129,
+     "y": 114,
+     "facing": "W",
+     "label": "Wandregal in geöltem Walnuss über dem WC, für gerollte Handtücher und eine Pflanze",
+     "color": "#6f4e37",
+     "why": "Ankermöbel. Es schafft Ablage für Handtücher, ohne Bodenfläche zu belegen. Es sitzt mittig über dem WC, damit es ruhig und aufgeräumt wirkt.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "pflanze",
+     "catalogId": "generic-plant-small",
+     "zone": "wc",
+     "x": 129,
+     "y": 90,
+     "facing": "W",
+     "label": "Kleine Grünpflanze im Terrakotta-Topf",
+     "color": "#8a9a7b",
+     "why": "Kleine Pflanze auf dem Regal, nicht auf dem Boden. Das Salbeigrün setzt einen frischen Akzent zu Walnuss und Kalkwand.",
+     "fallbacks": []
+    },
+    {
+     "id": "spiegel",
+     "catalogId": "generic-bath-mirror",
+     "zone": "waschen",
+     "x": 34,
+     "y": 177,
+     "facing": "N",
+     "label": "Badspiegel mit schmalem Walnussrahmen",
+     "color": "#6f4e37",
+     "why": "Der Spiegel gehört über den Waschtisch. Er steht im Blickfeld beim Hereinkommen und gibt dem kleinen Raum Tiefe.",
+     "fallbacks": []
+    },
+    {
+     "id": "matte",
+     "catalogId": "generic-bath-mat",
+     "zone": "waschen",
+     "x": 42,
+     "y": 107,
+     "facing": "N",
+     "label": "Waschbare Baumwoll-Badematte in Terrakotta",
+     "color": "#c46f4c",
+     "why": "Sie ist der Terrakotta-Akzent des Raums. Sie liegt zwischen WC und Waschtisch, damit die Füße warm bleiben. Sie ist waschbar und liegt außerhalb jedes Türschwenks.",
+     "fallbacks": []
+    },
+    {
+     "id": "bild",
+     "catalogId": "generic-picture",
+     "zone": "waschen",
+     "x": 2,
+     "y": 55,
+     "facing": "O",
+     "label": "Kleines Bild in Creme und Terrakotta",
+     "color": "#efe6d6",
+     "why": "Es gibt der freien Westwand einen ruhigen Blickfang, ohne etwas zu verstellen. Es hängt auf Augenhöhe und weit weg von Tür und Fenster.",
+     "fallbacks": []
+    },
+    {
+     "id": "pendel",
+     "catalogId": "generic-pendant",
+     "zone": "wc",
+     "x": 70,
+     "y": 70,
+     "facing": "S",
+     "label": "Pendelleuchte aus Rattan, warmweiß",
+     "color": "#c9a36a",
+     "why": "Grundlicht von der Decke in der Raummitte. Das Rattan passt zum Material-Mix. Sie hängt vor dem Weg zwischen den Möbeln, nicht darüber.",
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "regal",
+     "above",
+     "B1",
+     140
+    ],
+    [
+     "pflanze",
+     "on",
+     "regal"
+    ],
+    [
+     "spiegel",
+     "above",
+     "B2",
+     140
+    ],
+    [
+     "matte",
+     "near",
+     "B2",
+     60
+    ],
+    [
+     "bild",
+     "wall",
+     "W4",
+     30,
+     80
+    ]
+   ],
+   "walk": "Von der Tür (x 39–109) geht man gerade nach Süden. Zwischen WC-Vorderkante (x 85) und Westwand bleiben 85 cm, vor dem Waschtisch (y 133) sind es etwa 75 cm bis zur Nordwand. Die Tür schlägt nach außen auf, im Raum ist nichts im Weg. Das WC ist von der Matte aus bequem erreichbar, der Waschtisch liegt direkt links vom Eingang.",
+   "check": [
+    "Tür T1 schlägt nach außen auf, im Raum ist kein Schwenkbereich belegt.",
+    "Weg von der Tür zu WC und Waschtisch ist frei, mindestens 70 cm.",
+    "Vor WC und Waschtisch bleiben 60–75 cm frei.",
+    "Das Regal hängt auf 140 cm über dem WC, nichts steht höher als die Brüstung vor dem Fenster.",
+    "Der Spiegel (4–64) überdeckt den Fensterrand (49–64) auf etwa 15 cm. Das ist unvermeidlich, weil er über dem Waschtisch hängen soll und nur dieser Spiegel im Katalog ist. Das Fenster bleibt zu etwa 70 % offen.",
+    "Pflanze klein und auf dem Regal, nicht im Weg.",
+    "Die Pendelleuchte ist die einzige Deckenleuchte (2,5 m²). Nichts ist doppelt, nichts steht ohne Grund da.",
+    "Das Bad hat keinen Zusatz-Waschtisch und WC und Waschtisch sind nicht verschoben.",
+    "Farben sind aus der Palette: Walnuss, Terrakotta, Salbei, Creme, Ocker-Sand."
+   ]
+  },
+  "Balkon": {
+   "reading": "Der Südbalkon ist ein schmaler Streifen (428 × 139 cm) mit niedriger Brüstung ringsum. Das Licht kommt von Süden und über die Brüstung, die Wohnung liegt hinter der Südwand. Die Tür T1 schlägt nach außen auf und braucht davor einen Viertelkreis von 90 cm. Beim Hereinkommen blickt man nach Norden auf die Brüstung. Ruhig ist die Westhälfte, die weit weg von der Tür liegt. Dort passt eine kleine Sitzgruppe hin, und im Osten bleibt der Durchgang frei.",
+   "zones": [
+    {
+     "id": "sitzen",
+     "function": "Draußen sitzen, Morgenkaffee",
+     "rect": [
+      40,
+      30,
+      235,
+      135
+     ],
+     "why": "Westhälfte, weit weg vom Türschwenk (x 309–399) und am ruhigsten. Der Platz liegt in der Sonne, der Blick geht über die Brüstung nach Norden, und der Weg von der Tür her bleibt offen.",
+     "userZone": "Z1"
+    },
+    {
+     "id": "kraeuter",
+     "function": "Kräutergarten",
+     "rect": [
+      0,
+      0,
+      428,
+      25
+     ],
+     "why": "Der Streifen an der nördlichen Brüstung liegt voll in der Sonne und ist zugleich der Blickfang beim Hereinkommen. Er stört weder den Weg noch den Türschwenk, weil nur kleine Teile an die Wand kommen."
+    }
+   ],
+   "items": [
+    {
+     "id": "table",
+     "catalogId": "generic-balcony-table",
+     "zone": "sitzen",
+     "x": 135,
+     "y": 78,
+     "facing": "S",
+     "label": "Klappbarer Bistrotisch aus geöltem Walnussholz, Ø 60",
+     "color": "#6f4e37",
+     "why": "Ankermöbel: Morgenkaffee zu zweit. Er liegt klappbar und platzsparend in der ruhigen Westhälfte und weit vom Türschwenk entfernt.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "chair-w",
+     "catalogId": "generic-balcony-chair",
+     "zone": "sitzen",
+     "x": 83,
+     "y": 78,
+     "facing": "O",
+     "label": "Klappbarer Balkonstuhl in Ocker-Sand",
+     "color": "#c9a36a",
+     "why": "Der erste Platz sitzt an der Westseite des Tisches und blickt nach Osten Richtung Tür und Wohnung.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "chair-e",
+     "catalogId": "generic-balcony-chair",
+     "zone": "sitzen",
+     "x": 187,
+     "y": 78,
+     "facing": "W",
+     "label": "Klappbarer Balkonstuhl in Ocker-Sand",
+     "color": "#c9a36a",
+     "why": "Der Gegenplatz am Tisch, so sitzen beide einander zugewandt. Dahinter bleiben gut 100 cm bis zum Türschwenk.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "rug",
+     "catalogId": "generic-outdoor-rug",
+     "zone": "sitzen",
+     "x": 135,
+     "y": 75,
+     "facing": "S",
+     "label": "Outdoor-Teppich in Salbei, wetterfest und abwaschbar",
+     "color": "#8a9a7b",
+     "why": "Der Teppich fasst die Sitzgruppe optisch zusammen und macht den Boden wohnlicher. Er liegt weit außerhalb des Türschwenks.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf-a",
+     "catalogId": "generic-wall-shelf",
+     "zone": "kraeuter",
+     "x": 230,
+     "y": 10,
+     "facing": "S",
+     "label": "Wandregal aus Eiche an der Brüstung",
+     "color": "#6f4e37",
+     "why": "Hier stehen die Kräuter in Griffnähe zum Tisch, in der Sonne und nicht auf dem Boden.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf-b",
+     "catalogId": "generic-wall-shelf",
+     "zone": "kraeuter",
+     "x": 325,
+     "y": 10,
+     "facing": "S",
+     "label": "Wandregal aus Eiche an der Brüstung",
+     "color": "#6f4e37",
+     "why": "Es hängt genau gegenüber der Tür und ist der Blickfang beim Hereinkommen. Weil es flach ist, ragt es nicht in den Türschwenk (y ab 49).",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "herb1",
+     "catalogId": "generic-plant-small",
+     "zone": "kraeuter",
+     "x": 215,
+     "y": 10,
+     "facing": "S",
+     "label": "Terrakotta-Topf mit Basilikum",
+     "color": "#c46f4c",
+     "why": "Basilikum ist ein Klassiker für Frühstück und Küche.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "herb2",
+     "catalogId": "generic-plant-small",
+     "zone": "kraeuter",
+     "x": 245,
+     "y": 10,
+     "facing": "S",
+     "label": "Terrakotta-Topf mit Schnittlauch",
+     "color": "#c46f4c",
+     "why": "Der Schnittlauch ist robust und die Kinder können ihn selbst ernten.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "herb3",
+     "catalogId": "generic-plant-small",
+     "zone": "kraeuter",
+     "x": 310,
+     "y": 10,
+     "facing": "S",
+     "label": "Terrakotta-Topf mit Petersilie",
+     "color": "#c46f4c",
+     "why": "Petersilie ist ein Kräutertopf für den Alltag und passt zu den anderen Töpfen auf dem Regal.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "herb4",
+     "catalogId": "generic-plant-small",
+     "zone": "kraeuter",
+     "x": 340,
+     "y": 10,
+     "facing": "S",
+     "label": "Terrakotta-Topf mit Minze",
+     "color": "#c46f4c",
+     "why": "Minze gibt frischen Tee und einen grünen Akzent als Blickfang.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "planter-w",
+     "catalogId": "generic-planter",
+     "zone": "kraeuter",
+     "x": 24,
+     "y": 24,
+     "facing": "S",
+     "label": "Pflanzkübel mit Rosmarin in Terrakotta",
+     "color": "#c46f4c",
+     "why": "Der Kübel rahmt die Westecke und steht an der Brüstung, nicht frei im Raum. Er ist 90 cm hoch und damit nicht höher als die Brüstung.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-plant-small"
+     ]
+    },
+    {
+     "id": "planter-e",
+     "catalogId": "generic-planter",
+     "zone": "kraeuter",
+     "x": 404,
+     "y": 24,
+     "facing": "S",
+     "label": "Pflanzkübel mit Lavendel in Terrakotta",
+     "color": "#c46f4c",
+     "why": "Er steht in der Nordostecke und fasst die Kräuterwand ein. Der Türschwenk beginnt erst bei y=49, die Pflanze bleibt also im Norden davon.",
+     "anchor": false,
+     "fallbacks": [
+      "generic-plant-small"
+     ]
+    }
+   ],
+   "relations": [
+    [
+     "chair-w",
+     "around",
+     "table"
+    ],
+    [
+     "chair-e",
+     "around",
+     "table"
+    ],
+    [
+     "rug",
+     "under-all",
+     "table"
+    ],
+    [
+     "shelf-a",
+     "wall",
+     "W1",
+     190,
+     270
+    ],
+    [
+     "shelf-b",
+     "wall",
+     "W1",
+     285,
+     365
+    ],
+    [
+     "herb1",
+     "on",
+     "shelf-a"
+    ],
+    [
+     "herb2",
+     "on",
+     "shelf-a"
+    ],
+    [
+     "herb3",
+     "on",
+     "shelf-b"
+    ],
+    [
+     "herb4",
+     "on",
+     "shelf-b"
+    ],
+    [
+     "planter-w",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "planter-e",
+     "corner",
+     "W1",
+     "W2"
+    ]
+   ],
+   "walk": "Durch T1 tritt man auf freien Boden. Der Viertelkreis von 90 cm (x 309–399, y 49–139) bleibt leer, die Kräuterregale hängen davor an der Brüstung. Von dort läuft man ohne Hindernis nach Westen, es bleiben im Durchgang rund 100 cm bis zur Sitzgruppe frei. Die Stühle sitzen zwischen x 57 und 213, der Weg davor ist über 90 cm breit, bis zum Rand der Gruppe sind es gut 95 cm. Ein Durchgang zwischen den Türen ist nicht nötig, weil es nur eine Tür gibt. Hinter den Stühlen bleibt im Norden 45 cm bis zur Brüstung (kein Durchgang nötig), im Süden 31 cm zur Wand.",
+   "check": [
+    "Türschwenk T1: Viertelkreis x 309–399, y 49–139 ist komplett frei, nur das flache Regal (y 0–20) und die Töpfe (bis y 25) ragen nach Norden in die Zone, aber nicht in den Schwenk",
+    "Weg von der Tür zur Sitzgruppe: x 213–309 frei, rund 96 cm",
+    "Fenster F1 (x 34–194, Brüstung 90 cm): davor stehen nur Tisch (72 cm) und Stuhllehnen (82 cm), alles niedriger als die Brüstung",
+    "Pflanzen: Kübel nur in echten Ecken (W1/W4 und W1/W2), Kräuter auf Regalen, nichts frei im Raum und nichts im Türschwenk",
+    "Keine Lounge-Möbel und kein Stauraum, wie im Konzept gewünscht",
+    "Nur ein Tisch und zwei Stühle als Ankergruppe, kein Möbel doppelt",
+    "Farben aus der Palette: Walnuss (Tisch, Regale), Ocker-Sand (Stühle), Terrakotta (Töpfe, Kübel), Salbei (Teppich)",
+    "Blickfang beim Hereinkommen: Kräuterregal B mit vier Töpfen an der Nordwand, seitlich flankiert vom Lavendelkübel",
+    "Bild, Vorhang und Teppich im Schwenk entfallen bewusst: Draußen braucht es keine Wanddeko, und der Teppich liegt weit weg von der Tür"
+   ]
+  }
+ }
+}
