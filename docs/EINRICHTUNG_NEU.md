@@ -238,7 +238,14 @@ T0 bis T5 sind gebaut und gemergt (PRs #444 bis #453). Was anders kam als geplan
 - Aufstellen und Planprüfung messen denselben Platz (PR #452): Der Streifen, auf dem `placementIssues` besteht, ist Teil der Bewegungsflächen des Solvers. Mit den aufgezeichneten Antworten löst kein übernommenes Möbel mehr einen Befund der Planprüfung aus.
 - Gemessen (aufgezeichnete Antworten, Seed 1): Wohnung B erreicht 100 / 92 / 94 / 86 Punkte, alle vier Räume bestanden. Offen sind Räume, die ihre Befunde erst mit einer echten Kritikrunde loswerden (Wohnküche B: Fernseher nicht gegenüber dem Sofa; Garçonnière D: zu wenige Sitzplätze). Das misst T6.
 
-Offen: **T6** (Benchmark über alle Testwohnungen, Vorher/Nachher für G) und danach die Abnahme.
+T6 (Benchmark, #443), Stand 24.10.2026:
+
+- Werkzeuge: `e2e/designBenchmark.spec.ts` (`WP_BENCH=1` echter Lauf, `WP_REPLAY=<Lauf>` gleiche Antworten mit neuem Code, `WP_SHOTS=<Lauf>` nur Bilder, `WP_HEUTE=1` alter Ablauf für A/B), `scripts/design-image-review.mjs` (unabhängige Bildprüfung, 1–10 je Hauptraum, feste Liste), `scripts/design-bench-fixture.mjs` (Antworten eines Laufs als Testdatei).
+- Regression: `src/design/benchmark.test.ts` spielt die aufgezeichneten Antworten aller sechs Testwohnungen ohne Claude ab und prüft die Abnahme (kein S-Befund, Wohnung ab 85, kein Raum unter 75).
+- Gemessen (echtes Claude): alter Ablauf A 76,1 / B 68,4; neu A 98,4, B 97,6, C 94,6, D 96,7, E 94,8, F 92,7. Die Regel-Abnahme ist für alle sechs erfüllt.
+- Bildprüfung der Haupträume: neu 4–7 von 10 (alter Ablauf A/B 4–6). Das Ziel 8 ist noch nicht erreicht. Häufig bemängelt: Sofa ohne Gegenüber, leere Raumhälfte, fehlendes Arbeitslicht in Küchen (kein Katalogteil), Pflichtmöbel wird in engen Durchgangsräumen kleiner statt ein Nebenteil wegzulassen.
+
+Offen: Bildnote 8 (weitere Runden an Löser und Konzept) und danach die Abnahme durch G mit der eigenen Wohnung.
 - Dateigrenzen: Welle 1 arbeitet nur in neuen Ordnern unter `src/design/` (plus kleiner Export in `model/placement.ts`), also keine Konflikte mit anderen Threads. Erst T5 fasst die bestehenden Dateien an.
 - Der alte Ablauf bleibt bis zur Abnahme als Rückfall, danach wird er auf den neuen umgestellt.
 
