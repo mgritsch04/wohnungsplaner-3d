@@ -78,6 +78,12 @@ export function checkRequired(ctx: RoomCtx): void {
     // a sanitary piece that finds no place (the hand basin of a tiny WC) is the WC check above, not a second finding
     if (prog?.required && findCatalogItem(d.catalogId)?.category !== 'bathroom') ctx.add('A1', 'S', `${prog.label ?? d.catalogId} fehlt: ${d.reason}`, [d.id]);
   }
+  // a required piece that only fitted as a smaller variant (the double bed came in as a single bed, #443)
+  for (const i of ctx.placed) {
+    if (!i.replaces || !ctx.program?.items.find((p) => p.id === i.id)?.required) continue;
+    const planned = findCatalogItem(i.replaces, ctx.catalog)?.name ?? i.replaces;
+    ctx.add('A1', 'M', `${ctx.label(i)} passt nur kleiner hinein: geplant ${planned}, aufgestellt ${i.name}.`, [i], i);
+  }
 }
 
 /** A3 (S): sanitary pieces are never planned anew (a hand basin in the WC may be). */

@@ -105,6 +105,13 @@ describe('A Funktion', () => {
     });
     expect(r.findings.some((f) => f.rule === 'A1' && f.severity === 'S' && /Kleiderschrank/.test(f.text))).toBe(true);
   });
+  it('A1 a required piece that only fitted as a smaller variant is medium (the double bed came in as a single bed, #443)', () => {
+    const prog = (required: boolean) => ({ roomId: 'room_test', reading: '', zones: [], items: [{ id: 'bed', catalogId: 'generic-bed-140', zone: 'z', why: '', required, label: 'Bett 140×200' }], relations: [], walk: '', check: [] });
+    const bed = { ...put('generic-bed-90', { x: 3.45, y: 1.6, face: 'W', id: 'bed' }), replaces: 'generic-bed-140' };
+    const r = review({ room: room(), type: 'bedroom', items: [bed], program: prog(true) });
+    expect(r.findings.find((f) => f.rule === 'A1' && /nur kleiner/.test(f.text))?.severity).toBe('M');
+    expect(review({ room: room(), type: 'bedroom', items: [bed], program: prog(false) }).findings.some((f) => /nur kleiner/.test(f.text))).toBe(false);
+  });
   it('A1 a hand basin that finds no place in the WC is the WC finding (medium), not a second severe one', () => {
     const r = review({
       room: rectRoom(1.2, 1.6, { doors: [{ wall: 'S', at: 0.6, width: 0.7 }] }),
