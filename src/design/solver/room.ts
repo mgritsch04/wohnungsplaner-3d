@@ -70,8 +70,10 @@ export interface RoomCtx {
   wallIndex: Map<string, number>;
   height: number;
   doors: DoorInfo[];
-  /** Areas door leaves sweep in this room, and the opened leaf itself with its handle. */
+  /** Areas door leaves sweep in this room (quarter circles on the floor). */
   swings: { label: string; poly: Vec2[] }[];
+  /** The opened leaves themselves: a strip from the hinge into the room, solid up to the door's top. */
+  leaves: { label: string; poly: Vec2[]; z1: number }[];
   /** Water and drain connections with a hand's width round them: no cabinet in front (#81). */
   connections: { id: string; poly: Vec2[] }[];
   windows: WindowInfo[];
@@ -133,11 +135,15 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
   const windows: WindowInfo[] = [];
   const solid: [Vec2, Vec2][] = [];
   const swings: { label: string; poly: Vec2[] }[] = [];
+  const leaves: RoomCtx['leaves'] = [];
   walls.forEach((w, wi) => {
     // the wall face minus its doors, passages and glazed doors: what a person cannot walk through
     const gaps: { t0: number; t1: number }[] = [];
     for (const o of w.openings) {
-      if (o.swingsIn && o.swing?.length) swings.push({ label: o.id, poly: o.swing }, { label: o.id, poly: leafStrip(o.swing) });
+      if (o.swingsIn && o.swing?.length) {
+        swings.push({ label: o.id, poly: o.swing });
+        leaves.push({ label: o.id, poly: leafStrip(o.swing), z1: o.top ?? 2.1 });
+      }
       if (o.passable) {
         gaps.push(o);
         const mid = pointOnWall(w, (o.t0 + o.t1) / 2);
@@ -180,6 +186,7 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
     height: analysis.height,
     doors,
     swings,
+    leaves,
     connections: analysis.fixtures.filter((f) => f.kind === 'water' || f.kind === 'drain').map((f) => ({ id: f.id, poly: connectionArea(f, f.wall ? walls[wallIndex.get(f.wall)!] : undefined) })),
     windows,
     keepFree: analysis.userZones.filter((z) => z.keepFree).map((z) => ({ id: z.id, poly: z.points })),

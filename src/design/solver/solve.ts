@@ -293,6 +293,22 @@ function importance(u: Unit): number {
 /** Kitchen modules a run can do without when it does not fit (sink, cooker and fridge stay). */
 const STORAGE_MODULES = new Set(['base', 'wall']);
 
+/**
+ * The module a kitchen run can do without: one named in a violation, else the widest plain module
+ * of a run that is involved (its appliances cannot move aside, the run can only get shorter).
+ */
+function kitchenSpare(involved: Node[], m: Model): Node | undefined {
+  const spare = (n: Node) => n.run !== undefined && STORAGE_MODULES.has(n.spec.item.kitchen?.type ?? '') && m.units[n.unit].nodes.length > 2;
+  const direct = involved.find(spare);
+  if (direct) return direct;
+  for (const n of involved) {
+    if (n.run === undefined) continue;
+    const mods = m.units[n.unit].nodes.filter(spare).sort((a, b) => a.spec.width - b.spec.width);
+    if (mods.length) return mods[mods.length - 1];
+  }
+  return undefined;
+}
+
 function settle(st: State, seed: number): DroppedItem[] {
   const m = st.m;
   const dropped: DroppedItem[] = m.dropped.map((d) => ({ ...d }));
@@ -309,8 +325,9 @@ function settle(st: State, seed: number): DroppedItem[] {
       dropNode(st, dep, reasonFor(involved.get(dep.id), false), dropped);
       continue;
     }
-    // a plain storage module of a kitchen run (drawers, wall cabinet) in the way: the run gets shorter
-    const mod = [...involved.keys()].map((id) => m.nodes.get(id)!).find((n) => n.run !== undefined && STORAGE_MODULES.has(n.spec.item.kitchen?.type ?? '') && m.units[n.unit].nodes.length > 2);
+    // a kitchen run in the way: it gets shorter by a plain storage module (drawers, cupboard), so the
+    // run keeps clear of the other run's corner – sink, cooker and fridge stay
+    const mod = kitchenSpare([...involved.keys()].map((id) => m.nodes.get(id)!), m);
     if (mod) {
       const k = m.units[mod.unit].kitchen!;
       k.length -= mod.spec.width;

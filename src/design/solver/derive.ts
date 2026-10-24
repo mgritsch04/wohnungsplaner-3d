@@ -5,11 +5,12 @@
  */
 import { add, scale, type Vec2 } from '../../model/vec';
 import { rotationFacing } from '../../suggest/roomGeometry';
-import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, WALL_TOL, type Box } from './geom';
+import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
 import { specOf } from './items';
-import type { Model, Node, Unit } from './model';
+import type { Model, Node, Rule, Unit } from './model';
 import { runId } from './model';
 import { boxOnWall, pointOnWall, sideStrip } from './room';
+import { frontClearance } from '../../model/placementRules';
 
 const WALL_GAP = 0.005;
 
@@ -72,6 +73,89 @@ function insideScore(m: Model, b: Box): number {
   return outsideAmount(boxCorners(b), m.ctx.poly, WALL_TOL);
 }
 
+/**
+ * Where a wall piece hangs above its parent: on the wall behind it (a free-standing parent: the
+ * nearest wall to its place), never lower than the parent's top (Claude's height can be too low).
+ */
+function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number): { box: Box; elevation: number } {
+  const s = n.spec;
+  const ctx = m.ctx;
+  const parentNode = m.nodes.get(n.parent!);
+  const parentUnit = parentNode ? m.units[parentNode.unit] : null;
+  const parentOnWall = parentUnit && parentUnit.mode === 'wall' && parentUnit.main === parentNode;
+  const wi = parentOnWall ? parentUnit.wall : nearestWallTo(m, n.prog?.hint ?? { x: P.x, y: P.y });
+  const w = ctx.walls[wi];
+  const t = clamp((P.x - w.a.x) * w.dir.x + (P.y - w.a.y) * w.dir.y, s.width / 2, Math.max(s.width / 2, w.length - s.width / 2));
+  const gap = s.role === 'tv' ? 0.05 : 0.2;
+  const want = Math.max(height ?? Math.max(s.elevation, parentTop + gap), parentTop + 0.02);
+  return { box: boxOnWall(w, t, s.width, s.depth, 0.002), elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
+}
+
+/** Room for a hanging lamp at `b`: inside the room, clear of tall furniture, its doors and door leaves. */
+function hangFree(m: Model, n: Node, b: Box): boolean {
+  if (insideScore(m, b) > 0) return false;
+  const poly = boxCorners(b);
+  const z0 = n.elevation;
+  const z1 = n.elevation + n.spec.height;
+  for (const l of m.ctx.leaves) if (Math.min(z1, l.z1) - Math.max(z0, 0.015) > 0.005 && overlapDepth(poly, l.poly) > 0.0005) return false;
+  for (const o of m.nodes.values()) {
+    if (o === n || o.spec.base !== 'floor' || !m.units[o.unit].active) continue;
+    const top = o.elevation + o.spec.height;
+    if (z0 > top - 0.005 || z1 < o.elevation + 0.05) continue;
+    if (overlapDepth(poly, o.poly) > 0.003) return false;
+    const need = frontClearance({ ...o.spec.item, elevation: o.elevation });
+    if (need && overlapDepth(poly, sideStrip(o.box, 'front', need)) > 0.003) return false;
+  }
+  for (const f of m.ctx.fixed) {
+    if (!f.floor) continue;
+    const top = (f.piece.elevation ?? 0) + f.piece.height;
+    if (z0 > top - 0.005 || z1 < (f.piece.elevation ?? 0) + 0.05) continue;
+    if (overlapDepth(poly, f.poly) > 0.003) return false;
+  }
+  return true;
+}
+
+/**
+ * How far into the room, measured from the parent's middle along its front axis, something
+ * hanging over the parent between `z0` and `z1` reaches (the TV over the sideboard): what stands
+ * on the piece goes in front of it, not into it. `-Infinity` when nothing hangs there.
+ */
+function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number): number {
+  const f = axisY(P.rotation);
+  let v = -Infinity;
+  for (const sib of m.nodes.values()) {
+    if (sib === n || sib.parent !== n.parent || sib.spec.base !== 'wall' || sib.rule?.kind !== 'above') continue;
+    const pose = wallAbove(m, sib, P, z0, sib.rule.height);
+    if (Math.min(z1, pose.elevation + sib.spec.height) - Math.max(z0, pose.elevation) <= 0.005) continue;
+    for (const c of boxCorners(pose.box)) v = Math.max(v, (c.x - P.x) * f.x + (c.y - P.y) * f.y);
+  }
+  return v;
+}
+
+/** Gap between two pieces sharing a surface. */
+const ON_GAP = 0.05;
+
+/**
+ * Where a piece standing on another sits along its width: the pieces share the surface in the
+ * order the programme hints them, each taking as much room as it is wide, so the lamp lands beside
+ * the TV and not in it. `null` when they do not all fit and the even spread has to do.
+ */
+function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | null {
+  // the pieces that take another branch of the `on` rule do not share the row
+  const inRow = (s: Node) => s.spec.role !== 'mattress' && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
+  const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
+  if (sibs.length < 2) return null;
+  sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
+  const total = sibs.reduce((v, s) => v + s.spec.width, 0) + ON_GAP * (sibs.length - 1);
+  if (total > 2 * P.hw) return null;
+  let u = -total / 2;
+  for (const s of sibs) {
+    if (s === n) return u + s.spec.width / 2;
+    u += s.spec.width + ON_GAP;
+  }
+  return null;
+}
+
 function deriveNode(m: Model, n: Node): void {
   const r = n.rule!;
   const s = n.spec;
@@ -83,6 +167,16 @@ function deriveNode(m: Model, n: Node): void {
     const c = hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : centroidOf(ctx.poly));
     n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
     n.elevation = Math.min(s.elevation, ctx.height - s.height - 0.05);
+    // a hanging lamp gives way to tall furniture, its doors and an opened door leaf (#442)
+    if (!hangFree(m, n, n.box)) {
+      for (const d of [0.3, 0.6, 0.9, 1.2]) {
+        const hit = Array.from({ length: 8 }, (_, k) => ({ ...n.box, x: c.x + Math.cos((k * Math.PI) / 4) * d, y: c.y + Math.sin((k * Math.PI) / 4) * d })).find((b) => hangFree(m, n, b));
+        if (hit) {
+          n.box = hit;
+          break;
+        }
+      }
+    }
     return;
   }
   if (r.kind === 'sill' || r.kind === 'curtain') {
@@ -168,7 +262,7 @@ function deriveNode(m: Model, n: Node): void {
       const slots = chairSlots(P, s.depth);
       const open = slots.filter((sl) => insideScore(m, sl.box(s.width, s.depth)) === 0 && !m.ctx.fixed.some((fx) => fx.floor && distToBox(sl.c.x, sl.c.y, fx.box) < s.depth / 2));
       const pool = open.length >= r.count ? open : [...open, ...slots.filter((sl) => !open.includes(sl))];
-      const chosen = pickSlots(pool, r.count);
+      const chosen = pickSlots(pool, r.count, s.width, s.depth);
       const sl = chosen[r.index] ?? chosen[chosen.length - 1];
       n.box = sl.box(s.width, s.depth);
       return;
@@ -183,16 +277,9 @@ function deriveNode(m: Model, n: Node): void {
         return;
       }
       if (s.base === 'wall' || s.item.kitchen) {
-        // hangs on the wall behind the parent; a free-standing parent: on the wall nearest the hint
-        const parentUnit = parentNode ? m.units[parentNode.unit] : null;
-        const parentOnWall = parentUnit && parentUnit.mode === 'wall' && parentUnit.main === parentNode;
-        const wi = parentOnWall ? parentUnit.wall : nearestWallTo(m, hint ?? { x: P.x, y: P.y });
-        const w = ctx.walls[wi];
-        const t = clamp((P.x - w.a.x) * w.dir.x + (P.y - w.a.y) * w.dir.y, s.width / 2, Math.max(s.width / 2, w.length - s.width / 2));
-        n.box = boxOnWall(w, t, s.width, s.depth, 0.002);
-        const gap = s.role === 'tv' ? 0.05 : 0.2;
-        const want = r.height ?? Math.max(s.elevation, p.top + gap);
-        n.elevation = clamp(want, 0, ctx.height - s.height - 0.02);
+        const pose = wallAbove(m, n, P, p.top, r.height);
+        n.box = pose.box;
+        n.elevation = pose.elevation;
         return;
       }
       // stacked on top (dryer on the washer)
@@ -216,13 +303,15 @@ function deriveNode(m: Model, n: Node): void {
         n.elevation = p.elevation + 0.03 + row * 0.38;
         return;
       }
-      const u = -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
+      const u = onRow(m, n, P, parentNode) ?? -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
       const lim = Math.max(0, P.hw - s.width / 2);
       // on a table the chairs tuck in at the edges: what stands on it goes in the middle
       const table = parentNode?.spec.category === 'table';
-      const c = table
-        ? at(clamp(r.count === 1 ? 0 : u, -lim, lim), 0)
-        : at(clamp(r.count === 1 ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : u, -lim, lim), -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
+      // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
+      // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
+      const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height) + 0.01) + s.depth / 2;
+      const v = table ? Math.max(0, back) : Math.max(back, -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
+      const c = at(clamp(r.count === 1 && !table ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim), Math.min(v, P.hd));
       n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
       n.elevation = p.top;
       return;
@@ -264,8 +353,8 @@ function chairSlots(P: Box, chairDepth: number): Slot[] {
   return out;
 }
 
-/** n slots, alternating between the open sides so chairs face each other. */
-function pickSlots(pool: Slot[], n: number): Slot[] {
+/** n slots, alternating between the open sides so chairs face each other; never two chairs in one place. */
+function pickSlots(pool: Slot[], n: number, width: number, depth: number): Slot[] {
   const bySide = new Map<number, Slot[]>();
   for (const s of pool) bySide.set(s.side, [...(bySide.get(s.side) ?? []), s]);
   const order = [0, 1, 2, 3].filter((s) => bySide.has(s));
@@ -277,13 +366,15 @@ function pickSlots(pool: Slot[], n: number): Slot[] {
     for (const sd of order) {
       if (out.length >= n) break;
       if (sd >= 2 && order.some((o) => o < 2 && (used.get(o) ?? 0) < bySide.get(o)!.length)) continue;
-      const k = used.get(sd) ?? 0;
       const list = bySide.get(sd)!;
+      let k = used.get(sd) ?? 0;
+      // at a small table the places of two sides meet in the corner: skip a place already taken
+      while (k < list.length && out.some((o) => overlapDepth(boxCorners(o.box(width, depth)), boxCorners(list[k].box(width, depth))) > 0.002)) k++;
       if (k < list.length) {
         out.push(list[k]);
         used.set(sd, k + 1);
         progressed = true;
-      }
+      } else if ((used.get(sd) ?? 0) < list.length) used.set(sd, list.length);
     }
     if (!progressed) break;
   }
