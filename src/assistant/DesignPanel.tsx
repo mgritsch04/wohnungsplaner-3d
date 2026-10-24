@@ -39,6 +39,7 @@ import {
   MAX_FIELD,
   PLACEHOLDERS,
   proposalTotal,
+  METHOD_CHOICES,
   QUALITY_CHOICES,
   realProducts,
   RETAILER_CHOICES,
@@ -55,11 +56,27 @@ import {
 } from './design';
 import { implausibleSize } from './designGuide';
 import { designWishes, runDesign } from './designRun';
+import { pickItems, placedRooms, proposalFrom, withProduct } from '../design/apply/proposal';
+import { layoutSuggestion } from '../design/apply';
+import { svgToPng } from '../design/render';
+import { runFurnishing, type Stage } from '../design/run';
+import type { RoomReview } from '../design/types';
 import { useDesignStore } from './designStore';
 import { runSearchRounds, runText, type RoundRequest, type RunProgress } from './searchRun';
 import './assistant.css';
 
 const ALL = '__all';
+
+/** What the panel says while a stage of the new run is going on. */
+const STAGE_TEXT: Record<Stage, string> = {
+  read: 'Räume lesen',
+  concept: 'Wohnkonzept',
+  program: 'Raumprogramme',
+  place: 'Aufstellen',
+  review: 'Begehung',
+  critique: 'Nachbessern',
+  done: 'Fertig',
+};
 /** Pieces searched at the same time with local Claude Code. */
 const SEARCH_PARALLEL = 3;
 let controller: AbortController | null = null;
@@ -105,6 +122,7 @@ export function DesignPanel() {
   const [browser, setBrowser] = useState(false);
   const [search, setSearch] = useState<(RunProgress & { current: string }) | null>(null);
   const [designProgress, setDesignProgress] = useState<{ done: number; total: number } | null>(null);
+  const [stage, setStage] = useState<string | null>(null);
   const [notFound, setNotFound] = useState<Map<string, NotFound>>(new Map());
   const [note, setNote] = useState<string | null>(null);
   /** „Gefällt mir nicht“ (#350): room whose comment field is open, the comment, the room being redone. */
@@ -169,10 +187,51 @@ export function DesignPanel() {
   const byId = (id: string) => catalog.find((c) => c.id === id);
   const text = (k: keyof DesignWishes, v: string) => st.setWishes({ [k]: v.slice(0, MAX_FIELD) });
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name || 'Raum ohne Namen';
+  /** Walk-through of a room, where the new way made the proposal. */
+  const review = (id: string) => st.result?.rooms.find((r) => r.roomId === id)?.review;
 
   const clearPreview = () => {
     const old = useDesignStore.getState().preview;
     if (old && useFurnishStore.getState().preview === old) useFurnishStore.getState().setPreview(null);
+  };
+
+  /** The new way: the whole run, then its rooms as proposal and preview. */
+  const askConcept = async (ctl: AbortController) => {
+    try {
+      const result = await runFurnishing({
+        sample,
+        project,
+        wishes: w,
+        roomIds: targets.map((r) => r.id),
+        roomTypes,
+        products,
+        toImage: (plan) => svgToPng(plan),
+        signal: ctl.signal,
+        onProgress: (p) => {
+          setDesignProgress({ done: p.done, total: p.total });
+          setStage(STAGE_TEXT[p.stage] + (p.room ? `: ${p.room}` : ''));
+        },
+      });
+      const proposal = proposalFrom(result, project, roomTypes, own);
+      clearPreview();
+      setNotFound(new Map());
+      setNote(null);
+      setDislike(null);
+      st.set({ asking: false, proposal, result, preview: null });
+      if (result.failed.length) useUiStore.getState().toast(`Für ${result.failed.map((f) => (f.roomId ? roomName(f.roomId) : 'die Wohnung')).join(', ')} kam keine verwertbare Antwort.`, 'info');
+    } catch (e) {
+      const code = (e as SampleError | undefined)?.code;
+      if (code === 'cancelled') st.set({ asking: false });
+      else if (code && HIDE_CODES.includes(code)) {
+        st.set({ asking: false });
+        setHidden(true);
+        useUiStore.getState().toast(errorText(e), 'info');
+      } else st.set({ asking: false, error: code ? errorText(e) : 'Die Antwort enthielt keinen verwertbaren Plan – bitte erneut versuchen.' });
+    } finally {
+      if (controller === ctl) controller = null;
+      setStage(null);
+      setRedoing(null);
+    }
   };
 
   const ask = async (redo?: { roomId: string; feedback: string }) => {
@@ -185,6 +244,11 @@ export function DesignPanel() {
     setDesignProgress(null);
     setRedoing(redo?.roomId ?? null);
     let made: DesignProposal | null = null;
+    // the new way (#442): concept, zones, millimetre-exact placement, walk-through and Claude's own correction
+    if ((w.method ?? 'konzept') === 'konzept' && !redo) {
+      await askConcept(ctl);
+      return;
+    }
     try {
       const { proposal: fresh, failedRooms } = await runDesign({
         sample,
@@ -236,6 +300,16 @@ export function DesignPanel() {
 
   const showPreview = () => {
     if (!proposal) return;
+    // the new way already placed every room millimetre-exact: take that, do not place again
+    const result = st.result;
+    if (result) {
+      const inPlan = placedRooms(result, roomTypes).filter((r) => rooms.some((x) => x.id === r.analysis.roomId));
+      const preview = layoutSuggestion(project, inPlan, own);
+      useFurnishStore.getState().setPreview(preview);
+      st.set({ preview });
+      if (!preview.items.length) useUiStore.getState().toast('Für diese Möbel wurde kein freier Platz gefunden – die Gründe stehen beim Vorschlag.', 'info');
+      return;
+    }
     const inPlan = proposal.rooms.filter((r) => rooms.some((x) => x.id === r.roomId));
     const typeOf = (r: (typeof inPlan)[number]) => r.type ?? roomTypes[r.roomId] ?? guessRoomType(roomName(r.roomId));
     // a new preview replaces what an earlier, applied suggestion put into these rooms (#350) – never stacks on it
@@ -352,6 +426,16 @@ export function DesignPanel() {
           const found = await toCatalog(parsed, placeholder);
           const latest = useDesignStore.getState().proposal;
           if (!found.length || !latest) return { ok: false, reason: notFoundReason(raw, parsed.length) };
+          // the new way (#442): the product goes into the programme and the room is placed and walked through again
+          const run = useDesignStore.getState().result;
+          if (run && !t.kitchen) {
+            const line = latest.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
+            const swap = { roomId: t.roomId, items: line ? pickItems(line) : [], catalogId: found[0].id };
+            const again = withProduct(run, project, swap, useCatalogStore.getState().items, roomTypes);
+            if (!again.taken) return { ok: false, reason: `passt nicht in den Raum: ${again.why ?? 'die Begehung fand einen Mangel'}` };
+            st.set({ result: again.result, proposal: replaceWithFound(latest, t.roomId, t.index, found) });
+            return { ok: true };
+          }
           st.set({ proposal: t.kitchen ? replaceKitchenWithFound(latest, t.roomId, t.kitchen, found) : replaceWithFound(latest, t.roomId, t.index, found) });
           return { ok: true };
         } catch (e) {
@@ -488,7 +572,13 @@ export function DesignPanel() {
               </span>
             </label>
             <SelectField label="Händler" value={w.retailer} options={RETAILER_CHOICES} onChange={(v) => st.setWishes({ retailer: v })} />
+            <SelectField label="Verfahren" value={w.method ?? 'konzept'} options={METHOD_CHOICES} onChange={(v) => st.setWishes({ method: v })} />
             <SelectField label="Qualität" value={w.quality ?? 'thorough'} options={QUALITY_CHOICES} onChange={(v) => st.setWishes({ quality: v })} />
+            <p className="muted small" data-testid="design-method-hint">
+              {(w.method ?? 'konzept') === 'konzept'
+                ? `Claude entwirft erst ein Wohnkonzept für die ganze Wohnung, dann je Raum Zonen, Ankermöbel und Beziehungen. Die App stellt millimetergenau auf, begeht den Raum nach rund 35 Regeln und zeigt Claude das Ergebnis${sample.images ? ' als Bild' : ' als Textkarte'}; wo etwas nicht stimmt, bessert Claude bis zu zweimal nach. Das dauert pro Raum ein paar Minuten.`
+                : 'Der bisherige Weg: Claude wählt je Raum eine Möbelliste, der Planer stellt sie auf.'}
+            </p>
             <p className="muted small" data-testid="design-quality-hint">
               {w.quality === 'fast'
                 ? 'Eine Runde: Claude plant jeden Raum nach Leitfaden und Regeln des Raumtyps, der Planer ergänzt Fehlendes.'
@@ -499,7 +589,7 @@ export function DesignPanel() {
             </p>
             <div className="btn-row">
               <button className="primary" disabled={st.asking || !!search} onClick={() => void ask()}>
-                {st.asking ? `Claude richtet ein…${designProgress && designProgress.total > 1 ? ` (${designProgress.done}/${designProgress.total} Schritte)` : ''}` : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
+                {st.asking ? `${stage ? `${stage}…` : 'Claude richtet ein…'}${designProgress && designProgress.total > 1 ? ` (${designProgress.done}/${designProgress.total})` : ''}` : search ? 'Suche läuft…' : proposal ? 'Neu einrichten lassen' : 'Einrichten lassen'}
               </button>
               {st.asking && <button onClick={() => controller?.abort()}>Stopp</button>}
             </div>
@@ -522,6 +612,7 @@ export function DesignPanel() {
                 </h5>
                 {r.concept && <p className="muted">{r.concept}</p>}
                 {r.brief && <BriefView brief={r.brief} />}
+                {review(r.roomId) && <ReviewView review={review(r.roomId)!} />}
                 {r.fixes && r.fixes.length > 0 && (
                   <div className="design-fixes" data-testid="design-fixes">
                     <strong className="small">Planer-Prüfung:</strong>
@@ -804,6 +895,28 @@ function ZoneBadge({ zones, id }: { zones: PlanZone[]; id: string }) {
     <Badge kind="info" title="Der Planer stellt dieses Möbel nur in diesem markierten Bereich auf.">
       Bereich {i + 1}: {zones[i].purpose || 'ohne Angabe'}
     </Badge>
+  );
+}
+
+/** What the walk-through found in this room (#442, stage 4). */
+function ReviewView({ review }: { review: RoomReview }) {
+  return (
+    <div className="design-brief" data-testid="design-review">
+      <strong className="small">
+        Begehung: {review.score} von 100 Punkten {review.passed ? '· bestanden' : '· nicht bestanden'}
+      </strong>
+      {review.findings.length ? (
+        <ul className="small">
+          {review.findings.map((f, i) => (
+            <li key={i} className={f.severity === 'S' ? 'warning' : undefined}>
+              {f.severity === 'S' ? 'Schwer' : f.severity === 'M' ? 'Mittel' : 'Leicht'}: {f.text}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">Alle Regeln erfüllt.</p>
+      )}
+    </div>
   );
 }
 

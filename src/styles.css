@@ -2339,6 +2339,21 @@ code {
   stroke: var(--color-surface);
   font-weight: 600;
 }
+/* zones of the new proposal (#442): the areas behind the furniture, not competing with it */
+.furnish-zone {
+  fill: var(--color-accent);
+  fill-opacity: 0.05;
+  stroke: var(--color-accent);
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.furnish-zone-label {
+  fill: var(--color-accent);
+  fill-opacity: 0.75;
+  paint-order: stroke;
+  stroke: var(--color-surface);
+}
 /* six tabs on the left (#137, #345): two rows of three, so no label is cut off at any desktop width */
 .panel.left .tabs {
   display: grid;

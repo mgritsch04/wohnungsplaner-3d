@@ -81,7 +81,13 @@ export function better(a: RoomResult, b: RoomResult): RoomResult {
 }
 
 /** The pieces already in the room, as the walk-through and the room picture want them. */
-const asPlaced = (pieces: ReturnType<typeof existingPieces>): PlacedItem[] => pieces.map((f) => ({ ...f, elevation: f.elevation ?? 0, zone: 'bestand' }));
+export const asPlaced = (pieces: ReturnType<typeof existingPieces>): PlacedItem[] => pieces.map((f) => ({ ...f, elevation: f.elevation ?? 0, zone: 'bestand' }));
+
+/** The walk-through's input for one placed room: the same for the run and for the product step. */
+export function reviewInputOf(args: { analysis: RoomAnalysis; type: RoomType; layout: Layout; program: RoomProgram; existing: PlacedItem[]; palette: string[]; catalog?: CatalogItem[] }): ReviewInput {
+  const { analysis, type, layout, program, existing, palette } = args;
+  return { analysis, type, layout, program, existing, palette, ...(args.catalog ? { catalog: args.catalog } : {}) };
+}
 
 interface RoomWork {
   analysis: RoomAnalysis;
@@ -211,7 +217,7 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
           wishes,
           ...(input.products ? { products: input.products } : {}),
         },
-        review: (layout, prog) => ({ analysis: room, type, layout, program: prog, palette, existing: asPlaced(existing), ...(input.products ? { catalog: input.products } : {}) }),
+        review: (layout, prog) => reviewInputOf({ analysis: room, type, layout, program: prog, palette, existing: asPlaced(existing), ...(input.products ? { catalog: input.products } : {}) }),
       };
       const image = async (r: RoomResult): Promise<SampleImage | undefined> => {
         if (!input.toImage || !input.sample.images) return undefined;
@@ -243,7 +249,7 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
     results.map((r) => {
       const room = analysis.rooms.find((x) => x.roomId === r.roomId)!;
       const rc = roomConceptOf(concept.concept!, room);
-      return { analysis: room, type: (input.roomTypes?.[r.roomId] ?? rc.type) as RoomType, layout: r.layout, program: r.program, palette: concept.concept!.style.palette.map((c) => c.hex), existing: asPlaced(existingPieces(project, room)), ...(input.products ? { catalog: input.products } : {}) };
+      return reviewInputOf({ analysis: room, type: (input.roomTypes?.[r.roomId] ?? rc.type) as RoomType, layout: r.layout, program: r.program, palette: concept.concept!.style.palette.map((c) => c.hex), existing: asPlaced(existingPieces(project, room)), ...(input.products ? { catalog: input.products } : {}) });
     }),
   );
   report('done', total, total);
