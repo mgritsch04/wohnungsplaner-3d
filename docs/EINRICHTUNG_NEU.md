@@ -115,6 +115,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 
 **A Funktion**
 - A1 (S) Pflichtmöbel des Raumtyps fehlen: Schlafzimmer Bett (+ Schrank oder Kommode ab 8 m²: M); Wohnzimmer ein Sofa oder Sessel und Sitzplätze für mindestens 3 (Stühle am Esstisch im selben Raum zählen mit, etwa in der Garçonnière); Küche und jeder Raum mit Küchenzeile (Wohnküche) Spüle, Kochfeld, Kühlschrank, Arbeitsfläche (Unterschrank oder Geschirrspüler); Esszimmer Tisch und Stühle; Arbeitszimmer Schreibtisch und Stuhl; Gang/Vorraum Garderobe; Bad Waschtisch, WC oder Dusche/Wanne (Bestand zählt); WC: WC und Handwaschbecken (Handwaschbecken: M); Kinderzimmer Bett, Stauraum, Tisch; Balkon Sitzplatz ab 2 m².
+- A1 (M) Pflichtmöbel des Programms passt nur in einer kleineren Variante hinein (Doppelbett kam als Einzelbett).
 - A2 (M) Funktion ohne Grund doppelt in der Wohnung (Esstisch, Gästeschlafplatz, Küchenzeile, Fernseher).
 - A3 (S) Sanitärobjekt neu geplant (WC, Waschtisch, Dusche, Wanne), außer ausdrücklich gewünscht oder Handwaschbecken im WC.
 - A4 (M) Küche: Arbeitsfläche zwischen Spüle und Kochfeld unter 60 cm, Kochfeld unter 30 cm neben Hochschrank oder Wand, Arbeitsdreieck Kühlschrank–Spüle–Kochfeld unter 3,6 m oder über 7 m. Eine reine Bestandsküche wird nicht bewertet.
@@ -132,7 +133,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 
 **C Anordnung**
 - C1 Bett: Kopfteil nicht an einer Wand oder Bett frei im Raum (M); Kopfteil unter dem Fenster (L); Doppelbett nur von einer Seite zugänglich (M).
-- C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L).
+- C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L); Sofa im Wohnzimmer ab 12 m² ohne Couchtisch (L).
 - C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S).
 - C4 Esstisch: Stühle nicht am Tisch (M); Stuhlzone auf mehr als einer Seite unter 75 cm (L); Pendel nicht über dem Tisch (L); Tisch im Arbeitsgang der Küche (M).
 - C5 Schreibtisch: Fenster direkt hinter dem Bildschirm oder im Rücken (L).
@@ -145,18 +146,19 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - D1 Pflanze nicht in einer Ecke, nicht neben einem Möbel und nicht am Fenster (M); Pflanze im Wege-Schlauch (S, in jedem Raum); große Pflanze in fensterlosem Raum (L: Schattenpflanze oder Kunstpflanze vorschlagen).
 - D2 (M) Kleine Pflanze, Kräutertopf oder Box auf dem Boden statt auf Fensterbank, Regal oder Arbeitsplatte.
 - D3 (M) Tischlampe nicht auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal.
-- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe; nicht auf dem Balkon); Raum über 10 m² mit nur einer Lichtquelle.
+- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe, Sofa ohne Steh- oder Tischlampe daneben; nicht auf dem Balkon); Raum über 10 m² mit nur einer Lichtquelle.
 - D5 (L) Teppich: Sitzgruppe steht nicht mit den Vorderfüßen darauf; Bettteppich ragt seitlich weniger als 40 cm heraus; Teppich im Türschwenk; Läufer nicht mittig im Gang.
 - D6 (L) Bild oder Spiegel: über Sofa/Bett nicht mittig (über 10 cm) oder nicht 40–90 % der Möbelbreite; über Fenster oder Tür; Badspiegel nicht über dem Waschtisch.
 - D7 (L) Vorhang schmaler als das Fenster; Schlafzimmer ohne Verdunkelung, wenn gewünscht.
 - D8 (L) Zu viel Gleiches: mehr als eine Deckenleuchte je 6 m² im Gang, mehr als drei Bilder ohne geplante Bildergruppe, gleiche Teile ohne Beziehung.
 
 **E Gesamteindruck**
-- E1 Belegung außerhalb des Bereichs je Typ (Wohnen 20–45 %, Schlafen 25–50 %, Arbeiten 20–45 %, Gang bis 20 %): zu voll (M), halbherzig leer unter 15 % in Wohn- und Schlafräumen (M).
+- E1 Belegung außerhalb des Bereichs je Typ (Wohnen 20–45 %, Schlafen 25–50 %, Arbeiten 20–45 %, Gang bis 20 %): zu voll (M), halbherzig leer unter 15 % in Wohn- und Schlafräumen (M), unter dem Bereich eher leer (L).
 - E2 (L) Möbel mehr als 1 m außerhalb seiner Zone; Zonen überlappen stark.
 - E3 (L) Zusammengehöriges getrennt (zwei Bücherregale an verschiedenen Wänden derselben Zone, Stühle ohne Tisch).
 - E4 (L) Farbe außerhalb der Palette.
 - E5 (L) Blickfang von der Haupttür aus verdeckt.
+- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum).
 
 **Punktzahl je Raum:** 100 minus 25 je S, 8 je M, 2 je L (nicht unter 0). „Bestanden“ heißt keine S-Befunde und mindestens 85 Punkte. Dazu Kennzahlen: Weglängen leer/eingerichtet, Belegung, Abweichung vom Programm. Dieselben Regeln nutzt der Solver als Kosten, die Kritik-Stufe als Eingabe und die Tests als Maßstab. In der App erscheint je Raum „Begehung: alle 35 Punkte erfüllt“ oder die Liste der leichten Befunde.
 

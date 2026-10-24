@@ -150,6 +150,20 @@ describe('E Gesamteindruck', () => {
     expect(has(living(full), 'E1', /zu voll/)).toBe(true);
     expect(has(review({ room: rectRoom(1.2, 4, { doors: [{ wall: 'S', at: 0.6 }] }), type: 'hall', items: [put('generic-wardrobe-100', { x: 0.3, y: 1, face: 'O' }), put('generic-wardrobe-100', { x: 0.3, y: 2, face: 'O' })] }), 'E1', /zu voll/)).toBe(true);
   });
+  it('E1 a living room with less than a fifth of its floor furnished is light: rather empty (#443)', () => {
+    const group = [put('generic-sofa-3', { x: 2.5, y: 3.55, face: 'N' }), put('generic-coffee-table', { x: 2.5, y: 2.6 }), put('generic-armchair', { x: 4.3, y: 2.6, face: 'W' })];
+    expect(living(group).findings.find((f) => f.rule === 'E1')?.severity).toBe('L');
+  });
+  it('E6 one half of the room almost empty, everything in the other is medium (#443)', () => {
+    const bedroom = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4.5 }], windows: [{ wall: 'N', at: 2.5 }] }), type: 'bedroom', items });
+    const west = [put('generic-bed-160', { x: 1.1, y: 1.5, face: 'O' }), put('generic-wardrobe-150', { x: 1.5, y: 3.7, face: 'N' }), put('generic-nightstand', { x: 0.25, y: 0.3, face: 'O' })];
+    expect(has(bedroom(west), 'E6', /östliche Hälfte/)).toBe(true);
+    expect(has(bedroom([...west, put('generic-desk', { x: 4.6, y: 2, face: 'W' }), put('generic-office-chair', { x: 4.0, y: 2, face: 'O' }), put('generic-dresser', { x: 3.6, y: 0.25, face: 'S' })]), 'E6')).toBe(false);
+  });
+  it('D4 a sofa without a floor or table lamp beside it is light', () => {
+    expect(has(living([sofa]), 'D4', /Neben/)).toBe(true);
+    expect(has(living([sofa, put('generic-floor-lamp', { x: 3.9, y: 3.6 })]), 'D4', /Neben/)).toBe(false);
+  });
   it('E2 a piece more than 1 m outside its zone, zones on top of each other', () => {
     const zones = [{ id: 'sitzen', function: 'Sitzgruppe', rect: { x0: 0, y0: 2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2')).toBe(false);

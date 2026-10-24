@@ -42,6 +42,9 @@ export function checkLight(ctx: RoomCtx): void {
   if (ctx.type === 'balcony') return;
   if (!ctx.items.some((i) => i.role === 'pendant'))
     for (const t of ctx.items.filter((i) => isDiningTable(i) && i.floor)) if (ctx.items.filter((s) => s.role === 'seat' && dist(s, t) < 1.5).length >= 2) ctx.add('D4', 'L', 'Über dem Esstisch fehlt eine Pendelleuchte.', [t], t);
+  // reading light where one sits in the evening: floor or table lamp beside the sofa (#443)
+  for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor && !i.existing))
+    if (!lights.some((l) => l.role !== 'pendant' && polyDist(l.poly, s.poly) < 0.8)) ctx.add('D4', 'L', `Neben ${ctx.label(s)} fehlt eine Steh- oder Tischlampe zum Lesen.`, [s], s);
   for (const z of ctx.program?.zones ?? []) {
     if (!/lese|lesen/i.test(z.function)) continue;
     const c = { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 };

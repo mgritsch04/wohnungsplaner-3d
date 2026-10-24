@@ -38,8 +38,17 @@ describe('C2 Sitzgruppe', () => {
   });
   it('a sofa with its back directly in front of the room door is light', () => {
     const sofaAt = (x: number) => review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }] }), type: 'living', items: [put('generic-sofa-3', { x, y: 2.4, face: 'N' })] });
-    expect(sofaAt(1).findings.find((f) => f.rule === 'C2')?.severity).toBe('L');
-    expect(has(sofaAt(3.6), 'C2')).toBe(false);
+    const back = (r: ReturnType<typeof sofaAt>) => r.findings.find((f) => f.rule === 'C2' && /Rücken/.test(f.text));
+    expect(back(sofaAt(1))?.severity).toBe('L');
+    expect(back(sofaAt(3.6))).toBeUndefined();
+  });
+  it('a sofa without a coffee table in a living room looks parked (light), with one it is a group (#443)', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }] });
+    const sofa = put('generic-sofa-3', { x: 2.5, y: 3.55, face: 'N' });
+    const parked = (r: ReturnType<typeof review>) => r.findings.some((f) => f.rule === 'C2' && /fehlt ein Couchtisch/.test(f.text));
+    expect(parked(review({ room, type: 'living', items: [sofa] }))).toBe(true);
+    expect(parked(review({ room, type: 'living', items: [sofa, put('generic-coffee-table', { x: 2.5, y: 2.6, face: 'N' })] }))).toBe(false);
+    expect(parked(review({ room, type: 'office', items: [sofa] }))).toBe(false);
   });
 });
 

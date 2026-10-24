@@ -10,7 +10,7 @@ import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary 
 import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
 import { checkBeds, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs } from './decorRules';
-import { checkFocus, checkOccupancy, checkPalette, checkTogether, checkZones, occupancy } from './overallRules';
+import { checkBalance, checkFocus, checkOccupancy, checkPalette, checkTogether, checkZones, occupancy } from './overallRules';
 import { RoomCtx, type ReviewInput } from './context';
 
 export type { ReviewInput, ReviewOptions } from './context';
@@ -41,6 +41,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkCurtains(ctx);
   checkRepeats(ctx);
   checkOccupancy(ctx);
+  checkBalance(ctx);
   checkZones(ctx);
   checkTogether(ctx);
   checkPalette(ctx);
