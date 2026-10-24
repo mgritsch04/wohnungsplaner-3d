@@ -402,6 +402,8 @@ function writeRoomPictures(
 }
 
 test.describe("Benchmark mit echtem Claude", () => {
+  // the top view is cut out of the middle of the picture: twice the pixels keep it sharp
+  test.use({ deviceScaleFactor: 2 });
   test.skip(
     !process.env.WP_BENCH,
     "Nur lokal: WP_BENCH=1 und laufender Helfer (npm run ikea-helper).",
