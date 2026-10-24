@@ -82,6 +82,7 @@ const DEFS: Def[] = [
   // bathroom
   ['generic-toilet', 'WC wandhängend', 'bathroom', 0.37, 0.54, 0.8, 'toilet', '#ffffff', 250, { tags: ['wc'] }],
   ['generic-washbasin', 'Waschtisch 60 cm', 'bathroom', 0.6, 0.46, 0.85, 'washbasin', '#ffffff', 220, { tags: ['waschbecken'] }],
+  ['generic-washbasin-40', 'Handwaschbecken 40 cm', 'bathroom', 0.4, 0.25, 0.85, 'washbasin', '#ffffff', 150, { tags: ['waschbecken', 'handwaschbecken', 'wc'] }],
   ['generic-bathtub', 'Badewanne 170×75', 'bathroom', 1.7, 0.75, 0.58, 'bathtub', '#ffffff', 400, { tags: ['wanne'] }],
   ['generic-shower', 'Dusche 90×90', 'bathroom', 0.9, 0.9, 2.0, 'shower', '#dfe8ec', 500, { tags: ['dusche'] }],
   // storeys (#54, #335): straight and turning flights; its height is set to the storey height when placed. No price: built in, not bought like furniture

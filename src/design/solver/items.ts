@@ -160,6 +160,7 @@ const SMALLER: Record<string, string[]> = {
   'generic-plant': ['generic-plant-small'],
   'generic-picture-large': ['generic-picture'],
   'generic-coffee-table': ['generic-balcony-table'],
+  'generic-washbasin': ['generic-washbasin-40'],
 };
 
 export function smallerOptions(catalogId: string, own: string[] = []): string[] {
