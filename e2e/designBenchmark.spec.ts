@@ -8,7 +8,9 @@ import { FLAT_KEYS, TEST_FLATS, type FlatKey } from '../src/design/fixtures/flat
 import { roomPlanSvg, roomTextMap } from '../src/design/render';
 import { asPlaced, type FurnishRunResult } from '../src/design/run';
 import { existingPieces } from '../src/design/solver/solve';
-import type { RoomResult } from '../src/design/types';
+import type { PlacedItem, RoomAnalysis, RoomResult } from '../src/design/types';
+import type { PlacedRoom } from '../src/design/apply';
+
 import type { RoomType } from '../src/suggest/furnishing';
 import { derivePlan } from '../src/model/derived';
 import { findNarrowPassages } from '../src/model/passages';
@@ -194,15 +196,14 @@ type Wp = {
  * Je Raum ein Blick in 3D, wie man ihn beim Hereinkommen hat: von der Haupttür aus, schräg von
  * oben, die Wände in 1,20 m Höhe geschnitten. Das sind die Bilder für die Bildbewertung.
  */
-async function roomShots(page: Page, dir: string, result: FurnishRunResult) {
+async function roomShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
   await page.evaluate(() => (window as unknown as { __wp: Wp }).__wp.usePerformanceStore.getState().setCutaway(true));
   // Fotos des Raums: ohne die roten Engstellen-Streifen des Plan-Checks (die zählt der Bericht)
   await page.evaluate(() => (window as unknown as { __wp: Wp }).__wp.useProjectStore.getState().apply((d) => (d.settings.showNarrowPassages = false)));
   await page.waitForTimeout(800);
   const canvas = page.getByTestId('scene3d');
   await canvas.screenshot({ path: `${dir}/3d-schnitt.png` });
-  for (const room of result.analysis.rooms) {
-    if (!result.rooms.some((r) => r.roomId === room.roomId)) continue;
+  for (const room of rooms) {
     const xs = room.polygon.map((p) => p.x);
     const ys = room.polygon.map((p) => p.y);
     const c = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
@@ -315,9 +316,56 @@ test.describe('Benchmark mit echtem Claude', () => {
       await page.getByRole('button', { name: /alles zeigen/ }).first().click();
       await page.waitForTimeout(2000);
       await page.screenshot({ path: `${dir}/3d.png` });
-      await roomShots(page, dir, result!);
+      await roomShots(page, dir, result!.analysis.rooms.filter((a) => result!.rooms.some((r) => r.roomId === a.roomId)));
       await page.setViewportSize(size);
       expect(errors).toEqual([]);
+    });
+  }
+});
+
+/**
+ * Der Vorschlag des alten Ablaufs für A und B (src/design/review/fixtures/heute.json) in denselben
+ * Bildern wie der neue: Ausgangswert für die Vorher/Nachher-Seite. Ohne Claude.
+ *
+ *     WP_HEUTE=1 npx playwright test e2e/designBenchmark.spec.ts --workers=1
+ */
+test.describe('Alter Ablauf als Vergleich', () => {
+  test.skip(!process.env.WP_HEUTE, 'Nur lokal: WP_HEUTE=1.');
+  const recorded = JSON.parse(readFileSync(new URL('../src/design/review/fixtures/heute.json', import.meta.url), 'utf8')) as Record<string, Record<string, { type: string; items: Omit<PlacedItem, 'id' | 'zone'>[] }>>;
+  for (const key of ['A', 'B'] as const) {
+    test(`heute ${key}`, async ({ page }) => {
+      test.setTimeout(5 * 60_000);
+      const dir = `${OUT}/heute-${key}`;
+      mkdirSync(dir, { recursive: true });
+      const project = TEST_FLATS[key].build();
+      const analysis = analyzeFlat(project, derivePlan(project));
+      const rooms = analysis.rooms.map((room) => ({
+        analysis: room,
+        type: recorded[key][room.name].type,
+        layout: { roomId: room.roomId, items: recorded[key][room.name].items.map((i, n) => ({ ...i, id: `${room.roomId}-${n}`, zone: 'heute' })), dropped: [], cost: 0, unsolved: [], seed: 0 },
+      })) as unknown as PlacedRoom[];
+      const draft = structuredClone(project);
+      applyFurnishing(draft, layoutSuggestion(project, rooms));
+      await page.goto('/?e2e');
+      await expect(page.getByText('Beispielwohnung').or(page.locator('input.project-name'))).toBeVisible();
+      await page.evaluate((src) => {
+        const wp = (window as unknown as { __wp: { useProjectStore: { getState: () => { apply: (fn: (d: Record<string, unknown>) => void) => void } } } }).__wp;
+        wp.useProjectStore.getState().apply((d) => {
+          for (const k of ['nodes', 'walls', 'openings', 'rooms', 'furniture', 'zones']) d[k] = (src as Record<string, unknown>)[k] ?? [];
+          d.groups = [];
+        });
+      }, draft as unknown as Record<string, unknown>);
+      const setView = (viewMode: string) => page.evaluate((v) => (window as unknown as { __wp: { useUiStore: { setState: (s: object) => void } } }).__wp.useUiStore.setState({ viewMode: v }), viewMode);
+      await page.setViewportSize({ width: 2200, height: 1300 });
+      await setView('2d');
+      await page.getByRole('button', { name: /alles zeigen/ }).first().click();
+      await page.waitForTimeout(500);
+      await page.getByTestId('editor2d').screenshot({ path: `${dir}/plan.png` });
+      await setView('3d');
+      await page.waitForTimeout(1500);
+      await roomShots(page, dir, analysis.rooms);
+      writeFileSync(`${dir}/raumtypen.json`, JSON.stringify(Object.fromEntries(analysis.rooms.map((a) => [a.name, recorded[key][a.name].type])), null, 1));
+      writeFileSync(`${dir}/lauf.json`, JSON.stringify({ analysis }, null, 1));
     });
   }
 });
