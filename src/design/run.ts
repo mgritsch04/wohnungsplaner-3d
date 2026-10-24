@@ -80,6 +80,21 @@ export function better(a: RoomResult, b: RoomResult): RoomResult {
   return a.layout.dropped.length <= b.layout.dropped.length ? a : b;
 }
 
+/** Room types that get the look before handing over: where a person lives, not where they pass through. */
+export const LOOK_TYPES: ReadonlySet<RoomType> = new Set<RoomType>(['living', 'bedroom', 'kitchen', 'dining', 'kids', 'office']);
+
+/**
+ * Whether the look's answer replaces a room that already passed: it must still pass, keep nearly
+ * all its points (the look trades a few points for a better picture) and place no fewer pieces.
+ */
+export function lookKeeps(before: RoomResult, after: RoomResult): boolean {
+  if (after.layout.items.length * 2 < before.layout.items.length) return false;
+  return after.review.passed && after.review.score >= before.review.score - LOOK_TOLERANCE && after.layout.dropped.length <= before.layout.dropped.length;
+}
+
+/** Points the look may cost (#443). */
+export const LOOK_TOLERANCE = 4;
+
 /** The pieces already in the room, as the walk-through and the room picture want them. */
 export const asPlaced = (pieces: ReturnType<typeof existingPieces>): PlacedItem[] => pieces.map((f) => ({ ...f, elevation: f.elevation ?? 0, zone: 'bestand' }));
 
@@ -112,20 +127,28 @@ function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, roun
 async function critique(input: FurnishRunInput, work: RoomWork, first: RoomResult, image: (r: RoomResult) => Promise<SampleImage | undefined>, calls: CallLog[]): Promise<RoomResult> {
   let best = first;
   let current = first;
-  for (let round = 1; round <= MAX_ROUNDS && !goodEnough(best); round++) {
+  // a main room that passes at once still gets one look at its picture (#443), unless it should be fast
+  const look = goodEnough(first) && LOOK_TYPES.has(work.type) && input.wishes.quality !== 'fast';
+  for (let round = 1; round <= MAX_ROUNDS && (!goodEnough(best) || (look && round === 1)); round++) {
     const model = input.wishes.quality === 'fast' ? 'sonnet' : 'opus';
-    const label = `Kritik: ${work.analysis.name} (Runde ${round})`;
+    const label = `Kritik: ${work.analysis.name} (${look ? 'Blick' : `Runde ${round}`})`;
     const log: CallLog = { label, model, round, attempts: 1, ms: 0, problems: [] };
     const t0 = Date.now();
     calls.push(log);
     try {
       const img = await image(current);
+      // the look is about what the picture shows; without one the rules have said all there is
+      if (look && !img) {
+        calls.pop();
+        break;
+      }
       const ci: CritiqueInput = {
         base: work.base,
         program: current.program,
         layout: current.layout,
         review: current.review,
         round,
+        ...(look ? { look } : {}),
         ...(img ? { image: img } : { textMap: roomTextMap({ analysis: work.analysis, layout: current.layout, program: current.program, existing: asPlaced(work.existing), ...(work.base.products ? { catalog: work.base.products } : {}) }) }),
       };
       const opts: SampleOptions = { model, modelTier: model === 'opus' ? 'complex' : 'default', label, signal: input.signal, ...(img ? { images: [img] } : {}) };
@@ -133,7 +156,7 @@ async function critique(input: FurnishRunInput, work: RoomWork, first: RoomResul
       const checked = parseCritique(raw, ci);
       log.problems = checked.problems;
       current = placeAndReview(work, checked.value, (input.seed ?? 1) + round, round);
-      best = better(best, current);
+      best = look ? (lookKeeps(best, current) ? current : best) : better(best, current);
     } catch (e) {
       log.error = codeOf(e);
       if (isCancel(e)) throw e;

@@ -24,6 +24,11 @@ export interface CritiqueInput {
   textMap?: string;
   /** Round number (1 or 2), only for the wording. */
   round: number;
+  /**
+   * The look before handing over (#443): the room already passes the walk-through, Claude looks at
+   * the picture once more as an interior designer and improves what the rules do not see.
+   */
+  look?: boolean;
 }
 
 const cm = (v: number) => Math.round(v * 100);
@@ -123,10 +128,20 @@ export function buildCritiquePrompt(input: CritiqueInput): string {
     : input.textMap
       ? `So steht es im Raum:\n${input.textMap}`
       : 'Ein Bild gibt es nicht; geh nach den Angaben unten.';
+  const task = input.look
+    ? `Blick vor der Abgabe: Die Begehung ist bestanden. Sieh dir den Raum jetzt an wie eine Innenarchitektin, bevor sie ihn abgibt, und verbessere, was eine Regel nicht sieht:
+- Die Sitzgruppe schaut auf einen Blickpunkt (Fernseher, Kamin, Fenster mit Ausblick) oder einander zu; Sofa, Sessel und Couchtisch bilden eine geschlossene Gruppe auf einem Teppich, der unter die Vorderbeine reicht.
+- Kein Sessel und kein Schrank steht vor einem Fenster; Fenster bleiben frei und bekommen Vorhänge als Paar links und rechts.
+- Jeder Sitz- und Arbeitsplatz hat Licht in Reichweite: Leselampe neben Sofa oder Sessel, Pendelleuchte über dem Esstisch, Lampe am Schreibtisch, Leuchten an beiden Bettseiten.
+- Stühle stehen am Tisch, der Bürostuhl am Schreibtisch; Teppiche liegen mittig unter ihrer Gruppe.
+- Die Zonen sind über den Raum verteilt: keine Ecke leer, während anderswo alles aneinanderklebt; nichts steht verloren mitten im Raum.
+Ist das alles schon so, gib das Programm unverändert zurück. Sonst ändere gezielt, ohne Wege, Türen oder Funktionen zu verschlechtern, und sag in "why" des geänderten Teils kurz, warum.`
+    : 'Ändere nur, was die Befunde verlangen, und sag in "why" des geänderten Teils kurz, warum. Was gut ist, bleibt wie es ist: dieselben ids, dieselben Plätze.';
+  const heading = input.look ? 'Blick vor der Abgabe' : input.round === 1 ? 'Nachbesserung' : 'Zweite Nachbesserung';
   return `${buildRoomProgramPrompt(base)}
 
 ────────────────────────────────────────
-${input.round === 1 ? 'Nachbesserung' : 'Zweite Nachbesserung'}: Dein Programm wurde aufgestellt und begangen.
+${heading}: Dein Programm wurde aufgestellt und begangen.
 
 Dein bisheriges Programm:
 ${programAsAnswer(program, origin)}
@@ -135,7 +150,7 @@ ${picture}
 
 ${critiqueReport(program, layout, review)}
 
-Ändere nur, was die Befunde verlangen, und sag in "why" des geänderten Teils kurz, warum. Was gut ist, bleibt wie es ist: dieselben ids, dieselben Plätze.
+${task}
 Typische Mittel: eine Zone verschieben oder kleiner machen, eine Beziehung ändern (anderes Ziel, anderer Abstand), ein Teil gegen ein kleineres tauschen, Überflüssiges weglassen, Fehlendes ergänzen. Ein Teil, das nicht hineinkam, braucht einen anderen Platz oder eine kleinere Größe – oder es gehört nicht in diesen Raum.
 Rechne keine Koordinaten fein nach: die App stellt millimetergenau auf. Du gibst die Absicht vor.
 
