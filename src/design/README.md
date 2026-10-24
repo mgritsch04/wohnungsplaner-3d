@@ -87,6 +87,7 @@ Ein Raum, den die Begehung nicht besteht (ein schwerer Befund oder unter 85 Punk
 - `buildCritiquePrompt({ base, program, layout, review, round, image?, textMap? })` stellt die Aufgabe von Stufe 2 noch einmal (`buildRoomProgramPrompt`), dazu das bisherige Programm in der Form der eigenen Antwort (`programAsAnswer`), das Bild oder die Textkarte und den Bericht der Begehung (`critiqueReport`: Befunde mit Ort, nicht aufgestellte Teile, weit verschobene Teile, Belegung).
 - Verlangt ist wieder das vollständige Programm: dieselben ids und Plätze, wo nichts zu beanstanden war. `parseCritique` prüft es wie Stufe 2.
 - Der Text sagt ausdrücklich, dass Claude keine Koordinaten nachrechnen soll – die App stellt millimetergenau auf, Claude gibt die Absicht vor.
+- **Blick vor der Abgabe** (`look: true`, mgritsch04/wohnungsplaner-3d#443): Ein Hauptraum (`LOOK_TYPES`: Wohnen, Schlafen, Kinder, Arbeiten, Küche, Essen), der gleich beim ersten Aufstellen besteht, geht einmal mit Bild an Claude, mit einer Innenarchitektinnen-Liste statt der Befunde (Sitzgruppe auf Blickpunkt, Fenster frei, Licht an Sitz- und Arbeitsplätzen, Stühle am Tisch, Zonen verteilt). `lookKeeps` übernimmt die Antwort nur, wenn der Raum weiter besteht, höchstens `LOOK_TOLERANCE` (4) Punkte verliert und nichts mehr wegfällt. Nicht bei „schnell“, nicht ohne Bild.
 
 ## Ganzer Ablauf benutzen (`run.ts`)
 

@@ -164,6 +164,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - Eingabe: Programm, Bild des aufgestellten Raums von oben (Grundriss mit Beschriftung, Zonen, Wegen), Befunde und Punktzahl. Bilder gehen im Claude-Artefakt über `sample` mit `images` (Fähigkeit `{sample:{images:true}}` deklarieren); lokal über den Helfer (Bild als Datei, die Claude Code liest). Ohne Bildunterstützung: Textkarte (Skizze plus Möbelliste mit Plätzen).
 - Ausgabe: Änderungen am Programm (Zone verlegen, Beziehung ändern, Teil tauschen, weglassen oder ergänzen), keine Koordinaten-Bastelei. Danach Stufe 3 und 4 neu.
 - Abbruch: keine S-Befunde und mindestens 85 Punkte, oder zwei Runden erreicht (dann das beste Ergebnis).
+- Blick vor der Abgabe (T6): Ein Hauptraum, der sofort besteht, bekommt trotzdem einen Blick aufs Bild – Claude prüft wie eine Innenarchitektin, was keine Regel sieht (Ausrichtung der Sitzgruppe, Sessel vor dem Fenster, Licht, verteilte Zonen). Übernommen nur, wenn der Raum weiter besteht und höchstens 4 Punkte verliert.
 
 ### Stufe 6: Produkte
 - Bestehende Produktsuche (productSearch.ts, searchRun.ts) bleibt. Neu: nach dem Ersetzen mit echten Maßen Stufe 3 und 4 erneut; ein Produkt, das einen S-Befund auslöst, wird nicht übernommen (nächster Treffer oder kleinere Größe). Zone und Beziehungen bleiben am Teil (behebt M12).
