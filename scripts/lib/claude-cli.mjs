@@ -122,10 +122,10 @@ function locate(bin) {
  * Führt eine Anfrage aus. `bin` (Standard: `claude` bzw. Umgebungsvariable `WP_CLAUDE_BIN`).
  * Löst mit dem Antworttext auf; wirft bei Fehler oder Zeitüberschreitung. Die Zeitgrenzen sind
  * so lang wie die des Planers (`TIMEOUTS` in src/design/concept/run.ts): Ein Raumprogramm mit
- * Opus kann für eine Wohnküche länger als acht Minuten brauchen; früher abgebrochen ist die
+ * Opus kann für einen großen Raum länger als zwölf Minuten brauchen; früher abgebrochen ist die
  * Arbeit verloren und der Planer fragt noch einmal.
  */
-export function runClaude(prompt, { web = false, maxTurns, model, images = [], timeoutMs = web ? 8 * 60_000 : model === 'opus' ? 12 * 60_000 : 5 * 60_000, bin, signal } = {}) {
+export function runClaude(prompt, { web = false, maxTurns, model, images = [], timeoutMs = web ? 8 * 60_000 : model === 'opus' ? 20 * 60_000 : 5 * 60_000, bin, signal } = {}) {
   return new Promise((resolve, reject) => {
     const cwd = mkdtempSync(join(tmpdir(), 'wp-claude-'));
     // pictures as files in the working folder, named in the request: Claude Code reads them there
