@@ -95,7 +95,8 @@ function deriveNode(m: Model, n: Node): void {
       n.box = boxOnWall(w, t, s.width, s.depth, 0.02);
       n.elevation = win.sill;
     } else {
-      const t = r.count === 1 ? mid : clamp(win.t0 + (span * r.index) / (r.count - 1), s.width / 2, w.length - s.width / 2);
+      // a window near the corner: the curtain slides along the wall to stay in the room
+      const t = clamp(r.count === 1 ? mid : win.t0 + (span * r.index) / (r.count - 1), s.width / 2, w.length - s.width / 2);
       n.box = boxOnWall(w, t, s.width, s.depth, 0.08);
       n.elevation = Math.max(0, Math.min(0.02, ctx.height - s.height - 0.02));
     }
@@ -329,11 +330,14 @@ export function refreshUnit(m: Model, u: Unit): void {
 /** Polygons of a node after its box changed. */
 export function finishNode(n: Node): void {
   n.poly = boxCorners(n.box);
-  n.clear = n.spec.clear.map((c) => ({ poly: sideStrip(n.box, c.side, c.min, c.from ?? 0, c.to ?? 1), either: !!c.either }));
+  // a chair needs room behind it only at a table or desk (pulled out); a hall chair stands at the wall
+  const atTable = n.rule?.kind === 'around' || n.rule?.kind === 'front';
+  const clear = n.spec.role === 'seat' && !atTable ? n.spec.clear.filter((c) => c.side !== 'back') : n.spec.clear;
+  n.clear = clear.map((c) => ({ poly: sideStrip(n.box, c.side, c.min, c.from ?? 0, c.to ?? 1), either: !!c.either }));
   let c = 0;
-  for (const x of n.spec.clear) c = Math.max(c, x.comfort);
+  for (const x of clear) c = Math.max(c, x.comfort);
   n.reach = Math.hypot(n.box.hw + c, n.box.hd + c) + 0.25;
-  n.comfort = n.spec.clear.filter((c) => c.comfort > c.min).map((c) => sideStrip(n.box, c.side, c.comfort, c.from ?? 0, c.to ?? 1));
+  n.comfort = clear.filter((c) => c.comfort > c.min).map((c) => sideStrip(n.box, c.side, c.comfort, c.from ?? 0, c.to ?? 1));
 }
 
 /** Swap a node to a smaller catalogue piece (fallback). */

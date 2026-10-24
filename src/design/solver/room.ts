@@ -59,6 +59,8 @@ export const ENTRY_DEPTH = 0.5;
 /** Depth of the strip in front of a window where nothing may be higher than the sill. */
 export const WINDOW_DEPTH = 0.5;
 /** Clear width a piece must be reachable with (B7): 50 cm. */
+/** Extra distance of the walkways to placed pieces (m). */
+export const WALK_PAD = 0.03;
 export const REACH_RADIUS = 0.25;
 
 export interface RoomCtx {
@@ -135,6 +137,8 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
     solid,
     fixed.filter((f) => f.floor).map((f) => f.box),
     radii,
+    // the check of stage 0 measures on 5 cm cells and may find a few cm less: keep that much more
+    [...widths.map(() => WALK_PAD), 0],
   );
   return {
     analysis,

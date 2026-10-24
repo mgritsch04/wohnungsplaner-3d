@@ -117,14 +117,18 @@ function anchorsFirst(st: State, rng: Rng): void {
   }
 }
 
+const footprint = (u: Unit) => u.nodes.reduce((a, n) => a + (n.gridBox ? n.spec.width * n.spec.depth : 0), 0);
+
 /** Try the candidate poses of units involved in hard violations; keep what improves the total. */
 export function repair(st: State, rng: Rng, rounds = 4, only?: Unit[]): void {
   const m = st.m;
   for (let round = 0; round < rounds; round++) {
     if (st.hard() < 1e-9) return;
     let list = (only ?? m.units).filter((u) => movable(u) && st.unitHard(u) > 1e-9);
-    if (!list.length && st.grid > 0) list = (only ?? m.units).filter(movable);
-    list.sort((a, b) => st.unitHard(b) - st.unitHard(a));
+    // only a way is blocked: the big pieces on the floor are the ones to move, with a closer look
+    const wayOnly = !list.length && st.grid > 0;
+    if (wayOnly) list = (only ?? m.units).filter(movable).sort((a, b) => footprint(b) - footprint(a));
+    else list.sort((a, b) => st.unitHard(b) - st.unitHard(a));
     // best single move over all units involved, so the right one of two clashing pieces gives way
     let best: { u: Unit; pose: Pose; delta: number } | null = null;
     for (const u of list.slice(0, 5)) {
@@ -153,7 +157,7 @@ export function repair(st: State, rng: Rng, rounds = 4, only?: Unit[]): void {
       setPose(u, old);
       refreshUnit(m, u);
       scored.sort((a, b) => a.cost - b.cost);
-      for (const s of scored.slice(0, 4)) {
+      for (const s of scored.slice(0, wayOnly ? 12 : 4)) {
         const res = st.propose([{ u, pose: s.pose }]);
         if (res.delta < (best?.delta ?? -1e-6)) best = { u, pose: s.pose, delta: res.delta };
         res.rollback();
@@ -294,6 +298,7 @@ function settle(st: State, seed: number): DroppedItem[] {
   const dropped: DroppedItem[] = m.dropped.map((d) => ({ ...d }));
   let round = 0;
   const fresh = () => new Rng(seed * 31 + 7 + round++ * 101);
+  let restarted = false;
   for (let guard = 0; guard < 40 && st.hard() > 1e-9; guard++) {
     const vs = violations(st);
     const involved = new Map<string, Violation>();
@@ -325,6 +330,8 @@ function settle(st: State, seed: number): DroppedItem[] {
     //    what still breaks a rule afterwards gets its smaller variant in the next round
     const before = st.hard();
     let choice: { u: Unit; hard: number } | null = null;
+    // the least important optional piece whose removal helps at all: before giving up a required one
+    let optional: { u: Unit; hard: number } | null = null;
     for (const u of units.filter((x) => !x.kitchen).slice(0, 6)) {
       const snap = snapshot(m);
       u.active = false;
@@ -337,10 +344,30 @@ function settle(st: State, seed: number): DroppedItem[] {
       restore(m, snap);
       st.rebuild();
       if (!choice || h < choice.hard - 1e-9) choice = { u, hard: h };
+      if (!optional && !u.required && h < before - 1e-9) optional = { u, hard: h };
       if (h < 1e-9 || h <= before - HARD * 0.5) {
         choice = { u, hard: h };
         break;
       }
+    }
+    if (choice?.u.required && optional) choice = optional;
+    // before a required piece goes: one fresh start with the pieces as they are now (smaller bed …)
+    if (choice?.u.required && !restarted) {
+      restarted = true;
+      const snap = snapshot(m);
+      const rng = fresh();
+      // the big pieces somewhere else on their walls, then the usual search
+      for (const u of m.units.filter(movable).sort((a, b) => footprint(b) - footprint(a)).slice(0, 3)) {
+        const c = candidates(m, u, rng, 40);
+        if (c.length) setPose(u, c[Math.floor(rng.next() * c.length)]);
+      }
+      st.rebuild();
+      repair(st, rng);
+      anneal(st, rng, 400);
+      repair(st, rng);
+      if (st.hard() < before - 1e-9) continue;
+      restore(m, snap);
+      st.rebuild();
     }
     const target = choice?.u ?? units.find((u) => !u.kitchen);
     if (!target) break;
@@ -364,6 +391,8 @@ function tryFallbacks(st: State, u: Unit, rng: Rng): boolean {
   for (const id of smallerOptions(n.replaces ?? original, n.prog?.fallbacks ?? [])) {
     if (id === n.catalogId || !resizeNode(m, n, id)) continue;
     st.rebuild();
+    // the smaller piece looks for its own new place first, then the others adjust
+    repair(st, rng, 2, [u]);
     repair(st, rng, 3);
     anneal(st, rng, 150);
     if (st.hard() < before - 1e-9 && st.unitHard(u) < 1e-9) return true;

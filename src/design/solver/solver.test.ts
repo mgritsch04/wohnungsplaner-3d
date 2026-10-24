@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeFlat } from '../analysis';
-import { TEST_FLATS, type FlatKey } from '../fixtures/flats';
+import { parseFlatConcept } from '../concept/flatConcept';
+import { parseRoomProgram } from '../concept/roomProgram';
+import { testFlatInput } from '../concept/testFlats';
+import type { FlatKey } from '../fixtures/flats';
 import { RECORDED } from '../fixtures/recorded';
 import type { Layout, RoomAnalysis } from '../types';
-import { programFromRecorded } from './recordedProgram';
 import type { FixedPiece } from './room';
 import { existingPieces, solveRoom } from './solve';
 import { independentCheck } from './verify';
@@ -14,20 +15,20 @@ interface Case {
   run: () => { room: RoomAnalysis; layout: Layout; existing: FixedPiece[]; ms: number; programItems: number; required: string[] };
 }
 
+/** Every room of the recorded runs A–F, read by the parser of stage 2 as in the app. */
 function cases(): Case[] {
   const out: Case[] = [];
-  // A and B as titled; C–F (recorded with the prompts of concept/) are for the solver to take on next
-  for (const key of ['A', 'B'] as FlatKey[]) {
-    const project = TEST_FLATS[key].build();
-    const flat = analyzeFlat(project);
+  for (const key of Object.keys(RECORDED) as FlatKey[]) {
+    const f = testFlatInput(key);
+    const concept = parseFlatConcept(RECORDED[key]!.concept, f).value;
     for (const [name, raw] of Object.entries(RECORDED[key]!.programs)) {
       out.push({
         key,
         name,
         run: () => {
-          const room = flat.rooms.find((r) => r.name === name)!;
-          const existing = existingPieces(project, room);
-          const program = programFromRecorded(raw, room, existing);
+          const room = f.analysis.rooms.find((r) => r.name === name)!;
+          const existing = existingPieces(f.project, room);
+          const program = parseRoomProgram(raw, { project: f.project, concept, room, sketch: '', wishes: f.wishes }).value;
           const t = performance.now();
           const layout = solveRoom(room, program, { existing, seed: 7 });
           return { room, layout, existing, ms: performance.now() - t, programItems: program.items.length, required: program.items.filter((i) => i.required).map((i) => i.id) };
@@ -38,7 +39,7 @@ function cases(): Case[] {
   return out;
 }
 
-describe('solver on the recorded programmes of test flats A and B', () => {
+describe('solver on the recorded programmes of test flats A–F', () => {
   const all = cases();
   const results = new Map<string, ReturnType<Case['run']>>();
   const get = (c: Case) => {
@@ -75,5 +76,6 @@ describe('solver on the recorded programmes of test flats A and B', () => {
     const times = all.map((c) => c.run().ms);
     const mean = times.reduce((s, t) => s + t, 0) / times.length;
     expect(mean).toBeLessThan(300);
-  });
+    // 44 rooms take a few seconds in all
+  }, 30_000);
 });
