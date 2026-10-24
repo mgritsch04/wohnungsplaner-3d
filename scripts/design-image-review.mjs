@@ -33,7 +33,7 @@ function prompt(room, type, area) {
   return `Du bist eine erfahrene Innenarchitektin und prüfst einen Einrichtungsvorschlag unabhängig, nur nach Bildern.
 
 Raum: „${room}“, ${MAIN[type]}, ${area.toFixed(1).replace('.', ',')} m².
-Bild 1 zeigt den Raum schräg von oben, so wie man ihn beim Hereinkommen sieht, Bild 2 fast senkrecht von oben. Die Wände sind in 1,20 m Höhe aufgeschnitten. Andere Räume am Bildrand gehören nicht dazu. Die Möbel sind einfache Platzhalter-Modelle; beurteile Anordnung, Auswahl und Menge, nicht die Detailtreue der Modelle.
+Bild 1 zeigt den Raum schräg von oben, so wie man ihn beim Hereinkommen sieht. Es ist in 1,20 m Höhe waagrecht aufgeschnitten: Alles darüber fehlt dort (Hängeleuchten, Deckenleuchten, Oberschränke, Vorhänge, Bilder und die oberen Teile von Kühlschrank, Hochschrank, Kleiderschrank und hohen Regalen); hohe Möbel sehen darin wie niedrige Kästen aus. Bild 2 zeigt denselben Raum ungeschnitten fast senkrecht von oben, mit allem, was hängt; dort verdecken die Wände den Rand des Raums ein wenig. Urteile über Licht, Oberschränke und hohe Möbel nach Bild 2. Andere Räume am Bildrand gehören nicht dazu. Die Möbel sind einfache Platzhalter-Modelle; beurteile Anordnung, Auswahl und Menge, nicht die Detailtreue der Modelle.
 
 Bewerte jeden Punkt der Checkliste mit 1 (sehr schlecht) bis 10 (hervorragend) und begründe kurz:
 ${CHECKS.map(([id, text]) => `- ${id}: ${text}`).join('\n')}
