@@ -19,15 +19,18 @@ export class WalkGrid {
   readonly ny: number;
   /** Half widths (m) the grid tracks, one layer each. */
   readonly radii: number[];
+  /** Extra distance kept to placed pieces per layer (m), so the independent check measures the full width too. */
+  readonly pads: number[];
   private readonly fixed: Uint8Array[];
   private readonly count: Uint16Array[];
   private readonly label: Int32Array;
   private readonly queue: Int32Array;
   private labelLayer = -1;
 
-  constructor(room: readonly Vec2[], solid: readonly [Vec2, Vec2][], obstacles: readonly Box[], radii: number[], cell = 0.05) {
+  constructor(room: readonly Vec2[], solid: readonly [Vec2, Vec2][], obstacles: readonly Box[], radii: number[], pads: number[] = [], cell = 0.05) {
     this.cell = cell;
     this.radii = radii;
+    this.pads = radii.map((_, i) => pads[i] ?? 0);
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -75,7 +78,7 @@ export class WalkGrid {
     const ey = Math.abs(s) * b.hw + Math.abs(c) * b.hd;
     const cell = this.cell;
     for (let li = 0; li < this.radii.length; li++) {
-      const r = this.radii[li];
+      const r = this.radii[li] + this.pads[li];
       const r2 = r * r;
       const cnt = this.count[li];
       const i0 = Math.max(0, Math.floor((b.x - ex - r - this.ox) / cell));

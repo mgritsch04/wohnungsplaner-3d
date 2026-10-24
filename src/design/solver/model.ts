@@ -108,6 +108,38 @@ export interface Model {
 
 const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
 
+/**
+ * Chairs placed `front-of`, `left-of` or `right-of` a dining table each on their own would all
+ * land on the same spot: seats at a table are one `around` group (several per table, or one
+ * that is not an office chair).
+ */
+function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node>): Relation[] {
+  const isChair = (id: string) => {
+    const s = nodes.get(id)?.spec;
+    return !!s && s.role === 'seat' && !/büro/i.test(s.name);
+  };
+  const byTable = new Map<string, string[]>();
+  for (const r of relations) {
+    if ((r.kind === 'front-of' || r.kind === 'left-of' || r.kind === 'right-of') && isChair(r.item) && nodes.get(r.target)?.spec.role === 'table') {
+      byTable.set(r.target, [...(byTable.get(r.target) ?? []), r.item]);
+    }
+  }
+  if (!byTable.size) return [...relations];
+  const grouped = new Set([...byTable.values()].flat());
+  const out: Relation[] = [...byTable].map(([target, items]) => ({ kind: 'around', items, target }));
+  for (const r of relations) {
+    if ((r.kind === 'front-of' || r.kind === 'left-of' || r.kind === 'right-of') && grouped.has(r.item)) continue;
+    if (r.kind === 'around' && byTable.has(r.target)) {
+      // chairs listed twice: one group per table
+      const g = out.find((x) => x.kind === 'around' && x.target === r.target) as Extract<Relation, { kind: 'around' }>;
+      for (const i of r.items) if (!g.items.includes(i)) g.items.push(i);
+      continue;
+    }
+    out.push(r);
+  }
+  return out;
+}
+
 const DERIVED_FRONT_ROLES = new Set(['coffee-table', 'seat', 'rug']);
 /** Largest gap between a runner or mat and the piece it lies in front of. */
 const RUG_GAP = 0.05;
@@ -166,7 +198,7 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     n.rule = rule;
     return true;
   };
-  for (const rel of program.relations) {
+  for (const rel of withChairGroups(program.relations, nodes)) {
     let used = false;
     switch (rel.kind) {
       case 'around':

@@ -15,6 +15,22 @@ import { doorSeed, sideStrip, wallStrip } from './room';
 /** Weight of one broken hard rule; amounts (overlap depth, distance outside) add to it. */
 export const HARD = 4;
 const EPS = 0.005;
+/** Movement areas are guide values: a few centimetres of overlap do not count (a basin beside the WC in a 125 cm room). */
+const CLEAR_EPS = 0.03;
+
+/**
+ * q stands in the corner at one end of p, both against walls at right angles (shelves in an L,
+ * two kitchen runs): the corner piece takes the end of p's front area, which stays usable.
+ */
+function inCorner(p: Node, q: Node): boolean {
+  if (p.run !== undefined && q.run !== undefined) return true;
+  if (p.spec.wall !== 'always' || q.spec.wall !== 'always') return false;
+  if (Math.abs(Math.cos(p.box.rotation - q.box.rotation)) > 0.1) return false;
+  const ax = axisX(p.box.rotation);
+  const u = Math.abs((q.box.x - p.box.x) * ax.x + (q.box.y - p.box.y) * ax.y);
+  // q's extent along p's width is its depth (at right angles)
+  return q.box.hd <= 0.35 && u + q.box.hd >= p.box.hw - 0.02 && u - q.box.hd >= p.box.hw - 2 * q.box.hd - 0.05 && p.box.hw * 2 - 2 * q.box.hd >= 0.3;
+}
 
 /** A broken hard rule, for the debugging list `Layout.unsolved` and drop reasons. */
 export interface Violation {
@@ -115,7 +131,7 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
         if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'overlap', items: [n.id, f.piece.id], text: `${name(n)} überschneidet ${f.spec?.name ?? f.piece.id}` }));
         for (const cl of f.clear) {
           const e = overlapDepth(n.poly, cl);
-          if (e > EPS) hard(0.5 * (1 + 5 * e), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${name(n)} steht in der Bewegungsfläche vor ${f.spec?.name ?? f.piece.id}` }));
+          if (e > CLEAR_EPS) hard(0.5 * (1 + 5 * e), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${name(n)} steht in der Bewegungsfläche vor ${f.spec?.name ?? f.piece.id}` }));
         }
       }
       // movement areas inside the room and clear of existing pieces
@@ -125,9 +141,9 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
         const out = outsideAmount(cl.poly, ctx.poly);
         if (out > 0.02 && !(cl.either && eitherOk)) hard(0.5 * (1 + 5 * out), () => ({ rule: 'clearance', items: [n.id], text: `vor ${name(n)} fehlt Bewegungsfläche` }));
         for (const f of ctx.fixed) {
-          if (!f.floor) continue;
+          if (!f.floor || (n.run !== undefined && f.spec?.item.kitchen)) continue;
           const d = overlapDepth(cl.poly, f.poly);
-          if (d > EPS) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
+          if (d > CLEAR_EPS) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
         }
       }
       for (const cp of n.comfort) c.soft += 0.3 * Math.min(1, outsideAmount(cp, ctx.poly));
@@ -166,6 +182,17 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
           hard(0.5, () => ({ rule: 'hidden', items: [n.id], text: `${name(n)} hängt hinter ${f.spec?.name ?? f.piece.id}` }));
         }
       }
+    }
+  }
+  // pieces of one unit among themselves (chairs at a table, nightstands): a parent may cover its child
+  for (let i = 0; i < u.nodes.length; i++) {
+    const a = u.nodes[i];
+    if (!isFloor(a)) continue;
+    for (let j = i + 1; j < u.nodes.length; j++) {
+      const b = u.nodes[j];
+      if (!isFloor(b) || a.parent === b.id || b.parent === a.id || (a.run !== undefined && b.run !== undefined)) continue;
+      const d = overlapDepth(a.poly, b.poly);
+      if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} überschneidet ${name(b)}` }));
     }
   }
   // the unit's own design: Claude's place and zone, wanted wall, design rules
@@ -240,9 +267,10 @@ function armchairCost(a: Unit, group: Unit): number {
   const len = Math.hypot(dx, dy);
   if (len < 0.4) return 0;
   const f = axisY(chair.box.rotation);
-  return 1.0 * Math.max(0, COS70 - (f.x * dx + f.y * dy) / len);
+  return 1.0 * Math.max(0, COS_AIM - (f.x * dx + f.y * dy) / len);
 }
-const COS70 = Math.cos((70 * Math.PI) / 180);
+// aimed at 60° so the search does not stop right at the 70° the walk-through allows
+const COS_AIM = Math.cos((60 * Math.PI) / 180);
 
 // ---------------------------------------------------------------------------------------------
 // per pair of units
@@ -259,8 +287,22 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
   for (const a of near ? u.nodes : []) {
     const fa = isFloor(a);
     const wa = isWallItem(a);
+    if (isRug(a)) {
+      // a rug does not run under cabinets, wardrobes or a kitchen run
+      for (const b of v.nodes) {
+        if (!isFloor(b) || b.spec.wall !== 'always') continue;
+        const d = overlapDepth(a.poly, b.poly);
+        if (d > 0.02) hard(0.5 + 5 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} liegt unter ${name(b)}` }));
+      }
+      continue;
+    }
     if (!fa && !wa) continue;
     for (const b of v.nodes) {
+      if (isRug(b) && fa && a.spec.wall === 'always') {
+        const d = overlapDepth(a.poly, b.poly);
+        if (d > 0.02) hard(0.5 + 5 * d, () => ({ rule: 'overlap', items: [b.id, a.id], text: `${name(b)} liegt unter ${name(a)}` }));
+        continue;
+      }
       const fb = isFloor(b);
       const wb = isWallItem(b);
       if (!fb && !wb) continue;
@@ -274,9 +316,10 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
           [a, b],
           [b, a],
         ] as const) {
+          if (inCorner(p, q)) continue;
           for (const cl of p.clear) {
             const d = overlapDepth(cl.poly, q.poly);
-            if (d <= EPS) continue;
+            if (d <= CLEAR_EPS) continue;
             if (cl.either) c.soft += 0.5 + 2 * d;
             else hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [p.id, q.id], text: `${name(q)} steht in der Bewegungsfläche von ${name(p)}` }));
           }
@@ -471,15 +514,22 @@ export function gridCost(m: Model, sink: Sink = null): number {
   );
   for (const u of m.units) {
     if (!u.active) continue;
-    const list = u.kitchen ? u.nodes.filter((n) => n.run !== undefined).slice(0, 1) : u.main && isFloor(u.main) ? [u.main] : [];
+    const r = ctx.grid.radii[ctx.reachLayer];
+    const reached = (n: Node, side: 'front' | 'left' | 'right' | 'back') => ctx.grid.reached(ctx.reachLayer, sideStrip(n.box, side, r + 0.4));
+    if (u.kitchen) {
+      // a run is reached along its front; its corner module may stand in front of another run
+      const mods = u.nodes.filter((n) => n.run !== undefined);
+      if (mods.length && !mods.some((n) => reached(n, 'front'))) {
+        cost += HARD * 0.8;
+        if (sink) sink({ rule: 'reach', items: [mods[0].id], text: `${name(mods[0])} ist nicht erreichbar` });
+      }
+      continue;
+    }
+    const list = u.main && isFloor(u.main) ? [u.main] : [];
     for (const n of list) {
-      if (!n.spec.access.length && n.run === undefined) continue;
-      const sides = n.run !== undefined ? (['front'] as const) : n.spec.access;
-      const r = ctx.grid.radii[ctx.reachLayer];
-      const ok = sides.some((side) => {
-        const near = sideStrip(n.box, side, r + 0.4);
-        return ctx.grid.reached(ctx.reachLayer, near);
-      });
+      if (!n.spec.access.length) continue;
+      // seats in front of it (desk chair, chairs at the table) are pulled out: behind them counts
+      const ok = n.spec.access.some((side) => reached(n, side)) || u.nodes.some((c) => c.parent === n.id && c.spec.role === 'seat' && isFloor(c) && reached(c, 'back'));
       if (!ok) {
         cost += HARD * 0.8;
         if (sink) sink({ rule: 'reach', items: [n.id], text: `${name(n)} ist nicht erreichbar` });
