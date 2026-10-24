@@ -534,6 +534,17 @@ describe('L-shaped kitchen: the corner module is the blind corner (#443)', () =>
   });
 });
 
+describe('front clearance and what stands on top (#443)', () => {
+  it('a lamp standing on a shallow cabinet does not block its doors', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    const cabinet = { ...createFurnitureFromCatalog(findCatalogItem('generic-dresser')!, { x: 2, y: 0.25 }), x: 2, y: 0.25, rotation: 0, depth: 0.3 };
+    const lamp = { ...createFurnitureFromCatalog(findCatalogItem('generic-table-lamp')!, { x: 2.3, y: 0.3 }), x: 2.3, y: 0.3, elevation: cabinet.height };
+    p.furniture.push(cabinet, lamp);
+    expect(placementIssues(p, d, cabinet).filter((i) => i.kind === 'clearance')).toEqual([]);
+  });
+});
+
 describe('chair under table: only the seat goes under the table top (#16)', () => {
   const cat = (id: string) => findCatalogItem(id)!;
   function setup() {

@@ -539,7 +539,8 @@ export function placementIssues(p: Project, d: DerivedPlan, item: Furniture, obs
     const zone = frontZone(item, need);
     for (const o of p.furniture) {
       if (o.id === item.id || isRug(o) || pairRule(item, o).allowed || issues.some((i) => i.refId === o.id)) continue;
-      if (o.elevation > item.elevation + item.height || o.elevation + o.height < item.elevation + 0.05) continue;
+      // what stands on top (a lamp on the shoe cabinet) does not keep the doors from opening
+      if (o.elevation >= item.elevation + item.height - 0.005 || o.elevation + o.height < item.elevation + 0.05) continue;
       // the two runs of an L-shaped kitchen: the module in the corner is the blind corner cabinet
       if (item.kitchen && o.kitchen && Math.abs(Math.cos(item.rotation - o.rotation)) < 0.1) continue;
       const oc = furnitureCorners(o);
