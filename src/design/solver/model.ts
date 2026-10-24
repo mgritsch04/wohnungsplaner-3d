@@ -153,6 +153,12 @@ const VIEWERS = new Set(['sofa', 'armchair', 'bed']);
 const VIEWER_WEIGHT = 3;
 const small = (s: Spec) => Math.max(s.width, s.depth) <= 0.6 && s.base === 'floor';
 
+/**
+ * Where a kitchen run starts that meets another one at a corner: past the other run's 60 cm depth
+ * and its gap to the wall, with a few millimetres to spare for the plan's own overlap check.
+ */
+export const CORNER_START = 0.615;
+
 /** Kitchen run ids as relation targets: `kitchen` (first run), `kitchen1`, `kitchen2` … */
 export const runId = (i: number) => `kitchen${i + 1}`;
 export function runIndexOf(target: string, runs: number): number | null {
@@ -360,7 +366,10 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     const t1 = alongWallPt(w, run.to);
     const length = modules.reduce((s, m) => s + specOf(m, ctx.catalog)!.width, 0);
     const backwards = t1 < t0;
-    const preferred = backwards ? t0 - length : t0;
+    const span = Math.max(0, w.length - length);
+    // a run meant to start just past the other run of an L starts exactly there (#443)
+    const snap = (v: number) => (Math.abs(v - CORNER_START) < 0.1 ? CORNER_START : Math.abs(v - (span - CORNER_START)) < 0.1 ? span - CORNER_START : v);
+    const preferred = snap(backwards ? t0 - length : t0);
     const u = makeUnit(runId(i), 'kitchen', null);
     u.required = true;
     u.mode = 'wall';

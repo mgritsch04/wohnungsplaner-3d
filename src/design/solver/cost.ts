@@ -77,9 +77,12 @@ const LEAF_UNDERCUT = 0.015;
 function clearCost(p: Node, q: Node, hard: (amount: number, v: () => Violation) => void, soft: (x: number) => void): void {
   if (p === q || isRug(q) || q.parent === p.id || p.parent === q.id || tucked(p, q)) return;
   const sameRun = p.run !== undefined && q.run !== undefined && p.unit === q.unit;
+  // two runs of an L meet at a corner: the end module of one stands in front of the other's end,
+  // which becomes the blind corner cabinet every L-shaped kitchen has (#443)
+  const blindCorner = p.run !== undefined && q.run !== undefined && !sameRun && Math.abs(Math.cos(p.box.rotation - q.box.rotation)) < 0.1;
   for (const cl of p.clear) {
     // a movement area is about standing and walking: only the plan's own strip minds what hangs in it
-    if (cl.strict ? sameRun : inCorner(p, q) || !isFloor(q)) continue;
+    if (cl.strict ? sameRun || blindCorner : inCorner(p, q) || !isFloor(q)) continue;
     // the same height band as the plan; with the real heights (a fridge is 1.85 m tall, not 0.9 m)
     if (q.elevation > cl.z1 || top(q) < cl.z0) continue;
     const d = overlapDepth(cl.poly, q.poly);

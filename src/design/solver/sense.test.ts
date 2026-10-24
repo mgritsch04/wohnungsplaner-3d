@@ -179,6 +179,26 @@ describe('kitchen', () => {
     expect(layout.items.find((i) => i.id === cook.parent)?.catalogId).toBe('generic-k-oven');
   });
 
+  it('the two runs of an L meet in the corner without a gap: the corner module becomes the blind corner (#443)', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 1 }] });
+    // as Claude writes it: the second run starts 60 cm from the corner, past the depth of the first
+    const p: RoomProgram = {
+      ...program(room, []),
+      kitchen: [
+        { wall: 'W1', from: { x: 1.4, y: 0 }, to: { x: 4, y: 0 }, modules: ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-drawer-60'] },
+        { wall: 'W2', from: { x: 4, y: 0.6 }, to: { x: 4, y: 1.8 }, modules: ['generic-k-base-60', 'generic-k-base-60'] },
+      ],
+    };
+    const layout = solveRoom(room, p, { seed: 1 });
+    const first = layout.items.filter((i) => i.kitchenRun === 0 && i.elevation < 0.05);
+    const second = layout.items.filter((i) => i.kitchenRun === 1 && i.elevation < 0.05);
+    const end = first.reduce((a, b) => (b.x > a.x ? b : a));
+    const corner = end.y + end.depth / 2;
+    const start = Math.min(...second.map((i) => i.y - i.width / 2));
+    expect(start - corner).toBeGreaterThanOrEqual(0);
+    expect(start - corner).toBeLessThan(0.02);
+  });
+
   it('a runner lies right in front of the counter (flat A: Claude says 50 cm, meant is the walking strip)', () => {
     const { layout } = recorded('A', 'Küche');
     const runner = byId(layout, 'runner');

@@ -519,6 +519,21 @@ describe('why an item is marked (#16)', () => {
   });
 });
 
+describe('L-shaped kitchen: the corner module is the blind corner (#443)', () => {
+  const cat = (id: string) => findCatalogItem(id)!;
+  it('a module of the run at right angles may stand in front of the corner module, a parallel one may not', () => {
+    const p = roomProject();
+    const d = derivePlan(p);
+    // north run ends in the north-east corner (front south), east run starts in front of it (front west)
+    const corner = { ...createFurnitureFromCatalog(cat('generic-k-drawer-60'), { x: 3.7, y: 0.3 }), x: 3.7, y: 0.3, rotation: 0 };
+    const east = { ...createFurnitureFromCatalog(cat('generic-k-base-60'), { x: 3.7, y: 0.9 }), x: 3.7, y: 0.905, rotation: Math.PI / 2 };
+    p.furniture.push(corner, east);
+    expect(placementIssues(p, d, corner).filter((i) => i.kind === 'clearance')).toEqual([]);
+    east.rotation = 0;
+    expect(placementIssues(p, d, corner).filter((i) => i.kind === 'clearance')).toHaveLength(1);
+  });
+});
+
 describe('chair under table: only the seat goes under the table top (#16)', () => {
   const cat = (id: string) => findCatalogItem(id)!;
   function setup() {
