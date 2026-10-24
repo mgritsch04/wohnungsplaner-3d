@@ -293,12 +293,31 @@ function importance(u: Unit): number {
 /** Kitchen modules a run can do without when it does not fit (sink, cooker and fridge stay). */
 const STORAGE_MODULES = new Set(['base', 'wall']);
 
+/** Fresh starts per round before a required piece is given up. */
+const RESTART_TRIES = 4;
+
+/**
+ * The module a kitchen run can do without: one named in a violation, else the widest plain module
+ * of a run that is involved (its appliances cannot move aside, the run can only get shorter).
+ */
+function kitchenSpare(involved: Node[], m: Model): Node | undefined {
+  const spare = (n: Node) => n.run !== undefined && STORAGE_MODULES.has(n.spec.item.kitchen?.type ?? '') && m.units[n.unit].nodes.length > 2;
+  const direct = involved.find(spare);
+  if (direct) return direct;
+  for (const n of involved) {
+    if (n.run === undefined) continue;
+    const mods = m.units[n.unit].nodes.filter(spare).sort((a, b) => a.spec.width - b.spec.width);
+    if (mods.length) return mods[mods.length - 1];
+  }
+  return undefined;
+}
+
 function settle(st: State, seed: number): DroppedItem[] {
   const m = st.m;
   const dropped: DroppedItem[] = m.dropped.map((d) => ({ ...d }));
   let round = 0;
   const fresh = () => new Rng(seed * 31 + 7 + round++ * 101);
-  let restarted = false;
+  let restarted = 0;
   for (let guard = 0; guard < 40 && st.hard() > 1e-9; guard++) {
     const vs = violations(st);
     const involved = new Map<string, Violation>();
@@ -309,8 +328,9 @@ function settle(st: State, seed: number): DroppedItem[] {
       dropNode(st, dep, reasonFor(involved.get(dep.id), false), dropped);
       continue;
     }
-    // a plain storage module of a kitchen run (drawers, wall cabinet) in the way: the run gets shorter
-    const mod = [...involved.keys()].map((id) => m.nodes.get(id)!).find((n) => n.run !== undefined && STORAGE_MODULES.has(n.spec.item.kitchen?.type ?? '') && m.units[n.unit].nodes.length > 2);
+    // a kitchen run in the way: it gets shorter by a plain storage module (drawers, cupboard), so the
+    // run keeps clear of the other run's corner – sink, cooker and fridge stay
+    const mod = kitchenSpare([...involved.keys()].map((id) => m.nodes.get(id)!), m);
     if (mod) {
       const k = m.units[mod.unit].kitchen!;
       k.length -= mod.spec.width;
@@ -351,23 +371,36 @@ function settle(st: State, seed: number): DroppedItem[] {
       }
     }
     if (choice?.u.required && optional) choice = optional;
-    // before a required piece goes: one fresh start with the pieces as they are now (smaller bed …)
-    if (choice?.u.required && !restarted) {
-      restarted = true;
+    // before a required piece goes: fresh starts with the pieces as they are now (smaller bed …).
+    // A bed is worth several tries: in a tight room only one arrangement of the big pieces works.
+    if (choice?.u.required && restarted < 2) {
+      restarted++;
       const snap = snapshot(m);
-      const rng = fresh();
-      // the big pieces somewhere else on their walls, then the usual search
-      for (const u of m.units.filter(movable).sort((a, b) => footprint(b) - footprint(a)).slice(0, 3)) {
-        const c = candidates(m, u, rng, 40);
-        if (c.length) setPose(u, c[Math.floor(rng.next() * c.length)]);
+      let best: ReturnType<typeof snapshot> | null = null;
+      let bestHard = before;
+      for (let attempt = 0; attempt < RESTART_TRIES; attempt++) {
+        restore(m, snap);
+        st.rebuild();
+        const rng = fresh();
+        // the big pieces somewhere else on their walls, then the usual search
+        for (const u of m.units.filter(movable).sort((a, b) => footprint(b) - footprint(a)).slice(0, 3)) {
+          const c = candidates(m, u, rng, 40);
+          if (c.length) setPose(u, c[Math.floor(rng.next() * c.length)]);
+        }
+        st.rebuild();
+        repair(st, rng);
+        anneal(st, rng, 400);
+        repair(st, rng);
+        const h = st.hard();
+        if (h < bestHard - 1e-9) {
+          bestHard = h;
+          best = snapshot(m);
+          if (h < 1e-9) break;
+        }
       }
+      restore(m, best ?? snap);
       st.rebuild();
-      repair(st, rng);
-      anneal(st, rng, 400);
-      repair(st, rng);
-      if (st.hard() < before - 1e-9) continue;
-      restore(m, snap);
-      st.rebuild();
+      if (best) continue;
     }
     const target = choice?.u ?? units.find((u) => !u.kitchen);
     if (!target) break;
@@ -429,8 +462,8 @@ function toLayout(st: State, dropped: DroppedItem[], seed: number): Layout {
         ...(n.run !== undefined ? { kitchenRun: n.run } : {}),
       });
     }
-    if (u.kitchen) items.push(...kitchenTops(m, u));
   }
+  items.push(...kitchenTops(m));
   const vs = violations(st);
   let soft = st.total() - st.hard();
   if (!Number.isFinite(soft)) soft = 0;

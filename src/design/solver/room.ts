@@ -70,8 +70,12 @@ export interface RoomCtx {
   wallIndex: Map<string, number>;
   height: number;
   doors: DoorInfo[];
-  /** Areas door leaves sweep in this room. */
+  /** Areas door leaves sweep in this room (quarter circles on the floor). */
   swings: { label: string; poly: Vec2[] }[];
+  /** The opened leaves themselves: a strip from the hinge into the room, solid up to the door's top. */
+  leaves: { label: string; poly: Vec2[]; z1: number }[];
+  /** Water and drain connections with a hand's width round them: no cabinet in front (#81). */
+  connections: { id: string; poly: Vec2[] }[];
   windows: WindowInfo[];
   keepFree: { id: string; poly: Vec2[] }[];
   userZones: Map<string, Vec2[]>;
@@ -87,6 +91,36 @@ export interface RoomCtx {
 
 const pointOnWall = (w: WallInfo, t: number): Vec2 => add(w.a, scale(w.dir, t));
 
+/** Half the leaf thickness (`DOOR_LEAF_THICKNESS`): the plan centres the opened leaf on hinge → tip. */
+const LEAF_SIDE = 0.023;
+/** Space kept free round a water or drain connection, as in the plan check (`coveredConnections`). */
+const CONNECTION_ACCESS = 0.1;
+
+/**
+ * The opened door leaf: it stands along hinge → open tip and reaches beyond the swept quarter
+ * circle by half its thickness. `swing` is [hinge, closed tip, …, open tip].
+ */
+export function leafStrip(swing: Vec2[]): Vec2[] {
+  const hinge = swing[0];
+  const open = swing[swing.length - 1];
+  const closed = swing[1];
+  const len = Math.hypot(closed.x - hinge.x, closed.y - hinge.y) || 1;
+  const away = { x: ((hinge.x - closed.x) / len) * LEAF_SIDE, y: ((hinge.y - closed.y) / len) * LEAF_SIDE };
+  return [hinge, open, add(open, away), add(hinge, away)];
+}
+
+/** Area round a water or drain connection on a wall (or round the point when it is off the walls). */
+function connectionArea(f: RoomAnalysis['fixtures'][number], w: WallInfo | undefined): Vec2[] {
+  const hw = f.width / 2 + CONNECTION_ACCESS;
+  const dir = w?.dir ?? { x: 1, y: 0 };
+  const inward = w?.inward ?? { x: 0, y: 1 };
+  const base = w ? pointOnWall(w, f.t) : add(f.p, scale(inward, -CONNECTION_ACCESS));
+  const depth = 0.08 + 2 * CONNECTION_ACCESS;
+  const a = add(base, scale(dir, -hw));
+  const b = add(base, scale(dir, hw));
+  return [a, b, add(b, scale(inward, depth)), add(a, scale(inward, depth))];
+}
+
 /** Rectangle on the room side of a wall stretch, `depth` deep. */
 export function wallStrip(w: WallInfo, t0: number, t1: number, depth: number): Vec2[] {
   const a = pointOnWall(w, t0);
@@ -101,11 +135,15 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
   const windows: WindowInfo[] = [];
   const solid: [Vec2, Vec2][] = [];
   const swings: { label: string; poly: Vec2[] }[] = [];
+  const leaves: RoomCtx['leaves'] = [];
   walls.forEach((w, wi) => {
     // the wall face minus its doors, passages and glazed doors: what a person cannot walk through
     const gaps: { t0: number; t1: number }[] = [];
     for (const o of w.openings) {
-      if (o.swingsIn && o.swing?.length) swings.push({ label: o.id, poly: o.swing });
+      if (o.swingsIn && o.swing?.length) {
+        swings.push({ label: o.id, poly: o.swing });
+        leaves.push({ label: o.id, poly: leafStrip(o.swing), z1: o.top ?? 2.1 });
+      }
       if (o.passable) {
         gaps.push(o);
         const mid = pointOnWall(w, (o.t0 + o.t1) / 2);
@@ -148,6 +186,8 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
     height: analysis.height,
     doors,
     swings,
+    leaves,
+    connections: analysis.fixtures.filter((f) => f.kind === 'water' || f.kind === 'drain').map((f) => ({ id: f.id, poly: connectionArea(f, f.wall ? walls[wallIndex.get(f.wall)!] : undefined) })),
     windows,
     keepFree: analysis.userZones.filter((z) => z.keepFree).map((z) => ({ id: z.id, poly: z.points })),
     userZones: new Map(analysis.userZones.map((z) => [z.id, z.points])),

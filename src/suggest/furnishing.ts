@@ -173,6 +173,8 @@ export interface FurnishingSuggestion {
   items: Furniture[];
   /** Furniture of an earlier, applied suggestion that this one replaces (#350): hidden in the preview, removed when applied. */
   replaces?: string[];
+  /** Zones of the new proposal (#442): drawn as faint areas under the preview in 2D, never applied. */
+  zones?: { roomId: string; id: string; label: string; points: Vec2[] }[];
 }
 
 /** Which room an item stands in (by its centre). */

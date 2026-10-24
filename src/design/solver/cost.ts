@@ -8,13 +8,17 @@
  * the walking grid (`gridCost`), so the search can recompute only what a move touches.
  */
 import { add, closestPointOnSegment, scale, type Vec2 } from '../../model/vec';
-import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, wrapAngle, type Box } from './geom';
+import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, WALL_TOL, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
+import { usesWater } from '../../model/fixtures';
 import { doorSeed, sideStrip, wallStrip } from './room';
 
 /** Weight of one broken hard rule; amounts (overlap depth, distance outside) add to it. */
 export const HARD = 4;
-const EPS = 0.005;
+/** Overlaps up to this depth count as touching: below the plan's own checks (3 mm, see `placementIssues`). */
+const EPS = 0.002;
+/** The plan checks door swings to 1 mm. */
+const SWING_EPS = 0.0005;
 /** Movement areas are guide values: a few centimetres of overlap do not count (a basin beside the WC in a 125 cm room). */
 const CLEAR_EPS = 0.03;
 
@@ -56,9 +60,37 @@ const isRug = (n: Node) => n.spec.base === 'rug';
 const isWallItem = (n: Node) => n.spec.base === 'wall' && !n.spec.item.kitchen;
 /** Furniture one cannot squeeze past: not plants, lamps or chairs (C9). */
 const isFirm = (n: Node) => isFloor(n) && n.spec.shape !== 'plant' && n.spec.role !== 'floor-lamp' && n.spec.role !== 'seat' && n.spec.shape !== 'vacuum';
-const top = (n: Node) => n.elevation + (n.run !== undefined ? 0.9 : n.spec.height);
+/** Kitchen modules that end at worktop height; a tall unit or fridge is as tall as it is. */
+const WORKTOP = new Set(['base', 'sink', 'dishwasher', 'oven']);
+const top = (n: Node) => n.elevation + (n.run !== undefined && WORKTOP.has(n.spec.item.kitchen?.type ?? '') ? 0.9 : n.spec.height);
 
 const name = (n: Node) => n.spec.name;
+
+/** Floor clearance under an opened door leaf (`DOOR_LEAF_UNDERCUT`): a flat rug may lie below it. */
+const LEAF_UNDERCUT = 0.015;
+
+/**
+ * What `q` takes away from the movement areas of `p`. The strip the plan insists on (doors and
+ * drawers have to open) counts to the millimetre and whatever hangs at that height takes it away –
+ * a lamp in front of a wardrobe as much as a chest of drawers. The other strips are guide values.
+ */
+function clearCost(p: Node, q: Node, hard: (amount: number, v: () => Violation) => void, soft: (x: number) => void): void {
+  if (p === q || isRug(q) || q.parent === p.id || p.parent === q.id || tucked(p, q)) return;
+  const sameRun = p.run !== undefined && q.run !== undefined && p.unit === q.unit;
+  for (const cl of p.clear) {
+    // a movement area is about standing and walking: only the plan's own strip minds what hangs in it
+    if (cl.strict ? sameRun : inCorner(p, q) || !isFloor(q)) continue;
+    // the same height band as the plan; with the real heights (a fridge is 1.85 m tall, not 0.9 m)
+    if (q.elevation > cl.z1 || top(q) < cl.z0) continue;
+    const d = overlapDepth(cl.poly, q.poly);
+    if (d <= (cl.strict ? EPS : CLEAR_EPS)) {
+      if (cl.strict && d > 0) soft(0.2);
+      continue;
+    }
+    if (cl.either && !cl.strict) soft(0.5 + 2 * d);
+    else hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [p.id, q.id], text: cl.strict ? `${name(q)} steht vor den Türen von ${name(p)}` : `${name(q)} steht in der Bewegungsfläche von ${name(p)}` }));
+  }
+}
 
 /** Seat that may stand partly under its own table or desk. */
 function tucked(a: Node, b: Node): boolean {
@@ -107,14 +139,27 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
     const floor = isFloor(n);
     const rug = isRug(n);
     const wallItem = isWallItem(n);
-    if (floor || rug || wallItem || n.spec.base === 'curtain') {
-      const out = outsideAmount(n.poly, ctx.poly);
-      if (out > 0.01) hard(1 + 5 * out, () => ({ rule: 'inside', items: [n.id], text: `${name(n)} ragt aus dem Raum` }));
+    // the opened door leaf is solid up to the door's top: nothing may stand or hang in it (#442)
+    for (const l of ctx.leaves) {
+      if (Math.min(top(n), l.z1) - Math.max(n.elevation, LEAF_UNDERCUT) <= 0.005) continue;
+      const d = overlapDepth(n.poly, l.poly);
+      if (d > SWING_EPS) hard(1 + 10 * d, () => ({ rule: 'swing', items: [n.id], text: `${name(n)} steht im geöffneten Türblatt von ${l.label}` }));
+    }
+    // the plan reports anything reaching into a wall by more than 0.1 mm (`placementIssues`)
+    if (floor || rug || wallItem || n.spec.base === 'curtain' || n.spec.base === 'ceiling') {
+      const out = outsideAmount(n.poly, ctx.poly, WALL_TOL);
+      if (out > 0) hard(1 + 5 * out, () => ({ rule: 'inside', items: [n.id], text: `${name(n)} ragt aus dem Raum` }));
     }
     if (floor) {
       for (const s of ctx.swings) {
         const d = overlapDepth(n.poly, s.poly);
-        if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'swing', items: [n.id], text: `${name(n)} steht im Türschwenk von ${s.label}` }));
+        if (d > SWING_EPS) hard(1 + 10 * d, () => ({ rule: 'swing', items: [n.id], text: `${name(n)} steht im Türschwenk von ${s.label}` }));
+      }
+      if (n.spec.item.solid !== false && !usesWater(n.spec.item)) {
+        for (const k of ctx.connections) {
+          const d = overlapDepth(n.poly, k.poly);
+          if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'connection', items: [n.id], text: `${name(n)} steht vor einem Wasseranschluss` }));
+        }
       }
       for (const door of ctx.doors) {
         const d = overlapDepth(n.poly, door.entry);
@@ -143,7 +188,7 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
         for (const f of ctx.fixed) {
           if (!f.floor || (n.run !== undefined && f.spec?.item.kitchen)) continue;
           const d = overlapDepth(cl.poly, f.poly);
-          if (d > CLEAR_EPS) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
+          if (d > (cl.strict ? EPS : CLEAR_EPS)) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
         }
       }
       for (const cp of n.comfort) c.soft += 0.3 * Math.min(1, outsideAmount(cp, ctx.poly));
@@ -184,17 +229,22 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
       }
     }
   }
-  // pieces of one unit among themselves (chairs at a table, nightstands): a parent may cover its child
+  // pieces of one group among themselves: the derivation places them, so an overlap left here
+  // means one of them has to go (two chairs in the same place at a small table); a parent may
+  // cover its child, and the modules of a kitchen run meet by design
   for (let i = 0; i < u.nodes.length; i++) {
     const a = u.nodes[i];
     if (!isFloor(a)) continue;
     for (let j = i + 1; j < u.nodes.length; j++) {
       const b = u.nodes[j];
-      if (!isFloor(b) || a.parent === b.id || b.parent === a.id || (a.run !== undefined && b.run !== undefined)) continue;
+      if (!isFloor(b) || a.parent === b.id || b.parent === a.id || (a.run !== undefined && b.run !== undefined) || tucked(a, b)) continue;
       const d = overlapDepth(a.poly, b.poly);
       if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} überschneidet ${name(b)}` }));
     }
   }
+  // the group's own pieces in each other's movement areas (a stool in front of the sideboard)
+  for (const a of u.nodes) for (const b of u.nodes) clearCost(a, b, hard, (x) => (c.soft += x));
+
   // the unit's own design: Claude's place and zone, wanted wall, design rules
   const n = u.main;
   if (n && u.kind !== 'fixed') {
@@ -284,6 +334,16 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
     if (sink) sink(viol());
   };
   const near = u.bounds.x0 < v.bounds.x1 && v.bounds.x0 < u.bounds.x1 && u.bounds.y0 < v.bounds.y1 && v.bounds.y0 < u.bounds.y1;
+  // movement areas: whatever stands or hangs in them, seen from both sides
+  if (near) {
+    for (const a of u.nodes) {
+      for (const b of v.nodes) {
+        if (Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) > a.reach + b.reach) continue;
+        clearCost(a, b, hard, (x) => (c.soft += x));
+        clearCost(b, a, hard, (x) => (c.soft += x));
+      }
+    }
+  }
   for (const a of near ? u.nodes : []) {
     const fa = isFloor(a);
     const wa = isWallItem(a);
@@ -316,13 +376,6 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
           [a, b],
           [b, a],
         ] as const) {
-          if (inCorner(p, q)) continue;
-          for (const cl of p.clear) {
-            const d = overlapDepth(cl.poly, q.poly);
-            if (d <= CLEAR_EPS) continue;
-            if (cl.either) c.soft += 0.5 + 2 * d;
-            else hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [p.id, q.id], text: `${name(q)} steht in der Bewegungsfläche von ${name(p)}` }));
-          }
           for (const cp of p.comfort) c.soft += 0.4 * Math.min(0.5, overlapDepth(cp, q.poly));
         }
         if (isFirm(a) && isFirm(b) && Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) - Math.hypot(a.box.hw, a.box.hd) - Math.hypot(b.box.hw, b.box.hd) < 0.2) {
@@ -333,7 +386,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       } else if (wa !== wb) {
         const w = wa ? a : b;
         const f = wa ? b : a;
-        if (top(f) > w.elevation + 0.05 && overlapDepth(w.poly, f.poly) > EPS) hard(0.5, () => ({ rule: 'hidden', items: [w.id, f.id], text: `${name(w)} hängt hinter ${name(f)}` }));
+        if (top(f) > w.elevation + 0.005 && overlapDepth(w.poly, f.poly) > EPS) hard(0.5, () => ({ rule: 'hidden', items: [w.id, f.id], text: `${name(w)} hängt hinter ${name(f)}` }));
       } else if (wa && wb) {
         const zOverlap = Math.min(a.elevation + a.spec.height, b.elevation + b.spec.height) - Math.max(a.elevation, b.elevation);
         if (zOverlap > 0.02 && overlapDepth(a.poly, b.poly) > EPS) hard(0.5, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} hängt über ${name(b)}` }));
