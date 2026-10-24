@@ -89,6 +89,7 @@ test('Einrichtungsvorschlag (#350): jeder Raumtyp mit Leitfaden, Planer-Prüfung
   const left = page.locator('.panel.left');
   await left.getByRole('button', { name: 'Einrichten' }).click();
   const panel = page.getByTestId('design-panel');
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
   await expect(proposal).toBeVisible({ timeout: 30_000 });

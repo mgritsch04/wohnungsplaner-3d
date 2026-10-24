@@ -12,7 +12,9 @@ Neuer Ablauf für den Claude-Einrichtungsvorschlag (mgritsch04/wohnungsplaner-3d
 | 3 Aufstellen | `solver/` | `Layout` | mgritsch04/wohnungsplaner-3d#440 |
 | 4 Begehung | `review/` | `RoomReview`, `Review` | mgritsch04/wohnungsplaner-3d#441 |
 | 5 Kritik: Raumbild und Textkarte | `render/` | Bild (SVG, PNG) und Text des eingerichteten Raums | mgritsch04/wohnungsplaner-3d#442 |
-| 5 Kritik, 6 Produkte, Einbau | `src/assistant/` | `FlatResult` | mgritsch04/wohnungsplaner-3d#442 |
+| 5 Kritik (Claude, je Raum mit Befund) | `critique.ts` | nachgebessertes `RoomProgram` | mgritsch04/wohnungsplaner-3d#442 |
+| Ablauf über alle Stufen | `run.ts` | `FurnishRunResult` | mgritsch04/wohnungsplaner-3d#442 |
+| 6 Produkte, Übernahme, Oberfläche | `apply/`, `src/assistant/` | `DesignProposal`, Möbel im Projekt | mgritsch04/wohnungsplaner-3d#442 |
 | Benchmark, Vorher/Nachher | `scripts/`, `e2e/` | Bericht | mgritsch04/wohnungsplaner-3d#443 |
 
 Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinaten und Himmelsrichtungen für Claude), `score.ts` (Punkte der Begehung), `fixtures/` (Testwohnungen und aufgezeichnete Claude-Antworten).
@@ -77,6 +79,31 @@ Für die Kritik (Stufe 5) sieht Claude den eingerichteten Raum von oben.
 - `svgToPng(plan)` macht daraus im Browser ein PNG (`{ mediaType, data, width, height }`, `data` in Base64, höchstens 1568 px). Das geht an `sample` mit Bildern oder als Datei an den lokalen Helfer.
 - `roomTextMap(input)` schreibt dasselbe als Text, für die Kritik ohne Bild (zusammen mit `roomSketch`) und als Liste neben dem Bild. Er enthält Zonen, Teile mit Mitte, Wand und Blickrichtung, die Küchenzeile, nicht aufgestellte Teile, Wege und Befunde.
 - Beispiele: `render/__snapshots__/plan-*.svg` (auf GitHub direkt als Bild zu sehen) und `textmap-*.txt`.
+
+## Stufe 5 benutzen (`critique.ts`)
+
+Ein Raum, den die Begehung nicht besteht (ein schwerer Befund oder unter 85 Punkten), geht noch einmal an Claude.
+
+- `buildCritiquePrompt({ base, program, layout, review, round, image?, textMap? })` stellt die Aufgabe von Stufe 2 noch einmal (`buildRoomProgramPrompt`), dazu das bisherige Programm in der Form der eigenen Antwort (`programAsAnswer`), das Bild oder die Textkarte und den Bericht der Begehung (`critiqueReport`: Befunde mit Ort, nicht aufgestellte Teile, weit verschobene Teile, Belegung).
+- Verlangt ist wieder das vollständige Programm: dieselben ids und Plätze, wo nichts zu beanstanden war. `parseCritique` prüft es wie Stufe 2.
+- Der Text sagt ausdrücklich, dass Claude keine Koordinaten nachrechnen soll – die App stellt millimetergenau auf, Claude gibt die Absicht vor.
+
+## Ganzer Ablauf benutzen (`run.ts`)
+
+`runFurnishing({ sample, project, roomIds, wishes, roomTypes?, products?, toImage?, seed?, timeouts?, signal?, onProgress? })` führt durch alle Stufen und gibt ein `FurnishRunResult` zurück (`FlatResult` plus Begehung der Wohnung, ausgefallene Räume, Aufrufprotokoll).
+
+- Reihenfolge: Wohnung lesen → Wohnkonzept → Raumprogramme (drei Räume gleichzeitig) → Aufstellen → Begehung → Kritik → Begehung der ganzen Wohnung. `onProgress` meldet jede Stufe mit Raumnamen, `signal` bricht ab.
+- Kritik höchstens zweimal je Raum, Schluss sobald der Raum besteht. Es gewinnt die bessere Runde, nicht die letzte (`better`): eine Antwort, die den Raum leert oder mehr Teile verliert, wird verworfen; eine fehlgeschlagene Runde lässt den Raum so, wie er stand.
+- `toImage` zeichnet das Raumbild (im Browser `svgToPng`). Gefragt wird nur, wenn dieser Claude Bilder ansehen kann (`sample.images`); sonst geht die Textkarte mit. Im Claude-Artefakt braucht das die Fähigkeit `{ sample: { images: true } }`, lokal den Helfer ab Version 4 (`npm run ikea-helper`, Bilder als Dateien im Arbeitsordner).
+- Ein Raum ohne verwertbare Antwort hält die anderen nicht auf; er steht am Ende in `failed`.
+- Tests: `run.test.ts` mit nachgestelltem Claude auf den aufgezeichneten Antworten, `e2e/furnishConcept.spec.ts` in der echten Oberfläche (dort auch das Raumbild, das nur ein Browser zeichnen kann).
+
+## Stufe 6 und Oberfläche benutzen (`apply/`)
+
+- `proposalFrom(result, project, roomTypes?, catalog?)` macht aus dem Lauf den `DesignProposal`, den das Panel kennt: je Raum die Lesart des Programms, der Leitfaden aus dem Wohnkonzept, die Befunde der Planprüfung und die Möbel. Gleiche Teile in derselben Zone sind eine Zeile mit Anzahl; `pickItems(pick)` nennt die Programmteile dahinter.
+- `placedRooms(result, roomTypes?)` gibt die aufgestellten Räume für Vorschau und Übernahme; `layoutSuggestion` daraus die Möbel fürs Projekt.
+- `withProduct(result, project, swap, catalog, roomTypes?, seed?)` ist Stufe 6: Das gefundene Produkt kommt ins Raumprogramm, der Raum wird damit neu aufgestellt und neu begangen. Bringt das einen neuen schweren Befund oder verliert ein Teil seinen Platz, wird das Produkt nicht genommen (`taken: false`, `why`) – ein echter Schrank ist tiefer als sein Platzhalter und kann eine Tür blockieren.
+- Im Panel (`src/assistant/DesignPanel.tsx`) steht der neue Weg unter „Verfahren“ als **Wohnkonzept** (Voreinstellung); **Möbelliste** ist der bisherige Weg und bleibt als Rückfall. Während des Laufs zeigt der Knopf die Stufe, je Raum stehen Lesart, Leitfaden, Begehung mit Punkten und die Begründung an jedem Möbel; die Vorschau zeigt die Zonen des Programms im 2D-Plan.
 
 ## Konventionen
 

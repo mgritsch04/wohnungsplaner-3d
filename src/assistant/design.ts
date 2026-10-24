@@ -63,7 +63,17 @@ export interface DesignWishes {
   searchReal: boolean;
   /** „gründlich“: strongest model and a second round in which Claude checks the placed room; „schnell“: one round. */
   quality: DesignQuality;
+  /** Which way the proposal is made (#442): the new one with concept, placement and walk-through, or the old one. */
+  method?: DesignMethod;
 }
+
+/** „konzept“ = the new run (stages 0–5, `design/run.ts`); „liste“ = the old one (Claude picks a list). */
+export type DesignMethod = 'konzept' | 'liste';
+
+export const METHOD_CHOICES: { value: DesignMethod; label: string }[] = [
+  { value: 'konzept', label: 'Wohnkonzept – Claude entwirft Konzept und Zonen, die App stellt auf und begeht, Claude bessert nach' },
+  { value: 'liste', label: 'Möbelliste – der bisherige Weg: Claude wählt Möbel aus, der Planer stellt sie auf' },
+];
 
 export type DesignQuality = 'thorough' | 'fast';
 
@@ -72,7 +82,7 @@ export const QUALITY_CHOICES: { value: DesignQuality; label: string }[] = [
   { value: 'fast', label: 'Schnell – eine Runde mit dem Standardmodell' },
 ];
 
-export const EMPTY_WISHES: DesignWishes = { interests: '', needs: '', wants: '', style: 'skandinavisch', colors: '', budget: 0, retailer: 'both', searchReal: true, quality: 'thorough' };
+export const EMPTY_WISHES: DesignWishes = { interests: '', needs: '', wants: '', style: 'skandinavisch', colors: '', budget: 0, retailer: 'both', searchReal: true, quality: 'thorough', method: 'konzept' };
 
 export const MAX_FIELD = 300;
 /** At most this many own products go into one request (keeps the prompt and the usage small). */

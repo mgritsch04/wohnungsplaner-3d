@@ -171,6 +171,34 @@ process.stdin.on('end', () => process.stdout.write(JSON.stringify({ type: 'resul
     await expect(runClaude('x', { bin: join(dir, 'gibt-es-nicht') })).rejects.toThrow('nicht gefunden');
   });
 
+  it('Kommandozeile: Bilder liegen als Datei im Arbeitsordner und dürfen gelesen werden (#442)', async () => {
+    // one pixel, so the fake claude can report back what it found in its folder
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const withImages = claudeArgs({ images: 1 });
+    expect(withImages[withImages.indexOf('--allowedTools') + 1]).toBe('Read');
+    expect(withImages[withImages.indexOf('--max-turns') + 1]).toBe('4');
+    const dir = mkdtempSync(join(tmpdir(), 'fake-claude-img-'));
+    const bin = join(dir, 'claude');
+    writeFileSync(
+      bin,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+let input = '';
+process.stdin.on('data', (c) => (input += c));
+process.stdin.on('end', () => {
+  const files = fs.readdirSync(process.cwd()).join(',');
+  const bytes = fs.readFileSync(process.cwd() + '/bild1.png').length;
+  process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: files + ' | ' + bytes + ' | ' + input }));
+});
+`,
+    );
+    chmodSync(bin, 0o755);
+    const text = await runClaude('Sieh dir den Raum an', { bin, images: [{ data: png }] });
+    expect(text).toContain('bild1.png');
+    expect(text).toContain('| 70 |');
+    expect(text).toContain('bild1.png. Sieh sie dir mit dem Read-Werkzeug an');
+  });
+
   describe('Claude Code finden (Windows-Pfade gemockt)', () => {
     const win = (files: string[], env: Record<string, string> = {}) => ({
       platform: 'win32',

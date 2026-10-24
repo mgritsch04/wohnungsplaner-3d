@@ -10,7 +10,7 @@
  * läuft in einem leeren Arbeitsordner.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -23,10 +23,12 @@ const BLOCKED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Task', 'Agent'];
 /** Models the planner may ask for by name (#350, „gründlich“); anything else uses the Claude Code default. */
 export const MODELS = ['opus', 'sonnet'];
 
-export function claudeArgs({ web = false, maxTurns, model } = {}) {
-  const args = ['-p', '--output-format', 'json', '--max-turns', String(maxTurns ?? (web ? 40 : 2))];
+export function claudeArgs({ web = false, maxTurns, model, images = 0 } = {}) {
+  const args = ['-p', '--output-format', 'json', '--max-turns', String(maxTurns ?? (web ? 40 : images ? 4 : 2))];
   args.push('--disallowedTools', BLOCKED.join(','));
   if (web) args.push('--allowedTools', ['WebSearch', ...SHOP_FETCH].join(','));
+  // pictures lie in the empty working folder as files; Claude Code needs to read them
+  else if (images) args.push('--allowedTools', 'Read');
   // WP_CLAUDE_MODEL fixes the model for every request; otherwise the planner's choice, else the Claude Code default
   const chosen = process.env.WP_CLAUDE_MODEL || (MODELS.includes(model) ? model : '');
   if (chosen) args.push('--model', chosen);
@@ -120,16 +122,23 @@ function locate(bin) {
  * Führt eine Anfrage aus. `bin` (Standard: `claude` bzw. Umgebungsvariable `WP_CLAUDE_BIN`).
  * Löst mit dem Antworttext auf; wirft bei Fehler oder Zeitüberschreitung.
  */
-export function runClaude(prompt, { web = false, maxTurns, model, timeoutMs = web ? 8 * 60_000 : model === 'opus' ? 8 * 60_000 : 4 * 60_000, bin, signal } = {}) {
+export function runClaude(prompt, { web = false, maxTurns, model, images = [], timeoutMs = web ? 8 * 60_000 : model === 'opus' ? 8 * 60_000 : 4 * 60_000, bin, signal } = {}) {
   return new Promise((resolve, reject) => {
     const cwd = mkdtempSync(join(tmpdir(), 'wp-claude-'));
+    // pictures as files in the working folder, named in the request: Claude Code reads them there
+    const names = images.map((img, i) => {
+      const name = `bild${i + 1}.png`;
+      writeFileSync(join(cwd, name), Buffer.from(img.data, 'base64'));
+      return name;
+    });
+    const text = names.length ? `${prompt}\n\nDie Bilder zu dieser Anfrage liegen als Dateien in deinem Arbeitsordner: ${names.join(', ')}. Sieh sie dir mit dem Read-Werkzeug an, bevor du antwortest.` : prompt;
     const found = locate(bin);
     if (!found) {
       rmSync(cwd, { recursive: true, force: true });
       reject(new Error(`Claude Code nicht gefunden. ${INSTALL_HELP}`));
       return;
     }
-    const child = launch(found, claudeArgs({ web, maxTurns, model }), { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    const child = launch(found, claudeArgs({ web, maxTurns, model, images: names.length }), { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '';
     let stderr = '';
     let finished = false;
@@ -161,7 +170,7 @@ export function runClaude(prompt, { web = false, maxTurns, model, timeoutMs = we
         done(code ? new Error(`${e.message} ${stderr.trim().slice(0, 300)}`.trim()) : e);
       }
     });
-    child.stdin.end(prompt);
+    child.stdin.end(text);
   });
 }
 

@@ -38,11 +38,19 @@ export interface SampleTool {
   execute(input: unknown, context?: { signal?: AbortSignal }): unknown;
 }
 
+/** A picture Claude looks at (#442, the critique round): PNG, base64 without the `data:` prefix. */
+export interface SampleImage {
+  mediaType: 'image/png';
+  data: string;
+}
+
 export interface SampleOptions {
   signal?: AbortSignal;
   modelTier?: 'quick' | 'default' | 'complex';
   cache?: boolean;
   tools?: SampleTool[];
+  /** Pictures for this request; only where `Sample.images` is true (else leave them out). */
+  images?: SampleImage[];
   /** Local Claude Code only: allow web search and reading pages of ikea.com / moebelix.at. */
   web?: boolean;
   /** Local Claude Code only: short note for the helper's window (what is asked, how many are left). */
@@ -55,6 +63,8 @@ export interface SampleOptions {
 export interface Sample {
   /** 'artifact' = Claude artifact runtime, 'local' = Claude Code through the local helper. */
   kind: 'artifact' | 'local';
+  /** This Claude can look at pictures; where it cannot, the caller sends a text map instead. */
+  images: boolean;
   json<T = unknown>(input: string, options?: SampleOptions): Promise<T>;
 }
 
@@ -89,21 +99,24 @@ export async function missingClaude(base = IKEA_HELPER_URL, f: Fetch = fetch): P
 
 /** Claude through the local helper (`POST /claude`), when the helper reports Claude Code. */
 export async function localSample(base = IKEA_HELPER_URL, f: Fetch = fetch): Promise<Sample | null> {
+  let withImages = false;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 1500);
     const res = await f(`${base}/status`, { signal: ctrl.signal }).finally(() => clearTimeout(t));
-    const body = (await res.json()) as { name?: unknown; claude?: unknown };
+    const body = (await res.json()) as { name?: unknown; claude?: unknown; images?: unknown };
     if (!res.ok || body.name !== 'wohnungsplaner-ikea-helper' || body.claude !== true) return null;
+    withImages = body.images === true;
   } catch {
     return null;
   }
   return {
     kind: 'local',
+    images: withImages,
     async json<T>(input: string, options: SampleOptions = {}): Promise<T> {
       let res: Response;
       try {
-        res = await f(`${base}/claude`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: input, web: options.web === true, ...(options.label ? { label: options.label.slice(0, 120) } : {}), ...(options.model ? { model: options.model } : {}) }), signal: options.signal });
+        res = await f(`${base}/claude`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: input, web: options.web === true, ...(options.label ? { label: options.label.slice(0, 120) } : {}), ...(options.model ? { model: options.model } : {}), ...(withImages && options.images?.length ? { images: options.images } : {}) }), signal: options.signal });
       } catch (e) {
         if (options.signal?.aborted) throw { code: 'cancelled' } satisfies SampleError;
         throw { code: 'upstream_error', message: e instanceof Error ? e.message : String(e) } satisfies SampleError;
@@ -130,7 +143,16 @@ function runtime(): ClaudeRuntime | null {
 let pending: Promise<Sample | null> | null = null;
 
 interface RuntimeSample {
-  json(input: string, options?: Omit<SampleOptions, 'web'>): Promise<unknown>;
+  json(input: string, options?: Omit<SampleOptions, 'web' | 'images'> & { images?: Blob[] }): Promise<unknown>;
+  limits?(): Promise<{ images?: boolean }>;
+}
+
+/** Base64 PNG → Blob, as the artifact runtime wants its pictures. */
+function toBlob(image: SampleImage): Blob {
+  const bin = atob(image.data);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: image.mediaType });
 }
 
 /** Resolves Claude: artifact runtime first, else Claude Code through the local helper; null where Claude cannot be asked. */
@@ -139,13 +161,17 @@ export function loadSample(): Promise<Sample | null> {
     const rt = runtime();
     pending = rt
       ? rt.use('sample').then(
-          (s) => {
+          async (s) => {
             if (!s || typeof (s as Partial<RuntimeSample>).json !== 'function') return null;
             const run = s as RuntimeSample;
+            // whether this viewer's runtime takes pictures at all (the critique round asks for it)
+            const withImages = await run.limits?.().then((l) => l?.images === true, () => false);
             return {
               kind: 'artifact',
+              images: withImages === true,
               // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `web`, `label` and `model` are for the local helper only
-              json: <T,>(input: string, { web, label, model, ...options }: SampleOptions = {}) => run.json(input, options) as Promise<T>,
+              json: <T,>(input: string, { web, label, model, images, ...options }: SampleOptions = {}) =>
+                run.json(input, { ...options, ...(withImages && images?.length ? { images: images.map(toBlob) } : {}) }) as Promise<T>,
             } satisfies Sample;
           },
           () => null,

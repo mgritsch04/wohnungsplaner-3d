@@ -33,7 +33,8 @@
  *                                       → { article, entry | null, model | null, reason?, note?, cached }
  *   GET /model/<datei>.glb              → 3D-Modell aus dem Zwischenspeicher
  *   GET /image/<datei>                  → Produktfoto einer gesendeten Seite ohne 3D-Modell (#273)
- *   POST /claude { prompt, web?, model? } → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
+ *   POST /claude { prompt, web?, model?, images? } → { text }  Anfrage an Claude über die lokale Claude-Code-Kommandozeile
+ *                                         `images`: PNG-Bilder (base64) – werden als Dateien in den leeren Arbeitsordner gelegt
  *                                         (#350; `web`: Websuche + Seiten von ikea.com/moebelix.at lesen),
  *                                         bis zu 4 Anfragen gleichzeitig (WP_CLAUDE_PARALLEL); `/status` meldet `claude: true`, wenn verfügbar
  *
@@ -56,7 +57,7 @@ const portArg = args.indexOf('--port');
 const PORT = Number(portArg >= 0 ? args[portArg + 1] : process.env.IKEA_HELPER_PORT) || 4791;
 const CACHE = resolve(process.env.IKEA_HELPER_CACHE || join('ikea-import', 'auswahl'));
 const ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
-const VERSION = 3;
+const VERSION = 4;
 const MAX_BODY = 3 * 1024 * 1024;
 /** Shops whose product pages the bookmarklet may send (the page the user has open, one per click). */
 const SHOP_ORIGINS = ['https://www.ikea.com', 'https://www.moebelix.at'];
@@ -96,6 +97,19 @@ let claudeRunning = 0;
 /** Claude Code reports a usage/rate limit of the account (not just a busy helper). */
 const QUOTA_RE = /usage limit|rate limit|limit reached|too many requests|kontingent/i;
 
+/** Höchstens 4 PNG-Bilder je Anfrage, jedes bis 6 MB base64 (Raumbilder sind weit kleiner). */
+const MAX_IMAGES = 4;
+const MAX_IMAGE_B64 = 6 * 1024 * 1024;
+
+/** Bilder aus der Anfrage: nur PNG, nur base64, Anzahl und Größe begrenzt. */
+function readImages(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((i) => i && i.mediaType === 'image/png' && typeof i.data === 'string' && i.data.length <= MAX_IMAGE_B64 && /^[A-Za-z0-9+/=\s]*$/.test(i.data))
+    .slice(0, MAX_IMAGES)
+    .map((i) => ({ data: i.data }));
+}
+
 async function askClaude(body, signal) {
   if (!claudeReady) return [503, { error: `Claude Code ist auf diesem Rechner nicht verfügbar. ${INSTALL_HELP}` }];
   const prompt = typeof body?.prompt === 'string' ? body.prompt : '';
@@ -109,8 +123,9 @@ async function askClaude(body, signal) {
     const label = typeof body.label === 'string' ? body.label.replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '').slice(0, 120).trim() : '';
     console.log(`Claude-Anfrage${web ? ' mit Shop-Suche' : ''}${label ? `: ${label}` : ''} … (${claudeRunning} gleichzeitig)`);
     const model = typeof body.model === 'string' ? body.model : undefined;
+    const images = readImages(body.images);
     // the planner gave up (time limit, stop): end Claude Code too, so it does not block a place for minutes
-    const text = await runClaude(prompt, { web, model, signal });
+    const text = await runClaude(prompt, { web, model, images, signal });
     // a product search without a hit is reported here too, not only in the planner
     if (label) console.log(web && /"products"\s*:\s*\[\s*\]/.test(text) ? `  NICHT GEFUNDEN: ${label} – kein passendes Produkt im Shop` : `  fertig: ${label}`);
     return [200, { text }];
@@ -315,7 +330,7 @@ const server = createServer(async (req, res) => {
     if (req.method !== 'GET') return json(405, { error: 'Nur GET.' });
     if (url.pathname === '/bookmarklet') return json(200, { token: TOKEN });
     if (url.pathname === '/inbox') return json(200, { items: inbox });
-    if (url.pathname === '/status') return json(200, { ok: true, name: 'wohnungsplaner-ikea-helper', version: VERSION, claude: claudeReady });
+    if (url.pathname === '/status') return json(200, { ok: true, name: 'wohnungsplaner-ikea-helper', version: VERSION, claude: claudeReady, images: claudeReady });
     if (url.pathname === '/product') {
       const [status, body] = await product(url.searchParams);
       return json(status, body);

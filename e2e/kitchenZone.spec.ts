@@ -66,6 +66,7 @@ test('Küche nur im markierten Bereich, keine zweite Küchenzeile im Wohnbereich
 
   await page.locator('.panel.left').getByRole('button', { name: 'Einrichten' }).click();
   const panel = page.getByTestId('design-panel');
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   await expect(panel.getByTestId('design-proposal')).toBeVisible({ timeout: 30_000 });
   await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();

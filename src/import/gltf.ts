@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
-/** Local decoder path (copied from three.js by scripts/copy-draco.mjs). */
-export const DRACO_PATH = `${import.meta.env.BASE_URL ?? '/'}draco/`;
+/** Local decoder path (copied from three.js by scripts/copy-draco.mjs); `env` only exists under Vite. */
+export const DRACO_PATH = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'}draco/`;
 export const MAX_MODEL_BYTES = 50 * 1024 * 1024;
 
 export class ModelFileError extends Error {

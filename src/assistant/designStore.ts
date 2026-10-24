@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { FurnishingSuggestion } from '../suggest/furnishing';
+import type { FurnishRunResult } from '../design/run';
 import { EMPTY_WISHES, type DesignProposal, type DesignWishes } from './design';
 
 const KEY = 'wohnungsplaner-design-wishes';
@@ -25,6 +26,8 @@ interface DesignStore {
   asking: boolean;
   error: string | null;
   proposal: DesignProposal | null;
+  /** The whole run of the new way (#442): concept, programmes, placement and walk-through. */
+  result: FurnishRunResult | null;
   preview: FurnishingSuggestion | null;
   setWishes: (patch: Partial<DesignWishes>) => void;
   set: (patch: Partial<Omit<DesignStore, 'set' | 'setWishes'>>) => void;
@@ -36,6 +39,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   asking: false,
   error: null,
   proposal: null,
+  result: null,
   preview: null,
   setWishes: (patch) => {
     const wishes = { ...get().wishes, ...patch };
