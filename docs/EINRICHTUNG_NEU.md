@@ -245,6 +245,8 @@ T6 (Benchmark, #443), Stand 24.10.2026:
 - Gemessen (echtes Claude): alter Ablauf A 76,1 / B 68,4; neu A 98,4, B 97,6, C 94,6, D 96,7, E 94,8, F 92,7. Die Regel-Abnahme ist für alle sechs erfüllt.
 - Bildprüfung der Haupträume: neu 4–7 von 10 (alter Ablauf A/B 4–6). Das Ziel 8 ist noch nicht erreicht. Häufig bemängelt: Sofa ohne Gegenüber, leere Raumhälfte, fehlendes Arbeitslicht in Küchen (kein Katalogteil), Pflichtmöbel wird in engen Durchgangsräumen kleiner statt ein Nebenteil wegzulassen.
 
+- Runde gegen die häufigsten Mängel (24.10.): Ein enger Raum lässt eher einen Nachttisch oder ein Regal weg, als das Pflichtmöbel zu verkleinern (Löser, F Schlafzimmer behält das Doppelbett 180, 86 → 94 Punkte). Die Prüfung meldet ein Sofa ohne Gegenüber (C3) und große freie Flächen ohne Möbel (E6), das Raumprogramm verlangt ein Gegenüber für jedes Sofa. Echter Lauf danach: A 96,4 · B 92,8 · C 92,8 · D 94,7 · E 94,0 · F 93,8 (strengere Regeln, daher teils unter den Werten davor). Bildprüfung unverändert 5–7 von 10; häufigste Mängel jetzt: Möbel nur an den Wänden mit leerer Mitte, Sitzgruppe zerfällt (Sessel abgestellt, Sofa neben dem Teppich), Küchen zerstückelt, fehlender Stauraum im Schlafzimmer. Die aufgezeichneten Antworten der Regression bleiben die vom 24.10. Mittag.
+
 Offen: Bildnote 8 (weitere Runden an Löser und Konzept) und danach die Abnahme durch G mit der eigenen Wohnung.
 - Dateigrenzen: Welle 1 arbeitet nur in neuen Ordnern unter `src/design/` (plus kleiner Export in `model/placement.ts`), also keine Konflikte mit anderen Threads. Erst T5 fasst die bestehenden Dateien an.
 - Der alte Ablauf bleibt bis zur Abnahme als Rückfall, danach wird er auf den neuen umgestellt.
