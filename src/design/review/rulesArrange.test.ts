@@ -73,6 +73,15 @@ describe('C3 Fernseher', () => {
     const r2 = tvRoom(put('generic-tv', { x: 4.3, y: 0.21, face: 'S', elevation: 0.45, parent: 'b' }), put('generic-tv-sideboard', { id: 'b', x: 4.3, y: 0.21, face: 'S' }));
     expect(has(r2, 'C3', /Fenster/)).toBe(false);
   });
+  it('without a TV the sofa looks at a window or at armchairs, else it looks at nothing (medium)', () => {
+    const room = (windows: { wall: 'N' | 'O'; at: number }[]) => rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows });
+    const nothing = /schaut auf nichts/;
+    const sofa = put('generic-sofa-3', { x: 2.5, y: 3.5, face: 'N' });
+    expect(has(review({ room: room([{ wall: 'N', at: 2.5 }]), type: 'living', items: [sofa] }), 'C3', nothing)).toBe(false);
+    const blank = review({ room: room([{ wall: 'O', at: 2 }]), type: 'living', items: [sofa] });
+    expect(blank.findings.find((f) => nothing.test(f.text))?.severity).toBe('M');
+    expect(has(review({ room: room([{ wall: 'O', at: 2 }]), type: 'living', items: [sofa, put('generic-armchair', { x: 2.5, y: 1.2, face: 'S' })] }), 'C3', nothing)).toBe(false);
+  });
 });
 
 describe('C4 Esstisch', () => {

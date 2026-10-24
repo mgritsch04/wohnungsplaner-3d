@@ -134,7 +134,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 **C Anordnung**
 - C1 Bett: Kopfteil nicht an einer Wand oder Bett frei im Raum (M); Kopfteil unter dem Fenster (L); Doppelbett nur von einer Seite zugänglich (M).
 - C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L); Sofa im Wohnzimmer ab 12 m² ohne Couchtisch (L).
-- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S).
+- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S). Ohne Fernseher: Sofa schaut auf nichts, kein Fenster, kein großes Bild und keine Sessel im Blickfeld (45°, 6 m) (M).
 - C4 Esstisch: Stühle nicht am Tisch (M); Stuhlzone auf mehr als einer Seite unter 75 cm (L); Pendel nicht über dem Tisch (L); Tisch im Arbeitsgang der Küche (M).
 - C5 Schreibtisch: Fenster direkt hinter dem Bildschirm oder im Rücken (L).
 - C6 (M) Hohes Möbel über 1,2 m frei im Raum (außer bewusst als Raumteiler geplant).
@@ -158,7 +158,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - E3 (L) Zusammengehöriges getrennt (zwei Bücherregale an verschiedenen Wänden derselben Zone, Stühle ohne Tisch).
 - E4 (L) Farbe außerhalb der Palette.
 - E5 (L) Blickfang von der Haupttür aus verdeckt.
-- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum).
+- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum). Ebenso eine freie Fläche von mehr als etwa 3,6 m Durchmesser ohne Möbel und Teppich (frei zu lassende Bereiche des Nutzers zählen als belegt).
 
 **Punktzahl je Raum:** 100 minus 25 je S, 8 je M, 2 je L (nicht unter 0). „Bestanden“ heißt keine S-Befunde und mindestens 85 Punkte. Dazu Kennzahlen: Weglängen leer/eingerichtet, Belegung, Abweichung vom Programm. Dieselben Regeln nutzt der Solver als Kosten, die Kritik-Stufe als Eingabe und die Tests als Maßstab. In der App erscheint je Raum „Begehung: alle 35 Punkte erfüllt“ oder die Liste der leichten Befunde.
 
@@ -244,6 +244,8 @@ T6 (Benchmark, #443), Stand 24.10.2026:
 - Regression: `src/design/benchmark.test.ts` spielt die aufgezeichneten Antworten aller sechs Testwohnungen ohne Claude ab und prüft die Abnahme (kein S-Befund, Wohnung ab 85, kein Raum unter 75).
 - Gemessen (echtes Claude): alter Ablauf A 76,1 / B 68,4; neu A 98,4, B 97,6, C 94,6, D 96,7, E 94,8, F 92,7. Die Regel-Abnahme ist für alle sechs erfüllt.
 - Bildprüfung der Haupträume: neu 4–7 von 10 (alter Ablauf A/B 4–6). Das Ziel 8 ist noch nicht erreicht. Häufig bemängelt: Sofa ohne Gegenüber, leere Raumhälfte, fehlendes Arbeitslicht in Küchen (kein Katalogteil), Pflichtmöbel wird in engen Durchgangsräumen kleiner statt ein Nebenteil wegzulassen.
+
+- Runde gegen die häufigsten Mängel (24.10.): Ein enger Raum lässt eher einen Nachttisch oder ein Regal weg, als das Pflichtmöbel zu verkleinern (Löser, F Schlafzimmer behält das Doppelbett 180, 86 → 94 Punkte). Die Prüfung meldet ein Sofa ohne Gegenüber (C3) und große freie Flächen ohne Möbel (E6), das Raumprogramm verlangt ein Gegenüber für jedes Sofa. Echter Lauf danach: A 96,4 · B 92,8 · C 92,8 · D 94,7 · E 94,0 · F 93,8 (strengere Regeln, daher teils unter den Werten davor). Bildprüfung unverändert 5–7 von 10; häufigste Mängel jetzt: Möbel nur an den Wänden mit leerer Mitte, Sitzgruppe zerfällt (Sessel abgestellt, Sofa neben dem Teppich), Küchen zerstückelt, fehlender Stauraum im Schlafzimmer. Die aufgezeichneten Antworten der Regression bleiben die vom 24.10. Mittag.
 
 Offen: Bildnote 8 (weitere Runden an Löser und Konzept) und danach die Abnahme durch G mit der eigenen Wohnung.
 - Dateigrenzen: Welle 1 arbeitet nur in neuen Ordnern unter `src/design/` (plus kleiner Export in `model/placement.ts`), also keine Konflikte mit anderen Threads. Erst T5 fasst die bestehenden Dateien an.

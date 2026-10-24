@@ -61,8 +61,29 @@ export function checkSeating(ctx: RoomCtx): void {
     }
 }
 
+/** How far a sofa looks for its focal point (m), and how wide its view is. */
+const FOCUS_RANGE = 6;
+const FOCUS_CONE = deg(45);
+
+/**
+ * C3 without a television: the sofa looks at something, a window, a picture on the wall opposite or
+ * seats that look back (#443: the picture review asked „what does the sofa look at?“ in most rooms).
+ */
+function sofaFocus(ctx: RoomCtx, s: RItem): boolean {
+  const ahead = (p: Vec2, range = FOCUS_RANGE) => {
+    const to = sub(p, s);
+    return Math.hypot(to.x, to.y) <= range && angleBetween(s.front, to) <= FOCUS_CONE;
+  };
+  if (ctx.windows.some((w) => w.sill < 1.2 && ahead(w.mid))) return true;
+  if (ctx.items.some((i) => (i.role === 'wall-art' || i.role === 'mirror') && i.width >= 0.6 && ahead(i))) return true;
+  return ctx.items.some((i) => i !== s && (i.role === 'armchair' || i.role === 'sofa') && i.floor && ahead(i, 3.5) && angleBetween(i.front, sub(s, i)) <= deg(60));
+}
+
 /** C3: television. */
 export function checkTv(ctx: RoomCtx): void {
+  if (!ctx.items.some((i) => i.role === 'tv'))
+    for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor))
+      if (!sofaFocus(ctx, s)) ctx.add('C3', 'M', `${ctx.label(s)} schaut auf nichts: kein Fernseher, kein Fenster, kein Bild und keine Sessel gegenüber.`, [s], s);
   for (const tv of ctx.items.filter((i) => i.role === 'tv')) {
     const diag = tv.width / 0.872;
     const sofa = ctx.items.filter((i) => i.role === 'sofa' && i.floor).sort((a, b) => dist(a, tv) - dist(b, tv))[0];

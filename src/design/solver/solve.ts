@@ -345,7 +345,20 @@ function settle(st: State, seed: number): DroppedItem[] {
     let units = [...new Set([...involved.keys()].map((id) => m.nodes.get(id)!.unit))].map((i) => m.units[i]).filter((u) => u.active);
     if (vs.some((v) => v.rule === 'walkway') || !units.length) units = [...new Set([...units, ...m.units.filter((u) => movable(u) && u.nodes.some((n) => n.gridBox))])];
     units.sort((a, b) => importance(a) - importance(b));
-    if (units.some((u) => u.main && u.kind !== 'fixed' && tryFallbacks(st, u, fresh()))) continue;
+    if (units.some((u) => !u.required && u.main && u.kind !== 'fixed' && tryFallbacks(st, u, fresh()))) continue;
+    // a required piece keeps its size when leaving out one optional piece clears every rule: a
+    // designer gives up a nightstand or a shelf before the double bed (#443: F's 180 bed became a 90)
+    const shrinks = units.some((u) => u.required && u.main && u.kind !== 'fixed' && smallerOptions(u.main.replaces ?? u.main.catalogId, u.main.prog?.fallbacks ?? []).some((id) => id !== u.main!.catalogId));
+    // own random numbers: the trials leave the search after them as it was
+    const spare = shrinks ? spareToLeaveOut(st, units, (k) => new Rng(seed * 97 + guard * 13 + k)) : null;
+    if (spare) {
+      dropNode(st, spare.node, reasonFor(vs[0], false), dropped);
+      // the places the trial found without it
+      restore(m, spare.places);
+      st.rebuild();
+      continue;
+    }
+    if (units.some((u) => u.required && u.main && u.kind !== 'fixed' && tryFallbacks(st, u, fresh()))) continue;
     // 3. leave out the least important piece whose removal clearly helps (trial with repair);
     //    what still breaks a rule afterwards gets its smaller variant in the next round
     const before = st.hard();
@@ -412,6 +425,59 @@ function settle(st: State, seed: number): DroppedItem[] {
     anneal(st, rng, 200);
   }
   return dropped;
+}
+
+/** Optional pieces tried before a required one is made smaller. */
+const SPARE_TRIES = 8;
+
+/**
+ * The first optional piece on the floor (the smallest first: a nightstand, a side table, a shelf)
+ * without which every hard rule holds again (trial with repair). Pieces of a required unit count,
+ * the required main pieces themselves never do.
+ */
+function spareToLeaveOut(st: State, units: Unit[], fresh: (k: number) => Rng): { node: Node; places: Snapshot } | null {
+  const m = st.m;
+  const area = (n: Node) => n.spec.width * n.spec.depth;
+  const candidates = units
+    .filter((u) => !u.kitchen && u.kind !== 'fixed')
+    .flatMap((u) => u.nodes.filter((n) => n.gridBox && !n.prog?.required && (n !== u.main || !u.required) && n.run === undefined))
+    .sort((a, b) => area(a) - area(b))
+    .slice(0, SPARE_TRIES);
+  for (const [k, n] of candidates.entries()) {
+    const u = m.units[n.unit];
+    const gone = new Set<Node>([n]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const x of u.nodes) {
+        if (gone.has(x) || !x.parent || ![...gone].some((g) => g.id === x.parent)) continue;
+        gone.add(x);
+        grew = true;
+      }
+    }
+    const snap = snapshot(m);
+    const nodes = u.nodes;
+    const wasActive = u.active;
+    st.ungrid(u);
+    if (n === u.main) u.active = false;
+    else {
+      u.nodes = nodes.filter((x) => !gone.has(x));
+      for (const x of gone) m.nodes.delete(x.id);
+    }
+    st.rebuild();
+    const rng = fresh(k);
+    repair(st, rng, 3);
+    anneal(st, rng, 200);
+    const h = st.hard();
+    const places = snapshot(m);
+    st.ungrid(u);
+    u.nodes = nodes;
+    if (n !== u.main) for (const x of gone) m.nodes.set(x.id, x);
+    u.active = wasActive;
+    restore(m, snap);
+    st.rebuild();
+    if (h < 1e-9) return { node: n, places };
+  }
+  return null;
 }
 
 /** Smaller variants of a unit's main piece; keeps the first after which the hard rules improve and the piece itself fits. */
