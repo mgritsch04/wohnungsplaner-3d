@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Sample, SampleOptions } from '../assistant/claude';
-import { TEST_FLATS, type FlatKey } from './fixtures/flats';
+import { FLAT_KEYS, TEST_FLATS, type FlatKey } from './fixtures/flats';
 import { runFurnishing } from './run';
 
 interface BenchFixture {
@@ -45,7 +45,11 @@ function replay(fx: BenchFixture): Pick<Sample, 'json' | 'images'> {
 }
 
 // a whole flat with up to two critique rounds per room: longer than the 5 s default on the CI machines
-describe.skipIf(!KEYS.length)('benchmark with recorded answers (#443)', { timeout: 120_000 }, () => {
+describe('benchmark with recorded answers (#443)', { timeout: 120_000 }, () => {
+  it('has the recorded answers of all six test flats', () => {
+    expect(KEYS).toEqual([...FLAT_KEYS].sort());
+  });
+
   it.each(KEYS)('flat %s still meets the acceptance: no severe finding, at least 85 points, no room below 75', async (key) => {
     const fx = byKey.get(key)!;
     const flat = TEST_FLATS[key];
