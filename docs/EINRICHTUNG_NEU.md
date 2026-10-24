@@ -134,7 +134,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 **C Anordnung**
 - C1 Bett: Kopfteil nicht an einer Wand oder Bett frei im Raum (M); Kopfteil unter dem Fenster (L); Doppelbett nur von einer Seite zugänglich (M).
 - C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L); Sofa im Wohnzimmer ab 12 m² ohne Couchtisch (L).
-- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S).
+- C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S). Ohne Fernseher: Sofa schaut auf nichts, kein Fenster, kein großes Bild und keine Sessel im Blickfeld (45°, 6 m) (M).
 - C4 Esstisch: Stühle nicht am Tisch (M); Stuhlzone auf mehr als einer Seite unter 75 cm (L); Pendel nicht über dem Tisch (L); Tisch im Arbeitsgang der Küche (M).
 - C5 Schreibtisch: Fenster direkt hinter dem Bildschirm oder im Rücken (L).
 - C6 (M) Hohes Möbel über 1,2 m frei im Raum (außer bewusst als Raumteiler geplant).

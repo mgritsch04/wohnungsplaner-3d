@@ -112,13 +112,14 @@ export interface Model {
 
 const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
 
+/** How far from a table's edge a chair of Claude's still counts as one of its seats (m). */
+const CHAIR_REACH = 0.9;
+
 /**
  * Chairs placed `front-of`, `left-of` or `right-of` a dining table each on their own would all
  * land on the same spot: seats at a table are one `around` group (several per table, or one
  * that is not an office chair).
  */
-/** How far from a table's edge a chair of Claude's still counts as one of its seats (m). */
-const CHAIR_REACH = 0.9;
 
 function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node>): Relation[] {
   const isChair = (id: string) => {
