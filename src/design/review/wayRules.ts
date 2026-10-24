@@ -2,8 +2,8 @@
 import type { Vec2 } from '../../model/vec';
 import { checkWalkways } from '../analysis';
 import type { RoomMetrics } from '../types';
-import type { Clear, RoomCtx } from './context';
-import { cm, localRect, overlaps } from './geom';
+import type { Clear, RoomCtx, Win } from './context';
+import { cm, localRect, overlaps, pointPolyDist } from './geom';
 import { isDiningTable, isKitchenModule, type RItem } from './items';
 
 /** B1 (S), B2 (M), B3 (L) between the doors (the ways of stage 0); returns the walk lengths for the metrics. */
@@ -116,8 +116,23 @@ export function checkReach(ctx: RoomCtx): void {
   const g = ctx.grid;
   for (const i of ctx.placed) {
     if (!i.floor || i.category === 'decor' || isKitchenModule(i)) continue;
-    if (!g.touches(ctx.reach, i, Math.max(i.width, i.depth) / 2 + 0.5)) ctx.add('B7', 'M', `${ctx.label(i)} ist nicht erreichbar, der Weg dorthin ist zugestellt.`, [i], i);
+    // to a chair one sidesteps along the table (40 cm); everything else needs the 50 cm way
+    const seen = i.role === 'seat' ? ctx.reachSideways : ctx.reach;
+    if (!g.touches(seen, i, Math.max(i.width, i.depth) / 2 + 0.5)) ctx.add('B7', 'M', `${ctx.label(i)} ist nicht erreichbar, der Weg dorthin ist zugestellt.`, [i], i);
   }
-  if (ctx.type !== 'balcony' && ctx.windows.length && !ctx.windows.some((w) => g.touches(ctx.reach, { x: w.mid.x + w.wall.inward.x * 0.3, y: w.mid.y + w.wall.inward.y * 0.3 }, 0.5)))
+  if (ctx.type !== 'balcony' && ctx.windows.length && !ctx.windows.some((w) => windowReachable(ctx, w)))
     ctx.add('B8', 'L', 'Kein Fenster des Raums ist erreichbar, man kann nicht lüften.', [], ctx.windows[0].mid);
+}
+
+/**
+ * Standing at the window, or in front of a low piece under it (the worktop under the kitchen
+ * window, a sideboard): one leans over it to open the window.
+ */
+function windowReachable(ctx: RoomCtx, w: Win): boolean {
+  const at = (d: number) => ({ x: w.mid.x + w.wall.inward.x * d, y: w.mid.y + w.wall.inward.y * d });
+  if (ctx.grid.touches(ctx.reach, at(0.3), 0.5)) return true;
+  const under = ctx.items.filter((i) => i.obstacle && pointPolyDist(at(0.3), i.poly) < 0.05);
+  if (!under.length || under.some((i) => i.height > w.sill + 0.05)) return false;
+  const depth = Math.max(...under.map((i) => i.depth));
+  return depth <= 0.7 && ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
 }

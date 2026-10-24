@@ -105,6 +105,17 @@ describe('A Funktion', () => {
     });
     expect(r.findings.some((f) => f.rule === 'A1' && f.severity === 'S' && /Kleiderschrank/.test(f.text))).toBe(true);
   });
+  it('A1 a hand basin that finds no place in the WC is the WC finding (medium), not a second severe one', () => {
+    const r = review({
+      room: rectRoom(1.2, 1.6, { doors: [{ wall: 'S', at: 0.6, width: 0.7 }] }),
+      type: 'bath',
+      items: [],
+      existing: [put('generic-toilet', { x: 0.6, y: 0.3, face: 'S' })],
+      dropped: [{ id: 'basin', catalogId: 'generic-washbasin', reason: 'stünde direkt hinter der Tür' }],
+      program: { roomId: 'room_test', reading: '', zones: [], items: [{ id: 'basin', catalogId: 'generic-washbasin', zone: 'z', why: '', required: true, label: 'Handwaschbecken' }], relations: [], walk: '', check: [] },
+    });
+    expect(r.findings.filter((f) => f.rule === 'A1').map((f) => f.severity)).toEqual(['M']);
+  });
   it('A2 a function twice in the flat is medium, once is fine, a reason allows it', () => {
     const dining = (id: string) => {
       const a = rectRoom(4, 3, { id, name: id, doors: [{ wall: 'S', at: 2 }] });
@@ -289,6 +300,22 @@ describe('B Wege und Zugang', () => {
     const r = review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [...ring, inner] });
     expect(r.findings.some((f) => f.rule === 'B7' && f.items.includes('inner'))).toBe(true);
     expect(rulesOf(review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [inner] }))).not.toContain('B7');
+  });
+  it('B7 to a chair at the table one sidesteps: 40 cm are enough, for a cabinet not', () => {
+    // balcony 3.6 × 1.5: table against the end wall, the far chair behind it, 45 cm left on either side
+    const balcony = (id: string) =>
+      review({
+        room: rectRoom(3.6, 1.5, { doors: [{ wall: 'O', at: 0.75, width: 0.8 }] }),
+        type: 'other',
+        items: [put('generic-balcony-table', { x: 1.1, y: 0.75, face: 'S', width: 0.6, depth: 0.6 }), put(id, { x: 0.55, y: 0.75, face: 'O', id: 'far', width: 0.45, depth: 0.45 })],
+      });
+    expect(balcony('generic-chair').findings.some((f) => f.rule === 'B7')).toBe(false);
+    expect(balcony('generic-sideboard').findings.some((f) => f.rule === 'B7' && f.items.includes('far'))).toBe(true);
+  });
+  it('B8 a window over the kitchen worktop can be opened, one behind a tall cabinet not', () => {
+    const k = (id: string) => review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }], windows: [{ wall: 'N', at: 1.5, width: 1.0 }] }), type: 'other', items: [0.9, 1.5, 2.1].map((x) => put(id, { x, y: 0.3, face: 'S' })) });
+    expect(rulesOf(k('generic-k-base-60'))).not.toContain('B8');
+    expect(rulesOf(k('generic-k-tall-60'), 'L')).toContain('B8');
   });
   it('B8 no reachable window is light', () => {
     const row = [0.5, 1.5, 2.5, 3.5].map((x) => put('generic-wardrobe-100', { x, y: 0.3, face: 'S' }));

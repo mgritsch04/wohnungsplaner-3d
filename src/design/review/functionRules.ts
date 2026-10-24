@@ -1,4 +1,5 @@
 /** A Funktion (#441): does the room do what its type promises, and nothing twice? */
+import { findCatalogItem } from '../../catalog/generic';
 import { dist } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { isDiningTable, isKitchenModule, isSanitary, seatsOf, type RItem } from './items';
@@ -74,7 +75,8 @@ export function checkRequired(ctx: RoomCtx): void {
   // a required piece of the programme that was left out: never silent
   for (const d of ctx.layout.dropped) {
     const prog = ctx.program?.items.find((p) => p.id === d.id);
-    if (prog?.required) ctx.add('A1', 'S', `${prog.label ?? d.catalogId} fehlt: ${d.reason}`, [d.id]);
+    // a sanitary piece that finds no place (the hand basin of a tiny WC) is the WC check above, not a second finding
+    if (prog?.required && findCatalogItem(d.catalogId)?.category !== 'bathroom') ctx.add('A1', 'S', `${prog.label ?? d.catalogId} fehlt: ${d.reason}`, [d.id]);
   }
 }
 

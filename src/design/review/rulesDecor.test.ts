@@ -108,7 +108,11 @@ describe('D6 Bild und Spiegel', () => {
 describe('D7 Vorhang', () => {
   it('a curtain as wide as the window is fine, a narrow one is light', () => {
     const curtain = (w: number) => living([sofa, put('generic-curtain', { x: 2.5, y: 0.05, face: 'S', width: w })]);
-    expect(has(curtain(1.4), 'D7')).toBe(false);
+    // the fabric counts, not how wide the open panel hangs
+    const pair = living([sofa, put('generic-curtain', { x: 1.6, y: 0.05, face: 'S', width: 0.49 }), put('generic-curtain', { x: 3.4, y: 0.05, face: 'S', width: 0.49 })]);
+    expect(has(pair, 'D7')).toBe(false);
+    // one panel on one side: light, a pair frames the window
+    expect(curtain(1.4).findings.some((f) => f.rule === 'D7' && /nur ein Vorhangschal/.test(f.text))).toBe(true);
     expect(has(curtain(0.8), 'D7')).toBe(true);
   });
   it('a bedroom without darkening when the user wants one', () => {

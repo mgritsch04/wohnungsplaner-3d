@@ -1,4 +1,5 @@
 /** D Deko, Licht, Textil (#441): plants, lamps, rugs, pictures, curtains. */
+import { findCatalogItem } from '../../catalog/generic';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
@@ -107,8 +108,10 @@ export function checkCurtains(ctx: RoomCtx): void {
   for (const w of ctx.windows) {
     const mine = curtains.filter((c) => c.elevation < 1 && boundaryDist(c, ctx.an.polygon) < 0.4 && pointPolyDist(c, w.strip) < 0.5 && ctx.nearestWindow(c) === w);
     if (!mine.length) continue;
-    const total = mine.reduce((s, c) => s + c.width, 0);
+    // open curtains hang gathered beside the frame: what counts is the fabric, as the catalogue gives it
+    const total = mine.reduce((s, c) => s + (findCatalogItem(c.catalogId, ctx.catalog)?.width ?? c.width), 0);
     if (total < w.width - 0.05) ctx.add('D7', 'L', `Der Vorhang am Fenster ${w.label} ist mit ${cm(total)} cm schmaler als das Fenster (${cm(w.width)} cm).`, mine, mine[0]);
+    else if (mine.length === 1 && w.width >= 0.8) ctx.add('D7', 'L', `Am Fenster ${w.label} hängt nur ein Vorhangschal auf einer Seite, ein Paar links und rechts rahmt das Fenster.`, mine, mine[0]);
   }
   if (ctx.options.darkening && ctx.type === 'bedroom' && ctx.windows.length && !curtains.length) ctx.add('D7', 'L', 'Das Schlafzimmer hat keine Verdunkelung, gewünscht ist ein dunkler Raum.', [], ctx.windows[0].mid);
 }
