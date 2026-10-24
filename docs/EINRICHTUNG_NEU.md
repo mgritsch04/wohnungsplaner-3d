@@ -224,6 +224,18 @@ Reihenfolge in Wellen. Welle 1 kann parallel starten, sobald T0 die Schnittstell
 
 - **Welle 1 (parallel, 4 Threads):** T1, T2, T3, T4, sobald T0 die Schnittstellen festgelegt hat.
 - **Welle 2:** T5. **Welle 3:** T6, danach Abnahme durch G.
+
+### Stand am 24.10.2026
+
+T0 bis T5 sind gebaut und gemergt (PRs #444 bis #453). Was anders kam als geplant:
+
+- Der Ablauf wohnt in `src/design/run.ts` (`runFurnishing`), die Kritikrunde in `src/design/critique.ts`, die Übernahme ins Projekt in `src/design/apply/` – nicht in `assistant/designRun.ts`. Der Kern bleibt so frei von Oberfläche, und `designRun.ts` ist unverändert der alte Weg.
+- Im Panel wählt „Verfahren“ zwischen **Wohnkonzept** (neu, voreingestellt) und **Möbelliste** (alt, Rückfall).
+- Bilder: im Artefakt über die Fähigkeit `{ sample: { images: true } }`, lokal über den Helfer ab Version 4 (Bild als Datei im Arbeitsordner, Claude Code liest es mit dem Read-Werkzeug). Ohne Bildunterstützung geht die Textkarte mit.
+- Aufstellen und Planprüfung messen denselben Platz (PR #452): Der Streifen, auf dem `placementIssues` besteht, ist Teil der Bewegungsflächen des Solvers. Mit den aufgezeichneten Antworten löst kein übernommenes Möbel mehr einen Befund der Planprüfung aus.
+- Gemessen (aufgezeichnete Antworten, Seed 1): Wohnung B erreicht 100 / 92 / 94 / 86 Punkte, alle vier Räume bestanden. Offen sind Räume, die ihre Befunde erst mit einer echten Kritikrunde loswerden (Wohnküche B: Fernseher nicht gegenüber dem Sofa; Garçonnière D: zu wenige Sitzplätze). Das misst T6.
+
+Offen: **T6** (Benchmark über alle Testwohnungen, Vorher/Nachher für G) und danach die Abnahme.
 - Dateigrenzen: Welle 1 arbeitet nur in neuen Ordnern unter `src/design/` (plus kleiner Export in `model/placement.ts`), also keine Konflikte mit anderen Threads. Erst T5 fasst die bestehenden Dateien an.
 - Der alte Ablauf bleibt bis zur Abnahme als Rückfall, danach wird er auf den neuen umgestellt.
 
