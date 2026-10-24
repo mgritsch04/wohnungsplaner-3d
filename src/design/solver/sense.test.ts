@@ -70,6 +70,31 @@ describe('the sofa looks at the TV', () => {
   });
 });
 
+describe('a tight room keeps its double bed', () => {
+  it('three doors round the bed: a nightstand or the shelf stays out, the 180 bed keeps its size', () => {
+    const room = rectRoom(4.59, 4.08, {
+      doors: [{ wall: 'N', at: 3.55, width: 0.8 }, { wall: 'S', at: 2.44, width: 0.8 }, { wall: 'W', at: 3.43, width: 0.8 }],
+      windows: [{ wall: 'O', at: 2.05 }],
+      passThrough: true,
+    });
+    const E = -Math.PI / 2;
+    const p = program(
+      room,
+      [
+        { ...item('bed', 'generic-bed-180', [1.05, 2.2, E]), required: true },
+        item('ns1', 'generic-nightstand', [0.2, 1.05, E]),
+        item('ns2', 'generic-nightstand', [0.2, 3.35, E]),
+        item('shelf', 'generic-shelf-80', [2.9, 3.85, N]),
+        item('chair', 'generic-armchair', [3.9, 2.0, Math.PI / 2]),
+      ],
+      [{ kind: 'wall', item: 'bed', wall: 'W4' }, { kind: 'pair', item: 'ns1', item2: 'ns2', target: 'bed' }],
+    );
+    const layout = solveRoom(room, p, { seed: 1 });
+    expect(byId(layout, 'bed').catalogId).toBe('generic-bed-180');
+    expect(layout.dropped.map((d) => d.id).filter((id) => id !== 'bed')).not.toEqual([]);
+  });
+});
+
 describe('chairs at the table', () => {
   it('chairs Claude placed round the table without any relation stay at the table, not in a heap beside it', () => {
     const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
