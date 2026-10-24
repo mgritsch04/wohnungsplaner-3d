@@ -396,6 +396,20 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       }
     }
   }
+  // what stands on a piece and what hangs on the wall above it in another unit (a lamp on the
+  // lowboard and the TV hung on the wall over it, #443): the plan's check sees them collide
+  for (const a of near ? u.nodes : []) {
+    for (const b of v.nodes) {
+      for (const [p, q] of [
+        [a, b],
+        [b, a],
+      ] as const) {
+        if (p.rule?.kind !== 'on' || !isWallItem(q)) continue;
+        const zOverlap = Math.min(p.elevation + p.spec.height, q.elevation + q.spec.height) - Math.max(p.elevation, q.elevation);
+        if (zOverlap > 0.02 && overlapDepth(p.poly, q.poly) > EPS) hard(0.5, () => ({ rule: 'overlap', items: [p.id, q.id], text: `${name(p)} steht in ${name(q)}` }));
+      }
+    }
+  }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
   c.soft += armchairCost(u, v) + armchairCost(v, u);
   return c;
