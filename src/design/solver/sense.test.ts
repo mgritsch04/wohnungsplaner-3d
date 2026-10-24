@@ -211,6 +211,32 @@ describe('kitchen', () => {
   });
 });
 
+describe('bedroom and ceiling light as a designer lays them (#443)', () => {
+  it('a 160×230 rug lies across a double bed, from just below the nightstands, out on both sides', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }] });
+    const p = program(room, [item('bed', 'generic-bed-140', [2, 1.05, S]), item('rug', 'generic-rug-160')], [{ kind: 'under-all', item: 'rug', target: 'bed' }]);
+    const layout = solveRoom(room, p, { seed: 1 });
+    const bed = byId(layout, 'bed');
+    const rug = byId(layout, 'rug');
+    const across = Math.abs(Math.sin(rug.rotation - bed.rotation)) < 0.1 ? Math.max(rug.width, rug.depth) : Math.min(rug.width, rug.depth);
+    expect(across).toBeGreaterThan(2.2);
+    // head at the north wall: the rug starts 30–70 cm below it and ends past the foot
+    const top = rug.y - Math.min(rug.width, rug.depth) / 2;
+    expect(top - (bed.y - bed.depth / 2)).toBeGreaterThanOrEqual(0.29);
+    expect(top - (bed.y - bed.depth / 2)).toBeLessThanOrEqual(0.71);
+    expect(rug.y + Math.min(rug.width, rug.depth) / 2).toBeGreaterThan(bed.y + bed.depth / 2);
+  });
+
+  it('the only ceiling light hangs in the middle of the room, a pendant over the table stays there', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 3.4 }] });
+    const alone = solveRoom(room, program(room, [item('light', 'generic-pendant', [0.8, 0.8, S])]), { seed: 1 });
+    expect(byId(alone, 'light').x).toBeCloseTo(2, 1);
+    expect(byId(alone, 'light').y).toBeCloseTo(1.5, 1);
+    const dining = solveRoom(room, program(room, [item('table', 'generic-dining-table-4', [1, 1, S]), item('light', 'generic-pendant', [1, 1, S])]), { seed: 1 });
+    expect(Math.hypot(byId(dining, 'light').x - 1, byId(dining, 'light').y - 1)).toBeLessThan(0.3);
+  });
+});
+
 describe('what is left out', () => {
   it('the pendant of a table that does not fit is left out with it', () => {
     const room = rectRoom(2.2, 1.6, { doors: [{ wall: 'S', at: 1.1 }] });

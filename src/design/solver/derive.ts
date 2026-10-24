@@ -3,7 +3,7 @@
  * as a block, and every dependent piece from its parent (chairs round the table, nightstands,
  * rug, picture above, lamp on top, curtain at the window).
  */
-import { add, scale, type Vec2 } from '../../model/vec';
+import { add, pointInPolygon, scale, type Vec2 } from '../../model/vec';
 import { rotationFacing } from '../../suggest/roomGeometry';
 import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
 import { specOf } from './items';
@@ -169,7 +169,12 @@ function deriveNode(m: Model, n: Node): void {
   n.elevation = s.elevation;
   if (r.kind === 'ceiling') {
     const z = m.zones.get(n.zone);
-    const c = hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : centroidOf(ctx.poly));
+    // the room's only ceiling light is its main light: in the middle of the room, where the outlet
+    // usually is, not wherever the programme happened to put it (#443)
+    const overTable = hint && [...m.nodes.values()].some((o) => o.spec.role === 'table' && o.prog?.hint && Math.hypot(o.prog.hint.x - hint.x, o.prog.hint.y - hint.y) < 0.6);
+    const only = !overTable && ![...m.nodes.values()].some((o) => o !== n && o.rule?.kind === 'ceiling' && !o.parent);
+    const middle = centroidOf(ctx.poly);
+    const c = only && pointInPolygon(middle, ctx.poly) ? middle : (hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : middle));
     n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
     n.elevation = Math.min(s.elevation, ctx.height - s.height - 0.05);
     // a hanging lamp gives way to tall furniture, its doors and an opened door leaf (#442)
@@ -251,11 +256,14 @@ function deriveNode(m: Model, n: Node): void {
       const all = r.kind === 'under-all' || parentNode?.spec.role === 'table' || parentNode?.spec.role === 'coffee-table';
       const bed = parentNode?.spec.role === 'bed';
       const options: Box[] = [];
-      for (const longAlong of [true, false]) {
+      // under a bed a rug that is long enough lies across it, 40–60 cm out on both sides (#443)
+      const across = bed && Math.max(s.width, s.depth) >= 2 * P.hw + 0.6;
+      for (const longAlong of across ? [false, true] : [true, false]) {
         const probe = rugBox({ x: 0, y: 0 }, P.rotation, s.width, s.depth, longAlong);
         const { ey } = extents(probe, P.rotation);
         let v: number;
-        if (bed) v = -P.hd + 0.35 * 2 * P.hd + ey;
+        // from just below the nightstands to about 55 cm past the foot of the bed
+        if (bed) v = -P.hd + clamp(2 * P.hd + 0.55 - 2 * ey, 0.3, 0.7) + ey;
         else if (all) v = 0;
         else v = P.hd - 0.2 + ey;
         for (const shift of [0, -0.2, -0.4, 0.2]) {
