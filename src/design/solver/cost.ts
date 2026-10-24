@@ -11,7 +11,6 @@ import { add, closestPointOnSegment, scale, type Vec2 } from '../../model/vec';
 import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, WALL_TOL, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
 import { usesWater } from '../../model/fixtures';
-import { frontClearance } from '../../model/placementRules';
 import { doorSeed, sideStrip, wallStrip } from './room';
 
 /** Weight of one broken hard rule; amounts (overlap depth, distance outside) add to it. */
@@ -71,18 +70,26 @@ const name = (n: Node) => n.spec.name;
 const LEAF_UNDERCUT = 0.015;
 
 /**
- * The plan's own rule (`frontClearance`): doors and drawers need room in front, and anything at
- * their height is in the way – a hanging lamp in front of a wardrobe as much as a chest of drawers.
+ * What `q` takes away from the movement areas of `p`. The strip the plan insists on (doors and
+ * drawers have to open) counts to the millimetre and whatever hangs at that height takes it away –
+ * a lamp in front of a wardrobe as much as a chest of drawers. The other strips are guide values.
  */
-function frontCost(a: Node, b: Node, hard: (amount: number, v: () => Violation) => void, soft: (x: number) => void): void {
-  const need = frontClearance({ ...a.spec.item, elevation: a.elevation });
-  if (!need || a === b || b.spec.base === 'rug' || b.parent === a.id || a.parent === b.id || tucked(a, b)) return;
-  // the real heights: a fridge is 1.85 m tall, not the 0.9 m of the worktop
-  if (b.elevation > a.elevation + a.spec.height - 0.005 || b.elevation + b.spec.height < a.elevation + 0.05) return;
-  if (a.run !== undefined && b.run !== undefined) return; // modules of a kitchen: the corner is the kitchen's own
-  const d = overlapDepth(sideStrip(a.box, 'front', need), b.poly);
-  if (d > 0.003) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [a.id, b.id], text: `${name(b)} steht vor den Türen von ${name(a)}` }));
-  else if (d > 0) soft(0.2);
+function clearCost(p: Node, q: Node, hard: (amount: number, v: () => Violation) => void, soft: (x: number) => void): void {
+  if (p === q || isRug(q) || q.parent === p.id || p.parent === q.id || tucked(p, q)) return;
+  const sameRun = p.run !== undefined && q.run !== undefined && p.unit === q.unit;
+  for (const cl of p.clear) {
+    // a movement area is about standing and walking: only the plan's own strip minds what hangs in it
+    if (cl.strict ? sameRun : inCorner(p, q) || !isFloor(q)) continue;
+    // the same height band as the plan; with the real heights (a fridge is 1.85 m tall, not 0.9 m)
+    if (q.elevation > cl.z1 || top(q) < cl.z0) continue;
+    const d = overlapDepth(cl.poly, q.poly);
+    if (d <= (cl.strict ? EPS : CLEAR_EPS)) {
+      if (cl.strict && d > 0) soft(0.2);
+      continue;
+    }
+    if (cl.either && !cl.strict) soft(0.5 + 2 * d);
+    else hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [p.id, q.id], text: cl.strict ? `${name(q)} steht vor den Türen von ${name(p)}` : `${name(q)} steht in der Bewegungsfläche von ${name(p)}` }));
+  }
 }
 
 /** Seat that may stand partly under its own table or desk. */
@@ -181,7 +188,7 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
         for (const f of ctx.fixed) {
           if (!f.floor || (n.run !== undefined && f.spec?.item.kitchen)) continue;
           const d = overlapDepth(cl.poly, f.poly);
-          if (d > CLEAR_EPS) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
+          if (d > (cl.strict ? EPS : CLEAR_EPS)) hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [n.id, f.piece.id], text: `${f.spec?.name ?? f.piece.id} steht in der Bewegungsfläche von ${name(n)}` }));
         }
       }
       for (const cp of n.comfort) c.soft += 0.3 * Math.min(1, outsideAmount(cp, ctx.poly));
@@ -235,7 +242,8 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
       if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} überschneidet ${name(b)}` }));
     }
   }
-  for (const a of u.nodes) for (const b of u.nodes) frontCost(a, b, hard, (x) => (c.soft += x));
+  // the group's own pieces in each other's movement areas (a stool in front of the sideboard)
+  for (const a of u.nodes) for (const b of u.nodes) clearCost(a, b, hard, (x) => (c.soft += x));
 
   // the unit's own design: Claude's place and zone, wanted wall, design rules
   const n = u.main;
@@ -326,6 +334,16 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
     if (sink) sink(viol());
   };
   const near = u.bounds.x0 < v.bounds.x1 && v.bounds.x0 < u.bounds.x1 && u.bounds.y0 < v.bounds.y1 && v.bounds.y0 < u.bounds.y1;
+  // movement areas: whatever stands or hangs in them, seen from both sides
+  if (near) {
+    for (const a of u.nodes) {
+      for (const b of v.nodes) {
+        if (Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) > a.reach + b.reach) continue;
+        clearCost(a, b, hard, (x) => (c.soft += x));
+        clearCost(b, a, hard, (x) => (c.soft += x));
+      }
+    }
+  }
   for (const a of near ? u.nodes : []) {
     const fa = isFloor(a);
     const wa = isWallItem(a);
@@ -358,13 +376,6 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
           [a, b],
           [b, a],
         ] as const) {
-          if (inCorner(p, q)) continue;
-          for (const cl of p.clear) {
-            const d = overlapDepth(cl.poly, q.poly);
-            if (d <= CLEAR_EPS) continue;
-            if (cl.either) c.soft += 0.5 + 2 * d;
-            else hard(0.5 * (1 + 5 * d), () => ({ rule: 'clearance', items: [p.id, q.id], text: `${name(q)} steht in der Bewegungsfläche von ${name(p)}` }));
-          }
           for (const cp of p.comfort) c.soft += 0.4 * Math.min(0.5, overlapDepth(cp, q.poly));
         }
         if (isFirm(a) && isFirm(b) && Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) - Math.hypot(a.box.hw, a.box.hd) - Math.hypot(b.box.hw, b.box.hd) < 0.2) {
@@ -382,12 +393,6 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       }
     }
   }
-  if (near)
-    for (const a of u.nodes)
-      for (const b of v.nodes) {
-        frontCost(a, b, hard, (x) => (c.soft += x));
-        frontCost(b, a, hard, (x) => (c.soft += x));
-      }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
   c.soft += armchairCost(u, v) + armchairCost(v, u);
   return c;

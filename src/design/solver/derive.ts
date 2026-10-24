@@ -428,7 +428,15 @@ export function finishNode(n: Node): void {
   // a chair needs room behind it only at a table or desk (pulled out); a hall chair stands at the wall
   const atTable = n.rule?.kind === 'around' || n.rule?.kind === 'front';
   const clear = n.spec.role === 'seat' && !atTable ? n.spec.clear.filter((c) => c.side !== 'back') : n.spec.clear;
-  n.clear = clear.map((c) => ({ poly: sideStrip(n.box, c.side, c.min, c.from ?? 0, c.to ?? 1), either: !!c.either }));
+  // the band a movement area blocks: from a hand's width above the piece's base to its top
+  const z0 = n.elevation + 0.05;
+  const z1 = n.elevation + n.spec.height;
+  n.clear = clear.map((c) => ({ poly: sideStrip(n.box, c.side, c.min, c.from ?? 0, c.to ?? 1), either: !!c.either, z0, z1 }));
+  // what the plan insists on: the doors and drawers in front have to open (`placementIssues`).
+  // The same strip as there, a centimetre narrower on each side so a corner does not count.
+  const need = frontClearance({ ...n.spec.item, elevation: n.spec.item.elevation ?? 0 });
+  const inset = Math.min(0.3, 0.01 / Math.max(0.05, n.spec.width));
+  if (need > 0) n.clear.push({ poly: sideStrip(n.box, 'front', need, inset, 1 - inset), either: false, strict: true, z0, z1 });
   let c = 0;
   for (const x of clear) c = Math.max(c, x.comfort);
   n.reach = Math.hypot(n.box.hw + c, n.box.hd + c) + 0.25;

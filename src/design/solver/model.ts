@@ -37,8 +37,12 @@ export interface Node {
   box: Box;
   elevation: number;
   poly: Vec2[];
-  /** Movement areas (hard, `min` deep) and the comfortable ones (soft). */
-  clear: { poly: Vec2[]; either: boolean }[];
+  /**
+   * Movement areas (hard, `min` deep) and the comfortable ones (soft). `strict` marks the strip
+   * the plan itself insists on (doors and drawers have to open, `frontClearance`); the others are
+   * guide values that take a few centimetres. `z0`/`z1` is the height band the strip blocks.
+   */
+  clear: { poly: Vec2[]; either: boolean; strict?: boolean; z0: number; z1: number }[];
   comfort: Vec2[][];
   /** Radius round the centre that holds the piece and its movement areas. */
   reach: number;
