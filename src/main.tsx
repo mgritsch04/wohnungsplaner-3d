@@ -13,6 +13,7 @@ import './ui/projectSwitch';
 import { useCameraRig } from './view3d/cameraBookmarks';
 import { useObjectMenuStore } from './ui/objectMenu';
 import { useCatalogStore } from './catalog/catalogStore';
+import { useDesignStore } from './assistant/designStore';
 import { applyMotionPreference, loadMotionPreference } from './ui/motionPreference';
 
 installErrorCapture();
@@ -20,7 +21,7 @@ applyMotionPreference(loadMotionPreference());
 
 // Test/debug hook: exposes the stores for end-to-end tests (?e2e) and during development.
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('e2e')) {
-  (window as unknown as Record<string, unknown>).__wp = { useProjectStore, useUiStore, useImportStore, useSourceAnalysis, usePerformanceStore, useCameraRig, useObjectMenuStore, useCatalogStore };
+  (window as unknown as Record<string, unknown>).__wp = { useProjectStore, useUiStore, useImportStore, useSourceAnalysis, usePerformanceStore, useCameraRig, useObjectMenuStore, useCatalogStore, useDesignStore };
 }
 
 // offline shell for the shop mode (#361); not in the dev server and not in the Claude-artifact build
