@@ -1,4 +1,5 @@
 /** A Funktion (#441): does the room do what its type promises, and nothing twice? */
+import { findCatalogItem } from '../../catalog/generic';
 import { dist } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { isDiningTable, isKitchenModule, isSanitary, seatsOf, type RItem } from './items';
@@ -6,6 +7,11 @@ import { polyDist, toPlan } from './geom';
 
 const has = (ctx: RoomCtx, pred: (i: RItem) => boolean): boolean => ctx.items.some(pred);
 const isStorageFurniture = (i: RItem) => i.category === 'storage' && i.role !== 'box' && i.role !== 'tv-board' && i.height >= 0.7 && i.elevation < 0.5;
+/** Chairs standing at a dining table of the room. */
+const tableChairs = (ctx: RoomCtx): number => {
+  const tables = ctx.items.filter((i) => isDiningTable(i) && i.floor);
+  return ctx.items.filter((s) => s.role === 'seat' && tables.some((t) => dist(s, t) < 1.5)).length;
+};
 
 /** A1 (S): required pieces of the room type; fitted pieces count. */
 export function checkRequired(ctx: RoomCtx): void {
@@ -18,9 +24,13 @@ export function checkRequired(ctx: RoomCtx): void {
       if (!has(ctx, (i) => i.role === 'bed')) miss('Im Schlafzimmer fehlt das Bett.');
       else if (area >= 8 && !has(ctx, isStorageFurniture)) miss('Im Schlafzimmer fehlt ein Schrank oder eine Kommode für die Kleidung.', 'M');
       break;
-    case 'living':
-      if (ctx.items.reduce((n, i) => n + seatsOf(i), 0) < 3) miss('Im Wohnzimmer gibt es weniger als drei Sitzplätze.');
+    case 'living': {
+      const lounge = ctx.items.reduce((n, i) => n + seatsOf(i), 0);
+      // a table with chairs in the same room (Garçonnière, Wohn-Ess-Zimmer) seats guests too, once there is a sofa or armchair
+      if (!lounge) miss('Im Wohnzimmer fehlt ein Sofa oder Sessel zum Sitzen.');
+      else if (lounge + tableChairs(ctx) < 3) miss('Im Wohnzimmer gibt es weniger als drei Sitzplätze.');
       break;
+    }
     case 'kitchen':
       break;
     case 'dining':
@@ -65,7 +75,14 @@ export function checkRequired(ctx: RoomCtx): void {
   // a required piece of the programme that was left out: never silent
   for (const d of ctx.layout.dropped) {
     const prog = ctx.program?.items.find((p) => p.id === d.id);
-    if (prog?.required) ctx.add('A1', 'S', `${prog.label ?? d.catalogId} fehlt: ${d.reason}`, [d.id]);
+    // a sanitary piece that finds no place (the hand basin of a tiny WC) is the WC check above, not a second finding
+    if (prog?.required && findCatalogItem(d.catalogId)?.category !== 'bathroom') ctx.add('A1', 'S', `${prog.label ?? d.catalogId} fehlt: ${d.reason}`, [d.id]);
+  }
+  // a required piece that only fitted as a smaller variant (the double bed came in as a single bed, #443)
+  for (const i of ctx.placed) {
+    if (!i.replaces || !ctx.program?.items.find((p) => p.id === i.id)?.required) continue;
+    const planned = findCatalogItem(i.replaces, ctx.catalog)?.name ?? i.replaces;
+    ctx.add('A1', 'M', `${ctx.label(i)} passt nur kleiner hinein: geplant ${planned}, aufgestellt ${i.name}.`, [i], i);
   }
 }
 

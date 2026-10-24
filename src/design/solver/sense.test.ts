@@ -70,6 +70,52 @@ describe('the sofa looks at the TV', () => {
   });
 });
 
+describe('chairs at the table', () => {
+  it('chairs Claude placed round the table without any relation stay at the table, not in a heap beside it', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const chairs = [
+      item('c1', 'generic-chair', [2.5, 1.35, S]),
+      item('c2', 'generic-chair', [3.1, 1.75, -Math.PI / 2]),
+      item('c3', 'generic-chair', [3.1, 2.35, -Math.PI / 2]),
+      item('c4', 'generic-chair', [1.9, 1.75, Math.PI / 2]),
+      item('c5', 'generic-chair', [1.9, 2.35, Math.PI / 2]),
+      item('c6', 'generic-chair', [2.5, 2.75, N]),
+    ];
+    const p = program(room, [item('table', 'generic-dining-table-6', [2.5, 2.05, Math.PI / 2]), ...chairs]);
+    for (const seed of [1, 2, 3]) {
+      const layout = solveRoom(room, p, { seed });
+      const table = byId(layout, 'table');
+      for (const c of chairs) {
+        const chair = byId(layout, c.id);
+        const reach = Math.max(table.width, table.depth) / 2 + 0.45;
+        expect(Math.hypot(chair.x - table.x, chair.y - table.y), `${c.id} seed ${seed}`).toBeLessThan(reach);
+        expect(angleTo(chair, table), `${c.id} seed ${seed}`).toBeLessThan(60);
+      }
+    }
+  });
+});
+
+describe('what stands on the TV lowboard', () => {
+  it('a lamp and a plant stand at the ends of the lowboard, beside the TV hung over it, not in front of the screen', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const p = program(
+      room,
+      [item('sofa', 'generic-sofa-3', [2.5, 1.0, N]), item('board', 'generic-tv-sideboard', [2.5, 3.8, N]), item('tv', 'generic-tv'), item('lamp', 'generic-table-lamp'), item('plant', 'generic-plant-small')],
+      [{ kind: 'above', item: 'tv', target: 'board' }, { kind: 'on', item: 'lamp', target: 'board' }, { kind: 'on', item: 'plant', target: 'board' }],
+    );
+    const layout = solveRoom(room, p, { seed: 3 });
+    const board = byId(layout, 'board');
+    const tv = byId(layout, 'tv');
+    const along = (i: PlacedItem) => (i.x - board.x) * Math.cos(board.rotation) + (i.y - board.y) * Math.sin(board.rotation);
+    for (const id of ['lamp', 'plant']) {
+      const piece = byId(layout, id);
+      // beside the screen along the board (its middle outside the screen), at the board's end
+      expect(Math.abs(along(piece) - along(tv))).toBeGreaterThan(tv.width / 2);
+      expect(Math.abs(Math.abs(along(piece)) - (board.width - piece.width) / 2)).toBeLessThan(0.01);
+    }
+  });
+});
+
 describe('plants and armchairs', () => {
   const room = rectRoom(5, 4, { doors: [{ wall: 'S', at: 4.3 }, { wall: 'W', at: 2 }], windows: [{ wall: 'N', at: 2.5 }] });
 
@@ -179,6 +225,26 @@ describe('kitchen', () => {
     expect(layout.items.find((i) => i.id === cook.parent)?.catalogId).toBe('generic-k-oven');
   });
 
+  it('the two runs of an L meet in the corner without a gap: the corner module becomes the blind corner (#443)', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 1 }] });
+    // as Claude writes it: the second run starts 60 cm from the corner, past the depth of the first
+    const p: RoomProgram = {
+      ...program(room, []),
+      kitchen: [
+        { wall: 'W1', from: { x: 1.4, y: 0 }, to: { x: 4, y: 0 }, modules: ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-drawer-60'] },
+        { wall: 'W2', from: { x: 4, y: 0.6 }, to: { x: 4, y: 1.8 }, modules: ['generic-k-base-60', 'generic-k-base-60'] },
+      ],
+    };
+    const layout = solveRoom(room, p, { seed: 1 });
+    const first = layout.items.filter((i) => i.kitchenRun === 0 && i.elevation < 0.05);
+    const second = layout.items.filter((i) => i.kitchenRun === 1 && i.elevation < 0.05);
+    const end = first.reduce((a, b) => (b.x > a.x ? b : a));
+    const corner = end.y + end.depth / 2;
+    const start = Math.min(...second.map((i) => i.y - i.width / 2));
+    expect(start - corner).toBeGreaterThanOrEqual(0);
+    expect(start - corner).toBeLessThan(0.02);
+  });
+
   it('a runner lies right in front of the counter (flat A: Claude says 50 cm, meant is the walking strip)', () => {
     const { layout } = recorded('A', 'Küche');
     const runner = byId(layout, 'runner');
@@ -188,6 +254,32 @@ describe('kitchen', () => {
     const runnerEast = runner.x + Math.min(runner.width, runner.depth) / 2;
     expect(runFront - runnerEast).toBeGreaterThanOrEqual(0);
     expect(runFront - runnerEast).toBeLessThan(0.2);
+  });
+});
+
+describe('bedroom and ceiling light as a designer lays them (#443)', () => {
+  it('a 160×230 rug lies across a double bed, from just below the nightstands, out on both sides', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }] });
+    const p = program(room, [item('bed', 'generic-bed-140', [2, 1.05, S]), item('rug', 'generic-rug-160')], [{ kind: 'under-all', item: 'rug', target: 'bed' }]);
+    const layout = solveRoom(room, p, { seed: 1 });
+    const bed = byId(layout, 'bed');
+    const rug = byId(layout, 'rug');
+    const across = Math.abs(Math.sin(rug.rotation - bed.rotation)) < 0.1 ? Math.max(rug.width, rug.depth) : Math.min(rug.width, rug.depth);
+    expect(across).toBeGreaterThan(2.2);
+    // head at the north wall: the rug starts 30–70 cm below it and ends past the foot
+    const top = rug.y - Math.min(rug.width, rug.depth) / 2;
+    expect(top - (bed.y - bed.depth / 2)).toBeGreaterThanOrEqual(0.29);
+    expect(top - (bed.y - bed.depth / 2)).toBeLessThanOrEqual(0.71);
+    expect(rug.y + Math.min(rug.width, rug.depth) / 2).toBeGreaterThan(bed.y + bed.depth / 2);
+  });
+
+  it('the only ceiling light hangs in the middle of the room, a pendant over the table stays there', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 3.4 }] });
+    const alone = solveRoom(room, program(room, [item('light', 'generic-pendant', [0.8, 0.8, S])]), { seed: 1 });
+    expect(byId(alone, 'light').x).toBeCloseTo(2, 1);
+    expect(byId(alone, 'light').y).toBeCloseTo(1.5, 1);
+    const dining = solveRoom(room, program(room, [item('table', 'generic-dining-table-4', [1, 1, S]), item('light', 'generic-pendant', [1, 1, S])]), { seed: 1 });
+    expect(Math.hypot(byId(dining, 'light').x - 1, byId(dining, 'light').y - 1)).toBeLessThan(0.3);
   });
 });
 

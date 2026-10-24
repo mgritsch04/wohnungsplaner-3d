@@ -1,4 +1,5 @@
 /** D Deko, Licht, Textil (#441): plants, lamps, rugs, pictures, curtains. */
+import { findCatalogItem } from '../../catalog/generic';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
@@ -41,6 +42,9 @@ export function checkLight(ctx: RoomCtx): void {
   if (ctx.type === 'balcony') return;
   if (!ctx.items.some((i) => i.role === 'pendant'))
     for (const t of ctx.items.filter((i) => isDiningTable(i) && i.floor)) if (ctx.items.filter((s) => s.role === 'seat' && dist(s, t) < 1.5).length >= 2) ctx.add('D4', 'L', 'Über dem Esstisch fehlt eine Pendelleuchte.', [t], t);
+  // reading light where one sits in the evening: floor or table lamp beside the sofa (#443)
+  for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor && !i.existing))
+    if (!lights.some((l) => l.role !== 'pendant' && polyDist(l.poly, s.poly) < 0.8)) ctx.add('D4', 'L', `Neben ${ctx.label(s)} fehlt eine Steh- oder Tischlampe zum Lesen.`, [s], s);
   for (const z of ctx.program?.zones ?? []) {
     if (!/lese|lesen/i.test(z.function)) continue;
     const c = { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 };
@@ -107,8 +111,10 @@ export function checkCurtains(ctx: RoomCtx): void {
   for (const w of ctx.windows) {
     const mine = curtains.filter((c) => c.elevation < 1 && boundaryDist(c, ctx.an.polygon) < 0.4 && pointPolyDist(c, w.strip) < 0.5 && ctx.nearestWindow(c) === w);
     if (!mine.length) continue;
-    const total = mine.reduce((s, c) => s + c.width, 0);
+    // open curtains hang gathered beside the frame: what counts is the fabric, as the catalogue gives it
+    const total = mine.reduce((s, c) => s + (findCatalogItem(c.catalogId, ctx.catalog)?.width ?? c.width), 0);
     if (total < w.width - 0.05) ctx.add('D7', 'L', `Der Vorhang am Fenster ${w.label} ist mit ${cm(total)} cm schmaler als das Fenster (${cm(w.width)} cm).`, mine, mine[0]);
+    else if (mine.length === 1 && w.width >= 0.8) ctx.add('D7', 'L', `Am Fenster ${w.label} hängt nur ein Vorhangschal auf einer Seite, ein Paar links und rechts rahmt das Fenster.`, mine, mine[0]);
   }
   if (ctx.options.darkening && ctx.type === 'bedroom' && ctx.windows.length && !curtains.length) ctx.add('D7', 'L', 'Das Schlafzimmer hat keine Verdunkelung, gewünscht ist ein dunkler Raum.', [], ctx.windows[0].mid);
 }

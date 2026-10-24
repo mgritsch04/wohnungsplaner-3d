@@ -1,5 +1,5 @@
 /** E Gesamteindruck (#441): how full, how coherent, which colours, what one sees on entering. */
-import { dist, type Vec2 } from '../../model/vec';
+import { dist, pointInPolygon, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import type { RoomCtx } from './context';
 import { polyDist, segmentHitsConvex } from './geom';
@@ -29,6 +29,53 @@ export function checkOccupancy(ctx: RoomCtx): void {
   const pct = Math.round(o * 100);
   if (o > range[1] + 1e-9) ctx.add('E1', 'M', `Der Raum ist mit ${pct} % der Fläche zu voll, mehr als ${Math.round(range[1] * 100)} % wirken eng.`, [], ctx.an.polygon[0]);
   else if (o < EMPTY_LIMIT && ['living', 'bedroom', 'kids', 'office'].includes(ctx.type)) ctx.add('E1', 'M', `Der Raum wirkt mit nur ${pct} % Möbelfläche halbherzig eingerichtet.`, [], ctx.an.polygon[0]);
+  else if (o < range[0] && ['living', 'bedroom', 'kids', 'office'].includes(ctx.type)) ctx.add('E1', 'L', `Der Raum wirkt mit ${pct} % Möbelfläche eher leer, wohnlich sind ab ${Math.round(range[0] * 100)} %.`, [], ctx.an.polygon[0]);
+}
+
+const BALANCED: ReadonlySet<RoomType> = new Set<RoomType>(['living', 'bedroom', 'kids', 'office', 'dining']);
+
+/**
+ * E6 (M, #443): one half of a room stays almost empty while everything stands in the other – the
+ * picture a person notices first („halb eingerichtet“). The room is cut across its longer side;
+ * rugs do not fill a half, chairs do.
+ */
+export function checkBalance(ctx: RoomCtx): void {
+  if (!BALANCED.has(ctx.type) || ctx.an.area < 12) return;
+  const { share, alongX, mid, box } = halfShares(ctx);
+  const [x0, x1, y0, y1] = box;
+  const empty = share[0] <= share[1] ? 0 : 1;
+  if (share[empty] >= BALANCE_EMPTY || share[1 - empty] < 3 * share[empty]) return;
+  const side = alongX ? (empty === 0 ? 'westliche' : 'östliche') : empty === 0 ? 'nördliche' : 'südliche';
+  const at = alongX ? { x: empty === 0 ? (x0 + mid) / 2 : (mid + x1) / 2, y: (y0 + y1) / 2 } : { x: (x0 + x1) / 2, y: empty === 0 ? (y0 + mid) / 2 : (mid + y1) / 2 };
+  ctx.add('E6', 'M', `Die ${side} Hälfte des Raums bleibt fast leer (${Math.round(share[empty] * 100)} % Möbelfläche), in der anderen steht alles (${Math.round(share[1 - empty] * 100)} %).`, [], at);
+}
+
+/** Below this share of furniture a half of the room counts as empty. */
+export const BALANCE_EMPTY = 0.15;
+
+/** Share of the floor covered by standing pieces in the two halves of the room, cut across its longer side. */
+export function halfShares(ctx: RoomCtx): { share: [number, number]; alongX: boolean; mid: number; box: [number, number, number, number] } {
+  const xs = ctx.an.polygon.map((p) => p.x);
+  const ys = ctx.an.polygon.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const alongX = x1 - x0 >= y1 - y0;
+  const mid = alongX ? (x0 + x1) / 2 : (y0 + y1) / 2;
+  const pieces = ctx.items.filter((i) => i.floor);
+  const halves = [
+    { total: 0, used: 0 },
+    { total: 0, used: 0 },
+  ];
+  const step = 0.1;
+  for (let x = x0 + step / 2; x < x1; x += step)
+    for (let y = y0 + step / 2; y < y1; y += step) {
+      const p = { x, y };
+      if (!pointInPolygon(p, ctx.an.polygon)) continue;
+      const h = halves[(alongX ? x : y) < mid ? 0 : 1];
+      h.total++;
+      if (pieces.some((i) => pointInPolygon(p, i.poly))) h.used++;
+    }
+  const share = halves.map((h) => (h.total ? h.used / h.total : 0)) as [number, number];
+  return { share, alongX, mid, box: [x0, x1, y0, y1] };
 }
 
 /** E2 (L): a piece far outside its zone, zones overlapping. */

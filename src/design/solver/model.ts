@@ -117,6 +117,9 @@ const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
  * land on the same spot: seats at a table are one `around` group (several per table, or one
  * that is not an office chair).
  */
+/** How far from a table's edge a chair of Claude's still counts as one of its seats (m). */
+const CHAIR_REACH = 0.9;
+
 function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node>): Relation[] {
   const isChair = (id: string) => {
     const s = nodes.get(id)?.spec;
@@ -127,6 +130,18 @@ function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node
     if ((r.kind === 'front-of' || r.kind === 'left-of' || r.kind === 'right-of') && isChair(r.item) && nodes.get(r.target)?.spec.role === 'table') {
       byTable.set(r.target, [...(byTable.get(r.target) ?? []), r.item]);
     }
+  }
+  // chairs without any relation, placed by Claude round the only table of their zone: they belong to
+  // it, else each one wanders off on its own (#443: F's dining chairs in a heap beside the table)
+  const related = new Set(relations.flatMap((r) => ('items' in r ? r.items : 'item' in r ? [r.item] : [])));
+  for (const n of nodes.values()) {
+    if (!isChair(n.id) || related.has(n.id)) continue;
+    const tables = [...nodes.values()].filter((t) => t.spec.role === 'table' && t.zone === n.zone);
+    const t = tables[0];
+    const h = n.prog?.hint;
+    const th = t?.prog?.hint;
+    if (tables.length !== 1 || (h && th && Math.hypot(h.x - th.x, h.y - th.y) > Math.max(t.spec.width, t.spec.depth) / 2 + CHAIR_REACH)) continue;
+    byTable.set(t.id, [...(byTable.get(t.id) ?? []), n.id]);
   }
   if (!byTable.size) return [...relations];
   const grouped = new Set([...byTable.values()].flat());
@@ -152,6 +167,12 @@ const VIEWERS = new Set(['sofa', 'armchair', 'bed']);
 /** Weight of „the seat looks at the screen“: a sofa with its back to the TV is never meant (C3). */
 const VIEWER_WEIGHT = 3;
 const small = (s: Spec) => Math.max(s.width, s.depth) <= 0.6 && s.base === 'floor';
+
+/**
+ * Where a kitchen run starts that meets another one at a corner: past the other run's 60 cm depth
+ * and its gap to the wall, with a few millimetres to spare for the plan's own overlap check.
+ */
+export const CORNER_START = 0.615;
 
 /** Kitchen run ids as relation targets: `kitchen` (first run), `kitchen1`, `kitchen2` … */
 export const runId = (i: number) => `kitchen${i + 1}`;
@@ -360,7 +381,10 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     const t1 = alongWallPt(w, run.to);
     const length = modules.reduce((s, m) => s + specOf(m, ctx.catalog)!.width, 0);
     const backwards = t1 < t0;
-    const preferred = backwards ? t0 - length : t0;
+    const span = Math.max(0, w.length - length);
+    // a run meant to start just past the other run of an L starts exactly there (#443)
+    const snap = (v: number) => (Math.abs(v - CORNER_START) < 0.1 ? CORNER_START : Math.abs(v - (span - CORNER_START)) < 0.1 ? span - CORNER_START : v);
+    const preferred = snap(backwards ? t0 - length : t0);
     const u = makeUnit(runId(i), 'kitchen', null);
     u.required = true;
     u.mode = 'wall';

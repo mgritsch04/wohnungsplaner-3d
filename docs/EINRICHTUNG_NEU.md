@@ -114,7 +114,8 @@ Stufe 6  Produkte (bestehende Suche)  → echte Produkte, Neuaufstellung und Beg
 Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperrt die Anzeige; M = mittel; L = leicht). Jeder Befund hat Text in Alltagssprache, Raum, betroffene Teile und Ort (für die Markierung im Plan).
 
 **A Funktion**
-- A1 (S) Pflichtmöbel des Raumtyps fehlen: Schlafzimmer Bett (+ Schrank oder Kommode ab 8 m²: M); Wohnzimmer Sitzplätze für mindestens 3; Küche und jeder Raum mit Küchenzeile (Wohnküche) Spüle, Kochfeld, Kühlschrank, Arbeitsfläche (Unterschrank oder Geschirrspüler); Esszimmer Tisch und Stühle; Arbeitszimmer Schreibtisch und Stuhl; Gang/Vorraum Garderobe; Bad Waschtisch, WC oder Dusche/Wanne (Bestand zählt); WC: WC und Handwaschbecken (Handwaschbecken: M); Kinderzimmer Bett, Stauraum, Tisch; Balkon Sitzplatz ab 2 m².
+- A1 (S) Pflichtmöbel des Raumtyps fehlen: Schlafzimmer Bett (+ Schrank oder Kommode ab 8 m²: M); Wohnzimmer ein Sofa oder Sessel und Sitzplätze für mindestens 3 (Stühle am Esstisch im selben Raum zählen mit, etwa in der Garçonnière); Küche und jeder Raum mit Küchenzeile (Wohnküche) Spüle, Kochfeld, Kühlschrank, Arbeitsfläche (Unterschrank oder Geschirrspüler); Esszimmer Tisch und Stühle; Arbeitszimmer Schreibtisch und Stuhl; Gang/Vorraum Garderobe; Bad Waschtisch, WC oder Dusche/Wanne (Bestand zählt); WC: WC und Handwaschbecken (Handwaschbecken: M); Kinderzimmer Bett, Stauraum, Tisch; Balkon Sitzplatz ab 2 m².
+- A1 (M) Pflichtmöbel des Programms passt nur in einer kleineren Variante hinein (Doppelbett kam als Einzelbett).
 - A2 (M) Funktion ohne Grund doppelt in der Wohnung (Esstisch, Gästeschlafplatz, Küchenzeile, Fernseher).
 - A3 (S) Sanitärobjekt neu geplant (WC, Waschtisch, Dusche, Wanne), außer ausdrücklich gewünscht oder Handwaschbecken im WC.
 - A4 (M) Küche: Arbeitsfläche zwischen Spüle und Kochfeld unter 60 cm, Kochfeld unter 30 cm neben Hochschrank oder Wand, Arbeitsdreieck Kühlschrank–Spüle–Kochfeld unter 3,6 m oder über 7 m. Eine reine Bestandsküche wird nicht bewertet.
@@ -132,7 +133,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 
 **C Anordnung**
 - C1 Bett: Kopfteil nicht an einer Wand oder Bett frei im Raum (M); Kopfteil unter dem Fenster (L); Doppelbett nur von einer Seite zugänglich (M).
-- C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L).
+- C2 Sitzgruppe: Couchtisch nicht 30–60 cm vor dem Sofa (M); Sessel nicht der Sitzgruppe zugewandt (M); Sofa mit dem Rücken weniger als 1 m vor der Zimmertür (L); Sofa im Wohnzimmer ab 12 m² ohne Couchtisch (L).
 - C3 Fernseher: nicht gegenüber dem Sofa, Abstand außerhalb 1,5–2,5 × Diagonale, vor einem Fenster (M); seitlich oder hinter dem Sofa, mehr als 80° aus seiner Blickrichtung (S).
 - C4 Esstisch: Stühle nicht am Tisch (M); Stuhlzone auf mehr als einer Seite unter 75 cm (L); Pendel nicht über dem Tisch (L); Tisch im Arbeitsgang der Küche (M).
 - C5 Schreibtisch: Fenster direkt hinter dem Bildschirm oder im Rücken (L).
@@ -145,18 +146,19 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - D1 Pflanze nicht in einer Ecke, nicht neben einem Möbel und nicht am Fenster (M); Pflanze im Wege-Schlauch (S, in jedem Raum); große Pflanze in fensterlosem Raum (L: Schattenpflanze oder Kunstpflanze vorschlagen).
 - D2 (M) Kleine Pflanze, Kräutertopf oder Box auf dem Boden statt auf Fensterbank, Regal oder Arbeitsplatte.
 - D3 (M) Tischlampe nicht auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal.
-- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe; nicht auf dem Balkon); Raum über 10 m² mit nur einer Lichtquelle.
+- D4 (L) Zone ohne Licht (Leseecke ohne Steh- oder Tischlampe, Esstisch ohne Pendel, Schreibtisch ohne Lampe, Sofa ohne Steh- oder Tischlampe daneben; nicht auf dem Balkon); Raum über 10 m² mit nur einer Lichtquelle.
 - D5 (L) Teppich: Sitzgruppe steht nicht mit den Vorderfüßen darauf; Bettteppich ragt seitlich weniger als 40 cm heraus; Teppich im Türschwenk; Läufer nicht mittig im Gang.
 - D6 (L) Bild oder Spiegel: über Sofa/Bett nicht mittig (über 10 cm) oder nicht 40–90 % der Möbelbreite; über Fenster oder Tür; Badspiegel nicht über dem Waschtisch.
 - D7 (L) Vorhang schmaler als das Fenster; Schlafzimmer ohne Verdunkelung, wenn gewünscht.
 - D8 (L) Zu viel Gleiches: mehr als eine Deckenleuchte je 6 m² im Gang, mehr als drei Bilder ohne geplante Bildergruppe, gleiche Teile ohne Beziehung.
 
 **E Gesamteindruck**
-- E1 Belegung außerhalb des Bereichs je Typ (Wohnen 20–45 %, Schlafen 25–50 %, Arbeiten 20–45 %, Gang bis 20 %): zu voll (M), halbherzig leer unter 15 % in Wohn- und Schlafräumen (M).
+- E1 Belegung außerhalb des Bereichs je Typ (Wohnen 20–45 %, Schlafen 25–50 %, Arbeiten 20–45 %, Gang bis 20 %): zu voll (M), halbherzig leer unter 15 % in Wohn- und Schlafräumen (M), unter dem Bereich eher leer (L).
 - E2 (L) Möbel mehr als 1 m außerhalb seiner Zone; Zonen überlappen stark.
 - E3 (L) Zusammengehöriges getrennt (zwei Bücherregale an verschiedenen Wänden derselben Zone, Stühle ohne Tisch).
 - E4 (L) Farbe außerhalb der Palette.
 - E5 (L) Blickfang von der Haupttür aus verdeckt.
+- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum).
 
 **Punktzahl je Raum:** 100 minus 25 je S, 8 je M, 2 je L (nicht unter 0). „Bestanden“ heißt keine S-Befunde und mindestens 85 Punkte. Dazu Kennzahlen: Weglängen leer/eingerichtet, Belegung, Abweichung vom Programm. Dieselben Regeln nutzt der Solver als Kosten, die Kritik-Stufe als Eingabe und die Tests als Maßstab. In der App erscheint je Raum „Begehung: alle 35 Punkte erfüllt“ oder die Liste der leichten Befunde.
 
@@ -164,6 +166,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - Eingabe: Programm, Bild des aufgestellten Raums von oben (Grundriss mit Beschriftung, Zonen, Wegen), Befunde und Punktzahl. Bilder gehen im Claude-Artefakt über `sample` mit `images` (Fähigkeit `{sample:{images:true}}` deklarieren); lokal über den Helfer (Bild als Datei, die Claude Code liest). Ohne Bildunterstützung: Textkarte (Skizze plus Möbelliste mit Plätzen).
 - Ausgabe: Änderungen am Programm (Zone verlegen, Beziehung ändern, Teil tauschen, weglassen oder ergänzen), keine Koordinaten-Bastelei. Danach Stufe 3 und 4 neu.
 - Abbruch: keine S-Befunde und mindestens 85 Punkte, oder zwei Runden erreicht (dann das beste Ergebnis).
+- Blick vor der Abgabe (T6): Ein Hauptraum, der sofort besteht, bekommt trotzdem einen Blick aufs Bild – Claude prüft wie eine Innenarchitektin, was keine Regel sieht (Ausrichtung der Sitzgruppe, Sessel vor dem Fenster, Licht, verteilte Zonen). Übernommen nur, wenn der Raum weiter besteht und höchstens 4 Punkte verliert.
 
 ### Stufe 6: Produkte
 - Bestehende Produktsuche (productSearch.ts, searchRun.ts) bleibt. Neu: nach dem Ersetzen mit echten Maßen Stufe 3 und 4 erneut; ein Produkt, das einen S-Befund auslöst, wird nicht übernommen (nächster Treffer oder kleinere Größe). Zone und Beziehungen bleiben am Teil (behebt M12).
@@ -235,7 +238,14 @@ T0 bis T5 sind gebaut und gemergt (PRs #444 bis #453). Was anders kam als geplan
 - Aufstellen und Planprüfung messen denselben Platz (PR #452): Der Streifen, auf dem `placementIssues` besteht, ist Teil der Bewegungsflächen des Solvers. Mit den aufgezeichneten Antworten löst kein übernommenes Möbel mehr einen Befund der Planprüfung aus.
 - Gemessen (aufgezeichnete Antworten, Seed 1): Wohnung B erreicht 100 / 92 / 94 / 86 Punkte, alle vier Räume bestanden. Offen sind Räume, die ihre Befunde erst mit einer echten Kritikrunde loswerden (Wohnküche B: Fernseher nicht gegenüber dem Sofa; Garçonnière D: zu wenige Sitzplätze). Das misst T6.
 
-Offen: **T6** (Benchmark über alle Testwohnungen, Vorher/Nachher für G) und danach die Abnahme.
+T6 (Benchmark, #443), Stand 24.10.2026:
+
+- Werkzeuge: `e2e/designBenchmark.spec.ts` (`WP_BENCH=1` echter Lauf, `WP_REPLAY=<Lauf>` gleiche Antworten mit neuem Code, `WP_SHOTS=<Lauf>` nur Bilder, `WP_HEUTE=1` alter Ablauf für A/B), `scripts/design-image-review.mjs` (unabhängige Bildprüfung, 1–10 je Hauptraum, feste Liste), `scripts/design-bench-fixture.mjs` (Antworten eines Laufs als Testdatei).
+- Regression: `src/design/benchmark.test.ts` spielt die aufgezeichneten Antworten aller sechs Testwohnungen ohne Claude ab und prüft die Abnahme (kein S-Befund, Wohnung ab 85, kein Raum unter 75).
+- Gemessen (echtes Claude): alter Ablauf A 76,1 / B 68,4; neu A 98,4, B 97,6, C 94,6, D 96,7, E 94,8, F 92,7. Die Regel-Abnahme ist für alle sechs erfüllt.
+- Bildprüfung der Haupträume: neu 4–7 von 10 (alter Ablauf A/B 4–6). Das Ziel 8 ist noch nicht erreicht. Häufig bemängelt: Sofa ohne Gegenüber, leere Raumhälfte, fehlendes Arbeitslicht in Küchen (kein Katalogteil), Pflichtmöbel wird in engen Durchgangsräumen kleiner statt ein Nebenteil wegzulassen.
+
+Offen: Bildnote 8 (weitere Runden an Löser und Konzept) und danach die Abnahme durch G mit der eigenen Wohnung.
 - Dateigrenzen: Welle 1 arbeitet nur in neuen Ordnern unter `src/design/` (plus kleiner Export in `model/placement.ts`), also keine Konflikte mit anderen Threads. Erst T5 fasst die bestehenden Dateien an.
 - Der alte Ablauf bleibt bis zur Abnahme als Rückfall, danach wird er auf den neuen umgestellt.
 

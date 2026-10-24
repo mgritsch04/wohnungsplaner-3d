@@ -18,8 +18,8 @@ import { buildRoomProgramPrompt, parseRoomProgram, programModel, type RoomProgra
 /** Room programmes asked at the same time (the local helper allows 4). */
 export const CONCEPT_PARALLEL = 3;
 
-/** Time limits per request (ms): Opus took 1–3 minutes per room in the trial, once 10. */
-export const TIMEOUTS = { opus: 12 * 60_000, sonnet: 5 * 60_000 } as const;
+/** Time limits per request (ms): Opus took 1–3 minutes per room in the trial, once 10; in the benchmark (#443) a Wohnküche and a Garçonnière took longer than 12. */
+export const TIMEOUTS = { opus: 20 * 60_000, sonnet: 5 * 60_000 } as const;
 
 export interface ConceptRunInput {
   sample: Pick<Sample, 'json'>;

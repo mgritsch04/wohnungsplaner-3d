@@ -73,6 +73,8 @@ export class RoomCtx {
   readonly options: ReviewOptions;
   readonly palette: string[];
   readonly layout: Layout;
+  /** Products of the user, besides the generic catalogue. */
+  readonly catalog: CatalogItem[];
   /** Pieces of the proposal and existing pieces. */
   readonly items: RItem[];
   readonly placed: RItem[];
@@ -81,6 +83,7 @@ export class RoomCtx {
   readonly findings: Finding[] = [];
   private gridCache?: WalkGrid;
   private reachCache?: Uint8Array;
+  private reachSidewaysCache?: Uint8Array;
 
   constructor(input: ReviewInput) {
     this.an = input.analysis;
@@ -90,6 +93,7 @@ export class RoomCtx {
     this.palette = input.palette ?? [];
     this.layout = input.layout;
     const extra = input.catalog ?? [];
+    this.catalog = extra;
     this.placed = input.layout.items.map((i) => toRItem(i, false, extra));
     this.items = [...(input.existing ?? []).map((i) => toRItem(i, true, extra)), ...this.placed];
     for (const wall of this.an.walls)
@@ -131,6 +135,14 @@ export class RoomCtx {
     return (this.reachCache ??= this.grid.reachable(
       this.doors.map((d) => d.entry),
       0.25,
+    ));
+  }
+
+  /** Cells reachable sideways, at 40 cm width: enough to get to a chair at the table. */
+  get reachSideways(): Uint8Array {
+    return (this.reachSidewaysCache ??= this.grid.reachable(
+      this.doors.map((d) => d.entry),
+      0.2,
     ));
   }
 

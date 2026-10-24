@@ -71,7 +71,9 @@ const RULES = `- Wege zwischen den Türen bleiben frei: 90 cm breit in Gang, Vor
 - Tischlampen stehen auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal, nie auf dem Esstisch. Licht in drei Ebenen: Grundlicht (Decke), Zonenlicht (Pendel über dem Esstisch, Leselampe, Schreibtischlampe), Stimmungslicht; warmweiß.
 - Teppich im Wohnbereich: mindestens die vorderen Füße von Sofa und Sesseln liegen darauf. Unter dem Bett ragt der Teppich seitlich 40–60 cm heraus. Kein Teppich im Türschwenk, ein Läufer mittig im Gang.
 - Bild über Sofa oder Bett: etwa zwei Drittel der Möbelbreite, mittig darüber; Bildmitte auf etwa 150 cm. Nichts über Fenster oder Tür. Der Badspiegel hängt über dem Waschtisch.
-- Vorhang mindestens so breit wie das Fenster.
+- Vorhänge als Paar: je Fenster zwei Schals (zwei Teile, beide mit [..,"window","F1","over"]); sie hängen offen links und rechts neben dem Fenster, zusammen mindestens so breit wie das Fenster.
+- Jede Zone vollständig, so wie eine Innenarchitektin sie abgibt: Sitzgruppe mit Sofa, Couchtisch, Teppich unter den Vorderfüßen und einer Steh- oder Tischlampe daneben, ab etwa 16 m² dazu ein Sessel, der zur Gruppe schaut; Essplatz mit Tisch, Stühlen und Pendelleuchte; Arbeitsplatz mit Tisch, Stuhl, Lampe und Regal oder Rollcontainer in Griffnähe; Schlafplatz mit Bett, Nachttischen mit Lampen und Schrank oder Kommode (außer die Kleidung hat einen eigenen Raum).
+- Die Zonen verteilen sich über den ganzen Raum: keine Hälfte bleibt leer, während anderswo alles dicht steht. In Wohn- und Schlafräumen ist etwa ein Viertel bis zwei Fünftel des Bodens möbliert. Ein Sessel steht neben dem Fenster oder zur Sitzgruppe gedreht, nicht davor.
 - Ein Blickfang, den man beim Hereinkommen sieht; Farben aus der Palette; lieber weniger und stimmig. Nichts ohne Grund, nichts doppelt (im Gang höchstens eine Deckenleuchte je 6 m²).`;
 
 const RELATIONS = `Beziehungen (nur diese Wörter; a, b, c sind ids aus "items", Abstände und Höhen in cm):

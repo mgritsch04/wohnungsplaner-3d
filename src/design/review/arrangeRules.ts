@@ -35,6 +35,9 @@ export function checkSeating(ctx: RoomCtx): void {
       if (!front) ctx.add('C2', 'M', `Der Couchtisch steht nicht vor ${ctx.label(s)}.`, [s, ...tables], s);
       else if (front.gap < 0.3 - 0.01 || front.gap > 0.6 + 0.01)
         ctx.add('C2', 'M', `Der Couchtisch steht ${cm(front.gap)} cm vor ${ctx.label(s)}, bequem sind 30 bis 60 cm.`, [s, front.t], front.t);
+    } else if (ctx.type === 'living' && ctx.an.area >= 12) {
+      // a sofa alone looks parked, not furnished (#443): the coffee table makes it a group
+      ctx.add('C2', 'L', `Vor ${ctx.label(s)} fehlt ein Couchtisch, ohne ihn wirkt das Sofa abgestellt.`, [s], s);
     }
     for (const d of ctx.doors) {
       const l = toLocal(s, d.entry);

@@ -9,7 +9,7 @@ import { rotationFacing } from '../../suggest/roomGeometry';
 import { gridCost, pairCost, unitCost, type Cost } from './cost';
 import { refreshUnit } from './derive';
 import { clamp, wrapAngle } from './geom';
-import type { Model, Unit } from './model';
+import { CORNER_START, type Model, type Unit } from './model';
 import { isFloor } from './cost';
 import type { Rng } from './rng';
 
@@ -277,7 +277,10 @@ export function candidates(m: Model, u: Unit, rng: Rng, limit = 160): Pose[] {
   if (u.kitchen) {
     const w = m.ctx.walls[u.kitchen.wall];
     const span = Math.max(0, w.length - u.kitchen.length);
-    for (let s = 0; s <= span + 1e-6; s += 0.05) for (const reversed of [false, true]) out.push({ ...poseOf(u), s, reversed });
+    // and just past the depth of a run on the wall at the corner, so the two runs of an L meet
+    const slots = [CORNER_START, span - CORNER_START].filter((s) => s > 0 && s < span);
+    for (let s = 0; s <= span + 1e-6; s += 0.05) slots.push(s);
+    for (const s of slots) for (const reversed of [false, true]) out.push({ ...poseOf(u), s, reversed });
     return out;
   }
   const n = u.main!;

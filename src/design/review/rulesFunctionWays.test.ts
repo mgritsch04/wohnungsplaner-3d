@@ -35,6 +35,17 @@ describe('A Funktion', () => {
     expect(rulesOf(living([put('generic-sofa-3', { x: 2.5, y: 3.5, face: 'N' })]))).not.toContain('A1');
     expect(rulesOf(living([put('generic-armchair', { x: 2.5, y: 3.5, face: 'N' })]), 'S')).toContain('A1');
   });
+  it('A1 living room: the chairs at a table in the same room seat guests too, once there is a sofa or armchair', () => {
+    const living = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows: [{ wall: 'N', at: 2.5 }] }), type: 'living', items });
+    const table = [put('generic-dining-table-4', { x: 3.5, y: 1.2, face: 'S' }), put('generic-chair', { x: 3.1, y: 0.45, face: 'S' }), put('generic-chair', { x: 3.9, y: 1.95, face: 'N' })];
+    // Garçonnière: armchair for reading, table for two
+    expect(rulesOf(living([put('generic-armchair', { x: 0.6, y: 3.3, face: 'N' }), ...table]))).not.toContain('A1');
+    // chairs alone do not make a living room
+    const bare = living(table);
+    expect(bare.findings.some((f) => f.rule === 'A1' && f.severity === 'S' && /Sofa oder Sessel/.test(f.text))).toBe(true);
+    // one armchair and one chair are still too few
+    expect(rulesOf(living([put('generic-armchair', { x: 0.6, y: 3.3, face: 'N' }), table[0], table[1]]), 'S')).toContain('A1');
+  });
   it('A1 kitchen needs sink, hob, fridge and worktop; fitted pieces count', () => {
     const k = (ids: string[], existing: string[] = []) =>
       review({
@@ -93,6 +104,24 @@ describe('A Funktion', () => {
       program: { roomId: 'room_test', reading: '', zones: [], items: [{ id: 'wardrobe', catalogId: 'generic-wardrobe-150', zone: 'z', why: '', required: true, label: 'Kleiderschrank' }], relations: [], walk: '', check: [] },
     });
     expect(r.findings.some((f) => f.rule === 'A1' && f.severity === 'S' && /Kleiderschrank/.test(f.text))).toBe(true);
+  });
+  it('A1 a required piece that only fitted as a smaller variant is medium (the double bed came in as a single bed, #443)', () => {
+    const prog = (required: boolean) => ({ roomId: 'room_test', reading: '', zones: [], items: [{ id: 'bed', catalogId: 'generic-bed-140', zone: 'z', why: '', required, label: 'Bett 140×200' }], relations: [], walk: '', check: [] });
+    const bed = { ...put('generic-bed-90', { x: 3.45, y: 1.6, face: 'W', id: 'bed' }), replaces: 'generic-bed-140' };
+    const r = review({ room: room(), type: 'bedroom', items: [bed], program: prog(true) });
+    expect(r.findings.find((f) => f.rule === 'A1' && /nur kleiner/.test(f.text))?.severity).toBe('M');
+    expect(review({ room: room(), type: 'bedroom', items: [bed], program: prog(false) }).findings.some((f) => /nur kleiner/.test(f.text))).toBe(false);
+  });
+  it('A1 a hand basin that finds no place in the WC is the WC finding (medium), not a second severe one', () => {
+    const r = review({
+      room: rectRoom(1.2, 1.6, { doors: [{ wall: 'S', at: 0.6, width: 0.7 }] }),
+      type: 'bath',
+      items: [],
+      existing: [put('generic-toilet', { x: 0.6, y: 0.3, face: 'S' })],
+      dropped: [{ id: 'basin', catalogId: 'generic-washbasin', reason: 'stünde direkt hinter der Tür' }],
+      program: { roomId: 'room_test', reading: '', zones: [], items: [{ id: 'basin', catalogId: 'generic-washbasin', zone: 'z', why: '', required: true, label: 'Handwaschbecken' }], relations: [], walk: '', check: [] },
+    });
+    expect(r.findings.filter((f) => f.rule === 'A1').map((f) => f.severity)).toEqual(['M']);
   });
   it('A2 a function twice in the flat is medium, once is fine, a reason allows it', () => {
     const dining = (id: string) => {
@@ -244,10 +273,28 @@ describe('B Wege und Zugang', () => {
     expect(r(1.7).findings.find((f) => f.rule === 'B6')?.severity).toBe('L');
     expect(r(1.5).findings.find((f) => f.rule === 'B6')?.severity).toBe('M');
   });
-  it('B6 WC and washbasin: 55 cm', () => {
-    const r = (d: number) => review({ room: rectRoom(1.6, d, { doors: [{ wall: 'O', at: d / 2, width: 0.7, swingsIn: false }] }), type: 'bath', items: [], existing: [put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' })] });
-    expect(rulesOf(r(1.6))).not.toContain('B6');
-    expect(rulesOf(r(0.95), 'M')).toContain('B6');
+  it('B6 WC and washbasin: 55 cm in front of them for anything the proposal puts there', () => {
+    const wc = put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' });
+    const r = (y: number) => review({ room: rectRoom(1.6, 2, { doors: [{ wall: 'O', at: 1, width: 0.7, swingsIn: false }] }), type: 'bath', items: [put('generic-sideboard', { x: 0.8, y, face: 'N', width: 0.8, depth: 0.3 })], existing: [wc] });
+    // front edge of the WC near 0.54 m: a cabinet from 1.15 m leaves 60 cm, one from 0.85 m only 30 cm
+    expect(rulesOf(r(1.3))).not.toContain('B6');
+    expect(rulesOf(r(1.0), 'M')).toContain('B6');
+  });
+  it('B6 Bestand that only meets the wall or other Bestand is no finding of the proposal', () => {
+    const tight = (existing: ReturnType<typeof put>[]) => review({ room: rectRoom(1.6, 0.95, { doors: [{ wall: 'O', at: 0.47, width: 0.7, swingsIn: false }] }), type: 'bath', items: [], existing });
+    // the fitted WC 41 cm from the wall: as built, nothing to change
+    expect(rulesOf(tight([put('generic-toilet', { x: 0.8, y: 0.27, face: 'S' })]))).not.toContain('B6');
+    // a fitted kitchen opposite a wall at 90 cm: the same
+    const galley = review({ room: rectRoom(3, 1.5, { doors: [{ wall: 'W', at: 0.75 }] }), type: 'kitchen', items: [], existing: [put('generic-k-base-60', { x: 1.5, y: 0.3, face: 'S' })] });
+    expect(rulesOf(galley)).not.toContain('B6');
+    // a planned kitchen in the same place is reported
+    const planned = review({ room: rectRoom(3, 1.5, { doors: [{ wall: 'W', at: 0.75 }] }), type: 'kitchen', items: [put('generic-k-base-60', { x: 1.5, y: 0.3, face: 'S' })] });
+    expect(rulesOf(planned, 'M')).toContain('B6');
+  });
+  it('B4 and B5 Bestand in the swing or behind the door is no finding of the proposal', () => {
+    expect(rulesOf(review({ room: room(), type: 'other', items: [], existing: [put('generic-wardrobe-100', { x: 0.9, y: 3.0, face: 'N' })] }))).not.toContain('B4');
+    const behind = review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5, swingsIn: false }] }), type: 'other', items: [], existing: [put('generic-shelf-80', { x: 1.5, y: 2.7, face: 'S' })] });
+    expect(rulesOf(behind)).not.toContain('B5');
   });
   it('B7 a piece enclosed by others is not reachable', () => {
     const ring = [
@@ -260,6 +307,22 @@ describe('B Wege und Zugang', () => {
     const r = review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [...ring, inner] });
     expect(r.findings.some((f) => f.rule === 'B7' && f.items.includes('inner'))).toBe(true);
     expect(rulesOf(review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [inner] }))).not.toContain('B7');
+  });
+  it('B7 to a chair at the table one sidesteps: 40 cm are enough, for a cabinet not', () => {
+    // balcony 3.6 × 1.5: table against the end wall, the far chair behind it, 45 cm left on either side
+    const balcony = (id: string) =>
+      review({
+        room: rectRoom(3.6, 1.5, { doors: [{ wall: 'O', at: 0.75, width: 0.8 }] }),
+        type: 'other',
+        items: [put('generic-balcony-table', { x: 1.1, y: 0.75, face: 'S', width: 0.6, depth: 0.6 }), put(id, { x: 0.55, y: 0.75, face: 'O', id: 'far', width: 0.45, depth: 0.45 })],
+      });
+    expect(balcony('generic-chair').findings.some((f) => f.rule === 'B7')).toBe(false);
+    expect(balcony('generic-sideboard').findings.some((f) => f.rule === 'B7' && f.items.includes('far'))).toBe(true);
+  });
+  it('B8 a window over the kitchen worktop can be opened, one behind a tall cabinet not', () => {
+    const k = (id: string) => review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }], windows: [{ wall: 'N', at: 1.5, width: 1.0 }] }), type: 'other', items: [0.9, 1.5, 2.1].map((x) => put(id, { x, y: 0.3, face: 'S' })) });
+    expect(rulesOf(k('generic-k-base-60'))).not.toContain('B8');
+    expect(rulesOf(k('generic-k-tall-60'), 'L')).toContain('B8');
   });
   it('B8 no reachable window is light', () => {
     const row = [0.5, 1.5, 2.5, 3.5].map((x) => put('generic-wardrobe-100', { x, y: 0.3, face: 'S' }));

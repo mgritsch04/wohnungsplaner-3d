@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sample, SampleOptions } from '../assistant/claude';
 import { TEST_FLATS } from './fixtures/flats';
 import { RECORDED } from './fixtures/recorded';
-import { runFurnishing, type DesignRunProgress } from './run';
+import { lookKeeps, runFurnishing, type DesignRunProgress } from './run';
+import type { RoomResult } from './types';
 
 const flat = TEST_FLATS.B;
 const answers = RECORDED.B!;
@@ -32,7 +33,7 @@ function fake(reply: Reply, images = false) {
 const recorded: Reply = (prompt, opts) => {
   const label = opts.label ?? '';
   if (label === 'Wohnkonzept') return answers.concept;
-  const room = label.startsWith('Kritik: ') ? label.slice(8).replace(/ \(Runde \d\)$/, '') : label;
+  const room = label.startsWith('Kritik: ') ? label.slice(8).replace(/ \((Runde \d|Blick)\)$/, '') : label;
   if (!answers.programs[room]) throw new Error(`keine Antwort für ${label} (Prompt: ${prompt.slice(0, 60)})`);
   return structuredClone(answers.programs[room]);
 };
@@ -117,6 +118,37 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     const plain = noPicture.calls.filter((c) => c.label.startsWith('Kritik: '));
     expect(plain.every((c) => c.images === 0)).toBe(true);
     if (plain.length) expect(plain.every((c) => c.prompt.includes('So steht es im Raum'))).toBe(true);
+  });
+
+  it('a main room that passes gets one look at its picture; without a picture no look', async () => {
+    const toImage = vi.fn(async () => ({ mediaType: 'image/png' as const, data: 'AAAA' }));
+    const withPicture = fake(recorded, true);
+    const r = await run(withPicture.sample, { toImage });
+    const looks = withPicture.calls.filter((c) => c.label.endsWith('(Blick)'));
+    expect(looks.length).toBeGreaterThan(0);
+    for (const c of looks) expect(c.prompt).toContain('Blick vor der Abgabe');
+    for (const room of r.rooms) {
+      const name = r.analysis.rooms.find((a) => a.roomId === room.roomId)!.name;
+      const mine = withPicture.calls.filter((c) => c.label.startsWith(`Kritik: ${name} `));
+      // a look is the only critique call of its room, and only one
+      if (mine.some((c) => c.label.endsWith('(Blick)'))) expect(mine).toHaveLength(1);
+    }
+    const noPicture = fake(recorded, false);
+    await run(noPicture.sample, { toImage });
+    expect(noPicture.calls.filter((c) => c.label.endsWith('(Blick)'))).toEqual([]);
+    const fast = fake(recorded, true);
+    await run(fast.sample, { toImage, wishes: { ...flat.wishes, quality: 'fast' } });
+    expect(fast.calls.filter((c) => c.label.endsWith('(Blick)'))).toEqual([]);
+  });
+
+  it('the look replaces a passing room only if it still passes, keeps nearly its points and drops nothing more', () => {
+    const room = (score: number, passed: boolean, items = 6, dropped = 0) =>
+      ({ review: { score, passed }, layout: { items: Array(items).fill({}), dropped: Array(dropped).fill({}) } }) as unknown as RoomResult;
+    expect(lookKeeps(room(95, true), room(92, true))).toBe(true);
+    expect(lookKeeps(room(95, true), room(90, true))).toBe(false);
+    expect(lookKeeps(room(95, true), room(97, false))).toBe(false);
+    expect(lookKeeps(room(95, true), room(96, true, 6, 1))).toBe(false);
+    expect(lookKeeps(room(95, true), room(96, true, 2))).toBe(false);
   });
 
   it('stops when the user cancels', async () => {

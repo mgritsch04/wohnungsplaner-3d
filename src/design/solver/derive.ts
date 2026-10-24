@@ -3,7 +3,7 @@
  * as a block, and every dependent piece from its parent (chairs round the table, nightstands,
  * rug, picture above, lamp on top, curtain at the window).
  */
-import { add, scale, type Vec2 } from '../../model/vec';
+import { add, pointInPolygon, scale, type Vec2 } from '../../model/vec';
 import { rotationFacing } from '../../suggest/roomGeometry';
 import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
 import { specOf } from './items';
@@ -39,6 +39,11 @@ function parentBox(m: Model, id: string): { box: Box; top: number; elevation: nu
   }
   return null;
 }
+
+/** How far an open curtain panel covers the frame of its window (m). */
+const CURTAIN_OVERLAP = 0.08;
+/** Width of an open, gathered curtain panel: about a third of its fabric, 30 to 50 cm. */
+export const curtainOpenWidth = (fabric: number): number => clamp(fabric * 0.35, 0.3, 0.5);
 
 /** Rotate a rug so its longer side runs along `along` (the parent's width axis). */
 function rugBox(center: Vec2, parentRot: number, w: number, d: number, longAlongWidth: boolean): Box {
@@ -120,14 +125,19 @@ function hangFree(m: Model, n: Node, b: Box): boolean {
  * hanging over the parent between `z0` and `z1` reaches (the TV over the sideboard): what stands
  * on the piece goes in front of it, not into it. `-Infinity` when nothing hangs there.
  */
-function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number): number {
+function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number, u0 = -Infinity, u1 = Infinity): number {
   const f = axisY(P.rotation);
+  const side = axisX(P.rotation);
   let v = -Infinity;
   for (const sib of m.nodes.values()) {
     if (sib === n || sib.parent !== n.parent || sib.spec.base !== 'wall' || sib.rule?.kind !== 'above') continue;
     const pose = wallAbove(m, sib, P, z0, sib.rule.height);
     if (Math.min(z1, pose.elevation + sib.spec.height) - Math.max(z0, pose.elevation) <= 0.005) continue;
-    for (const c of boxCorners(pose.box)) v = Math.max(v, (c.x - P.x) * f.x + (c.y - P.y) * f.y);
+    const corners = boxCorners(pose.box);
+    // beside it, not under it: nothing to step in front of
+    const along = corners.map((c) => (c.x - P.x) * side.x + (c.y - P.y) * side.y);
+    if (Math.max(...along) <= u0 + 0.005 || Math.min(...along) >= u1 - 0.005) continue;
+    for (const c of corners) v = Math.max(v, (c.x - P.x) * f.x + (c.y - P.y) * f.y);
   }
   return v;
 }
@@ -144,14 +154,18 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
   // the pieces that take another branch of the `on` rule do not share the row
   const inRow = (s: Node) => s.spec.role !== 'mattress' && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
   const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
-  if (sibs.length < 2) return null;
+  // a screen hanging over the piece takes its middle: what stands on it goes to the ends (#443)
+  const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && s.spec.role === 'tv');
+  if (sibs.length < 2 && !screenAbove) return null;
   sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
-  const total = sibs.reduce((v, s) => v + s.spec.width, 0) + ON_GAP * (sibs.length - 1);
+  const widths = sibs.reduce((v, s) => v + s.spec.width, 0);
+  const total = widths + ON_GAP * (sibs.length - 1);
   if (total > 2 * P.hw) return null;
-  let u = -total / 2;
+  const gap = screenAbove && sibs.length > 1 ? (2 * P.hw - widths) / (sibs.length - 1) : ON_GAP;
+  let u = screenAbove ? -P.hw : -total / 2;
   for (const s of sibs) {
     if (s === n) return u + s.spec.width / 2;
-    u += s.spec.width + ON_GAP;
+    u += s.spec.width + gap;
   }
   return null;
 }
@@ -164,7 +178,12 @@ function deriveNode(m: Model, n: Node): void {
   n.elevation = s.elevation;
   if (r.kind === 'ceiling') {
     const z = m.zones.get(n.zone);
-    const c = hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : centroidOf(ctx.poly));
+    // the room's only ceiling light is its main light: in the middle of the room, where the outlet
+    // usually is, not wherever the programme happened to put it (#443)
+    const overTable = hint && [...m.nodes.values()].some((o) => o.spec.role === 'table' && o.prog?.hint && Math.hypot(o.prog.hint.x - hint.x, o.prog.hint.y - hint.y) < 0.6);
+    const only = !overTable && ![...m.nodes.values()].some((o) => o !== n && o.rule?.kind === 'ceiling' && !o.parent);
+    const middle = centroidOf(ctx.poly);
+    const c = only && pointInPolygon(middle, ctx.poly) ? middle : (hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : middle));
     n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
     n.elevation = Math.min(s.elevation, ctx.height - s.height - 0.05);
     // a hanging lamp gives way to tall furniture, its doors and an opened door leaf (#442)
@@ -182,16 +201,20 @@ function deriveNode(m: Model, n: Node): void {
   if (r.kind === 'sill' || r.kind === 'curtain') {
     const win = ctx.windows.find((w) => w.label === r.window)!;
     const w = ctx.walls[win.wall];
-    const mid = (win.t0 + win.t1) / 2;
     const span = win.t1 - win.t0;
     if (r.kind === 'sill') {
       const t = win.t0 + (span * (r.index + 0.5)) / r.count;
       n.box = boxOnWall(w, t, s.width, s.depth, 0.02);
       n.elevation = win.sill;
     } else {
-      // a window near the corner: the curtain slides along the wall to stay in the room
-      const t = clamp(r.count === 1 ? mid : win.t0 + (span * r.index) / (r.count - 1), s.width / 2, w.length - s.width / 2);
-      n.box = boxOnWall(w, t, s.width, s.depth, 0.08);
+      // drawn open: each panel gathered beside the frame, overlapping it a little; a pair frames the
+      // window, a single panel goes to the side with more wall; near a corner it slides along the wall
+      const g = curtainOpenWidth(s.width);
+      const left = win.t0 - g / 2 + CURTAIN_OVERLAP;
+      const right = win.t1 + g / 2 - CURTAIN_OVERLAP;
+      const side = r.count === 1 ? (win.t0 >= w.length - win.t1 ? left : right) : r.index % 2 === 0 ? left : right;
+      const t = clamp(side, g / 2, w.length - g / 2);
+      n.box = boxOnWall(w, t, g, s.depth, 0.08);
       n.elevation = Math.max(0, Math.min(0.02, ctx.height - s.height - 0.02));
     }
     return;
@@ -242,11 +265,14 @@ function deriveNode(m: Model, n: Node): void {
       const all = r.kind === 'under-all' || parentNode?.spec.role === 'table' || parentNode?.spec.role === 'coffee-table';
       const bed = parentNode?.spec.role === 'bed';
       const options: Box[] = [];
-      for (const longAlong of [true, false]) {
+      // under a bed a rug that is long enough lies across it, 40–60 cm out on both sides (#443)
+      const across = bed && Math.max(s.width, s.depth) >= 2 * P.hw + 0.6;
+      for (const longAlong of across ? [false, true] : [true, false]) {
         const probe = rugBox({ x: 0, y: 0 }, P.rotation, s.width, s.depth, longAlong);
         const { ey } = extents(probe, P.rotation);
         let v: number;
-        if (bed) v = -P.hd + 0.35 * 2 * P.hd + ey;
+        // from just below the nightstands to about 55 cm past the foot of the bed
+        if (bed) v = -P.hd + clamp(2 * P.hd + 0.55 - 2 * ey, 0.3, 0.7) + ey;
         else if (all) v = 0;
         else v = P.hd - 0.2 + ey;
         for (const shift of [0, -0.2, -0.4, 0.2]) {
@@ -303,15 +329,17 @@ function deriveNode(m: Model, n: Node): void {
         n.elevation = p.elevation + 0.03 + row * 0.38;
         return;
       }
-      const u = onRow(m, n, P, parentNode) ?? -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
+      const row = onRow(m, n, P, parentNode);
+      const u = row ?? -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
       const lim = Math.max(0, P.hw - s.width / 2);
       // on a table the chairs tuck in at the edges: what stands on it goes in the middle
       const table = parentNode?.spec.category === 'table';
+      const side = clamp(r.count === 1 && !table && row === null ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim);
       // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
       // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
-      const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height) + 0.01) + s.depth / 2;
+      const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height, side - s.width / 2, side + s.width / 2) + 0.01) + s.depth / 2;
       const v = table ? Math.max(0, back) : Math.max(back, -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
-      const c = at(clamp(r.count === 1 && !table ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim), Math.min(v, P.hd));
+      const c = at(side, Math.min(v, P.hd));
       n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
       n.elevation = p.top;
       return;

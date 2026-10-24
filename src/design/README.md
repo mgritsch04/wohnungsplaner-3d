@@ -61,7 +61,7 @@ Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinate
 
 - `reviewRoom({ analysis, type, layout, existing?, program?, palette?, catalog?, options? })` gibt ein `RoomReview` zurück: Befunde (Regel A1 … E5, Schwere, Text in Alltagssprache, betroffene Teile, Ort im Plan), Punkte nach `score.ts`, `passed` und die Kennzahlen (Belegung, Weglänge leer und eingerichtet, nicht aufgestellte Teile).
 - `reviewFlat(inputs)` prüft alle Räume und liefert zusätzlich die Befunde der ganzen Wohnung (A2, eine Funktion doppelt) und `Review.score`/`minScore`/`passed`.
-- Eingabe ist `Layout` von Stufe 3. Bestand im Raum (`RoomAnalysis.existing`) wird als `existing` mitgegeben: Er zählt für A1, blockiert Wege und löst keine Befunde über Neuplanung aus.
+- Eingabe ist `Layout` von Stufe 3. Bestand im Raum (`RoomAnalysis.existing`) wird als `existing` mitgegeben: Er zählt für A1, blockiert Wege und löst keine Befunde über Neuplanung aus; was nur Bestand und Wand betrifft (eingebautes WC gegenüber der eingebauten Dusche, Bestand im Türaufschwung), meldet die Begehung nicht, weil der Vorschlag es nicht ändern kann.
 - Wege (B1–B3) misst `checkWalkways` aus Stufe 0, also dasselbe wie der Solver. Alles andere (Bewegungsflächen, Erreichbarkeit, Schwenkflächen) rechnet `review/` auf einem Raster von 5 cm (10 cm ab 45 m²).
 - Ohne `program` entfallen nur die Regeln, die Claudes Zonen brauchen (A5, E2, die Leseecke in D4, Farben E4, Raumteiler in C6/C8). `options` hält Ausnahmen, die der Nutzer bewusst wollte: neue Sanitärobjekte, Verdunkelung, erlaubte Doppelungen.
 - Tests: `review/rules*.test.ts` (je Regel ein gutes und ein schlechtes Beispiel mit `review/testkit.ts`), `review/heute.test.ts` (der Vorschlag des alten Ablaufs für A und B liefert die bekannten Mängel), `review/flats.test.ts` (alle sechs Testwohnungen leer, unter 100 ms je Raum).
@@ -87,6 +87,7 @@ Ein Raum, den die Begehung nicht besteht (ein schwerer Befund oder unter 85 Punk
 - `buildCritiquePrompt({ base, program, layout, review, round, image?, textMap? })` stellt die Aufgabe von Stufe 2 noch einmal (`buildRoomProgramPrompt`), dazu das bisherige Programm in der Form der eigenen Antwort (`programAsAnswer`), das Bild oder die Textkarte und den Bericht der Begehung (`critiqueReport`: Befunde mit Ort, nicht aufgestellte Teile, weit verschobene Teile, Belegung).
 - Verlangt ist wieder das vollständige Programm: dieselben ids und Plätze, wo nichts zu beanstanden war. `parseCritique` prüft es wie Stufe 2.
 - Der Text sagt ausdrücklich, dass Claude keine Koordinaten nachrechnen soll – die App stellt millimetergenau auf, Claude gibt die Absicht vor.
+- **Blick vor der Abgabe** (`look: true`, mgritsch04/wohnungsplaner-3d#443): Ein Hauptraum (`LOOK_TYPES`: Wohnen, Schlafen, Kinder, Arbeiten, Küche, Essen), der gleich beim ersten Aufstellen besteht, geht einmal mit Bild an Claude, mit einer Innenarchitektinnen-Liste statt der Befunde (Sitzgruppe auf Blickpunkt, Fenster frei, Licht an Sitz- und Arbeitsplätzen, Stühle am Tisch, Zonen verteilt). `lookKeeps` übernimmt die Antwort nur, wenn der Raum weiter besteht, höchstens `LOOK_TOLERANCE` (4) Punkte verliert und nichts mehr wegfällt. Nicht bei „schnell“, nicht ohne Bild.
 
 ## Ganzer Ablauf benutzen (`run.ts`)
 
