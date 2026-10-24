@@ -136,7 +136,8 @@ export function buildCritiquePrompt(input: CritiqueInput): string {
 - Stühle stehen am Tisch, der Bürostuhl am Schreibtisch; Teppiche liegen mittig unter ihrer Gruppe.
 - Die Zonen sind über den Raum verteilt: keine Ecke leer, während anderswo alles aneinanderklebt; nichts steht verloren mitten im Raum.
 Ist das alles schon so, gib das Programm unverändert zurück. Sonst ändere gezielt, ohne Wege, Türen oder Funktionen zu verschlechtern, und sag in "why" des geänderten Teils kurz, warum.`
-    : 'Ändere nur, was die Befunde verlangen, und sag in "why" des geänderten Teils kurz, warum. Was gut ist, bleibt wie es ist: dieselben ids, dieselben Plätze.';
+    : `Ändere nur, was die Befunde verlangen, und sag in "why" des geänderten Teils kurz, warum. Was gut ist, bleibt wie es ist: dieselben ids, dieselben Plätze.
+Passt ein Möbel nur kleiner hinein, steht etwas weit außerhalb seiner Zone oder sind Abstände zu knapp, ist der Raum für dein Programm zu voll. Verschieben allein hilft dann nicht: Plane das kleinere Teil gleich selbst ein, nimm weniger Plätze am Tisch oder ordne die Gruppe anders an (das Sofa an eine andere Wand, die Medienwand dorthin, wo der Weg nicht vorbeiführt).`;
   const heading = input.look ? 'Blick vor der Abgabe' : input.round === 1 ? 'Nachbesserung' : 'Zweite Nachbesserung';
   return `${buildRoomProgramPrompt(base)}
 
