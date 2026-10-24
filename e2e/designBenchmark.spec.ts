@@ -337,8 +337,11 @@ async function roomShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
         Math.max(...ys) - Math.min(...ys),
       ) / 2;
     const look = room.entryView?.dir ?? { x: 0, y: -1 };
-    const dist = Math.max(4.5, (radius + 0.6) / Math.sin((25 * Math.PI) / 180));
-    const high = (86 * Math.PI) / 180;
+    // from far away and cut out afterwards: close up, the perspective tilts tall pieces outwards
+    // so far that a wardrobe seems to stand in the desk beside it (#443)
+    const dist =
+      FAR * Math.max(4.5, (radius + 0.6) / Math.sin((25 * Math.PI) / 180));
+    const high = (88 * Math.PI) / 180;
     const top = {
       x: c.x - look.x * dist * Math.cos(high),
       y: dist * Math.sin(high),
@@ -352,11 +355,23 @@ async function roomShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
       [top, { x: c.x, y: 0, z: c.y }] as const,
     );
     await page.waitForTimeout(1500);
-    await canvas.screenshot({
+    const box = (await canvas.boundingBox())!;
+    const w = Math.min(box.width, (box.height / FAR) * 1.25);
+    const h = Math.min(box.height, box.height / FAR + 40);
+    await page.screenshot({
       path: `${dir}/3d-${fileOf(room.name)}-oben.png`,
+      clip: {
+        x: box.x + (box.width - w) / 2,
+        y: box.y + (box.height - h) / 2,
+        width: w,
+        height: h,
+      },
     });
   }
 }
+
+/** How much farther than needed the top view stands (and how much of the picture is cut out). */
+const FAR = 2.2;
 
 /** Raumbild und Textkarte je Raum, wie Claude sie in der Kritik sieht. */
 function writeRoomPictures(
@@ -706,6 +721,8 @@ async function shootPlaced(
  *     WP_SHOTS=local-analysis/benchmark/lauf1 WP_APTS=B npx playwright test e2e/designBenchmark.spec.ts --workers=1
  */
 test.describe("Bilder eines gespeicherten Laufs", () => {
+  // the top view is cut out of the middle of the picture: twice the pixels keep it sharp
+  test.use({ deviceScaleFactor: 2 });
   test.skip(!process.env.WP_SHOTS, "Nur lokal: WP_SHOTS=<Ordner des Laufs>.");
   for (const key of KEYS) {
     test(`Bilder ${key}`, async ({ page }) => {
