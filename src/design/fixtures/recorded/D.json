@@ -1,0 +1,901 @@
+{
+ "source": "Lauf T2 vom 23.10.2026 mit Testwohnung D: unveränderte Antworten von Claude (Opus für Haupträume, Sonnet für kleine Räume) auf die Prompts aus src/design/concept/. Je Anfrage die gültige Antwort (nach höchstens einer Reparatur-Runde).",
+ "concept": {
+  "living": "Hier wohnt eine Person allein und sehr bewusst auf kleinem Raum. Sie kocht jeden Tag selbst, isst zu zweit mit Besuch, arbeitet zeitweise am Laptop und rollt morgens oder abends die Yogamatte aus. Am Abend liest sie bei Tageslicht von Norden oder unter einer warmen Leuchte zwischen ihren Pflanzen. Übernachtungsgäste kommen selten, deshalb gibt es keinen Gästeschlafplatz. Alles hat einen festen Platz, damit der eine große Raum ruhig bleibt.",
+  "style": {
+   "idea": "Ein heller, stiller Raum aus Weiß, Sand und Esche: wenige gute Möbel mit klaren Flächen, Stauraum hinter Fronten ohne Griffe und Pflanzen als einziger Schmuck.",
+   "materials": [
+    "Esche hell geölt (Tisch, Bett, Regalbretter)",
+    "weiß matte Fronten, grifflos",
+    "Leinen und Baumwolle in Sand (Bettwäsche, Vorhang)",
+    "Wollteppich naturfarben",
+    "Keramik und Terrakotta für Pflanzen",
+    "Arbeitsplatte Esche oder sandfarbener Kompaktlaminat"
+   ],
+   "palette": [
+    {
+     "name": "Weiß",
+     "hex": "#f6f5f2"
+    },
+    {
+     "name": "Hellgrau",
+     "hex": "#d9d8d4"
+    },
+    {
+     "name": "Esche hell",
+     "hex": "#e0cfb1"
+    },
+    {
+     "name": "Sand",
+     "hex": "#c9b593"
+    },
+    {
+     "name": "Salbei",
+     "hex": "#9aa58c"
+    }
+   ]
+  },
+  "functions": [
+   {
+    "function": "Schlafen",
+    "room": "Zimmer",
+    "why": "Ein richtiges Bett 140 braucht festen Platz. Die ruhige Ecke weit weg von Tür und Kochnische trennt Schlafen vom Tag.",
+    "wishes": [
+     4,
+     8
+    ]
+   },
+   {
+    "function": "Kleidung",
+    "room": "Zimmer",
+    "why": "Im Vorraum mit drei Türen ist kein Platz für einen Schrank. Ein schmaler, weißer Schrank neben dem Bett hält Kleidung unsichtbar.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Kochen",
+    "room": "Zimmer",
+    "why": "Es gibt noch keine Küche, und der Vorraum muss als Durchgang frei bleiben. Die Kochnische kommt deshalb als kompakte Zeile an die Wand neben der Zimmertür, nahe am Eingang und weit weg vom Bett.",
+    "wishes": [
+     1,
+     5
+    ]
+   },
+   {
+    "function": "Vorräte/Stauraum",
+    "room": "Zimmer",
+    "why": "Ein Hochschrank am Ende der Küchenzeile nimmt Vorräte, Putzzeug und Staubsauger auf. So bleibt nichts offen stehen.",
+    "wishes": [
+     5,
+     8
+    ]
+   },
+   {
+    "function": "Essen",
+    "room": "Zimmer",
+    "why": "Ein einziger Tisch aus Esche für zwei Personen steht am Nordfenster, nahe an der Kochnische.",
+    "wishes": [
+     6
+    ]
+   },
+   {
+    "function": "Arbeiten/Laptop",
+    "room": "Zimmer",
+    "why": "Der Esstisch ist zugleich Arbeitsplatz. Das blendfreie Nordlicht passt gut zum Bildschirm. Der Laptop wird nach der Arbeit im Sideboard verstaut, damit kein zweiter Tisch nötig ist.",
+    "wishes": [
+     7,
+     8
+    ]
+   },
+   {
+    "function": "Lesen",
+    "room": "Zimmer",
+    "why": "Ein bequemer Sessel mit Stehleuchte am zweiten Fenster, zwischen Pflanzen, wird zur ruhigen Leseecke.",
+    "wishes": [
+     3
+    ]
+   },
+   {
+    "function": "Yoga",
+    "room": "Zimmer",
+    "why": "Die Mitte des Raums vor der Leseecke bleibt frei, etwa 200 × 120 cm auf einem flachen Teppich. Die Matte wohnt im Schrank.",
+    "wishes": [
+     2,
+     8
+    ]
+   },
+   {
+    "function": "Pflanzen",
+    "room": "Zimmer",
+    "why": "Nur das Zimmer hat Fenster. Schattenverträgliche Pflanzen für Nordlicht wie Monstera, Zamioculcas und Farn stehen auf der Fensterbank und als Bodenpflanze an der Leseecke.",
+    "wishes": [
+     9
+    ]
+   },
+   {
+    "function": "Garderobe/Schuhe",
+    "room": "Vorraum",
+    "why": "Jacken und Schuhe bleiben direkt am Eingang. Dafür reicht eine flache Wandgarderobe mit schmalem Schuhschrank (max. 25 cm tief), und der Weg zu Bad und Zimmer bleibt frei.",
+    "wishes": [
+     8
+    ]
+   },
+   {
+    "function": "Körperpflege",
+    "room": "Bad",
+    "why": "Dusche, WC und Waschtisch sind schon vorhanden und bleiben, wie sie sind.",
+    "wishes": []
+   },
+   {
+    "function": "Wäsche",
+    "room": "Bad",
+    "why": "Ein Wäschekorb und ein schmales Regal über dem WC halten Handtücher und Schmutzwäsche aus dem Wohnraum heraus.",
+    "wishes": [
+     8
+    ]
+   }
+  ],
+  "rooms": [
+   {
+    "room": "Zimmer",
+    "type": "living",
+    "role": "Der einzige Wohnraum ist in ruhige Zonen gegliedert: Kochen nahe der Tür, Essen und Arbeiten sowie Lesen an den Nordfenstern, Schlafen in der hinteren Ecke, und die Mitte bleibt frei für Yoga.",
+    "functions": [
+     "Schlafen",
+     "Kleidung",
+     "Kochen",
+     "Vorräte/Stauraum",
+     "Essen",
+     "Arbeiten/Laptop",
+     "Lesen",
+     "Yoga",
+     "Pflanzen"
+    ],
+    "anchors": [
+     "Bett 140 × 200 aus heller Esche mit niedrigem Kopfteil in der ruhigen Ecke gegenüber der Tür",
+     "Kochzeile ca. 180–210 cm mit Hochschrank, weiß matt und grifflos, an der Wand neben der Zimmertür",
+     "Tisch aus Esche ca. 80 × 80 cm für Essen und Laptop am Nordfenster, mit zwei Stühlen"
+    ],
+    "accent": "#9aa58c",
+    "avoid": [
+     "Schlafsofa",
+     "zweiter Tisch oder eigener Schreibtisch",
+     "Fernsehwand",
+     "offene, volle Regalwände",
+     "dunkle oder hochglänzende Fronten",
+     "Möbel in der freien Yogafläche"
+    ]
+   },
+   {
+    "room": "Vorraum",
+    "type": "hall",
+    "role": "Ankommen und Ablegen, und der Weg zu Bad und Zimmer bleibt frei.",
+    "functions": [
+     "Garderobe/Schuhe"
+    ],
+    "anchors": [
+     "flache Wandgarderobe mit Hakenleiste aus Esche und Ablagebord",
+     "schmaler weißer Schuhschrank, max. 25 cm tief, mit Spiegel darüber"
+    ],
+    "accent": "#e0cfb1",
+    "avoid": [
+     "Küchenzeile",
+     "tiefe Schränke, die Türen oder Weg einengen",
+     "Bank oder Möbel mitten im Durchgang",
+     "Vorräte oder Wäsche"
+    ]
+   },
+   {
+    "room": "Bad",
+    "type": "bath",
+    "role": "Kompaktes Bad für Körperpflege und Wäsche mit klarer Ordnung in hellen Tönen.",
+    "functions": [
+     "Körperpflege",
+     "Wäsche"
+    ],
+    "anchors": [
+     "schmales Regal über dem WC für Handtücher",
+     "Wäschekorb aus Naturfaser"
+    ],
+    "accent": "#c9b593",
+    "avoid": [
+     "Dusche, WC oder Waschtisch umplanen oder versetzen",
+     "zusätzliches Waschbecken",
+     "offene Ablagen voller Fläschchen",
+     "Pflanzen, die Licht brauchen (kein Fenster)"
+    ]
+   }
+  ]
+ },
+ "programs": {
+  "Zimmer": {
+   "reading": "Ein fast quadratischer Raum mit kühlem, gleichmäßigem Nordlicht durch zwei Fenster in der Nordwand (F1 im Westen, F2 im Osten). Die einzige Tür T1 liegt in der Ostwand bei y=100–190 und schlägt nach Norden in den Raum auf. Deshalb ist die Ostwand südlich der Tür (y=190–450) der natürliche Platz für die Küche. West- und Südwand sind geschlossen und ruhig. Wer hereinkommt, blickt nach Westen auf W4: rechts liegt die helle Fensterecke mit der großen Pflanze, links das Bett in der stillen Südwestecke.",
+   "zones": [
+    {
+     "id": "kochen",
+     "function": "Kochen, Vorräte",
+     "rect": [
+      279,
+      190,
+      439,
+      450
+     ],
+     "why": "An der Wand gleich neben der Tür. Einkäufe landen sofort am Kühlschrank, Gerüche und Arbeit bleiben am Eingang und weg von Bett und Lesezone. Die Zone umfasst Zeile (x 379–439) und Arbeitsgang (x 279–379)."
+    },
+    {
+     "id": "essen",
+     "function": "Essen zu zweit, Arbeiten am Laptop",
+     "rect": [
+      205,
+      0,
+      439,
+      150
+     ],
+     "why": "Vor F2 und nur wenige Schritte von der Küche entfernt. Der Tisch steht quer zur Fensterwand, so haben beide Plätze das Tageslicht seitlich und der Laptop steht nie vor dem Fenster. Der Schwenkbereich der Tür (x>349, y>100) bleibt frei, Tisch und Stühle liegen außerhalb."
+    },
+    {
+     "id": "lesen",
+     "function": "Lesen, Pflanzen",
+     "rect": [
+      0,
+      0,
+      205,
+      85
+     ],
+     "why": "Die ruhige Nordwestecke vor F1, mit Tageslicht von hinten über die Schulter. Hier stehen die große Pflanze, der Sessel und die Leselampe. Diese Ecke sieht man beim Hereinkommen schräg vorne."
+    },
+    {
+     "id": "kleidung",
+     "function": "Kleidung",
+     "rect": [
+      0,
+      85,
+      65,
+      185
+     ],
+     "why": "Die geschlossene Westwand zwischen Lesezone und Bett. Der Schrank steht flach an der Wand, die Bedienfläche davor gehört zur freien Mitte und ist bei der Yogaübung geschlossen."
+    },
+    {
+     "id": "yoga",
+     "function": "Yoga, freie Mitte",
+     "rect": [
+      65,
+      95,
+      279,
+      195
+     ],
+     "why": "Die freie Bodenfläche zwischen Lesezone, Schrank, Bett und Küchengang, 214 × 100 cm, Platz für eine Matte 180 × 60 in Ost-West-Richtung. Hier steht kein Möbel."
+    },
+    {
+     "id": "schlafen",
+     "function": "Schlafen",
+     "rect": [
+      0,
+      195,
+      210,
+      450
+     ],
+     "why": "Die hintere Südwestecke, weit weg von Tür und Küche, mit dem Kopfteil an der geschlossenen Westwand. Das Bett ist von beiden Seiten zugänglich."
+    }
+   ],
+   "items": [
+    {
+     "id": "bed",
+     "catalogId": "generic-bed-140",
+     "zone": "schlafen",
+     "x": 102,
+     "y": 312,
+     "facing": "O",
+     "label": "Bett 140 × 200 Esche hell geölt, niedriges Kopfteil, Leinenbettwäsche in Sand",
+     "color": "#e0cfb1",
+     "why": "Ankermöbel des Schlafbereichs. Kopfteil an W4, je 65 cm frei an der Nord- und Südseite.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-bed-90"
+     ]
+    },
+    {
+     "id": "ns1",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 219,
+     "facing": "O",
+     "label": "Nachttisch Esche, eine Schublade, grifflos",
+     "color": "#e0cfb1",
+     "why": "Ablage an der Nordseite des Bettes, Platz für Leselicht und Buch."
+    },
+    {
+     "id": "ns2",
+     "catalogId": "generic-nightstand",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 406,
+     "facing": "O",
+     "label": "Nachttisch Esche, eine Schublade, grifflos",
+     "color": "#e0cfb1",
+     "why": "Gegenstück an der Südseite, damit das Bett symmetrisch und ruhig wirkt."
+    },
+    {
+     "id": "rug_bed",
+     "catalogId": "generic-rug-160",
+     "zone": "schlafen",
+     "x": 130,
+     "y": 312,
+     "facing": "O",
+     "label": "Wollteppich naturfarben, quer unter dem Bett (230 cm in Nord-Süd-Richtung)",
+     "color": "#d9d8d4",
+     "why": "Warmer Tritt beim Aufstehen. Ragt seitlich je ca. 42 cm unter dem Bett hervor, die Nachttische stehen daneben."
+    },
+    {
+     "id": "lamp_bed",
+     "catalogId": "generic-table-lamp",
+     "zone": "schlafen",
+     "x": 19,
+     "y": 219,
+     "facing": "O",
+     "label": "Tischleuchte Keramik weiß mit Leinenschirm, warmweiß 2700 K",
+     "color": "#f6f5f2",
+     "why": "Stimmungs- und Bettleselicht auf dem Nachttisch an der Raumseite."
+    },
+    {
+     "id": "wardrobe",
+     "catalogId": "generic-wardrobe-100",
+     "zone": "kleidung",
+     "x": 30,
+     "y": 135,
+     "facing": "O",
+     "label": "Kleiderschrank 100 cm, weiß matt, grifflos (Push-to-open)",
+     "color": "#f6f5f2",
+     "why": "Ankermöbel für Kleidung. Steht als hohes Möbel flach an der geschlossenen Westwand, alles verschwindet hinter ruhigen Fronten. Nach Süden bleiben 60 cm Zugang zur Nordseite des Bettes.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-dresser"
+     ]
+    },
+    {
+     "id": "table",
+     "catalogId": "generic-dining-table-4",
+     "zone": "essen",
+     "x": 305,
+     "y": 75,
+     "facing": "S",
+     "label": "Tisch Esche hell geölt (gewünscht wäre ca. 80 × 80, im Katalog 85 × 140), quer zur Fensterwand",
+     "color": "#e0cfb1",
+     "why": "Ankermöbel für Essen und Laptop. Die kurze Seite steht unter F2, so haben beide Plätze das Nordlicht seitlich. Ostkante bei x 347,5, also 91 cm Abstand zur Türangel und außerhalb des Schwenkbereichs.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-balcony-table"
+     ]
+    },
+    {
+     "id": "chair1",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 236,
+     "y": 75,
+     "facing": "O",
+     "label": "Stuhl Esche, Sitz Leinen sand",
+     "color": "#e0cfb1",
+     "why": "Laptop- und Essplatz, Fenster zur Linken. Dahinter 75 cm frei bis zur Leselampe."
+    },
+    {
+     "id": "chair2",
+     "catalogId": "generic-chair",
+     "zone": "essen",
+     "x": 373,
+     "y": 75,
+     "facing": "W",
+     "label": "Stuhl Esche, Sitz Leinen sand",
+     "color": "#e0cfb1",
+     "why": "Gastplatz gegenüber. Dahinter 91 cm bis W2, ganz nördlich des Türschwenks (y < 100)."
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "essen",
+     "x": 305,
+     "y": 75,
+     "facing": "S",
+     "label": "Pendelleuchte Leinen sand, warmweiß",
+     "color": "#c9b593",
+     "why": "Zonenlicht über dem Tisch für Essen und Arbeiten."
+    },
+    {
+     "id": "armchair",
+     "catalogId": "generic-armchair",
+     "zone": "lesen",
+     "x": 105,
+     "y": 43,
+     "facing": "S",
+     "label": "Lesesessel, Bezug Wollstoff Salbei, Gestell Esche",
+     "color": "#9aa58c",
+     "why": "Ankermöbel der Lesezone, mittig vor F1. Mit 85 cm niedriger als die Brüstung, das Nordlicht fällt über die Schulter. Gleichzeitig der einzige Farbakzent im Raum.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "floorlamp",
+     "catalogId": "generic-floor-lamp",
+     "zone": "lesen",
+     "x": 183,
+     "y": 25,
+     "facing": "S",
+     "label": "Leseleuchte Stoffschirm sand, warmweiß, dimmbar",
+     "color": "#c9b593",
+     "why": "Warmes Leselicht am Abend, rechts vom Sessel an der Wand zwischen den Fenstern, nicht vor dem Fenster."
+    },
+    {
+     "id": "plant_big",
+     "catalogId": "generic-plant",
+     "zone": "lesen",
+     "x": 25,
+     "y": 25,
+     "facing": "S",
+     "label": "Große Zimmerpflanze (z. B. Olive oder Ficus) im Terrakottatopf",
+     "color": "#9aa58c",
+     "why": "Blickfang: Beim Hereinkommen schaut man nach Westen, und diese Pflanze steht am Ende des Blicks, beleuchtet vom Nordfenster. Sie steht in der echten Ecke seitlich neben F1."
+    },
+    {
+     "id": "plant_f1",
+     "catalogId": "generic-plant-small",
+     "zone": "lesen",
+     "x": 105,
+     "y": 5,
+     "facing": "S",
+     "label": "Kleine Pflanze im Keramiktopf weiß",
+     "color": "#9aa58c",
+     "why": "Grün auf der Fensterbank hinter dem Sessel, damit man zwischen den Pflanzen liest."
+    },
+    {
+     "id": "herbs_f2",
+     "catalogId": "generic-plant-small",
+     "zone": "essen",
+     "x": 315,
+     "y": 5,
+     "facing": "S",
+     "label": "Küchenkräuter im Terrakottatopf",
+     "color": "#9aa58c",
+     "why": "Kräuter für das tägliche Kochen auf der Fensterbank von F2, wenige Schritte von der Küche."
+    },
+    {
+     "id": "curtain1",
+     "catalogId": "generic-curtain",
+     "zone": "lesen",
+     "x": 105,
+     "y": 3,
+     "facing": "S",
+     "label": "Vorhang Leinen sand, 140 cm breit",
+     "color": "#c9b593",
+     "why": "Weiches Licht und Sichtschutz an F1. Mit 140 cm breiter als das 120 cm breite Fenster."
+    },
+    {
+     "id": "curtain2",
+     "catalogId": "generic-curtain",
+     "zone": "essen",
+     "x": 315,
+     "y": 3,
+     "facing": "S",
+     "label": "Vorhang Leinen sand, 140 cm breit",
+     "color": "#c9b593",
+     "why": "Gleicher Vorhang an F2, damit die Nordwand ruhig und einheitlich wirkt."
+    },
+    {
+     "id": "ceiling",
+     "catalogId": "generic-pendant",
+     "zone": "yoga",
+     "x": 220,
+     "y": 225,
+     "facing": "S",
+     "label": "Flache Deckenleuchte Papier weiß, warmweiß, Unterkante ca. 210 cm",
+     "color": "#f6f5f2",
+     "why": "Grundlicht für den ganzen Raum mittig an der Decke. Hängt hoch genug, damit man bei der Yogaübung die Arme frei heben kann."
+    }
+   ],
+   "relations": [
+    [
+     "bed",
+     "wall",
+     "W4",
+     240,
+     385
+    ],
+    [
+     "ns1",
+     "pair",
+     "ns2",
+     "bed"
+    ],
+    [
+     "rug_bed",
+     "under-all",
+     "bed"
+    ],
+    [
+     "lamp_bed",
+     "on",
+     "ns1"
+    ],
+    [
+     "wardrobe",
+     "wall",
+     "W4",
+     85,
+     185
+    ],
+    [
+     "table",
+     "window",
+     "F2",
+     "front"
+    ],
+    [
+     "chair1",
+     "around",
+     "table"
+    ],
+    [
+     "chair2",
+     "around",
+     "table"
+    ],
+    [
+     "pendant",
+     "above",
+     "table",
+     140
+    ],
+    [
+     "armchair",
+     "window",
+     "F1",
+     "front"
+    ],
+    [
+     "floorlamp",
+     "near",
+     "armchair",
+     80
+    ],
+    [
+     "floorlamp",
+     "window",
+     "F1",
+     "beside"
+    ],
+    [
+     "plant_big",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "plant_f1",
+     "on",
+     "F1"
+    ],
+    [
+     "herbs_f2",
+     "on",
+     "F2"
+    ],
+    [
+     "curtain1",
+     "window",
+     "F1",
+     "over"
+    ],
+    [
+     "curtain2",
+     "window",
+     "F2",
+     "over"
+    ],
+    [
+     "ceiling",
+     "away",
+     "table",
+     150
+    ]
+   ],
+   "kitchen": [
+    {
+     "wall": "W2",
+     "from": [
+      439,
+      190
+     ],
+     "to": [
+      439,
+      450
+     ],
+     "modules": [
+      "generic-k-fridge",
+      "generic-k-sink-80",
+      "generic-k-drawer-60",
+      "generic-k-oven"
+     ]
+    }
+   ],
+   "walk": "Man tritt durch T1 ein. Das Türblatt schwenkt frei nach Norden (x 349–439, y 100–190), dort steht nichts. Links beginnt gleich die Küchenzeile mit dem Kühlschrank als hohem Abschluss am Türrand, davor ein 100–120 cm breiter Arbeitsgang (x 259/279–379). Geradeaus öffnet sich die freie Mitte (x 65–279, y 95–195), über die man alle Zonen erreicht. Nach rechts oben geht es zum Tisch an F2: zum Gaststuhl über den Streifen nördlich des Türschwenks, zum Laptopplatz von Süden. Weiter nach Westen liegen der Lesesessel vor F1 mit Pflanze und Leuchte und davor der Kleiderschrank an W4 mit 80–90 cm Bedienfläche. Zum Bett gelangt man nördlich am Bett entlang (60–65 cm Streifen) oder über den 74 cm breiten Weg zwischen Fußende (x 205) und Küchengang zur Südseite (65 cm bis W3).",
+   "check": [
+    "Türschwenk T1: Viertelkreis um (439,100) mit 90 cm Radius ist frei. Tischkante (347,5|100) liegt 91,5 cm von der Angel, Stuhl 2 endet bei y 97,5, der Kühlschrank beginnt bei y 190.",
+    "Wege: Eingang → Küchengang 100+ cm, Eingang → Mitte etwa 90 cm, Fußende → Südseite des Bettes 74 cm, Zugang zur Nordseite des Bettes 60 cm. Alle Wege sind mindestens 70 cm breit, der Raum ist kein Durchgangszimmer.",
+    "Küche: 260 cm an W2 (y 190–450) mit Kühlschrank, Spüle 80, Schubladenschrank 60 als Arbeitsfläche zwischen Spüle und Kochfeld, Backofen mit Kochfeld. Länger als die gewünschten 180–210 cm, weil Kühlschrank, Spüle, 60 cm Arbeitsfläche und Herd mindestens 260 cm brauchen. Einen eigenen Hochschrank gibt es nicht, der Kühlschrank (185 cm) ist der hohe Abschluss am Türrand. Nichts steht vor der Tür. Spüle nicht unter einem Fenster, weil an W2 keines ist.",
+    "Kochfeld am Südende der Zeile direkt an W3: wenig seitlicher Abstand, daher dort eine Wandabschlussleiste oder Rückwandplatte vorsehen.",
+    "Bett: Kopfteil an der geschlossenen Wand W4, nicht unter dem Fenster. Beidseitig 65 cm frei, Nachttische als Paar, Teppich ragt seitlich ca. 42 cm heraus.",
+    "Fenster: Vor F1 und F2 stehen nur Sessel (85 cm), Tisch (75 cm) und Stühle (86 cm), alle unter der Brüstung von 90 cm. Stehlampe und große Pflanze stehen seitlich, beide Vorhänge sind 140 cm breit und damit breiter als die Fenster (120 cm).",
+    "Tisch als Arbeitsplatz: quer zum Fenster, Licht kommt seitlich, kein Bildschirm vor dem Fenster. Hinter Stuhl 1 sind 75 cm frei, hinter Stuhl 2 91 cm.",
+    "Kleiderschrank (200 cm hoch) und Kühlschrank (185 cm) stehen als hohe Möbel an Wänden. Vor dem Schrank sind 80–90 cm Bedienfläche frei.",
+    "Yogafläche: 214 × 100 cm ohne Möbel, für eine Matte 180 × 60. Die Bedienfläche des Schranks und der Fußraum des Sessels grenzen an, stehen aber nicht in der Fläche.",
+    "Licht in drei Ebenen, alles warmweiß: Grundlicht ist die Deckenleuchte, Zonenlicht sind Pendel über dem Tisch und Leseleuchte, Stimmungslicht ist die Tischleuchte auf dem Nachttisch. Keine Lampe steht auf dem Esstisch.",
+    "Pflanzen: die große in der echten Ecke neben F1, Kräuter und kleine Pflanze auf den Fensterbänken, keine frei im Raum.",
+    "Abweichungen von der Pflichtliste, begründet mit dem Wohnkonzept: Ein Sofa für drei passt nicht zu einer Person auf 19,8 m² mit freier Yogamitte. Die drei Sitzplätze sind Lesesessel und zwei Stühle. Einen eigenen Schreibtisch gibt es laut Konzept nicht, der Esstisch übernimmt das Arbeiten.",
+    "Stil: Esche hell, weiß matte grifflose Fronten, Leinen in Sand, Wolle naturfarben, Salbei nur am Sessel. Kein Bild, keine offenen Regale, die Pflanzen sind der einzige Schmuck, nichts ist doppelt ohne Grund."
+   ]
+  },
+  "Vorraum": {
+   "reading": "Der Vorraum ist ein schmaler Durchgang. Die Wohnungstür schwenkt mit einem Viertelkreis von 100 cm in die Osthälfte, und die Wege zu Bad und Zimmer laufen diagonal durch die Raummitte nach Südwesten. Möbel gehören deshalb nur in den Nordwestblock: die freie Nordwand und das freie Stück der Westwand (y=0–100). Beim Hereinkommen blickt man nach Westen auf genau diese Wand. Dort hängt die Esche-Garderobe als ruhiger Blickfang neben der Zimmertür.",
+   "zones": [
+    {
+     "id": "garderobe",
+     "function": "Ankommen, Ablegen, Schuhe",
+     "rect": [
+      0,
+      0,
+      85,
+      100
+     ],
+     "why": "Nordwest-Block: der einzige Bereich, der weder im Türschwenk der Wohnungstür noch auf den 90-cm-Wegen zwischen den drei Türen liegt. Er ist der Blickfang beim Hereinkommen, und Jacken und Schuhe liegen direkt am Eingangsweg.",
+     "userZone": "Z1"
+    }
+   ],
+   "items": [
+    {
+     "id": "coatrack",
+     "catalogId": "generic-coat-rack",
+     "zone": "garderobe",
+     "x": 5,
+     "y": 65,
+     "facing": "O",
+     "label": "Wandgarderobe: Hakenleiste aus Esche hell geölt, auf ca. 150 cm Höhe",
+     "color": "#e0cfb1",
+     "why": "Ankermöbel der Zone. Sie hängt flach an der freien Westwand (y=35–95) neben der Zimmertür T3, ist beim Hereinkommen das Erste, was man sieht, und lässt die Wegbreite unberührt. Die Mäntel ragen nur rund 25 cm vor und enden bei y=95, also vor der Tür.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "shelf",
+     "catalogId": "generic-wall-shelf",
+     "zone": "garderobe",
+     "x": 10,
+     "y": 65,
+     "facing": "O",
+     "label": "Ablagebord aus Esche über der Hakenleiste, für Schlüssel, Post und Mütze",
+     "color": "#e0cfb1",
+     "why": "Das Ablagebord gehört zur Garderobe und ist die Ablage für Schlüssel und Post. Es hängt über den Hakenleiste-Köpfen und so hoch, dass man den Kopf nicht anstößt.",
+     "anchor": false
+    },
+    {
+     "id": "shoes",
+     "catalogId": "generic-shoe-cabinet",
+     "zone": "garderobe",
+     "x": 40,
+     "y": 15,
+     "facing": "S",
+     "label": "Schmaler Schuhschrank, weiß matt, grifflos, an der Nordwand",
+     "color": "#f6f5f2",
+     "why": "Zweites Ankermöbel. Er steht in der Nordwestecke, wo er weder Tür noch Weg berührt, und die Fronten sind grifflos und ruhig. Die Katalogtiefe beträgt 30 cm statt der gewünschten 25 cm; ein schmaleres Modell gibt es im Katalog nicht, und die Wege bleiben dabei frei.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-bath-mirror",
+     "zone": "garderobe",
+     "x": 40,
+     "y": 2,
+     "facing": "S",
+     "label": "Spiegel 60×70, schlicht, über dem Schuhschrank",
+     "color": "#d9d8d4",
+     "why": "Der Spiegel hängt mittig über dem Schuhschrank, damit man vor dem Gehen noch einmal kontrolliert. Er holt außerdem Licht in den schmalen Raum.",
+     "anchor": false
+    },
+    {
+     "id": "pendant",
+     "catalogId": "generic-pendant",
+     "zone": "garderobe",
+     "x": 45,
+     "y": 75,
+     "facing": "S",
+     "label": "Pendelleuchte, warmweiß, weißer Schirm",
+     "color": "#f6f5f2",
+     "why": "Grundlicht, eine Leuchte für 4,3 m². Sie hängt über dem Garderobenbereich, außerhalb des Türschwenks und der Wegachse, und beleuchtet Mäntel und Spiegel von vorn.",
+     "anchor": false
+    }
+   ],
+   "relations": [
+    [
+     "shoes",
+     "corner",
+     "W1",
+     "W4"
+    ],
+    [
+     "coatrack",
+     "wall",
+     "W4",
+     35,
+     95
+    ],
+    [
+     "shelf",
+     "wall",
+     "W4",
+     35,
+     95
+    ],
+    [
+     "shelf",
+     "above",
+     "coatrack",
+     175
+    ],
+    [
+     "mirror",
+     "above",
+     "shoes",
+     110
+    ],
+    [
+     "mirror",
+     "wall",
+     "W1",
+     10,
+     70
+    ]
+   ],
+   "walk": "Durch die Wohnungstür T1 (Türblatt schwenkt in den Viertelkreis x=79–179, y=65–165) geht man diagonal nach Südwesten. Der Weg zur Badtür T2 (x=14–94, schlägt nach außen) und zur Zimmertür T3 (y=100–190, schlägt nach außen) ist rund 90 cm breit und völlig frei. Möbel gibt es nur im Nordwestblock (x<85, y<100); das Bad und das Zimmer sind direkt erreichbar. Zwischen der Hakenleiste und der Wegachse liegen noch ca. 60–90 cm, vor dem Schuhschrank rund 40–50 cm bis zur Wegkante.",
+   "check": [
+    "Türschwenk T1 (Viertelkreis 100 cm um (179,65)): kein Möbel, keine Leuchte, kein Teppich darin; Pendelleuchte bei x=45 liegt außerhalb.",
+    "T2 und T3 schlagen nach außen, also in den Raum nichts im Schwenk.",
+    "Wege T1→T2, T1→T3, T2→T3 (je 90 cm): alle Möbel liegen nördlich/westlich davon, der Weg bleibt breit.",
+    "Alles was hoch ist (Schuhschrank 100 cm) steht an der Wand; Hakenleiste, Bord und Spiegel hängen flach, nichts ragt in den Weg.",
+    "Schuhschrank 30 cm statt der verlangten 25 cm tief; kein schmaleres Teil im Katalog; die 90-cm-Wege sind nicht betroffen.",
+    "Nichts aus anderen Räumen (keine Pflanzen, Kommode, Wäsche, Vorräte); kein Teppich, weil im Gang nur Läufer erlaubt wären und der Platz sonst im Türschwenk läge.",
+    "Farben nur aus der Palette: Weiß für den Schrank, Esche für Garderobe und Bord, Hellgrau für den Spiegelrahmen."
+   ]
+  },
+  "Bad": {
+   "reading": "Ein sehr kleines Bad (179 × 199 cm), in dem alles Wichtige schon steht: Dusche und WC an der Südseite, der Waschtisch an der Ostwand. Es gibt kein Fenster, also kommt das Licht allein von der Decke. Darum bleiben die Flächen hell und still. Durch T1 schaut man nach Süden auf die weiße Duschwand und links auf die Westwand. Dort wirken ein Eschenbrett mit Handtüchern und ein weißer Schrank als ruhiger Blickfang. Der Türschwenk (x 14–94, y 0–80) und der Weg von der Tür zu Dusche, WC und Waschtisch bleiben komplett frei.",
+   "zones": [
+    {
+     "id": "waschen",
+     "function": "Körperpflege und Wäsche am Waschtisch",
+     "rect": [
+      95,
+      0,
+      179,
+      84
+     ],
+     "why": "Der Waschtisch steht schon an der Ostwand. In der Nische zwischen der Türangel (x 94) und dem Waschtisch (x 133) ist Platz für den Wäschekorb. Er steht hinter der Tür, dort stört er nicht und ist trotzdem gleich greifbar. Der Spiegel hängt über dem Waschtisch.",
+     "userZone": ""
+    },
+    {
+     "id": "ordnung",
+     "function": "Handtücher und verdeckter Stauraum",
+     "rect": [
+      0,
+      72,
+      30,
+      199
+     ],
+     "why": "Die Westwand neben dem WC ist die einzige freie, tragfähige Wand außerhalb des Türschwenks. Der Schrank steht nördlich vom WC, das Handtuchbrett darüber. So bleibt die Mitte des Raums frei, und die Handtücher hängen in Reichweite von Dusche und Waschtisch."
+    }
+   ],
+   "items": [
+    {
+     "id": "towelshelf",
+     "catalogId": "generic-wall-shelf",
+     "zone": "ordnung",
+     "x": 10,
+     "y": 158,
+     "facing": "O",
+     "label": "Schmales Wandbrett aus Esche hell geölt, auf ca. 130 cm über dem WC, für gerollte Handtücher in Sand und Weiß",
+     "color": "#e0cfb1",
+     "why": "Ankermöbel: Handtuchablage über dem WC. Sie nutzt die Höhe über dem Bestand, kostet keine Bodenfläche und liegt in Reichweite der Dusche. Nur gerollte Tücher liegen darauf, keine Fläschchen.",
+     "anchor": true,
+     "fallbacks": [
+      "generic-wall-shelf"
+     ]
+    },
+    {
+     "id": "hamper",
+     "catalogId": "generic-storage-box",
+     "zone": "waschen",
+     "x": 114,
+     "y": 15,
+     "facing": "S",
+     "label": "Wäschekorb aus Naturfaser in Sand mit Deckel, 38 × 30 cm, in der Nische hinter der Tür",
+     "color": "#c9b593",
+     "why": "Ankermöbel: Wäschekorb. Die Nische zwischen Türangel und Waschtisch liegt außerhalb des Türschwenks und ist sonst totes Eck. Der Korb ist niedrig, er ragt nicht in den Stehplatz am Waschtisch und steht bündig am Waschtisch (x 133). Der Farbton ist die Akzentfarbe.",
+     "anchor": true,
+     "fallbacks": []
+    },
+    {
+     "id": "cabinet",
+     "catalogId": "generic-bath-cabinet",
+     "zone": "ordnung",
+     "x": 15,
+     "y": 92,
+     "facing": "O",
+     "label": "Schmaler Bad-Hochschrank, weiß matt, grifflos, für Pflegeprodukte und Reservewäsche hinter Fronten",
+     "color": "#f6f5f2",
+     "why": "Alles Kleinteilige verschwindet hinter geschlossenen Fronten, und es gibt keine offenen Ablagen mit Fläschchen. Der Schrank steht als hohes Möbel an der Wand und ganz außerhalb des Türschwenks (nächste Ecke 96 cm von der Angel). Davor bleibt die Fläche bis zur Dusche offen.",
+     "anchor": false,
+     "fallbacks": []
+    },
+    {
+     "id": "mirror",
+     "catalogId": "generic-bath-mirror",
+     "zone": "waschen",
+     "x": 177,
+     "y": 54,
+     "facing": "W",
+     "label": "Badspiegel 60 × 70 cm, schmaler heller Rahmen, mittig über dem Waschtisch",
+     "color": "#d9d8d4",
+     "why": "Der Spiegel hängt über dem Waschtisch und gibt dem fensterlosen Raum Tiefe. Beim Hereinkommen sieht man ihn schräg links im Blick nach Osten. Er holt das Deckenlicht in den Raum, ohne dass ein weiteres Möbel nötig ist.",
+     "anchor": false,
+     "fallbacks": []
+    }
+   ],
+   "relations": [
+    [
+     "towelshelf",
+     "wall",
+     "W4",
+     118,
+     198
+    ],
+    [
+     "towelshelf",
+     "near",
+     "B2",
+     60
+    ],
+    [
+     "cabinet",
+     "wall",
+     "W4",
+     72,
+     112
+    ],
+    [
+     "hamper",
+     "wall",
+     "W1",
+     95,
+     133
+    ],
+    [
+     "mirror",
+     "above",
+     "B3",
+     120
+    ]
+   ],
+   "walk": "Man tritt durch T1 (x 14–94) ein, und das Türblatt schlägt in den freien Viertelkreis auf. Nach Süden bleibt der Weg durch die Raummitte frei und mindestens 70 cm breit. Zum Waschtisch geht man nach Osten (Stehplatz x 58–133, über 70 cm). Zur Dusche geht man diagonal über die offene Fläche vor ihr (x 89–179, y 84–109). Zum WC geht man an der Westseite entlang, und der Schrank vor der Westwand lässt dabei fast 60 cm Standraum nach Osten. Der Wäschekorb sitzt ganz in der Nische hinter dem Türblatt und blockiert keinen Weg.",
+   "check": [
+    "Türschwenk (Viertelkreis r = 80 um (94,0)): Schrank, Regalbrett, Korb und Spiegel liegen alle außerhalb. Die nächste Schrankecke (30,72) ist 96 cm von der Angel entfernt.",
+    "Bestand B1–B3 ist unverändert und nicht in items enthalten. Der Spiegel bezieht sich auf B3, und das Brett sitzt an der Wand über B2.",
+    "Wege: Zwischen Tür, Waschtisch, Dusche und WC bleiben mindestens 70 cm frei, und die Mitte des Raums ist leer.",
+    "Waschtisch: 60–75 cm Stehplatz davor sind gegeben, der Korb steht nur im hinteren Eck (y 0–30) und nicht davor.",
+    "Zwischen Korb und Waschtisch ist kein Spalt (bündig bei x 133). Zwischen Schrank und Handtuchbrett bleiben nur 6 cm, aber das ist eine Wandfuge und keine Durchgangslücke.",
+    "Hohe Möbel (Schrank 170 cm) stehen an der Westwand, nichts steht frei im Raum.",
+    "Nicht aufgenommen: Pflanzen (kein Fenster), zusätzliches Waschbecken, offene Fläschchen-Ablagen, Teppich oder Matte (im Türschwenk bzw. am Waschtisch ist kein Platz), zusätzliche Leuchte (das Grundlicht gibt es schon an der Decke, bei 3,6 m² reicht eine Quelle).",
+    "Materialien und Farben stimmen mit dem Stil überein: Esche für das Brett, Weiß matt für den Schrank, Sand für den Korb."
+   ]
+  }
+ }
+}

@@ -146,6 +146,8 @@ export function programFromRecorded(raw: RawProgram, room: RoomAnalysis, existin
     const p1 = cm(z.rect[2], z.rect[3]);
     return { id: z.id, function: z.function, rect: { x0: Math.min(p0.x, p1.x), y0: Math.min(p0.y, p1.y), x1: Math.max(p0.x, p1.x), y1: Math.max(p0.y, p1.y) }, why: z.why };
   });
-  const kitchen = raw.kitchen ? [{ wall: raw.kitchen.wall, from: cm(raw.kitchen.from[0], raw.kitchen.from[1]), to: cm(raw.kitchen.to[0], raw.kitchen.to[1]), modules: raw.kitchen.modules }] : undefined;
+  // one run in the first trial, a list of runs with the prompts of concept/
+  const runs = raw.kitchen ? [raw.kitchen].flat() : [];
+  const kitchen = runs.length ? runs.map((k) => ({ wall: k.wall, from: cm(k.from[0], k.from[1]), to: cm(k.to[0], k.to[1]), modules: k.modules })) : undefined;
   return { roomId: room.roomId, reading: raw.reading, zones, items, relations, ...(kitchen ? { kitchen } : {}), walk: raw.walk, check: raw.check };
 }

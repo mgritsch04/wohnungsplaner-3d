@@ -12,7 +12,7 @@ describe.each(Object.keys(RECORDED) as FlatKey[])('recorded answers for flat %s'
     expect(run.concept.rooms.map((r) => r.room).sort()).toEqual([...rooms].sort());
     for (const [room, prog] of Object.entries(run.programs)) {
       for (const it of prog.items) expect(findCatalogItem(it.catalogId), `${room}: ${it.catalogId}`).toBeTruthy();
-      for (const m of prog.kitchen?.modules ?? []) expect(findCatalogItem(m), `${room}: ${m}`).toBeTruthy();
+      for (const m of [prog.kitchen ?? []].flat().flatMap((k) => k.modules)) expect(findCatalogItem(m), `${room}: ${m}`).toBeTruthy();
     }
   });
 
