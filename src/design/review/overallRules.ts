@@ -50,6 +50,51 @@ export function checkBalance(ctx: RoomCtx): void {
   ctx.add('E6', 'M', `Die ${side} Hälfte des Raums bleibt fast leer (${Math.round(share[empty] * 100)} % Möbelfläche), in der anderen steht alles (${Math.round(share[1 - empty] * 100)} %).`, [], at);
 }
 
+/**
+ * E6 (M), the other picture of „half furnished“ (#443): an open patch of floor wider than about
+ * 3.6 m, far from every piece and rug, in a room of the balanced kinds. Areas the user keeps free
+ * count as furnished. Measured on a 10 cm grid: the largest distance of a free spot to anything.
+ */
+export function checkOpenPatch(ctx: RoomCtx): void {
+  if (!BALANCED.has(ctx.type) || ctx.an.area < 12) return;
+  const r = largestOpening(ctx);
+  if (r.radius <= OPEN_RADIUS) return;
+  ctx.add('E6', 'M', `Eine Fläche von etwa ${(2 * r.radius).toFixed(1)} m Durchmesser bleibt ganz ohne Möbel, der Raum wirkt dort unbewohnt.`, [], r.at);
+}
+
+/** Radius (m) of the largest open patch a furnished room may keep (walkways and space to move included). */
+export const OPEN_RADIUS = 1.8;
+
+/** The free spot farthest from every piece on the floor and every rug (walls do not count). */
+export function largestOpening(ctx: RoomCtx): { radius: number; at: Vec2 } {
+  const xs = ctx.an.polygon.map((p) => p.x);
+  const ys = ctx.an.polygon.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const pieces = ctx.items.filter((i) => i.floor || i.role === 'rug');
+  const kept = ctx.an.userZones.filter((z) => z.keepFree).map((z) => z.points);
+  const step = 0.1;
+  const free: Vec2[] = [];
+  const used: Vec2[] = [];
+  for (let x = x0 + step / 2; x < x1; x += step)
+    for (let y = y0 + step / 2; y < y1; y += step) {
+      const p = { x, y };
+      if (!pointInPolygon(p, ctx.an.polygon)) continue;
+      (pieces.some((i) => pointInPolygon(p, i.poly)) || kept.some((z) => pointInPolygon(p, z)) ? used : free).push(p);
+    }
+  let best = { radius: 0, at: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 } };
+  if (!used.length) return best;
+  for (const p of free) {
+    let d = Infinity;
+    for (const u of used) {
+      const e = Math.hypot(u.x - p.x, u.y - p.y);
+      if (e < d) d = e;
+      if (d <= best.radius) break;
+    }
+    if (d > best.radius) best = { radius: d, at: p };
+  }
+  return best;
+}
+
 /** Below this share of furniture a half of the room counts as empty. */
 export const BALANCE_EMPTY = 0.15;
 

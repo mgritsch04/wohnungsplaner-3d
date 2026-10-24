@@ -158,7 +158,7 @@ Prüfliste „würde das jemand so einrichten?“ mit Schwere (S = schwer, sperr
 - E3 (L) Zusammengehöriges getrennt (zwei Bücherregale an verschiedenen Wänden derselben Zone, Stühle ohne Tisch).
 - E4 (L) Farbe außerhalb der Palette.
 - E5 (L) Blickfang von der Haupttür aus verdeckt.
-- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum).
+- E6 (M) Eine Hälfte eines Hauptraums ab 12 m² bleibt fast leer (unter 15 % Möbelfläche), in der anderen steht mindestens dreimal so viel (T6: die Bildprüfung nannte „halb eingerichtet“ in fast jedem Raum). Ebenso eine freie Fläche von mehr als etwa 3,6 m Durchmesser ohne Möbel und Teppich (frei zu lassende Bereiche des Nutzers zählen als belegt).
 
 **Punktzahl je Raum:** 100 minus 25 je S, 8 je M, 2 je L (nicht unter 0). „Bestanden“ heißt keine S-Befunde und mindestens 85 Punkte. Dazu Kennzahlen: Weglängen leer/eingerichtet, Belegung, Abweichung vom Programm. Dieselben Regeln nutzt der Solver als Kosten, die Kritik-Stufe als Eingabe und die Tests als Maßstab. In der App erscheint je Raum „Begehung: alle 35 Punkte erfüllt“ oder die Liste der leichten Befunde.
 

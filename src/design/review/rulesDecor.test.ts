@@ -160,6 +160,13 @@ describe('E Gesamteindruck', () => {
     expect(has(bedroom(west), 'E6', /östliche Hälfte/)).toBe(true);
     expect(has(bedroom([...west, put('generic-desk', { x: 4.6, y: 2, face: 'W' }), put('generic-office-chair', { x: 4.0, y: 2, face: 'O' }), put('generic-dresser', { x: 3.6, y: 0.25, face: 'S' })]), 'E6')).toBe(false);
   });
+  it('E6 an open patch more than 3.6 m across, far from every piece, is medium (#443)', () => {
+    const big = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(7, 5, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] }), type: 'living', items });
+    const corner = [put('generic-sofa-3', { x: 1.2, y: 4.5, face: 'N' }), put('generic-shelf-80', { x: 6.5, y: 0.25, face: 'S' })];
+    expect(has(big(corner), 'E6', /Durchmesser/)).toBe(true);
+    const spread = [...corner, put('generic-coffee-table', { x: 1.2, y: 3.4 }), put('generic-dining-table-4', { x: 4.5, y: 2.5 }), put('generic-armchair', { x: 3.0, y: 1.0, face: 'S' }), put('generic-dresser', { x: 5.8, y: 4.75, face: 'N' }), put('generic-plant', { x: 0.3, y: 0.3 })];
+    expect(has(big(spread), 'E6', /Durchmesser/)).toBe(false);
+  });
   it('D4 a sofa without a floor or table lamp beside it is light', () => {
     expect(has(living([sofa]), 'D4', /Neben/)).toBe(true);
     expect(has(living([sofa, put('generic-floor-lamp', { x: 3.9, y: 3.6 })]), 'D4', /Neben/)).toBe(false);
