@@ -5,7 +5,7 @@
  */
 import { add, scale, type Vec2 } from '../../model/vec';
 import { rotationFacing } from '../../suggest/roomGeometry';
-import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, type Box } from './geom';
+import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, WALL_TOL, type Box } from './geom';
 import { specOf } from './items';
 import type { Model, Node, Unit } from './model';
 import { runId } from './model';
@@ -69,7 +69,7 @@ function nearestWallTo(m: Model, p: Vec2): number {
 }
 
 function insideScore(m: Model, b: Box): number {
-  return outsideAmount(boxCorners(b), m.ctx.poly);
+  return outsideAmount(boxCorners(b), m.ctx.poly, WALL_TOL);
 }
 
 function deriveNode(m: Model, n: Node): void {
@@ -218,7 +218,11 @@ function deriveNode(m: Model, n: Node): void {
       }
       const u = -P.hw + (2 * P.hw * (r.index + 0.5)) / r.count;
       const lim = Math.max(0, P.hw - s.width / 2);
-      const c = at(clamp(r.count === 1 ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : u, -lim, lim), -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
+      // on a table the chairs tuck in at the edges: what stands on it goes in the middle
+      const table = parentNode?.spec.category === 'table';
+      const c = table
+        ? at(clamp(r.count === 1 ? 0 : u, -lim, lim), 0)
+        : at(clamp(r.count === 1 ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : u, -lim, lim), -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
       n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
       n.elevation = p.top;
       return;

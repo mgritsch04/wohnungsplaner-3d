@@ -429,8 +429,8 @@ function toLayout(st: State, dropped: DroppedItem[], seed: number): Layout {
         ...(n.run !== undefined ? { kitchenRun: n.run } : {}),
       });
     }
-    if (u.kitchen) items.push(...kitchenTops(m, u));
   }
+  items.push(...kitchenTops(m));
   const vs = violations(st);
   let soft = st.total() - st.hard();
   if (!Number.isFinite(soft)) soft = 0;

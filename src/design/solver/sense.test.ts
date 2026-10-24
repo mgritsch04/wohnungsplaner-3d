@@ -146,6 +146,39 @@ describe('kitchen', () => {
     expect(layout.items.some((i) => i.id === 'kitchen1-hood')).toBe(false);
   });
 
+  it('wall cabinets hang over the other base modules, never in front of the window or over the cooktop', () => {
+    const room = rectRoom(5, 3, { doors: [{ wall: 'S', at: 2.5 }], windows: [{ wall: 'N', at: 1.0, width: 1.0 }] });
+    const layout = solveRoom(room, withRun(room, ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-drawer-60', 'generic-k-oven', 'generic-k-base-60']), { seed: 1 });
+    const cabinets = layout.items.filter((i) => /^generic-k-wall-/.test(i.catalogId));
+    expect(cabinets.length).toBeGreaterThanOrEqual(2);
+    const win = windowSpan(room);
+    const cook = byId(layout, 'kitchen1-cooktop');
+    for (const c of cabinets) {
+      expect(c.elevation).toBeCloseTo(1.45);
+      expect(c.x + c.width / 2 <= win.t0 + 1e-6 || c.x - c.width / 2 >= win.t1 - 1e-6, c.id).toBe(true);
+      expect(c.parent, c.id).not.toBe(cook.parent);
+      const host = byId(layout, c.parent!);
+      expect(Math.abs(c.x - host.x)).toBeLessThan(0.01);
+      expect(c.y).toBeLessThan(host.y);
+    }
+  });
+
+  it('an L-shaped kitchen (two runs) gets one cooktop and one hood', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 2 }] });
+    const p: RoomProgram = {
+      ...program(room, []),
+      kitchen: [
+        { wall: 'W1', from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, modules: ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-drawer-60'] },
+        { wall: 'W2', from: { x: 4, y: 0 }, to: { x: 4, y: 3 }, modules: ['generic-k-base-60', 'generic-k-oven', 'generic-k-base-60'] },
+      ],
+    };
+    const layout = solveRoom(room, p, { seed: 2 });
+    expect(layout.items.filter((i) => i.catalogId === 'generic-k-cooktop')).toHaveLength(1);
+    expect(layout.items.filter((i) => i.catalogId === 'generic-k-hood-60')).toHaveLength(1);
+    const cook = layout.items.find((i) => i.catalogId === 'generic-k-cooktop')!;
+    expect(layout.items.find((i) => i.id === cook.parent)?.catalogId).toBe('generic-k-oven');
+  });
+
   it('a runner lies right in front of the counter (flat A: Claude says 50 cm, meant is the walking strip)', () => {
     const { layout } = recorded('A', 'Küche');
     const runner = byId(layout, 'runner');

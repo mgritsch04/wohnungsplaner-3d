@@ -8,13 +8,17 @@
  * the walking grid (`gridCost`), so the search can recompute only what a move touches.
  */
 import { add, closestPointOnSegment, scale, type Vec2 } from '../../model/vec';
-import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, wrapAngle, type Box } from './geom';
+import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, WALL_TOL, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
+import { usesWater } from '../../model/fixtures';
 import { doorSeed, sideStrip, wallStrip } from './room';
 
 /** Weight of one broken hard rule; amounts (overlap depth, distance outside) add to it. */
 export const HARD = 4;
-const EPS = 0.005;
+/** Overlaps up to this depth count as touching: below the plan's own checks (3 mm, see `placementIssues`). */
+const EPS = 0.002;
+/** The plan checks door swings to 1 mm. */
+const SWING_EPS = 0.0005;
 /** Movement areas are guide values: a few centimetres of overlap do not count (a basin beside the WC in a 125 cm room). */
 const CLEAR_EPS = 0.03;
 
@@ -107,14 +111,21 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
     const floor = isFloor(n);
     const rug = isRug(n);
     const wallItem = isWallItem(n);
-    if (floor || rug || wallItem || n.spec.base === 'curtain') {
-      const out = outsideAmount(n.poly, ctx.poly);
-      if (out > 0.01) hard(1 + 5 * out, () => ({ rule: 'inside', items: [n.id], text: `${name(n)} ragt aus dem Raum` }));
+    // the plan reports anything reaching into a wall by more than 0.1 mm (`placementIssues`)
+    if (floor || rug || wallItem || n.spec.base === 'curtain' || n.spec.base === 'ceiling') {
+      const out = outsideAmount(n.poly, ctx.poly, WALL_TOL);
+      if (out > 0) hard(1 + 5 * out, () => ({ rule: 'inside', items: [n.id], text: `${name(n)} ragt aus dem Raum` }));
     }
     if (floor) {
       for (const s of ctx.swings) {
         const d = overlapDepth(n.poly, s.poly);
-        if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'swing', items: [n.id], text: `${name(n)} steht im Türschwenk von ${s.label}` }));
+        if (d > SWING_EPS) hard(1 + 10 * d, () => ({ rule: 'swing', items: [n.id], text: `${name(n)} steht im Türschwenk von ${s.label}` }));
+      }
+      if (n.spec.item.solid !== false && !usesWater(n.spec.item)) {
+        for (const k of ctx.connections) {
+          const d = overlapDepth(n.poly, k.poly);
+          if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'connection', items: [n.id], text: `${name(n)} steht vor einem Wasseranschluss` }));
+        }
       }
       for (const door of ctx.doors) {
         const d = overlapDepth(n.poly, door.entry);
@@ -333,7 +344,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       } else if (wa !== wb) {
         const w = wa ? a : b;
         const f = wa ? b : a;
-        if (top(f) > w.elevation + 0.05 && overlapDepth(w.poly, f.poly) > EPS) hard(0.5, () => ({ rule: 'hidden', items: [w.id, f.id], text: `${name(w)} hängt hinter ${name(f)}` }));
+        if (top(f) > w.elevation + 0.005 && overlapDepth(w.poly, f.poly) > EPS) hard(0.5, () => ({ rule: 'hidden', items: [w.id, f.id], text: `${name(w)} hängt hinter ${name(f)}` }));
       } else if (wa && wb) {
         const zOverlap = Math.min(a.elevation + a.spec.height, b.elevation + b.spec.height) - Math.max(a.elevation, b.elevation);
         if (zOverlap > 0.02 && overlapDepth(a.poly, b.poly) > EPS) hard(0.5, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} hängt über ${name(b)}` }));

@@ -189,6 +189,9 @@ export function isConvex(poly: readonly Vec2[]): boolean {
   return c;
 }
 
+/** Below the plan's own wall check (`placementIssues`, 0.1 mm): a piece flush with a wall is inside. */
+export const WALL_TOL = 0.00005;
+
 export function outsideAmount(shape: readonly Vec2[], room: readonly Vec2[], tol = 0.005): number {
   let amount = 0;
   for (const p of shape) {
