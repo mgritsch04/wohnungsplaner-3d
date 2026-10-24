@@ -70,6 +70,31 @@ describe('the sofa looks at the TV', () => {
   });
 });
 
+describe('chairs at the table', () => {
+  it('chairs Claude placed round the table without any relation stay at the table, not in a heap beside it', () => {
+    const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const chairs = [
+      item('c1', 'generic-chair', [2.5, 1.35, S]),
+      item('c2', 'generic-chair', [3.1, 1.75, -Math.PI / 2]),
+      item('c3', 'generic-chair', [3.1, 2.35, -Math.PI / 2]),
+      item('c4', 'generic-chair', [1.9, 1.75, Math.PI / 2]),
+      item('c5', 'generic-chair', [1.9, 2.35, Math.PI / 2]),
+      item('c6', 'generic-chair', [2.5, 2.75, N]),
+    ];
+    const p = program(room, [item('table', 'generic-dining-table-6', [2.5, 2.05, Math.PI / 2]), ...chairs]);
+    for (const seed of [1, 2, 3]) {
+      const layout = solveRoom(room, p, { seed });
+      const table = byId(layout, 'table');
+      for (const c of chairs) {
+        const chair = byId(layout, c.id);
+        const reach = Math.max(table.width, table.depth) / 2 + 0.45;
+        expect(Math.hypot(chair.x - table.x, chair.y - table.y), `${c.id} seed ${seed}`).toBeLessThan(reach);
+        expect(angleTo(chair, table), `${c.id} seed ${seed}`).toBeLessThan(60);
+      }
+    }
+  });
+});
+
 describe('what stands on the TV lowboard', () => {
   it('a lamp and a plant stand at the ends of the lowboard, beside the TV hung over it, not in front of the screen', () => {
     const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });

@@ -117,6 +117,9 @@ const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
  * land on the same spot: seats at a table are one `around` group (several per table, or one
  * that is not an office chair).
  */
+/** How far from a table's edge a chair of Claude's still counts as one of its seats (m). */
+const CHAIR_REACH = 0.9;
+
 function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node>): Relation[] {
   const isChair = (id: string) => {
     const s = nodes.get(id)?.spec;
@@ -127,6 +130,18 @@ function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node
     if ((r.kind === 'front-of' || r.kind === 'left-of' || r.kind === 'right-of') && isChair(r.item) && nodes.get(r.target)?.spec.role === 'table') {
       byTable.set(r.target, [...(byTable.get(r.target) ?? []), r.item]);
     }
+  }
+  // chairs without any relation, placed by Claude round the only table of their zone: they belong to
+  // it, else each one wanders off on its own (#443: F's dining chairs in a heap beside the table)
+  const related = new Set(relations.flatMap((r) => ('items' in r ? r.items : 'item' in r ? [r.item] : [])));
+  for (const n of nodes.values()) {
+    if (!isChair(n.id) || related.has(n.id)) continue;
+    const tables = [...nodes.values()].filter((t) => t.spec.role === 'table' && t.zone === n.zone);
+    const t = tables[0];
+    const h = n.prog?.hint;
+    const th = t?.prog?.hint;
+    if (tables.length !== 1 || (h && th && Math.hypot(h.x - th.x, h.y - th.y) > Math.max(t.spec.width, t.spec.depth) / 2 + CHAIR_REACH)) continue;
+    byTable.set(t.id, [...(byTable.get(t.id) ?? []), n.id]);
   }
   if (!byTable.size) return [...relations];
   const grouped = new Set([...byTable.values()].flat());
