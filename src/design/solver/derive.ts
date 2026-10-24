@@ -40,6 +40,11 @@ function parentBox(m: Model, id: string): { box: Box; top: number; elevation: nu
   return null;
 }
 
+/** How far an open curtain panel covers the frame of its window (m). */
+const CURTAIN_OVERLAP = 0.08;
+/** Width of an open, gathered curtain panel: about a third of its fabric, 30 to 50 cm. */
+export const curtainOpenWidth = (fabric: number): number => clamp(fabric * 0.35, 0.3, 0.5);
+
 /** Rotate a rug so its longer side runs along `along` (the parent's width axis). */
 function rugBox(center: Vec2, parentRot: number, w: number, d: number, longAlongWidth: boolean): Box {
   // catalogue rugs are given as width × depth; turn by 90° when the long side should lie the other way
@@ -182,16 +187,20 @@ function deriveNode(m: Model, n: Node): void {
   if (r.kind === 'sill' || r.kind === 'curtain') {
     const win = ctx.windows.find((w) => w.label === r.window)!;
     const w = ctx.walls[win.wall];
-    const mid = (win.t0 + win.t1) / 2;
     const span = win.t1 - win.t0;
     if (r.kind === 'sill') {
       const t = win.t0 + (span * (r.index + 0.5)) / r.count;
       n.box = boxOnWall(w, t, s.width, s.depth, 0.02);
       n.elevation = win.sill;
     } else {
-      // a window near the corner: the curtain slides along the wall to stay in the room
-      const t = clamp(r.count === 1 ? mid : win.t0 + (span * r.index) / (r.count - 1), s.width / 2, w.length - s.width / 2);
-      n.box = boxOnWall(w, t, s.width, s.depth, 0.08);
+      // drawn open: each panel gathered beside the frame, overlapping it a little; a pair frames the
+      // window, a single panel goes to the side with more wall; near a corner it slides along the wall
+      const g = curtainOpenWidth(s.width);
+      const left = win.t0 - g / 2 + CURTAIN_OVERLAP;
+      const right = win.t1 + g / 2 - CURTAIN_OVERLAP;
+      const side = r.count === 1 ? (win.t0 >= w.length - win.t1 ? left : right) : r.index % 2 === 0 ? left : right;
+      const t = clamp(side, g / 2, w.length - g / 2);
+      n.box = boxOnWall(w, t, g, s.depth, 0.08);
       n.elevation = Math.max(0, Math.min(0.02, ctx.height - s.height - 0.02));
     }
     return;

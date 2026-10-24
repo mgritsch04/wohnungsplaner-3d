@@ -71,7 +71,7 @@ const RULES = `- Wege zwischen den Türen bleiben frei: 90 cm breit in Gang, Vor
 - Tischlampen stehen auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal, nie auf dem Esstisch. Licht in drei Ebenen: Grundlicht (Decke), Zonenlicht (Pendel über dem Esstisch, Leselampe, Schreibtischlampe), Stimmungslicht; warmweiß.
 - Teppich im Wohnbereich: mindestens die vorderen Füße von Sofa und Sesseln liegen darauf. Unter dem Bett ragt der Teppich seitlich 40–60 cm heraus. Kein Teppich im Türschwenk, ein Läufer mittig im Gang.
 - Bild über Sofa oder Bett: etwa zwei Drittel der Möbelbreite, mittig darüber; Bildmitte auf etwa 150 cm. Nichts über Fenster oder Tür. Der Badspiegel hängt über dem Waschtisch.
-- Vorhang mindestens so breit wie das Fenster.
+- Vorhänge als Paar: je Fenster zwei Schals (zwei Teile, beide mit [..,"window","F1","over"]); sie hängen offen links und rechts neben dem Fenster, zusammen mindestens so breit wie das Fenster.
 - Ein Blickfang, den man beim Hereinkommen sieht; Farben aus der Palette; lieber weniger und stimmig. Nichts ohne Grund, nichts doppelt (im Gang höchstens eine Deckenleuchte je 6 m²).`;
 
 const RELATIONS = `Beziehungen (nur diese Wörter; a, b, c sind ids aus "items", Abstände und Höhen in cm):
