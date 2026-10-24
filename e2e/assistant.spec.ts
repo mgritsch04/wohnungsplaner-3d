@@ -174,6 +174,7 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   await panel.getByLabel('Was du dir wünschst').fill('Pflanzen');
   await panel.getByLabel('Stil').fill('gemütlich');
   await panel.getByLabel('Qualität').selectOption('fast');
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
 
   const proposal = panel.getByTestId('design-proposal');
@@ -301,6 +302,7 @@ test('Einrichtungsvorschlag mit Claude (#350): einstufig mit echten Produkten, N
   await left.getByRole('button', { name: 'Einrichten' }).click();
   const panel = page.getByTestId('design-panel');
   await panel.getByLabel('Umfang').selectOption({ label: 'Wohnzimmer' });
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
   // one step: the real product is found without a second click; the progress is shown meanwhile
@@ -357,6 +359,7 @@ test('Einrichtungsvorschlag mit Claude (#350): Schalter „Erst Vorschlag, dann 
   await expect(panel.getByTestId('design-mode-hint')).toContainText('zuerst den Vorschlag mit Platzhaltern');
   await page.screenshot({ path: 'test-results/design-350-mode-switch.png' });
 
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const proposal = panel.getByTestId('design-proposal');
   await expect(proposal).toContainText('Lesesessel aus Cord');
@@ -435,6 +438,7 @@ test('Einrichtungsvorschlag mit Claude (#350): Küche bekommt eine Küchenzeile 
   await left.getByRole('button', { name: 'Einrichten' }).click();
   const panel = page.getByTestId('design-panel');
   await panel.getByLabel('Umfang').selectOption({ label: 'Küche' });
+  await panel.getByLabel('Verfahren').selectOption('liste');
   await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
   const kitchen = panel.getByTestId('design-kitchen');
   await expect(kitchen).toBeVisible();

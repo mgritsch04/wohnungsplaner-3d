@@ -5,7 +5,8 @@
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    // vite/client: E2E-Tests importieren App-Code, der `import.meta.env` benutzt
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

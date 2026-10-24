@@ -46,7 +46,8 @@ const run = (sample: Pick<Sample, 'json' | 'images'>, extra: Partial<Parameters<
   return runFurnishing({ sample, project, roomIds, wishes: flat.wishes, seed: 7, timeouts: { opus: 2000, sonnet: 2000 }, ...extra });
 };
 
-describe('runFurnishing', () => {
+// jeder Test stellt eine ganze Wohnung auf: das dauert auf den Rechnern der CI länger als die 5 s Voreinstellung
+describe('runFurnishing', { timeout: 60_000 }, () => {
   it('reads, asks, places, walks through and criticises – every room ends with a layout and a score', async () => {
     const { sample, calls } = fake(recorded);
     const stages: DesignRunProgress[] = [];
