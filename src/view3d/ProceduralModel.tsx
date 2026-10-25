@@ -419,6 +419,8 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
           return { ...box(-0.015, 0.05, 0, 0.015, 0.075, W * 0.9, BLACK), p: [Math.sin(a) * W * 0.45, 0.06, Math.cos(a) * W * 0.45] as V3, s: [0.03, 0.025, W * 0.9] as V3, r: [0, a, 0] as V3 };
         }),
       ];
+    case 'pouf':
+      return [rbox(-W, 0, -D, W, h, D, Math.min(w, d) * 0.3, color, fabric)];
     case 'stool':
       return [cyl(0, h - 0.05, 0, Math.min(w, d) / 2, h, color, fabric), cyl(0, 0, 0, 0.025, h - 0.05, METAL, { metal: 0.8, rough: 0.3 }), cyl(0, 0, 0, Math.min(w, d) * 0.4, 0.02, METAL, { metal: 0.8 })];
     case 'wardrobe':
@@ -471,7 +473,7 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
     case 'k-dishwasher': {
       const isKitchenFloor = shape === 'k-base' || shape === 'k-sink' || shape === 'k-dishwasher';
       const plinth = isKitchenFloor ? 0.1 : shape === 'k-wall' ? 0 : 0.05;
-      const parts: Part[] = [box(-W, plinth, -D, W, h, D - 0.02, shade(color, 0.96))];
+      const parts: Part[] = [box(-W, shape === 'k-wall' ? 0.012 : plinth, -D, W, h, D - 0.02, shade(color, 0.96))];
       if (plinth > 0) {
         if (shape === 'cabinet' || shape === 'dresser') parts.push(...legs4(plinth, 0.04, 0.015, BLACK));
         else parts.push(box(-W + 0.01, 0, -D, W - 0.01, plinth, D - 0.07, '#333333'));
@@ -494,6 +496,8 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
           parts.push(rbox((x0 + x1) / 2 - 0.08, hy, D, (x0 + x1) / 2 + 0.08, hy + 0.012, D + 0.02, 0.004, METAL, { metal: 0.85, rough: 0.3 }));
         }
       }
+      // a light strip under the wall cabinets: work light on the counter (#443)
+      if (shape === 'k-wall') parts.push({ ...box(-W + 0.03, 0, D - 0.09, W - 0.03, 0.012, D - 0.06, '#fff6e0'), emissive: '#ffd9a3' });
       if (shape === 'k-sink') {
         // basin and tap above the cabinet (countertop is generated separately)
         parts.push(rbox(-W * 0.6, h + 0.035, -D * 0.4, W * 0.6, h + 0.045, D * 0.55, 0.02, '#c9ccd0', { metal: 0.7, rough: 0.25 }));

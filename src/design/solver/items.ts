@@ -99,7 +99,7 @@ function accessOf(role: Role, base: Base, shape: string, it: CatalogItem): Spec[
   if (base !== 'floor' || shape === 'plant' || role === 'floor-lamp' || shape === 'vacuum') return [];
   if (role === 'bed') return ['left', 'right', 'front'];
   if (role === 'table' || role === 'coffee-table') return ['front', 'back', 'left', 'right'];
-  if (role === 'seat' || role === 'nightstand') return [];
+  if (role === 'seat' || role === 'nightstand' || role === 'side-table') return [];
   if (it.category === 'chair') return [];
   return ['front'];
 }

@@ -197,7 +197,7 @@ export function wishesForRoom(p: Project, d: DerivedPlan, roomId: string, type: 
 // placement
 
 /** Placement order: anchors first, then what is placed relative to them; wall decor last (it goes above what stands there). */
-const ROLE_ORDER: Role[] = ['bed', 'nightstand', 'sofa', 'tv-board', 'table', 'corner', 'wall', 'coffee-table', 'armchair', 'seat', 'floor-lamp', 'rug', 'tv', 'table-lamp', 'pendant', 'mattress', 'box', 'curtain', 'mirror', 'coat-rack', 'wall-art'];
+const ROLE_ORDER: Role[] = ['bed', 'nightstand', 'sofa', 'tv-board', 'table', 'corner', 'wall', 'coffee-table', 'side-table', 'armchair', 'seat', 'floor-lamp', 'rug', 'tv', 'table-lamp', 'pendant', 'mattress', 'box', 'curtain', 'mirror', 'coat-rack', 'wall-art'];
 
 /** Rooms where a table is a work or side table against a wall, not a free-standing dining table (#350). */
 const WALL_TABLE_ROOMS = new Set<RoomType>(['bedroom', 'kids', 'office', 'hall', 'utility', 'bath']);
@@ -569,6 +569,21 @@ function placeItem(c: RoomCtx, item: CatalogItem, role: Role, companions: Catalo
     }
     case 'seat':
       return firstFit(c, seatPoses(c, item));
+    case 'side-table': {
+      // beside the armchair or sofa, flush with its front; else a corner
+      const seats = findIn(c, (f) => roleOf(f) === 'armchair' || roleOf(f) === 'sofa' || roleOf(f) === 'bed');
+      const poses = function* () {
+        for (const s of seats) {
+          const back = sub(s, scale(frontOf(s), s.depth / 2));
+          for (const side of [1, -1]) {
+            const p = add(add(back, scale(rightOf(s), side * (s.width / 2 + item.width / 2 + 0.05))), scale(frontOf(s), item.depth / 2 + 0.05));
+            yield withPose(item, p.x, p.y, s.rotation);
+          }
+        }
+        yield* wallPoses(item, edges, 'corner');
+      };
+      return firstFit(c, poses());
+    }
     case 'floor-lamp': {
       // reading light beside the sofa or armchair, else a corner
       const seats = findIn(c, (f) => roleOf(f) === 'sofa' || roleOf(f) === 'armchair' || roleOf(f) === 'bed');

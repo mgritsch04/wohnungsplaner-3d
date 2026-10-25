@@ -33,7 +33,7 @@ export function fillOf(i: RItem): string {
   return FILL[i.category] ?? '#d9d4ca';
 }
 
-const ROUND = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant']);
+const ROUND = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'pouf']);
 
 /** Pieces whose front says nothing (round, flat or hanging decoration). */
 const NO_FRONT = new Set(['rug', 'curtain', 'wall-art', 'mirror', 'pendant', 'table-lamp', 'floor-lamp']);
