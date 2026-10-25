@@ -108,6 +108,8 @@ export interface Model {
   soft: SoftRelation[];
   dropped: { id: string; catalogId: string; reason: string }[];
   zones: Map<string, ProgramZone>;
+  /** Living and sleeping rooms from 12 m²: the search avoids large patches without furniture (E6). */
+  spread?: boolean;
 }
 
 const emptyBox = (): Box => ({ x: 0, y: 0, hw: 0, hd: 0, rotation: 0 });
