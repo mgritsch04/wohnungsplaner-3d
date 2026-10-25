@@ -57,6 +57,7 @@ import {
 import { implausibleSize } from './designGuide';
 import { designWishes, runDesign } from './designRun';
 import { pickItems, placedRooms, proposalFrom, withProduct } from '../design/apply/proposal';
+import { roomShots } from './roomShots';
 import { layoutSuggestion } from '../design/apply';
 import { svgToPng } from '../design/render';
 import { runFurnishing, type Stage } from '../design/run';
@@ -206,6 +207,8 @@ export function DesignPanel() {
         roomTypes,
         products,
         toImage: (plan) => svgToPng(plan),
+        // the look sees the room in 3D, as the image review does (#443)
+        toRoomShots: (room) => roomShots(room, own),
         signal: ctl.signal,
         onProgress: (p) => {
           setDesignProgress({ done: p.done, total: p.total });

@@ -18,6 +18,7 @@ export type Role =
   | 'corner'
   | 'nightstand'
   | 'coffee-table'
+  | 'side-table'
   | 'armchair'
   | 'seat'
   | 'floor-lamp'
@@ -56,7 +57,7 @@ export function roleOf(f: RoleInput): Role {
   if (shape === 'pendant') return 'pendant';
   if (shape === 'table-lamp') return 'table-lamp';
   if (shape === 'floor-lamp') return 'floor-lamp';
-  if (item.category === 'table') return tags.includes('couchtisch') || /couchtisch|beistelltisch/i.test(item.name) ? 'coffee-table' : 'table';
+  if (item.category === 'table') return tags.includes('beistelltisch') || /beistelltisch/i.test(item.name) ? 'side-table' : tags.includes('couchtisch') || /couchtisch/i.test(item.name) ? 'coffee-table' : 'table';
   if (item.category === 'storage' && (tags.includes('tv') || /tv|lowboard/i.test(item.name))) return 'tv-board';
   if (shape === 'armchair') return 'armchair';
   if (shape === 'sofa' || shape === 'sofa-corner') return 'sofa';

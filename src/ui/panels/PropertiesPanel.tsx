@@ -943,7 +943,7 @@ function simplifyGeo<G extends { interior: { x: number; y: number }[] }>(g: G): 
   return { ...g, interior: keep };
 }
 
-const ROUND_SHAPES = new Set(['table-round', 'plant', 'floor-lamp', 'table-lamp', 'pendant', 'stool']);
+const ROUND_SHAPES = new Set(['table-round', 'plant', 'floor-lamp', 'table-lamp', 'pendant', 'stool', 'pouf']);
 /** Round things are listed by diameter in shops: offer one field that sets width = depth. */
 function isRoundFootprint(f: { model: { type: string; shape?: string; fallbackShape?: string }; width: number; depth: number }): boolean {
   const shape = f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape;

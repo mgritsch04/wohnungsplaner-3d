@@ -4,6 +4,7 @@ import type { Furniture } from '../model/schema';
 import { planRotationToWorldY } from '../model/units';
 import { useFurnishStore } from '../suggest/furnishStore';
 import { ProceduralModel } from './ProceduralModel';
+import { useSceneSnap } from './sceneSnap';
 
 /**
  * Furnishing suggestion (#137) in 3D: the proposed items as simple models with a coloured
@@ -26,6 +27,8 @@ export function FurnishPreview3D() {
 }
 
 function Ghost({ item, color }: { item: Furniture; color: string }) {
+  // a picture for Claude shows the room as applied: no outlines (#443)
+  const bare = useSceneSnap((s) => s.bare);
   const h = Math.max(item.height, 0.02);
   const edges = useMemo(() => {
     const box = new THREE.BoxGeometry(item.width + 0.02, h + 0.02, item.depth + 0.02);
@@ -38,9 +41,11 @@ function Ghost({ item, color }: { item: Furniture; color: string }) {
   return (
     <group position={[item.x, item.elevation, item.y]} rotation={[0, planRotationToWorldY(item.rotation), 0]} userData={{ furnishPreview: true, name: item.name }}>
       <ProceduralModel shape={shape} width={item.width} depth={item.depth} height={item.height} color={item.color} quality="planning" castShadow={false} />
-      <lineSegments geometry={edges} position={[0, h / 2, 0]} raycast={() => null} renderOrder={3}>
-        <lineBasicMaterial color={color} depthTest={false} transparent opacity={0.9} />
-      </lineSegments>
+      {!bare && (
+        <lineSegments geometry={edges} position={[0, h / 2, 0]} raycast={() => null} renderOrder={3}>
+          <lineBasicMaterial color={color} depthTest={false} transparent opacity={0.9} />
+        </lineSegments>
+      )}
     </group>
   );
 }

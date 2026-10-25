@@ -22,6 +22,7 @@ interface Call {
   room: string;
   images: number;
   picture: boolean;
+  look: boolean;
 }
 
 const recorded = (key: FlatKey): RecordedRun => JSON.parse(readFileSync(new URL(`../src/design/fixtures/recorded/${key}.json`, import.meta.url), 'utf8')) as RecordedRun;
@@ -41,7 +42,7 @@ async function fakeClaude(page: Page, answers: RecordedRun) {
         json: async (prompt: string, opts: { images?: Blob[] } = {}) => {
           const kind = prompt.includes('Wohnkonzept für die ganze Wohnung') ? 'konzept' : prompt.includes('Dein bisheriges Programm') ? 'kritik' : 'programm';
           const room = /Raum „([^“]+)“/.exec(prompt)?.[1] ?? '';
-          w.__calls.push({ kind, room, images: opts.images?.length ?? 0, picture: prompt.includes('beigefügte Bild') });
+          w.__calls.push({ kind, room, images: opts.images?.length ?? 0, picture: /beigefügten? Bild/.test(prompt), look: prompt.includes('Blick vor der Abgabe') });
           await new Promise((r) => setTimeout(r, 10));
           if (kind === 'konzept') return rec.concept;
           const program = rec.programs[room];
@@ -83,9 +84,9 @@ function expectStages(made: Call[], planned: string[]) {
   expect(concept.length).toBeGreaterThanOrEqual(1);
   expect(concept.length).toBeLessThanOrEqual(2);
   for (const room of planned) expect(made.filter((c) => c.kind === 'programm' && c.room === room).length).toBeGreaterThanOrEqual(1);
-  // jede Kritikrunde geht mit genau einem Raumbild hinaus, und höchstens zwei je Raum
+  // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443); höchstens zwei je Raum
   const critique = made.filter((c) => c.kind === 'kritik');
-  expect(critique.every((c) => c.images === 1 && c.picture)).toBe(true);
+  expect(critique.every((c) => c.images === (c.look ? 3 : 1) && c.picture)).toBe(true);
   for (const room of new Set(critique.map((c) => c.room))) expect(critique.filter((c) => c.room === room).length).toBeLessThanOrEqual(2);
   return critique;
 }

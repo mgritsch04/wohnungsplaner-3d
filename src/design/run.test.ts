@@ -33,7 +33,7 @@ function fake(reply: Reply, images = false) {
 const recorded: Reply = (prompt, opts) => {
   const label = opts.label ?? '';
   if (label === 'Wohnkonzept') return answers.concept;
-  const room = label.startsWith('Kritik: ') ? label.slice(8).replace(/ \((Runde \d|Blick)\)$/, '') : label;
+  const room = label.startsWith('Kritik: ') ? label.slice(8).replace(/ \((Runde \d|Blick( \d)?)\)$/, '') : label;
   if (!answers.programs[room]) throw new Error(`keine Antwort für ${label} (Prompt: ${prompt.slice(0, 60)})`);
   return structuredClone(answers.programs[room]);
 };
@@ -120,25 +120,50 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     if (plain.length) expect(plain.every((c) => c.prompt.includes('So steht es im Raum'))).toBe(true);
   });
 
-  it('a main room that passes gets one look at its picture; without a picture no look', async () => {
+  it('a main room that passes gets a look at its picture, one look even when Claude rates it below 8; without a picture no look', async () => {
     const toImage = vi.fn(async () => ({ mediaType: 'image/png' as const, data: 'AAAA' }));
-    const withPicture = fake(recorded, true);
-    const r = await run(withPicture.sample, { toImage });
-    const looks = withPicture.calls.filter((c) => c.label.endsWith('(Blick)'));
+    const withNote = (note: number): Reply => (p, o) => (o.label?.includes('(Blick') ? { ...(recorded(p, o) as object), note } : recorded(p, o));
+    const good = fake(withNote(9), true);
+    const r = await run(good.sample, { toImage });
+    const looks = good.calls.filter((c) => c.label.endsWith('(Blick)'));
     expect(looks.length).toBeGreaterThan(0);
     for (const c of looks) expect(c.prompt).toContain('Blick vor der Abgabe');
+    expect(good.calls.filter((c) => c.label.endsWith('(Blick 2)'))).toEqual([]);
     for (const room of r.rooms) {
       const name = r.analysis.rooms.find((a) => a.roomId === room.roomId)!.name;
-      const mine = withPicture.calls.filter((c) => c.label.startsWith(`Kritik: ${name} `));
-      // a look is the only critique call of its room, and only one
-      if (mine.some((c) => c.label.endsWith('(Blick)'))) expect(mine).toHaveLength(1);
+      const mine = good.calls.filter((c) => c.label.startsWith(`Kritik: ${name} `));
+      // a room that passed at once: its look rated 9 is its only critique call
+      if (mine.some((c) => c.label.endsWith('(Blick)')) && !mine.some((c) => c.label.includes('Runde'))) expect(mine).toHaveLength(1);
     }
+    const weak = fake(withNote(5), true);
+    await run(weak.sample, { toImage });
+    expect(weak.calls.filter((c) => c.label.endsWith('(Blick)')).length).toBeGreaterThan(0);
+    expect(weak.calls.filter((c) => c.label.includes('(Blick 2)'))).toEqual([]);
     const noPicture = fake(recorded, false);
     await run(noPicture.sample, { toImage });
-    expect(noPicture.calls.filter((c) => c.label.endsWith('(Blick)'))).toEqual([]);
+    expect(noPicture.calls.filter((c) => c.label.includes('(Blick'))).toEqual([]);
     const fast = fake(recorded, true);
     await run(fast.sample, { toImage, wishes: { ...flat.wishes, quality: 'fast' } });
-    expect(fast.calls.filter((c) => c.label.endsWith('(Blick)'))).toEqual([]);
+    expect(fast.calls.filter((c) => c.label.includes('(Blick'))).toEqual([]);
+  });
+
+  it('the look sees the room in 3D as the image review does, then the plan', async () => {
+    const toImage = vi.fn(async () => ({ mediaType: 'image/png' as const, data: 'AAAA' }));
+    const toRoomShots = vi.fn(async () => [
+      { mediaType: 'image/png' as const, data: 'BBBB' },
+      { mediaType: 'image/png' as const, data: 'CCCC' },
+    ]);
+    const f = fake(recorded, true);
+    await run(f.sample, { toImage, toRoomShots });
+    const looks = f.calls.filter((c) => c.label.includes('(Blick'));
+    expect(looks.length).toBeGreaterThan(0);
+    for (const c of looks) {
+      expect(c.images).toBe(3);
+      expect(c.prompt).toContain('in 3D');
+      expect(c.prompt).toContain('"note"');
+    }
+    // the rule rounds keep the plan alone
+    for (const c of f.calls.filter((x) => x.label.includes('(Runde'))) expect(c.images).toBe(1);
   });
 
   it('the look replaces a passing room only if it still passes, keeps nearly its points and drops nothing more', () => {

@@ -31,7 +31,7 @@ export function checkPlants(ctx: RoomCtx): void {
 export function checkLight(ctx: RoomCtx): void {
   for (const l of ctx.items.filter((i) => i.role === 'table-lamp')) {
     const base = ctx.supportOf(l);
-    const ok = base && (base.role === 'nightstand' || base.category === 'desk' || (base.category === 'storage' && base.role !== 'box') || base.role === 'tv-board');
+    const ok = base && (base.role === 'nightstand' || base.role === 'side-table' || base.category === 'desk' || (base.category === 'storage' && base.role !== 'box') || base.role === 'tv-board');
     if (!ok) ctx.add('D3', 'M', base ? `${ctx.label(l)} steht auf ${ctx.label(base)}, dort stört sie. Eine Tischlampe gehört auf Nachttisch, Sideboard, Kommode, Schreibtisch oder Regal.` : `${ctx.label(l)} steht frei, ohne Ablage darunter.`, [l], l);
   }
   const lights = ctx.items.filter(isLamp);

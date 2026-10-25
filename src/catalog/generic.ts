@@ -22,6 +22,9 @@ const DEFS: Def[] = [
   ['generic-dining-table-6', 'Esstisch 6 Personen', 'table', 1.8, 0.9, 0.75, 'table', '#b8946a', 420, { tags: ['esstisch'] }],
   ['generic-round-table', 'Runder Tisch Ø 110', 'table', 1.1, 1.1, 0.75, 'table-round', '#b8946a', 250, { tags: ['tisch', 'rund'] }],
   ['generic-coffee-table', 'Couchtisch', 'table', 1.1, 0.6, 0.42, 'table', '#a88a68', 120, { tags: ['couchtisch'] }],
+  // a place for a cup next to sofa or armchair, a seat on a play rug (#443: the image review missed both)
+  ['generic-side-table', 'Beistelltisch Ø 45', 'table', 0.45, 0.45, 0.52, 'table-round', '#a88a68', 50, { tags: ['beistelltisch'] }],
+  ['generic-pouf', 'Pouf / Sitzsack Ø 55', 'chair', 0.55, 0.55, 0.42, 'pouf', '#c9b79c', 60, { tags: ['pouf', 'sitzsack', 'hocker'] }],
   ['generic-chair', 'Stuhl', 'chair', 0.45, 0.52, 0.86, 'chair', '#a88a68', 70, { tags: ['stuhl', 'esszimmer'] }],
   ['generic-office-chair', 'Bürostuhl', 'chair', 0.65, 0.65, 1.1, 'office-chair', '#333538', 180, { tags: ['büro'] }],
   ['generic-bar-stool', 'Barhocker', 'chair', 0.42, 0.42, 0.75, 'stool', '#3d3f42', 60, { tags: ['hocker'] }],

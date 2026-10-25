@@ -22,6 +22,7 @@ import { goToNeighbourLevel } from '../ui/levelActions';
 import { Photos3D } from '../photos/Photos3D';
 import { FurnitureObject } from './FurnitureObject';
 import { useFurnishStore } from '../suggest/furnishStore';
+import { useSceneSnap } from './sceneSnap';
 import { Devices3D } from '../smarthome/Devices3D';
 import { Fixtures3D } from '../installation/Fixtures3D';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
@@ -247,6 +248,18 @@ function SceneContent({
     const wp = (window as unknown as { __wp?: Record<string, unknown> }).__wp;
     if (wp) wp.three = { camera, canvas: gl.domElement, scene, gl };
   }, [camera, gl, scene]);
+  // a picture of the view for Claude's look at a room (#443): rendered now, read before the next frame
+  useEffect(() => {
+    if (readOnly) return;
+    const snap = () => {
+      gl.render(scene, camera);
+      return gl.domElement.toDataURL('image/png');
+    };
+    useSceneSnap.setState({ snap });
+    return () => {
+      if (useSceneSnap.getState().snap === snap) useSceneSnap.setState({ snap: null });
+    };
+  }, [camera, gl, scene, readOnly]);
 
   const bounds = useMemo(() => {
     const pts = [...frame.nodes, ...frame.furniture.flatMap((f) => furnitureCorners(f))];

@@ -29,7 +29,26 @@ export interface CritiqueInput {
    * the picture once more as an interior designer and improves what the rules do not see.
    */
   look?: boolean;
+  /**
+   * Number of 3D pictures sent before the plan (the look, #443): from the main door, cut at 1.20 m,
+   * and from above.
+   */
+  views?: number;
 }
+
+/** Claude's own mark (1–10, as the image review gives it) from which the room is handed over. */
+export const LOOK_ENOUGH = 8;
+
+/** The image review's checklist (`scripts/design-image-review.mjs`): the look rates the room by it. */
+export const LOOK_CHECKS: readonly [string, string][] = [
+  ['wege', 'Wege frei: Man kommt von der Tür überall hin, Türen und Fenster bleiben frei, nichts versperrt den Durchgang.'],
+  ['funktionen', 'Funktionen erkennbar: Man sieht sofort, wo man schläft, sitzt, isst, kocht oder arbeitet; jede Zone ist vollständig.'],
+  ['blickfang', 'Blickfang: Es gibt einen klaren Mittelpunkt (Sofa mit Teppich, Bett mit Kopfteil, Esstisch mit Leuchte), auf den der Raum ausgerichtet ist.'],
+  ['proportionen', 'Proportionen: Die Möbel passen in Größe und Menge zum Raum, weder leer noch vollgestellt; Abstände wirken bewusst.'],
+  ['licht', 'Licht: Grundlicht und Leselicht oder Arbeitslicht sind da, wo man sie braucht; Fenster werden genutzt, nicht zugestellt.'],
+  ['ordnung', 'Ordnung: Möbel stehen gerade an Wänden oder bewusst frei, Gruppen sind geschlossen, nichts steht zufällig herum.'],
+  ['abgabe', '„Würde eine Innenarchitektin das so abgeben?“ – als Ganzes stimmig, wohnlich und durchdacht.'],
+];
 
 const cm = (v: number) => Math.round(v * 100);
 const SEVERITY: Record<Finding['severity'], string> = { S: 'schwer', M: 'mittel', L: 'leicht' };
@@ -123,19 +142,18 @@ export function critiqueReport(program: RoomProgram, layout: Layout, review: Roo
 export function buildCritiquePrompt(input: CritiqueInput): string {
   const { base, program, layout, review } = input;
   const origin = base.room.origin;
-  const picture = input.image
+  const picture = input.image && input.views
+    ? `Sieh dir die beigefügten Bilder an. ${input.views > 1 ? 'Bild 1 zeigt den Raum in 3D schräg von oben, so wie man ihn beim Hereinkommen sieht, waagrecht in 1,20 m Höhe aufgeschnitten (alles darüber fehlt dort: Hängeleuchten, Oberschränke, Vorhänge, Bilder, obere Teile hoher Möbel). Bild 2 zeigt ihn in 3D ungeschnitten fast senkrecht von oben. Bild 3' : 'Bild 1 zeigt den Raum in 3D, so wie man ihn beim Hereinkommen sieht. Bild 2'} ist der Plan von oben, mit Möbeln, Zonen (gestrichelt) und Wegen; Norden ist oben. Die Möbel sind einfache Platzhalter-Modelle.`
+    : input.image
     ? 'Sieh dir das beigefügte Bild an: der Raum von oben, mit Möbeln, Zonen (gestrichelt) und Wegen. Norden ist oben.'
     : input.textMap
       ? `So steht es im Raum:\n${input.textMap}`
       : 'Ein Bild gibt es nicht; geh nach den Angaben unten.';
   const task = input.look
-    ? `Blick vor der Abgabe: Die Begehung ist bestanden. Sieh dir den Raum jetzt an wie eine Innenarchitektin, bevor sie ihn abgibt, und verbessere, was eine Regel nicht sieht:
-- Die Sitzgruppe schaut auf einen Blickpunkt (Fernseher, Kamin, Fenster mit Ausblick) oder einander zu; Sofa, Sessel und Couchtisch bilden eine geschlossene Gruppe auf einem Teppich, der unter die Vorderbeine reicht.
-- Kein Sessel und kein Schrank steht vor einem Fenster; Fenster bleiben frei und bekommen Vorhänge als Paar links und rechts.
-- Jeder Sitz- und Arbeitsplatz hat Licht in Reichweite: Leselampe neben Sofa oder Sessel, Pendelleuchte über dem Esstisch, Lampe am Schreibtisch, Leuchten an beiden Bettseiten.
-- Stühle stehen am Tisch, der Bürostuhl am Schreibtisch; Teppiche liegen mittig unter ihrer Gruppe.
-- Die Zonen sind über den Raum verteilt: keine Ecke leer, während anderswo alles aneinanderklebt; nichts steht verloren mitten im Raum.
-Ist das alles schon so, gib das Programm unverändert zurück. Sonst ändere gezielt, ohne Wege, Türen oder Funktionen zu verschlechtern, und sag in "why" des geänderten Teils kurz, warum.`
+    ? `Blick vor der Abgabe: Die Begehung ist bestanden. Sieh dir den Raum jetzt an wie eine Innenarchitektin, bevor sie ihn abgibt. Eine unabhängige Prüferin bewertet später genau diese Bilder mit 1 bis 10 nach dieser Liste:
+${LOOK_CHECKS.map(([id, text]) => `- ${id}: ${text}`).join('\n')}
+Bewerte den Raum so, wie er jetzt ist, ehrlich mit einer Gesamtnote 1–10 ("note") und nenne die drei wichtigsten Mängel ("maengel"), so wie die Prüferin sie sähe. Häufig bemängelt sie: leere Flächen oder eine leere Raumhälfte, während anderswo alles dicht steht; ein Sessel, der abseits steht oder nicht zur Gruppe schaut; ein Teppich ohne Möbel darauf; eine Sitzecke ohne Ablage und ohne Leselicht; ein Sofa ohne Gegenüber; Möbel vor dem Fenster; eine Küche ohne durchgehende Arbeitsfläche.
+Behebe dann diese Mängel im Programm: ergänze, was fehlt, verschiebe Zonen in leere Bereiche, lass Überflüssiges weg, ohne Wege, Türen oder Funktionen zu verschlechtern. Sag in "why" des geänderten Teils kurz, warum. Ist die Note schon ${LOOK_ENOUGH} oder mehr, gib das Programm unverändert zurück.`
     : `Ändere nur, was die Befunde verlangen, und sag in "why" des geänderten Teils kurz, warum. Was gut ist, bleibt wie es ist: dieselben ids, dieselben Plätze.
 Passt ein Möbel nur kleiner hinein, steht etwas weit außerhalb seiner Zone oder sind Abstände zu knapp, ist der Raum für dein Programm zu voll. Verschieben allein hilft dann nicht: Plane das kleinere Teil gleich selbst ein, nimm weniger Plätze am Tisch oder ordne die Gruppe anders an (das Sofa an eine andere Wand, die Medienwand dorthin, wo der Weg nicht vorbeiführt).`;
   const heading = input.look ? 'Blick vor der Abgabe' : input.round === 1 ? 'Nachbesserung' : 'Zweite Nachbesserung';
@@ -155,7 +173,7 @@ ${task}
 Typische Mittel: eine Zone verschieben oder kleiner machen, eine Beziehung ändern (anderes Ziel, anderer Abstand), ein Teil gegen ein kleineres tauschen, Überflüssiges weglassen, Fehlendes ergänzen. Ein Teil, das nicht hineinkam, braucht einen anderen Platz oder eine kleinere Größe – oder es gehört nicht in diesen Raum.
 Rechne keine Koordinaten fein nach: die App stellt millimetergenau auf. Du gibst die Absicht vor.
 
-Antworte wieder mit dem vollständigen Programm im selben JSON-Format (alle Zonen, alle Teile, alle Beziehungen).`;
+Antworte wieder mit dem vollständigen Programm im selben JSON-Format (alle Zonen, alle Teile, alle Beziehungen)${input.look ? ', dazu "note" (deine Note 1–10 für den Raum, wie er jetzt ist) und "maengel" (die drei Mängel)' : ''}.`;
 }
 
 export const parseCritique = (raw: unknown, input: CritiqueInput): Checked<RoomProgram> => parseRoomProgram(raw, input.base);
