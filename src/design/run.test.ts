@@ -120,7 +120,7 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     if (plain.length) expect(plain.every((c) => c.prompt.includes('So steht es im Raum'))).toBe(true);
   });
 
-  it('a main room that passes gets a look at its picture, a second one only while Claude rates it below 8; without a picture no look', async () => {
+  it('a main room that passes gets a look at its picture, one look even when Claude rates it below 8; without a picture no look', async () => {
     const toImage = vi.fn(async () => ({ mediaType: 'image/png' as const, data: 'AAAA' }));
     const withNote = (note: number): Reply => (p, o) => (o.label?.includes('(Blick') ? { ...(recorded(p, o) as object), note } : recorded(p, o));
     const good = fake(withNote(9), true);
@@ -137,8 +137,8 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     }
     const weak = fake(withNote(5), true);
     await run(weak.sample, { toImage });
-    expect(weak.calls.filter((c) => c.label.endsWith('(Blick 2)')).length).toBe(weak.calls.filter((c) => c.label.endsWith('(Blick)')).length);
-    expect(weak.calls.filter((c) => c.label.includes('(Blick 3)'))).toEqual([]);
+    expect(weak.calls.filter((c) => c.label.endsWith('(Blick)')).length).toBeGreaterThan(0);
+    expect(weak.calls.filter((c) => c.label.includes('(Blick 2)'))).toEqual([]);
     const noPicture = fake(recorded, false);
     await run(noPicture.sample, { toImage });
     expect(noPicture.calls.filter((c) => c.label.includes('(Blick'))).toEqual([]);

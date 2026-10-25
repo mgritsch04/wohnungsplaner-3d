@@ -454,7 +454,7 @@ export interface RoomResult {
   program: RoomProgram;
   layout: Layout;
   review: RoomReview;
-  /** Critique calls that changed the programme (up to two rounds and two looks). */
+  /** Critique calls that changed the programme (up to two rounds and one look). */
   rounds: number;
 }
 

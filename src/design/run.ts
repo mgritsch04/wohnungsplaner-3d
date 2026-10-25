@@ -108,8 +108,11 @@ export function lookKeeps(before: RoomResult, after: RoomResult): boolean {
 
 /** Points the look may cost (#443). */
 export const LOOK_TOLERANCE = 4;
-/** Looks at the picture at most: a second one only while Claude rates its own room below `LOOK_ENOUGH`. */
-export const LOOK_ROUNDS = 2;
+/**
+ * Looks at the picture at most; a further one only while Claude rates its own room below `LOOK_ENOUGH`.
+ * One: in the real run of 25.10. a second look kept Claude's own note and did not move the image review (#443).
+ */
+export const LOOK_ROUNDS = 1;
 
 /** Claude's own mark for the room it looked at (`"note"` in the answer), if it gave one. */
 export function lookNote(raw: unknown): number | null {
