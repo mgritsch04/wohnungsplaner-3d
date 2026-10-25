@@ -3,7 +3,7 @@ import { dist, pointInPolygon, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import type { RoomCtx } from './context';
 import { polyDist, segmentHitsConvex } from './geom';
-import { isKitchenModule } from './items';
+import { isKitchenModule, type RItem } from './items';
 
 /** Share of the floor covered by pieces standing on it (chairs at a table do not count extra). */
 export function occupancy(ctx: RoomCtx): number {
@@ -66,12 +66,18 @@ export function checkOpenPatch(ctx: RoomCtx): void {
 /** Radius (m) of the largest open patch a furnished room may keep (walkways and space to move included). */
 export const OPEN_RADIUS = 1.8;
 
-/** The free spot farthest from every piece on the floor and every rug (walls do not count). */
+/**
+ * A piece that furnishes floor: not a chair, plant or lamp (they do not fill a patch on their own)
+ * and not a rug (an empty rug looks as empty as the floor, image review #443).
+ */
+export const furnishes = (i: RItem): boolean => i.floor && i.role !== 'seat' && i.role !== 'floor-lamp' && i.shape !== 'plant' && i.width * i.depth >= 0.2;
+
+/** The free spot farthest from every piece that furnishes floor (walls do not count). */
 export function largestOpening(ctx: RoomCtx): { radius: number; at: Vec2 } {
   const xs = ctx.an.polygon.map((p) => p.x);
   const ys = ctx.an.polygon.map((p) => p.y);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const pieces = ctx.items.filter((i) => i.floor || i.role === 'rug');
+  const pieces = ctx.items.filter(furnishes);
   const kept = ctx.an.userZones.filter((z) => z.keepFree).map((z) => z.points);
   const step = 0.1;
   const free: Vec2[] = [];

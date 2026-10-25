@@ -164,7 +164,7 @@ describe('E Gesamteindruck', () => {
     const big = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(7, 5, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] }), type: 'living', items });
     const corner = [put('generic-sofa-3', { x: 1.2, y: 4.5, face: 'N' }), put('generic-shelf-80', { x: 6.5, y: 0.25, face: 'S' })];
     expect(has(big(corner), 'E6', /Durchmesser/)).toBe(true);
-    const spread = [...corner, put('generic-coffee-table', { x: 1.2, y: 3.4 }), put('generic-dining-table-4', { x: 4.5, y: 2.5 }), put('generic-armchair', { x: 3.0, y: 1.0, face: 'S' }), put('generic-dresser', { x: 5.8, y: 4.75, face: 'N' }), put('generic-plant', { x: 0.3, y: 0.3 })];
+    const spread = [...corner, put('generic-coffee-table', { x: 1.2, y: 3.4 }), put('generic-dining-table-4', { x: 4.5, y: 2.5 }), put('generic-armchair', { x: 3.0, y: 1.0, face: 'S' }), put('generic-dresser', { x: 5.8, y: 4.75, face: 'N' }), put('generic-shelf-80', { x: 0.5, y: 0.15, face: 'S' })];
     expect(has(big(spread), 'E6', /Durchmesser/)).toBe(false);
   });
   it('D4 a sofa without a floor or table lamp beside it is light', () => {

@@ -684,8 +684,11 @@ function openGrid(m: Model): OpenGrid {
   return g;
 }
 
+/** Same as `furnishes` in the review: chairs, plants, lamps and rugs do not fill a patch. */
+const furnishes = (n: Node) => isFloor(n) && n.spec.role !== 'seat' && n.spec.role !== 'floor-lamp' && n.spec.shape !== 'plant' && 4 * n.box.hw * n.box.hd >= 0.2;
+
 /**
- * Radius (m) of the largest patch of floor away from every piece on the floor and every rug
+ * Radius (m) of the largest patch of floor away from every piece that furnishes it
  * (walls do not count), on a 20 cm grid with a chamfer distance: the solver's cheap twin of
  * `largestOpening` in the review.
  */
@@ -698,7 +701,7 @@ export function openRadius(m: Model): number {
   for (const u of m.units) {
     if (!u.active) continue;
     for (const n of u.nodes) {
-      if (!(isFloor(n) || isRug(n)) || n.box.hw <= 0) continue;
+      if (!furnishes(n)) continue;
       const r = Math.hypot(n.box.hw, n.box.hd);
       const i0 = Math.max(0, Math.floor((n.box.x - r - g.ox) / OPEN_CELL));
       const i1 = Math.min(nx - 1, Math.floor((n.box.x + r - g.ox) / OPEN_CELL));
