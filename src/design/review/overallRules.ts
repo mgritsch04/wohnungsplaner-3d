@@ -32,7 +32,8 @@ export function checkOccupancy(ctx: RoomCtx): void {
   else if (o < range[0] && ['living', 'bedroom', 'kids', 'office'].includes(ctx.type)) ctx.add('E1', 'L', `Der Raum wirkt mit ${pct} % Möbelfläche eher leer, wohnlich sind ab ${Math.round(range[0] * 100)} %.`, [], ctx.an.polygon[0]);
 }
 
-const BALANCED: ReadonlySet<RoomType> = new Set<RoomType>(['living', 'bedroom', 'kids', 'office', 'dining']);
+/** Room types whose floor should be furnished evenly (E6); the solver uses it too. */
+export const BALANCED: ReadonlySet<RoomType> = new Set<RoomType>(['living', 'bedroom', 'kids', 'office', 'dining']);
 
 /**
  * E6 (M, #443): one half of a room stays almost empty while everything stands in the other – the

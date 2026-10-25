@@ -95,6 +95,27 @@ describe('a tight room keeps its double bed', () => {
   });
 });
 
+describe('no large empty patch (E6)', () => {
+  it('a living room spreads its zones: the dining table leaves the sofa and takes the empty half', () => {
+    const room = rectRoom(7, 4.5, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 3.5 }] });
+    const E = -Math.PI / 2;
+    const p = program(
+      room,
+      [
+        item('sofa', 'generic-sofa-3', [0.5, 2.25, E]),
+        item('coffee', 'generic-coffee-table', [1.4, 2.25, 0]),
+        item('table', 'generic-dining-table-4', [3.0, 2.25, 0]),
+        item('c1', 'generic-chair', [3.0, 1.6, 0]),
+        item('c2', 'generic-chair', [3.0, 2.9, N]),
+      ],
+      [{ kind: 'wall', item: 'sofa', wall: 'W4' }, { kind: 'front-of', item: 'coffee', target: 'sofa', gap: 0.45 }, { kind: 'around', items: ['c1', 'c2'], target: 'table' }],
+    );
+    const plain = solveRoom(room, p, { seed: 1 });
+    const spread = solveRoom(room, p, { seed: 1, spread: true });
+    expect(byId(spread, 'table').x).toBeGreaterThan(byId(plain, 'table').x + 0.5);
+  });
+});
+
 describe('chairs at the table', () => {
   it('chairs Claude placed round the table without any relation stay at the table, not in a heap beside it', () => {
     const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
@@ -268,6 +289,23 @@ describe('kitchen', () => {
     const start = Math.min(...second.map((i) => i.y - i.width / 2));
     expect(start - corner).toBeGreaterThanOrEqual(0);
     expect(start - corner).toBeLessThan(0.02);
+  });
+
+  it('a second run Claude starts a little off the corner still closes the L: no gap between hob and sink (image review)', () => {
+    const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 1 }] });
+    const p: RoomProgram = {
+      ...program(room, []),
+      kitchen: [
+        { wall: 'W1', from: { x: 1.4, y: 0 }, to: { x: 4, y: 0 }, modules: ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-drawer-60'] },
+        { wall: 'W2', from: { x: 4, y: 0.8 }, to: { x: 4, y: 2.0 }, modules: ['generic-k-base-60', 'generic-k-oven'] },
+      ],
+    };
+    const layout = solveRoom(room, p, { seed: 1 });
+    const first = layout.items.filter((i) => i.kitchenRun === 0 && i.elevation < 0.05);
+    const second = layout.items.filter((i) => i.kitchenRun === 1 && i.elevation < 0.05);
+    const end = first.reduce((a, b) => (b.x > a.x ? b : a));
+    const start = Math.min(...second.map((i) => i.y - i.width / 2));
+    expect(start - (end.y + end.depth / 2)).toBeLessThan(0.02);
   });
 
   it('a runner lies right in front of the counter (flat A: Claude says 50 cm, meant is the walking strip)', () => {

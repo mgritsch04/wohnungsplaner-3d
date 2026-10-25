@@ -32,6 +32,8 @@ export interface SolveOptions {
   starts?: number;
   /** Debugging: receives the hard rules still broken before pieces are made smaller or left out. */
   trace?: (broken: string[]) => void;
+  /** Living or sleeping room: avoid large patches without furniture (E6, from 12 m²). */
+  spread?: boolean;
 }
 
 /** Existing pieces of a room from the project (`RoomAnalysis.existing`). */
@@ -57,6 +59,7 @@ export function solveRoom(analysis: RoomAnalysis, program: RoomProgram, opts: So
   const seed = opts.seed ?? 1;
   const ctx = buildRoom(analysis, opts.existing ?? [], opts.catalog ?? []);
   const m = buildModel(ctx, program);
+  m.spread = !!opts.spread && analysis.area >= 12;
   const st = new State(m);
   const steps = opts.steps ?? 600;
   const starts = Math.max(1, opts.starts ?? 3);

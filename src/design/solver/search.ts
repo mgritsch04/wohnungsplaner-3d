@@ -6,7 +6,7 @@
  */
 import { pointInPolygon, type Vec2 } from '../../model/vec';
 import { rotationFacing } from '../../suggest/roomGeometry';
-import { gridCost, pairCost, unitCost, type Cost } from './cost';
+import { gridCost, openCost, pairCost, unitCost, type Cost } from './cost';
 import { refreshUnit } from './derive';
 import { clamp, wrapAngle } from './geom';
 import { CORNER_START, type Model, type Unit } from './model';
@@ -46,6 +46,8 @@ export class State {
   unitC: Cost[];
   pairC: Cost[][];
   grid = 0;
+  /** Soft cost of open floor (`openCost`), kept apart from the grid's hard part. */
+  open = 0;
   constructor(m: Model) {
     this.m = m;
     const n = m.units.length;
@@ -67,6 +69,7 @@ export class State {
     for (const u of m.units) this.unitC[u.index] = unitCost(m, u);
     for (const u of m.units) for (const v of m.units) if (u.index < v.index) this.pairC[u.index][v.index] = pairCost(m, u, v);
     this.grid = gridCost(m);
+    this.open = openCost(m);
   }
 
   ungrid(u: Unit): void {
@@ -96,7 +99,7 @@ export class State {
   }
 
   total(): number {
-    let t = this.grid;
+    let t = this.grid + this.open;
     for (const c of this.unitC) t += total(c);
     for (let i = 0; i < this.pairC.length; i++) for (let j = i + 1; j < this.pairC.length; j++) t += total(this.pairC[i][j]);
     return t;
@@ -145,8 +148,8 @@ export class State {
         refreshUnit(m, c.u);
       });
     };
-    // the grid cost can only drop by what it is now
-    if (delta - this.grid > bound) {
+    // the grid and open costs can only drop by what they are now
+    if (delta - this.grid - this.open > bound) {
       restorePoses();
       return { delta: Infinity, commit: () => {}, rollback: () => {} };
     }
@@ -155,6 +158,8 @@ export class State {
     for (const c of changes) this.engrid(c.u);
     const g = gridCost(m);
     delta += g - this.grid;
+    const o = openCost(m);
+    delta += o - this.open;
     return {
       delta,
       commit: () => {
@@ -165,6 +170,7 @@ export class State {
           else this.pairC[b][a] = c;
         }
         this.grid = g;
+        this.open = o;
       },
       rollback: () => {
         for (const c of changes) this.ungrid(c.u);

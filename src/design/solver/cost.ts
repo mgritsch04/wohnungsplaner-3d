@@ -7,7 +7,7 @@
  * The total splits into a part per unit (`unitCost`), a part per pair of units (`pairCost`) and
  * the walking grid (`gridCost`), so the search can recompute only what a move touches.
  */
-import { add, closestPointOnSegment, scale, type Vec2 } from '../../model/vec';
+import { add, closestPointOnSegment, pointInPolygon, scale, type Vec2 } from '../../model/vec';
 import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, WALL_TOL, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
 import { usesWater } from '../../model/fixtures';
@@ -320,8 +320,12 @@ function armchairCost(a: Unit, group: Unit): number {
   const len = Math.hypot(dx, dy);
   if (len < 0.4) return 0;
   const f = axisY(chair.box.rotation);
-  return 1.0 * Math.max(0, COS_AIM - (f.x * dx + f.y * dy) / len);
+  // in the same zone it joins the group: at the coffee table's edge, not across the room (image review)
+  const near = chair.zone === ref.zone ? Math.max(0, gapBetween(chair.poly, (table ?? ref).poly) - ARMCHAIR_GAP) : 0;
+  return 1.0 * Math.max(0, COS_AIM - (f.x * dx + f.y * dy) / len) + 0.8 * near;
 }
+/** Farthest an armchair of the seating zone stands from the coffee table (m). */
+const ARMCHAIR_GAP = 0.9;
 // aimed at 60° so the search does not stop right at the 70° the walk-through allows
 const COS_AIM = Math.cos((60 * Math.PI) / 180);
 
@@ -412,7 +416,25 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
   }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
   c.soft += armchairCost(u, v) + armchairCost(v, u);
+  c.soft += cornerGapCost(u, v);
   return c;
+}
+
+/** Up to this gap (m) two kitchen runs at right angles count as one L that should close. */
+const L_GAP = 0.8;
+
+/**
+ * Two runs of an L meet in the corner: a gap between them reads as two separate kitchens, with
+ * no worktop going round from sink to hob (image review, #443).
+ */
+function cornerGapCost(u: Unit, v: Unit): number {
+  if (!u.kitchen || !v.kitchen) return 0;
+  const a = u.nodes.filter((n) => n.run !== undefined && isFloor(n));
+  const b = v.nodes.filter((n) => n.run !== undefined && isFloor(n));
+  if (!a.length || !b.length || Math.abs(Math.cos(a[0].box.rotation - b[0].box.rotation)) > 0.1) return 0;
+  let gap = Infinity;
+  for (const p of a) for (const q of b) gap = Math.min(gap, gapBetween(p.poly, q.poly));
+  return gap > 0.02 && gap < L_GAP ? 1.5 * gap + 0.2 : 0;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -607,4 +629,112 @@ export function gridCost(m: Model, sink: Sink = null): number {
     }
   }
   return cost;
+}
+
+// ---------------------------------------------------------------------------------------------
+// open floor: no large patch without furniture (E6)
+// ---------------------------------------------------------------------------------------------
+
+/** Cell of the coarse grid for open patches (m). */
+const OPEN_CELL = 0.2;
+/** Radius (m) of an open patch the search starts to mind, below the review's 1.8 m (E6). */
+export const OPEN_SOFT = 1.6;
+const OPEN_WEIGHT = 1.0;
+
+interface OpenGrid {
+  nx: number;
+  ny: number;
+  ox: number;
+  oy: number;
+  inside: Uint8Array;
+  /** Cells taken before any piece: areas the user keeps free. */
+  kept: Uint8Array;
+}
+const openCache = new WeakMap<Model, OpenGrid>();
+
+function openGrid(m: Model): OpenGrid {
+  let g = openCache.get(m);
+  if (g) return g;
+  const xs = m.ctx.poly.map((p) => p.x);
+  const ys = m.ctx.poly.map((p) => p.y);
+  const ox = Math.min(...xs);
+  const oy = Math.min(...ys);
+  const nx = Math.max(1, Math.ceil((Math.max(...xs) - ox) / OPEN_CELL));
+  const ny = Math.max(1, Math.ceil((Math.max(...ys) - oy) / OPEN_CELL));
+  const inside = new Uint8Array(nx * ny);
+  const kept = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++)
+    for (let i = 0; i < nx; i++) {
+      const p = { x: ox + (i + 0.5) * OPEN_CELL, y: oy + (j + 0.5) * OPEN_CELL };
+      inside[j * nx + i] = pointInPolygon(p, m.ctx.poly) ? 1 : 0;
+      kept[j * nx + i] = m.ctx.keepFree.some((z) => pointInPolygon(p, z.poly)) ? 1 : 0;
+    }
+  g = { nx, ny, ox, oy, inside, kept };
+  openCache.set(m, g);
+  return g;
+}
+
+/**
+ * Radius (m) of the largest patch of floor away from every piece on the floor and every rug
+ * (walls do not count), on a 20 cm grid with a chamfer distance: the solver's cheap twin of
+ * `largestOpening` in the review.
+ */
+export function openRadius(m: Model): number {
+  const g = openGrid(m);
+  const { nx, ny } = g;
+  const d = new Float32Array(nx * ny).fill(1e9);
+  let any = false;
+  for (let k = 0; k < d.length; k++) if (g.kept[k]) d[k] = 0;
+  for (const u of m.units) {
+    if (!u.active) continue;
+    for (const n of u.nodes) {
+      if (!(isFloor(n) || isRug(n)) || n.box.hw <= 0) continue;
+      const r = Math.hypot(n.box.hw, n.box.hd);
+      const i0 = Math.max(0, Math.floor((n.box.x - r - g.ox) / OPEN_CELL));
+      const i1 = Math.min(nx - 1, Math.floor((n.box.x + r - g.ox) / OPEN_CELL));
+      const j0 = Math.max(0, Math.floor((n.box.y - r - g.oy) / OPEN_CELL));
+      const j1 = Math.min(ny - 1, Math.floor((n.box.y + r - g.oy) / OPEN_CELL));
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          if (distToBox(g.ox + (i + 0.5) * OPEN_CELL, g.oy + (j + 0.5) * OPEN_CELL, n.box) > 0) continue;
+          d[j * nx + i] = 0;
+          any = true;
+        }
+    }
+  }
+  if (!any) return 0;
+  const D = Math.SQRT2;
+  for (let j = 0; j < ny; j++)
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      let v = d[k];
+      if (i > 0) v = Math.min(v, d[k - 1] + 1);
+      if (j > 0) {
+        v = Math.min(v, d[k - nx] + 1);
+        if (i > 0) v = Math.min(v, d[k - nx - 1] + D);
+        if (i < nx - 1) v = Math.min(v, d[k - nx + 1] + D);
+      }
+      d[k] = v;
+    }
+  let best = 0;
+  for (let j = ny - 1; j >= 0; j--)
+    for (let i = nx - 1; i >= 0; i--) {
+      const k = j * nx + i;
+      let v = d[k];
+      if (i < nx - 1) v = Math.min(v, d[k + 1] + 1);
+      if (j < ny - 1) {
+        v = Math.min(v, d[k + nx] + 1);
+        if (i < nx - 1) v = Math.min(v, d[k + nx + 1] + D);
+        if (i > 0) v = Math.min(v, d[k + nx - 1] + D);
+      }
+      d[k] = v;
+      if (g.inside[k] && v > best) best = v;
+    }
+  return best * OPEN_CELL;
+}
+
+/** E6 in the search: a living or sleeping room should not keep a large patch without furniture. */
+export function openCost(m: Model): number {
+  if (!m.spread) return 0;
+  return OPEN_WEIGHT * Math.max(0, openRadius(m) - OPEN_SOFT);
 }
