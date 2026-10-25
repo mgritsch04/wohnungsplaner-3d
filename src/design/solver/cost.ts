@@ -13,6 +13,11 @@ import type { Model, Node, SoftRelation, Unit } from './model';
 import { usesWater } from '../../model/fixtures';
 import { doorSeed, sideStrip, wallStrip } from './room';
 
+/** How far a piece may reach out of the user's marked area (m) before it counts as outside. */
+export const USER_ZONE_SLACK = 0.6;
+/** How far a piece may graze an area the user keeps free (m). */
+const KEEP_FREE_SLACK = 0.15;
+
 /** Weight of one broken hard rule; amounts (overlap depth, distance outside) add to it. */
 export const HARD = 4;
 /** Overlaps up to this depth count as touching: below the plan's own checks (3 mm, see `placementIssues`). */
@@ -203,13 +208,18 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
     if (floor || rug) {
       for (const z of ctx.keepFree) {
         const d = overlapDepth(n.poly, z.poly);
-        if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'keep-free', items: [n.id], text: `${name(n)} steht im frei zu lassenden Bereich ${z.id}` }));
+        // the user draws areas by hand: grazing the edge is fine, standing in it is not
+        if (d > KEEP_FREE_SLACK) hard(1 + 10 * d, () => ({ rule: 'keep-free', items: [n.id], text: `${name(n)} steht im frei zu lassenden Bereich ${z.id}` }));
+        else if (d > EPS) c.soft += 1 + 10 * d;
       }
       const uz = m.zones.get(n.zone)?.userZone;
       const zp = uz ? ctx.userZones.get(uz) : undefined;
       if (zp && (n === u.main || floor)) {
+        // a marked area is a rough sketch (wish of G): a piece may reach past its edge, it is
+        // only left out when it lands clearly elsewhere
         const out = outsideAmount(n.poly, zp);
-        if (out > 0.02) hard(1 + 5 * out, () => ({ rule: 'user-zone', items: [n.id], text: `${name(n)} liegt nicht im markierten Bereich ${uz}` }));
+        if (out > USER_ZONE_SLACK) hard(1 + 5 * out, () => ({ rule: 'user-zone', items: [n.id], text: `${name(n)} liegt nicht im markierten Bereich ${uz}` }));
+        else if (out > 0.02) c.soft += 0.5 + 3 * out;
       }
     }
     if (rug) for (const s of ctx.swings) if (overlapDepth(n.poly, s.poly) > 0.02) c.soft += 0.3;

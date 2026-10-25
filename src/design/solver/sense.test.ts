@@ -116,6 +116,21 @@ describe('no large empty patch (E6)', () => {
   });
 });
 
+describe('marked areas are rough sketches', () => {
+  it('a desk that reaches a little past the area the user drew is still placed, not left out as missing', () => {
+    const base = rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const room: RoomAnalysis = { ...base, userZones: [{ id: 'Z1', zoneId: 'z1', purpose: 'Arbeitsplatz', keepFree: false, points: [{ x: 0, y: 0.5 }, { x: 0.8, y: 0.5 }, { x: 0.8, y: 1.3 }, { x: 0, y: 1.3 }] }] };
+    const E = -Math.PI / 2;
+    const p: RoomProgram = {
+      ...program(room, [{ ...item('desk', 'generic-desk-small', [0.3, 0.9, E]), required: true }, item('chair', 'generic-office-chair', [0.95, 0.9, Math.PI / 2])], [{ kind: 'wall', item: 'desk', wall: 'W4' }]),
+      zones: [{ id: 'z', function: 'Arbeiten', rect: { x0: 0, y0: 0.5, x1: 0.8, y1: 1.3 }, why: '', userZone: 'Z1' }],
+    };
+    const layout = solveRoom(room, p, { seed: 1 });
+    expect(layout.dropped.map((d) => d.id)).not.toContain('desk');
+    expect(byId(layout, 'desk').x).toBeLessThan(1.0);
+  });
+});
+
 describe('chairs at the table', () => {
   it('chairs Claude placed round the table without any relation stay at the table, not in a heap beside it', () => {
     const room = rectRoom(5, 4, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'N', at: 2.5 }] });
