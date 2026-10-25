@@ -17,7 +17,7 @@ import { analyzeFlat, flatSketch, roomSketch } from './analysis';
 import { roomConceptOf } from './concept/flatConcept';
 import { runConcept, TIMEOUTS, type CallLog, type ConceptRunResult } from './concept/run';
 import type { RoomProgramInput } from './concept/roomProgram';
-import { buildCritiquePrompt, parseCritique, type CritiqueInput } from './critique';
+import { buildCritiquePrompt, LOOK_ENOUGH, parseCritique, type CritiqueInput } from './critique';
 import { roomPlanSvg, roomTextMap, type RoomPlan } from './render';
 import { reviewFlat, reviewRoom, type ReviewInput } from './review';
 import { BALANCED } from './review/overallRules';
@@ -51,11 +51,24 @@ export interface FurnishRunInput {
   products?: CatalogItem[];
   /** Turns a room plan into a PNG; only where this runs in a browser. */
   toImage?: (plan: RoomPlan) => Promise<SampleImage>;
+  /**
+   * Pictures of the placed room in 3D, as the image review sees it (from the main door, cut at
+   * 1.20 m, and from above), for the look before handing over; only where the 3D view runs.
+   */
+  toRoomShots?: (room: ShotRoom) => Promise<SampleImage[] | undefined>;
   seed?: number;
   signal?: AbortSignal;
   onProgress?: (p: DesignRunProgress) => void;
   /** Overrides the time limits (tests). */
   timeouts?: { opus: number; sonnet: number };
+}
+
+/** One placed room, for `toRoomShots`. */
+export interface ShotRoom {
+  analysis: RoomAnalysis;
+  type: RoomType;
+  layout: Layout;
+  program: RoomProgram;
 }
 
 export interface FurnishRunResult extends FlatResult {
@@ -95,6 +108,14 @@ export function lookKeeps(before: RoomResult, after: RoomResult): boolean {
 
 /** Points the look may cost (#443). */
 export const LOOK_TOLERANCE = 4;
+/** Looks at the picture at most: a second one only while Claude rates its own room below `LOOK_ENOUGH`. */
+export const LOOK_ROUNDS = 2;
+
+/** Claude's own mark for the room it looked at (`"note"` in the answer), if it gave one. */
+export function lookNote(raw: unknown): number | null {
+  const n = (raw as { note?: unknown } | null)?.note;
+  return typeof n === 'number' && n >= 1 && n <= 10 ? n : null;
+}
 
 /** The pieces already in the room, as the walk-through and the room picture want them. */
 export const asPlaced = (pieces: ReturnType<typeof existingPieces>): PlacedItem[] => pieces.map((f) => ({ ...f, elevation: f.elevation ?? 0, zone: 'bestand' }));
@@ -121,52 +142,74 @@ function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, roun
 }
 
 /**
- * Stage 5 for one room: at most `MAX_ROUNDS` times, show Claude the placed room and let it
- * change the programme, then place and walk through again. Keeps the best round. Any error in a
- * round simply ends the critique: the room keeps what it already has.
+ * Stage 5 for one room. First, while the walk-through fails, at most `MAX_ROUNDS` rounds: show
+ * Claude the placed room and let it change the programme, then place and walk through again,
+ * keeping the best round. Then a main room that passes gets the look before handing over (#443):
+ * Claude sees the room as the image review does (3D from the door and from above, plus the plan),
+ * rates it, and improves the worst points; a second look follows while its own mark stays below
+ * `LOOK_ENOUGH`. A look replaces the room only if `lookKeeps`. Any error simply ends the critique:
+ * the room keeps what it already has.
  */
 async function critique(input: FurnishRunInput, work: RoomWork, first: RoomResult, image: (r: RoomResult) => Promise<SampleImage | undefined>, calls: CallLog[]): Promise<RoomResult> {
   let best = first;
-  let current = first;
-  // a main room that passes at once still gets one look at its picture (#443), unless it should be fast
-  const look = goodEnough(first) && LOOK_TYPES.has(work.type) && input.wishes.quality !== 'fast';
-  for (let round = 1; round <= MAX_ROUNDS && (!goodEnough(best) || (look && round === 1)); round++) {
-    const model = input.wishes.quality === 'fast' ? 'sonnet' : 'opus';
-    const label = `Kritik: ${work.analysis.name} (${look ? 'Blick' : `Runde ${round}`})`;
+  let rounds = 0;
+  const model = input.wishes.quality === 'fast' ? 'sonnet' : 'opus';
+  /** One critique call; null when it failed (the critique ends there). */
+  const ask = async (from: RoomResult, round: number, look: boolean): Promise<{ result: RoomResult; note: number | null } | null> => {
+    const label = `Kritik: ${work.analysis.name} (${look ? (round === 1 ? 'Blick' : `Blick ${round}`) : `Runde ${round}`})`;
     const log: CallLog = { label, model, round, attempts: 1, ms: 0, problems: [] };
     const t0 = Date.now();
     calls.push(log);
     try {
-      const img = await image(current);
+      const img = await image(from);
+      const views = look && img && input.toRoomShots ? await input.toRoomShots({ analysis: work.analysis, type: work.type, layout: from.layout, program: from.program }).catch(() => undefined) : undefined;
       // the look is about what the picture shows; without one the rules have said all there is
       if (look && !img) {
         calls.pop();
-        break;
+        return null;
       }
       const ci: CritiqueInput = {
         base: work.base,
-        program: current.program,
-        layout: current.layout,
-        review: current.review,
+        program: from.program,
+        layout: from.layout,
+        review: from.review,
         round,
         ...(look ? { look } : {}),
-        ...(img ? { image: img } : { textMap: roomTextMap({ analysis: work.analysis, layout: current.layout, program: current.program, existing: asPlaced(work.existing), ...(work.base.products ? { catalog: work.base.products } : {}) }) }),
+        ...(views?.length ? { views: views.length } : {}),
+        ...(img ? { image: img } : { textMap: roomTextMap({ analysis: work.analysis, layout: from.layout, program: from.program, existing: asPlaced(work.existing), ...(work.base.products ? { catalog: work.base.products } : {}) }) }),
       };
-      const opts: SampleOptions = { model, modelTier: model === 'opus' ? 'complex' : 'default', label, signal: input.signal, ...(img ? { images: [img] } : {}) };
+      const images = img ? [...(views ?? []), img] : [];
+      const opts: SampleOptions = { model, modelTier: model === 'opus' ? 'complex' : 'default', label, signal: input.signal, ...(images.length ? { images } : {}) };
       const raw = await withTimeout(input.sample.json(buildCritiquePrompt(ci), opts), (input.timeouts ?? TIMEOUTS)[model], input.signal);
       const checked = parseCritique(raw, ci);
       log.problems = checked.problems;
-      current = placeAndReview(work, checked.value, (input.seed ?? 1) + round, round);
-      best = look ? (lookKeeps(best, current) ? current : best) : better(best, current);
+      rounds++;
+      return { result: placeAndReview(work, checked.value, (input.seed ?? 1) + rounds, rounds), note: look ? lookNote(raw) : null };
     } catch (e) {
       log.error = codeOf(e);
       if (isCancel(e)) throw e;
-      break;
+      return null;
     } finally {
       log.ms = Date.now() - t0;
     }
+  };
+  let current = first;
+  for (let round = 1; round <= MAX_ROUNDS && !goodEnough(best); round++) {
+    const got = await ask(current, round, false);
+    if (!got) return { ...best, rounds };
+    current = got.result;
+    best = better(best, current);
   }
-  return { ...best, rounds: current.rounds };
+  if (goodEnough(best) && LOOK_TYPES.has(work.type) && input.wishes.quality !== 'fast') {
+    for (let round = 1; round <= LOOK_ROUNDS; round++) {
+      const got = await ask(best, round, true);
+      if (!got) break;
+      if (lookKeeps(best, got.result)) best = got.result;
+      // Claude rates the room it looked at, before its changes: good enough means hand it over
+      if (got.note !== null && got.note >= LOOK_ENOUGH) break;
+    }
+  }
+  return { ...best, rounds };
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
