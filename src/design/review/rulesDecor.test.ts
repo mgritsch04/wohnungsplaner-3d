@@ -197,6 +197,12 @@ describe('E Gesamteindruck', () => {
     expect(has(run('#f0f0f0'), 'E4')).toBe(false);
     expect(has(run('#d4202a'), 'E4')).toBe(true);
   });
+  it('E4 more than three woods in a room are light (SL3, #436)', () => {
+    const items = [put('generic-sofa-3', { id: 'sofa', x: 2.5, y: 3.5, face: 'N' }), put('generic-coffee-table', { id: 'ct', x: 2.5, y: 2.5, face: 'N' }), put('generic-shelf-80', { id: 'sh', x: 0.5, y: 0.15, face: 'S' }), put('generic-side-table', { id: 'st', x: 4, y: 3.5, face: 'N' })];
+    const labels = (woods: string[]) => living(items, { program: prog({ items: ['sofa', 'ct', 'sh', 'st'].map((id, k) => ({ id, catalogId: items[k].catalogId, zone: 'z', why: '', label: `Teil aus ${woods[k]}` })) }) });
+    expect(has(labels(['Eiche', 'Nussbaum', 'Buche', 'Kiefer']), 'E4', /Holzarten/)).toBe(true);
+    expect(has(labels(['Eiche hell', 'Eiche geölt', 'Nussbaum', 'Walnuss']), 'E4', /Holzarten/)).toBe(false);
+  });
   it('E5 the eye-catcher is hidden from the main door', () => {
     const bed = put('generic-bed-140', { x: 2.975, y: 1.6, face: 'W' });
     const run = (blocker: boolean) => review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'bedroom', items: [bed, ...(blocker ? [put('generic-wardrobe-100', { x: 1.2, y: 2.6, face: 'N' })] : [])] });

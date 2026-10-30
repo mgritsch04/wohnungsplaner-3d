@@ -119,7 +119,8 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
   const needs = roomNeeds(rc, room.area);
   const own = preselect(input.products ?? [], [rc.type], 0, MAX_ROOM_PRODUCTS);
   const zones = room.userZones.filter((z) => !z.keepFree).map((z) => z.id);
-  const palette = concept.style.palette.map((c) => `${c.name} ${c.hex}`).join(', ');
+  const SHARE = { haupt: 'Hauptfarbe 60 %', zweit: 'Zweitfarbe 30 %', akzent: 'Akzent 10 %', neutral: 'neutral' } as const;
+  const palette = concept.style.palette.map((c) => `${c.name} ${c.hex}${c.role ? ` (${SHARE[c.role]})` : ''}`).join(', ');
   return `Du bist eine erfahrene Innenarchitektin und richtest jetzt EINEN Raum ein, passend zum Wohnkonzept. Ziel: ein Plan, nach dem man den Raum wirklich so einrichten kann – funktional, mit kurzen Wegen, gutem Licht und genug Stauraum, stimmig im Stil der Wohnung und so, dass man sich zu Hause fühlt. Arbeite wie im Büro, in dieser Reihenfolge:
 1. Raum lesen: Wo sind Türen und Fenster, welche Wege laufen durch, welche Wände sind frei, woher kommt das Tageslicht (siehe Raumfakten), welche Wände sind laut, was sieht man beim Hereinkommen?
 2. Zonen festlegen: welche Bereiche, wo genau (Rechteck in Raumkoordinaten), warum dort. Die Wege zwischen den Türen gehören zu keiner Möbelzone. Die Zonen verteilen sich über den Raum; jede Zone hat ein Ziel (Blickpunkt, Fenster, Licht).
@@ -131,7 +132,7 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
 8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
-Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''} Palette: ${palette}.
+Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.
 Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Nicht hierher: ${rc.avoid.join(', ') || '–'}.
 In anderen Räumen (hier NICHT planen): ${elsewhere.join('; ') || '–'}
 ${room.passThrough ? 'Dieser Raum ist ein Durchgangszimmer: die Wege zwischen seinen Türen bleiben 90 cm breit frei.\n' : ''}

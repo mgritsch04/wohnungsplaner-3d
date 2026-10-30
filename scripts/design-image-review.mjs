@@ -21,9 +21,10 @@ const CHECKS = [
   ['wege', 'Wege frei: Man kommt von der Tür überall hin, Türen und Fenster bleiben frei, nichts versperrt den Durchgang.'],
   ['funktionen', 'Funktionen erkennbar: Man sieht sofort, wo man schläft, sitzt, isst, kocht oder arbeitet; jede Zone ist vollständig.'],
   ['blickfang', 'Blickfang: Es gibt einen klaren Mittelpunkt (Sofa mit Teppich, Bett mit Kopfteil, Esstisch mit Leuchte), auf den der Raum ausgerichtet ist.'],
-  ['proportionen', 'Proportionen: Die Möbel passen in Größe und Menge zum Raum, weder leer noch vollgestellt; Abstände wirken bewusst.'],
+  ['proportionen', 'Proportionen: Die Möbel passen in Größe und Menge zum Raum, weder leer noch vollgestellt; Abstände wirken bewusst. Ein freier Laufweg von der Tür zu den Zonen ist gewollt und keine leere Fläche.'],
   ['licht', 'Licht: Grundlicht und Leselicht oder Arbeitslicht sind da, wo man sie braucht; Fenster werden genutzt, nicht zugestellt.'],
   ['ordnung', 'Ordnung: Möbel stehen gerade an Wänden oder bewusst frei, Gruppen sind geschlossen, nichts steht zufällig herum.'],
+  ['stil', 'Stil: Farben, Materialien und Formen passen zusammen (eine Hauptfarbe, eine Zweitfarbe, ein Akzent; wenige Holztöne, die sich wiederholen; Rundes zu Eckigem, Textur zu glatten Flächen); der Raum wirkt aus einem Guss, nicht zusammengewürfelt.'],
   ['abgabe', '„Würde eine Innenarchitektin das so abgeben?“ – als Ganzes stimmig, wohnlich und durchdacht.'],
 ];
 

@@ -216,9 +216,15 @@ export interface FlatAnalysis {
 export interface StylePlan {
   /** Guiding idea in one or two sentences. */
   idea: string;
+  /** Woods, one metal, textiles that recur through the flat (SL3). */
   materials: string[];
-  palette: { name: string; hex: string }[];
+  /** Colours with their share (SL2): main 60 %, second 30 %, accent 10 %, or a neutral. */
+  palette: { name: string; hex: string; role?: PaletteRole }[];
+  /** Form language in one sentence: lines, legs, round against square, textures (SL4, SL5). */
+  forms?: string;
 }
+
+export type PaletteRole = 'haupt' | 'zweit' | 'akzent' | 'neutral';
 
 /** A function of the flat (from the wishes and the room types) and the one room it goes to. */
 export interface FunctionAssignment {

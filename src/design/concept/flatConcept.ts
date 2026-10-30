@@ -8,7 +8,7 @@
 import { clipLines, type DesignWishes, MAX_FIELD, apartmentPalette } from '../../assistant/design';
 import type { Furniture, Project } from '../../model/schema';
 import { guessRoomType, ROOM_TYPES } from '../../suggest/furnishing';
-import type { FlatAnalysis, FlatConcept, FunctionAssignment, RoomAnalysis, RoomConcept, RoomType, StylePlan } from '../types';
+import type { FlatAnalysis, FlatConcept, FunctionAssignment, RoomAnalysis, PaletteRole, RoomConcept, RoomType, StylePlan } from '../types';
 import { type Checked, hex, key, SANITARY, shapeOf, str, strList } from './common';
 import { isCooking, isSleeping, SINGLE_FUNCTIONS } from './needs';
 
@@ -50,8 +50,11 @@ export function parseRoomType(v: unknown): RoomType | null {
   return guess === 'other' ? (s === 'sonstiges' ? 'other' : null) : guess;
 }
 
+/** Shares of the palette (SL2). */
+const ROLES: PaletteRole[] = ['haupt', 'zweit', 'akzent', 'neutral'];
+
 const FORMAT = `{"living":"2–3 Sätze",
- "style":{"idea":"Leitidee in einem Satz","materials":["…"],"palette":[{"name":"…","hex":"#rrggbb"}]},
+ "style":{"idea":"Leitidee in einem Satz","materials":["Eiche hell geölt","…"],"forms":"ein Satz","palette":[{"name":"…","hex":"#rrggbb","role":"haupt"}]},
  "functions":[{"function":"Schlafen","room":"<Raumname>","why":"…","wishes":[2]}],
  "rooms":[{"room":"<Raumname>","type":"bedroom","role":"ein Satz","functions":["Schlafen","Kleidung"],"anchors":["Doppelbett 160 mit Kopfteil an der ruhigen Wand"],"accent":"#rrggbb","avoid":["…"]}]}`;
 
@@ -76,7 +79,7 @@ Aufgabe:
 2. Funktionen verteilen: Ordne jede Funktion GENAU EINEM Raum zu, mit Grund. Funktionen sind zum Beispiel Schlafen, Kleidung, Kochen, Essen, Sitzen/Fernsehen, Lesen, Arbeiten/PC, Gästeschlafplatz, Vorräte/Stauraum, Garderobe/Schuhe, Wäsche, Körperpflege, Draußen sitzen, dazu jede Funktion aus den Wünschen. "wishes" nennt die Nummern der Wünsche, die diese Funktion erfüllt.
 3. Esstisch, Gästeschlafplatz und Küchenzeile gibt es in der Wohnung nur einmal. Plane nichts doppelt, was niemand doppelt braucht (zwei Esstische, zwei Gästebetten, zwei Fernsehplätze).
 4. Je Raum: Raumtyp (${ROOM_TYPE_IDS.join(', ')}; ein WC ist bath), Rolle in einem Satz, Funktionen, 1–3 Ankermöbel (das, worum der Raum gebaut wird), Akzentfarbe aus der Palette und was dort ausdrücklich NICHT hinkommt. Ein Schlafzimmer bekommt die Funktion Schlafen. Jeder Raum der Wohnung kommt genau einmal vor, mit seinem Namen wie oben.
-5. Stil: Leitidee in einem Satz, Materialien, Palette mit 4–5 Farben (Hex).
+5. Stil wie ein Profi, für die ganze Wohnung (SL1): Leitidee in einem Satz. Palette mit 4–5 Farben (Hex), jede mit Rolle: "haupt" (60 %: Wände, große Flächen, große Möbel), "zweit" (30 %: Möbel, Textilien), "akzent" (10 %: Kissen, Sessel, Bild, Vase), dazu "neutral" (SL2). Materialien, die wiederkehren: höchstens 2–3 Holztöne, eine Metallfarbe, 2–3 Textilien (SL3). "forms": Formensprache in einem Satz, z. B. schlanke Beine, Rundes zu Eckigem, Texturen zu glatten Flächen (SL4, SL5). Daran richten sich später alle Möbel und die echten Produkte aus.
 6. Grenzen: WC, Waschtisch, Dusche und Wanne sind fest eingebaut und werden nicht dazugeplant und nicht verschoben. Nur in einem WC ohne Waschbecken kommt ein kleines Handwaschbecken dazu. Ein Durchgangszimmer behält seinen Weg frei. Eine vorhandene Küche bleibt, wie sie ist.
 
 Antworte nur mit JSON in dieser Form:
@@ -123,12 +126,14 @@ export function parseFlatConcept(raw: unknown, input: FlatConceptInput): Checked
     .map((c) => {
       const e = (c ?? {}) as Record<string, unknown>;
       const h = hex(e.hex ?? (typeof c === 'string' ? /#[0-9a-f]{3,6}/i.exec(c)?.[0] : undefined));
-      return h ? { name: str(e.name ?? (typeof c === 'string' ? c.replace(/#[0-9a-f]{3,6}/i, '') : ''), 40) || h, hex: h } : null;
+      const role = ROLES.find((r) => r === str(e.role, 20).toLowerCase());
+      return h ? { name: str(e.name ?? (typeof c === 'string' ? c.replace(/#[0-9a-f]{3,6}/i, '') : ''), 40) || h, hex: h, ...(role ? { role } : {}) } : null;
     })
-    .filter((c): c is { name: string; hex: string } => !!c)
+    .filter((c): c is StylePlan['palette'][number] => !!c)
     .slice(0, 8);
   if (!palette.length) problems.push('"style.palette" braucht 4–5 Farben mit gültigem Hex-Wert (#rrggbb).');
-  const style: StylePlan = { idea: str(s.idea), materials: strList(s.materials, 80, 12), palette };
+  const forms = str(s.forms, 300);
+  const style: StylePlan = { idea: str(s.idea), materials: strList(s.materials, 80, 12), palette, ...(forms ? { forms } : {}) };
   if (!style.idea) problems.push('"style.idea" (Leitidee) fehlt.');
 
   // rooms

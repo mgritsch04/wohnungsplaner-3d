@@ -197,6 +197,36 @@ export function checkPalette(ctx: RoomCtx): void {
   }
 }
 
+/** Wood words in a label, by tone (Nussbaum and Walnuss are one wood). */
+const WOODS: [RegExp, string][] = [
+  [/eiche/i, 'Eiche'],
+  [/nuss|walnu/i, 'Nussbaum'],
+  [/buche/i, 'Buche'],
+  [/kiefer|pinie/i, 'Kiefer'],
+  [/birke/i, 'Birke'],
+  [/esche/i, 'Esche'],
+  [/teak/i, 'Teak'],
+  [/akazie/i, 'Akazie'],
+  [/bambus/i, 'Bambus'],
+  [/kirsch/i, 'Kirsche'],
+  [/ahorn/i, 'Ahorn'],
+];
+
+/** E4 (L, SL2, SL3): at most two or three woods and three or four colours (beside neutrals) in a room. */
+export function checkStyle(ctx: RoomCtx): void {
+  if (!ctx.program) return;
+  const woods = new Set<string>();
+  for (const p of ctx.program.items) for (const [re, name] of WOODS) if (p.label && re.test(p.label)) woods.add(name);
+  if (woods.size > 3) ctx.add('E4', 'L', `Im Raum mischen sich ${woods.size} Holzarten (${[...woods].join(', ')}), stimmig sind höchstens zwei bis drei.`, [], undefined);
+  const colours: [number, number, number][] = [];
+  for (const p of ctx.program.items) {
+    const c = p.color ? rgb(p.color) : null;
+    if (!c || Math.max(...c) - Math.min(...c) < 28 || !ctx.byId(p.id)) continue;
+    if (!colours.some((q) => Math.hypot(c[0] - q[0], c[1] - q[1], c[2] - q[2]) < 60)) colours.push(c);
+  }
+  if (colours.length > 5) ctx.add('E4', 'L', `Im Raum stehen ${colours.length} deutlich verschiedene Farben, ruhig wirken drei bis vier neben Weiß, Grau und Holz (60/30/10).`, [], undefined);
+}
+
 /** E5 (L): the eye-catcher is hidden from the main door. */
 export function checkFocus(ctx: RoomCtx): void {
   const door = ctx.doors.find((d) => d.label === ctx.an.mainDoor);
