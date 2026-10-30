@@ -56,6 +56,12 @@ Gemeinsam: `types.ts` (Schnittstellen aller Stufen), `coords.ts` (Raumkoordinate
   - `against` wird `wall`, Ecke `E3` wird `corner`
   - Was nicht passt (Türen als Ziel), fällt mit Hinweis weg; der Startplatz trägt die Idee weiter.
 - Tests mit den aufgezeichneten Antworten (`fixtures/recorded/`) und einer Fake-Antwort-Funktion; `concept/testFlats.ts` baut die Eingaben der Testwohnungen.
+- **Wie ein Profi (mgritsch04/wohnungsplaner-3d#436):**
+  - `rulebook.ts` ist das Regelwerk als eine Quelle: Regeln mit Kennung (W2, L3, SL2 …), Maß, Grund und Quelle. Daraus speisen sich Prompt (`rulebookPrompt`), Bausteine und Begehung. Lesbar ist es in `docs/EINRICHTUNG_REGELWERK.md` (erzeugt aus `rulebookMarkdown()`).
+  - `concept/groups.ts` (`completeGroups`) macht nach dem Lesen jedes Programms die Möbelgruppen vollständig und verbindet sie fest: Sitzgruppe, Schlafplatz, Essplatz, Arbeitsplatz und Leseecke. Was Claude plante, bleibt. Neben das Sofa kommen nur so viele Teile, wie die Zone daneben fasst (`armSlots`). In kleinen oder geteilten Räumen gibt es weniger (`GroupScope`).
+  - `concept/roomFacts.ts` liefert die Raumfakten für den Prompt: Tageslicht je Fenster nach Himmelsrichtung, laute Wände (Bad, Küche, Stiegenhaus) und die Ziel-Stellfläche.
+  - Das Raumprogramm arbeitet in acht Schritten, vom Raum lesen bis zur Selbstprüfung je Kennung. Je Möbel nennt es Material, Farbe und Form in `label` und die Pflicht-Funktionen in `features`. Kann das Modell Bilder sehen, bekommt es den leeren Raum als Bild (`ConceptRunInput.roomImage`).
+  - Das Wohnkonzept plant den Stil: Palette mit Rollen (`haupt`, `zweit`, `akzent`, `neutral`; 60/30/10), wiederkehrende Materialien und Formensprache (`StylePlan.forms`).
 
 ## Stufe 4 benutzen (`review/`)
 
@@ -104,6 +110,8 @@ Ein Raum, den die Begehung nicht besteht (ein schwerer Befund oder unter 85 Punk
 - `proposalFrom(result, project, roomTypes?, catalog?)` macht aus dem Lauf den `DesignProposal`, den das Panel kennt: je Raum die Lesart des Programms, der Leitfaden aus dem Wohnkonzept, die Befunde der Planprüfung und die Möbel. Gleiche Teile in derselben Zone sind eine Zeile mit Anzahl; `pickItems(pick)` nennt die Programmteile dahinter.
 - `placedRooms(result, roomTypes?)` gibt die aufgestellten Räume für Vorschau und Übernahme; `layoutSuggestion` daraus die Möbel fürs Projekt.
 - `withProduct(result, project, swap, catalog, roomTypes?, seed?)` ist Stufe 6: Das gefundene Produkt kommt ins Raumprogramm, der Raum wird damit neu aufgestellt und neu begangen. Bringt das einen neuen schweren Befund oder verliert ein Teil seinen Platz, wird das Produkt nicht genommen (`taken: false`, `why`) – ein echter Schrank ist tiefer als sein Platzhalter und kann eine Tür blockieren.
+- **Ideal und Kaufbar (#436):** Das Panel hält Claudes Plan als `ideal` fest (Store `designStore.ts`). Gefundene Produkte machen `result`/`proposal` zur Fassung „Kaufbar“: Der Raum wird mit ihnen neu aufgestellt. Passt der beste Treffer nicht, wird der nächste versucht. Je Möbel steht die Abweichung vom Ideal (`deviationText`), je Raum die Punkte beider Fassungen. Die Suche (`buildFindPrompt` mit `ProductLook`) nennt Optik, Funktionen und den Stil der Wohnung; Claude bewertet die Treffer nach Maßen, Optik, Funktionen und Stil (`fit`), der passendste kommt zuerst.
+- `furnishingSheet(result, names, catalog?, roomIds?, variant?)` (`apply/sheet.ts`) schreibt das Einrichtungsblatt als Markdown: je Raum Zonen und Wege, die Möbel mit Maßen, Wand, Abstand von der Ecke, Blickrichtung und Grund, außerdem Leuchten mit Höhe und empfohlener Lichtfarbe. Im Panel liegt es unter „Einrichtungsblatt“.
 - Im Panel (`src/assistant/DesignPanel.tsx`) steht der neue Weg unter „Verfahren“ als **Wohnkonzept** (Voreinstellung); **Möbelliste** ist der bisherige Weg und bleibt als Rückfall. Während des Laufs zeigt der Knopf die Stufe, je Raum stehen Lesart, Leitfaden, Begehung mit Punkten und die Begründung an jedem Möbel; die Vorschau zeigt die Zonen des Programms im 2D-Plan.
 
 ## Konventionen
