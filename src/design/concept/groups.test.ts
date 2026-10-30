@@ -90,6 +90,17 @@ describe('furniture groups (#436)', () => {
     expect(rel(p, 'on', ids(p, 'generic-table-lamp')[0])).toMatchObject({ target: 'd' });
   });
 
+  it('hangs curtains as a pair at every window of a bedroom without them, in the zone by the window (R8)', () => {
+    const plan: RoomProgram = { ...program([item('bed', 'generic-bed-160', 'z', { required: true }), item('c', 'generic-curtain', 'z')], [{ kind: 'window', item: 'c', window: 'F1', place: 'over' }]), zones: [{ id: 'z', function: 'Schlafen', rect: { x0: 0, y0: 0, x1: 3, y1: 4 }, why: '' }, { id: 'k', function: 'Kleidung', rect: { x0: 3.2, y0: 0, x1: 4, y1: 4 }, why: '' }] };
+    const windows = [{ id: 'F1', x: 1, y: 0, rotation: 0 }, { id: 'F2', x: 4, y: 2, rotation: Math.PI / 2 }];
+    const { program: p } = completeGroups(plan, 'bedroom', 14, 2, [], windows);
+    const added = p.items.filter((i) => i.catalogId === 'generic-curtain' && i.id !== 'c');
+    expect(added.map((i) => rel(p, 'window', i.id))).toEqual([expect.objectContaining({ window: 'F2', place: 'over' }), expect.objectContaining({ window: 'F2', place: 'over' })]);
+    expect(added.every((i) => i.zone === 'k')).toBe(true);
+    // a kitchen gets none
+    expect(completeGroups(plan, 'kitchen', 14, 2, [], windows).program.items.filter((i) => i.catalogId === 'generic-curtain')).toHaveLength(1);
+  });
+
   it('leaves baths, halls and balconies as planned', () => {
     const plan = program([item('sofa', 'generic-sofa-2')]);
     expect(completeGroups(plan, 'balcony', 6, 1).program).toBe(plan);

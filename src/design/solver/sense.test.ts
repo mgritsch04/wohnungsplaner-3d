@@ -270,6 +270,21 @@ describe('kitchen', () => {
     }
   });
 
+  it('a 40 cm module gets its wall cabinet, every wall cabinet a light strip under its front edge (K5)', () => {
+    const room = rectRoom(5, 3, { doors: [{ wall: 'S', at: 2.5 }] });
+    const layout = solveRoom(room, withRun(room, ['generic-k-fridge', 'generic-k-base-40', 'generic-k-sink-80', 'generic-k-dishwasher', 'generic-k-oven', 'generic-k-base-60']), { seed: 1 });
+    const cabinets = layout.items.filter((i) => /^generic-k-wall-/.test(i.catalogId));
+    expect(cabinets.map((c) => c.catalogId)).toContain('generic-k-wall-40');
+    for (const c of cabinets) {
+      const light = layout.items.find((i) => i.catalogId === 'generic-k-light' && i.parent === c.id);
+      expect(light, c.id).toBeDefined();
+      expect(light!.elevation + light!.height).toBeCloseTo(c.elevation);
+      expect(light!.width).toBeLessThan(c.width);
+      // under the front edge: further from the wall than the cabinet's middle
+      expect(light!.y).toBeGreaterThan(c.y);
+    }
+  });
+
   it('an L-shaped kitchen (two runs) gets one cooktop and one hood', () => {
     const room = rectRoom(4, 3, { doors: [{ wall: 'S', at: 2 }] });
     const p: RoomProgram = {

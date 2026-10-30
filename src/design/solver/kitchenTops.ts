@@ -4,7 +4,8 @@
  * (an L-shaped kitchen has two runs, but one cooktop), on the oven, else on a base module, where
  * it keeps 60 cm of worktop to the sink, 30 cm beside it free of tall units and walls, and stays
  * out from under a window (A4). The hood hangs above it unless a window is there. Wall cabinets
- * hang over the other base modules wherever the wall above the worktop is free.
+ * hang over the other base modules wherever the wall above the worktop is free, each with a light
+ * strip under its front edge (K5: work light in front of the cook, not a ceiling light behind).
  */
 import { add, pointInPolygon, scale } from '../../model/vec';
 import type { PlacedItem, WallInfo } from '../types';
@@ -17,6 +18,8 @@ const COOKTOP = 'generic-k-cooktop';
 const HOOD = 'generic-k-hood-60';
 const WALL_60 = 'generic-k-wall-60';
 const WALL_80 = 'generic-k-wall-80';
+const WALL_40 = 'generic-k-wall-40';
+const LIGHT = 'generic-k-light';
 /** Floor modules a wall cabinet may hang over. */
 const UNDER_WALL = new Set(['base', 'sink', 'dishwasher', 'oven']);
 
@@ -62,13 +65,19 @@ export function kitchenTops(m: Model): PlacedItem[] {
   for (const run of runs) {
     let k = 0;
     for (const n of run.mods) {
-      if (hung.has(n.id) || !UNDER_WALL.has(typeOf(n)) || n.spec.width < 0.59) continue;
-      const spec = specOf(n.spec.width >= 0.79 ? WALL_80 : WALL_60, ctx.catalog);
+      if (hung.has(n.id) || !UNDER_WALL.has(typeOf(n)) || n.spec.width < 0.39) continue;
+      const spec = specOf(n.spec.width >= 0.79 ? WALL_80 : n.spec.width >= 0.59 ? WALL_60 : WALL_40, ctx.catalog);
       if (!spec || spec.elevation + spec.height > ctx.analysis.height - 0.02) continue;
       const t = alongWall(run.w, n.box);
       const box = boxOnWall(run.w, t, spec.width, spec.depth, 0.002);
       if (!wallFree(run.w, t, spec.width, spec.elevation, spec.elevation + spec.height) || clash(box, spec.elevation, spec.elevation + spec.height)) continue;
-      out.push(placed(`${run.u.id}-wall${++k}`, spec.item.id, spec, n, box, spec.elevation, n.id));
+      const id = `${run.u.id}-wall${++k}`;
+      out.push(placed(id, spec.item.id, spec, n, box, spec.elevation, n.id));
+      const light = specOf(LIGHT, ctx.catalog);
+      if (!light) continue;
+      const width = spec.width - 0.04;
+      const strip = boxOnWall(run.w, t, width, light.depth, spec.depth - light.depth - 0.02);
+      out.push(placed(`${id}-licht`, LIGHT, { ...light, width }, n, strip, spec.elevation - light.height, id));
     }
   }
   return out;
