@@ -10,7 +10,7 @@ import { addRectRoom } from '../model/operations';
 import { jsonFromText, localSample, type McpRuntime } from './claude';
 import { EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, realProducts, swapPick } from './design';
 import { summarizePlan } from './planSummary';
-import { browserTools, buildFindPrompt, foundId, foundToCatalog, parseFound, replaceWithFound, searchTargets, shopOf } from './productSearch';
+import { browserTools, buildFindPrompt, deviationText, foundId, foundToCatalog, parseFound, replaceWithFound, searchTargets, shopOf } from './productSearch';
 
 const SOFA = PLACEHOLDERS.find((c) => c.id === 'generic-sofa-3')!;
 
@@ -81,6 +81,33 @@ describe('Produktsuche durch Claude (#350, Stufe 3)', () => {
     expect(buildFindPrompt({ catalogId: 'x', reason: '', placeholder: true, label: 'x', search: 'x' }, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R')).toContain('Websuche');
     expect(prompt).toContain('BEIDEN Shops');
     expect(buildFindPrompt({ catalogId: 'x', reason: '', placeholder: true, label: 'x', search: 'x' }, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R')).not.toContain('BEIDEN');
+  });
+
+  it('Suche nach Optik, Funktionen und Stil der Wohnung (#436): Treffer bewertet, der passendste zuerst', () => {
+    const spec = { catalogId: 'generic-sofa-3', reason: 'Gäste schlafen hier.', placeholder: true, label: 'Schlafsofa, Leinen salbeigrün, schmale Eichenfüße', search: 'Schlafsofa', color: '#8a9a7b', features: ['Schlaffunktion', 'Bettkasten'] };
+    const look = { idea: 'Ruhiges Skandi mit warmem Holz.', materials: ['Eiche hell', 'Leinen', 'schwarzes Metall'], forms: 'Schlanke Beine, Rundes zu Eckigem.', palette: ['Kalkweiß #f2efe8 (Hauptfarbe 60 %)', 'Salbei #8a9a7b (Zweitfarbe 30 %)'], accent: '#c27c4e' };
+    const prompt = buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'both', 'web', 'Wohnzimmer', null, look);
+    expect(prompt).toContain('Optik dieses Stücks: Schlafsofa, Leinen salbeigrün, schmale Eichenfüße, Farbe #8a9a7b. Muss haben: Schlaffunktion, Bettkasten.');
+    expect(prompt).toContain('Materialien: Eiche hell, Leinen, schwarzes Metall.');
+    expect(prompt).toContain('Salbei #8a9a7b (Zweitfarbe 30 %)');
+    expect(prompt).toContain('"fit"');
+    // without the concept the functions still go along
+    expect(buildFindPrompt(spec, SOFA, EMPTY_WISHES, 'ikea', 'web', 'R')).toContain('Muss haben: Schlaffunktion, Bettkasten.');
+    const hit = (name: string, fit: unknown, abweichung = '') => ({ name, url: `https://www.ikea.com/at/de/p/${name}`, price: 499, width_cm: 210, depth_cm: 90, height_cm: 80, why: '', fit, abweichung });
+    const found = parseFound({ products: [hit('a', { masse: 5, optik: 2, funktionen: 1, stil: 3 }), hit('b', { masse: 4, optik: 4, funktionen: 5, stil: 4 }, 'grau statt salbeigrün')] });
+    expect(found.map((f) => f.name)).toEqual(['b', 'a']);
+    expect(found[0]).toMatchObject({ fit: 4.4, deviation: 'grau statt salbeigrün' });
+    expect(deviationText({ width: 2.2, depth: 0.88, height: 0.85 }, { width: 2.1, depth: 0.9, height: 0.82 }, 'grau statt salbeigrün')).toBe('10 cm breiter, 3 cm höher; grau statt salbeigrün');
+  });
+
+  it('Gefundenes Produkt behält Zone und Programmteile der Zeile (#436)', () => {
+    const p = createEmptyProject();
+    addRectRoom(p, { x: 0, y: 0, width: 4, depth: 4, name: 'Wohnzimmer', thickness: 0.12, height: 2.6 });
+    const r = parseDesignAnswer({ rooms: [{ room: 'R1', items: [{ catalogId: 'generic-sofa-3', label: 'Sofa', search: 'Sofa', reason: 'x' }] }] }, summarizePlan(p), [p.rooms[0].id], []);
+    const line = { ...r.rooms[0].picks[0], zone: 'sitzen', items: ['sofa'] };
+    const withLine = { ...r, rooms: [{ ...r.rooms[0], picks: [line] }] };
+    const next = replaceWithFound(withLine, p.rooms[0].id, 0, [{ id: 'found-a', why: '', deviation: '10 cm breiter' }]).rooms[0].picks[0];
+    expect(next).toMatchObject({ catalogId: 'found-a', zone: 'sitzen', items: ['sofa'], deviation: '10 cm breiter' });
   });
 
   it('Browser-Werkzeuge öffnen nur Shop-Seiten und liefern gekürzten Text', async () => {

@@ -15,7 +15,7 @@ import { add, dot, pointInPolygon, scale, sub, type Vec2 } from '../../model/vec
 import { fromRoomCm, parseSide, rotationForSide, toRoomCm } from '../coords';
 import type { FlatConcept, KitchenRun, ProgramItem, ProgramZone, RoomAnalysis, RoomConcept, RoomProgram, RoomType } from '../types';
 import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, strList, type Thing, thingOf } from './common';
-import { existingIn, roomConceptOf, wantsHandBasin } from './flatConcept';
+import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
 import { rulebookPrompt } from '../rulebook';
 import { completeGroups, groupLines } from './groups';
@@ -119,8 +119,7 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
   const needs = roomNeeds(rc, room.area);
   const own = preselect(input.products ?? [], [rc.type], 0, MAX_ROOM_PRODUCTS);
   const zones = room.userZones.filter((z) => !z.keepFree).map((z) => z.id);
-  const SHARE = { haupt: 'Hauptfarbe 60 %', zweit: 'Zweitfarbe 30 %', akzent: 'Akzent 10 %', neutral: 'neutral' } as const;
-  const palette = concept.style.palette.map((c) => `${c.name} ${c.hex}${c.role ? ` (${SHARE[c.role]})` : ''}`).join(', ');
+  const palette = concept.style.palette.map(paletteText).join(', ');
   return `Du bist eine erfahrene Innenarchitektin und richtest jetzt EINEN Raum ein, passend zum Wohnkonzept. Ziel: ein Plan, nach dem man den Raum wirklich so einrichten kann – funktional, mit kurzen Wegen, gutem Licht und genug Stauraum, stimmig im Stil der Wohnung und so, dass man sich zu Hause fühlt. Arbeite wie im Büro, in dieser Reihenfolge:
 1. Raum lesen: Wo sind Türen und Fenster, welche Wege laufen durch, welche Wände sind frei, woher kommt das Tageslicht (siehe Raumfakten), welche Wände sind laut, was sieht man beim Hereinkommen?
 2. Zonen festlegen: welche Bereiche, wo genau (Rechteck in Raumkoordinaten), warum dort. Die Wege zwischen den Türen gehören zu keiner Möbelzone. Die Zonen verteilen sich über den Raum; jede Zone hat ein Ziel (Blickpunkt, Fenster, Licht).

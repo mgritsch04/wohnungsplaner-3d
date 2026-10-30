@@ -276,6 +276,10 @@ export interface DesignOption {
   placeholder: boolean;
   label: string;
   search: string;
+  /** Functions the real product must have („Schlaffunktion“, „Stauraum“), from Claude's plan (#436). */
+  features?: string[];
+  /** A real product: how it differs from the planned piece (size, look, functions), shown in the panel (#436). */
+  deviation?: string;
 }
 
 export interface DesignPick extends DesignOption {

@@ -14,6 +14,7 @@ import {
   browserAvailable,
   browserTools,
   buildFindPrompt,
+  deviationText,
   FOUND_SOURCE,
   foundToCatalog,
   ITEM_TIMEOUT_LATE_MS,
@@ -32,6 +33,7 @@ import {
   replaceWithFound,
   searchTargets,
   type FoundProduct,
+  type ProductLook,
   type SearchTarget,
 } from './productSearch';
 import { furnishWithKitchens, kitchenShoppingList, resolveWith, runLength, type DesignKitchen, type KitchenPart, type Resolve } from './kitchenDesign';
@@ -61,6 +63,7 @@ import { roomShots } from './roomShots';
 import { layoutSuggestion } from '../design/apply';
 import { svgToPng } from '../design/render';
 import { runFurnishing, type Stage } from '../design/run';
+import { paletteText, roomConceptOf } from '../design/concept/flatConcept';
 import type { RoomReview } from '../design/types';
 import { useDesignStore } from './designStore';
 import { runSearchRounds, runText, type RoundRequest, type RunProgress } from './searchRun';
@@ -188,8 +191,19 @@ export function DesignPanel() {
   const byId = (id: string) => catalog.find((c) => c.id === id);
   const text = (k: keyof DesignWishes, v: string) => st.setWishes({ [k]: v.slice(0, MAX_FIELD) });
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name || 'Raum ohne Namen';
+  /** „Ideal“ (Claude's plan with placeholders) or „Kaufbar“ (real products, rooms placed anew), #436. */
+  const showIdeal = st.variant === 'ideal' && !!st.ideal;
+  const shownResult = showIdeal ? st.ideal!.result : st.result;
   /** Walk-through of a room, where the new way made the proposal. */
-  const review = (id: string) => st.result?.rooms.find((r) => r.roomId === id)?.review;
+  const review = (id: string) => shownResult?.rooms.find((r) => r.roomId === id)?.review;
+  /** Points of the ideal plan for a room, shown beside the buyable one when they differ. */
+  const idealScore = (id: string) => (showIdeal ? undefined : st.ideal?.result.rooms.find((r) => r.roomId === id)?.review.score);
+  const variant = (v: 'ideal' | 'kaufbar') => {
+    if (v === st.variant) return;
+    clearPreview();
+    st.set({ variant: v, preview: null });
+    setOpenAlt(null);
+  };
 
   const clearPreview = () => {
     const old = useDesignStore.getState().preview;
@@ -220,7 +234,7 @@ export function DesignPanel() {
       setNotFound(new Map());
       setNote(null);
       setDislike(null);
-      st.set({ asking: false, proposal, result, preview: null });
+      st.set({ asking: false, proposal, result, ideal: { result, proposal }, variant: 'kaufbar', preview: null });
       if (result.failed.length) useUiStore.getState().toast(`Für ${result.failed.map((f) => (f.roomId ? roomName(f.roomId) : 'die Wohnung')).join(', ')} kam keine verwertbare Antwort.`, 'info');
     } catch (e) {
       const code = (e as SampleError | undefined)?.code;
@@ -273,7 +287,7 @@ export function DesignPanel() {
       setNotFound(new Map());
       setNote(null);
       setDislike(null);
-      st.set({ asking: false, proposal, preview: null });
+      st.set({ asking: false, proposal, ideal: null, variant: 'kaufbar', preview: null });
       // the automatic product search then only runs for the redone room
       made = redo ? { ...proposal, rooms: proposal.rooms.filter((r) => r.roomId === redo.roomId) } : proposal;
     } catch (e) {
@@ -298,13 +312,13 @@ export function DesignPanel() {
     }
   };
 
-  const proposal = st.proposal;
+  const proposal = showIdeal ? st.ideal!.proposal : st.proposal;
   const total = proposal ? proposalTotal(proposal, catalog) : null;
 
   const showPreview = () => {
     if (!proposal) return;
     // the new way already placed every room millimetre-exact: take that, do not place again
-    const result = st.result;
+    const result = shownResult;
     if (result) {
       const inPlan = placedRooms(result, roomTypes).filter((r) => rooms.some((x) => x.id === r.analysis.roomId));
       const preview = layoutSuggestion(project, inPlan, own);
@@ -355,12 +369,33 @@ export function DesignPanel() {
     st.set({ preview: null });
   };
 
+  /** The look a real product has to fit (#436): the style plan of the concept, the room's accent. */
+  const lookOf = (roomId: string): ProductLook | null => {
+    const run = useDesignStore.getState().result;
+    if (!run) return null;
+    const style = run.concept.style;
+    const analysis = run.analysis.rooms.find((a) => a.roomId === roomId);
+    const accent = analysis ? roomConceptOf(run.concept, analysis).accent : undefined;
+    return {
+      idea: style.idea,
+      materials: style.materials,
+      ...(style.forms ? { forms: style.forms } : {}),
+      palette: style.palette.map(paletteText),
+      ...(accent ? { accent } : {}),
+    };
+  };
+
   // real products instead of placeholders (#350, stage 3): browser of the Claude desktop app, or Claude Code locally
   const searchMode: 'browser' | 'web' | null = sample.kind === 'local' ? 'web' : browser && mcp ? 'browser' : null;
 
   /** Found products → catalogue ids; locally IKEA pages are read again by the helper (exact data and 3D model). */
-  const toCatalog = async (found: FoundProduct[], placeholder: CatalogItem): Promise<{ id: string; why: string }[]> => {
-    const out: { id: string; why: string }[] = [];
+  const toCatalog = async (found: FoundProduct[], placeholder: CatalogItem): Promise<{ id: string; why: string; deviation?: string }[]> => {
+    const out: { id: string; why: string; deviation?: string }[] = [];
+    // what differs from the planned piece (#436): sizes from the catalogue entry, the look in Claude's words
+    const deviation = (it: CatalogItem | undefined, f: FoundProduct) => {
+      const t = it ? deviationText(it, placeholder, f.deviation) : (f.deviation ?? '');
+      return t ? { deviation: t } : {};
+    };
     const add: CatalogItem[] = [];
     for (const f of found) {
       if (searchMode === 'web' && f.shop === 'IKEA') {
@@ -369,7 +404,7 @@ export function DesignPanel() {
         const imported = ok?.id ? useCatalogStore.getState().items.find((c) => c.id === ok.id) : undefined;
         // a product whose page height is only the seat or the top would stand squashed (#350): skipped
         if (ok?.id && !(imported && implausibleSize(imported))) {
-          out.push({ id: ok.id, why: f.why });
+          out.push({ id: ok.id, why: f.why, ...deviation(imported, f) });
           continue;
         }
         if (ok?.id) continue;
@@ -377,7 +412,7 @@ export function DesignPanel() {
       const item = foundToCatalog(f, placeholder);
       if (implausibleSize(item)) continue;
       add.push(item);
-      out.push({ id: item.id, why: f.why });
+      out.push({ id: item.id, why: f.why, ...deviation(item, f) });
     }
     if (add.length) await useCatalogStore.getState().addItems(add);
     return out;
@@ -422,7 +457,7 @@ export function DesignPanel() {
           item.abort();
         }, limit);
         try {
-          const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId), retry);
+          const prompt = buildFindPrompt(pick, placeholder, w, w.retailer, searchMode, roomName(t.roomId), retry, lookOf(t.roomId));
           const label = `Produktsuche: ${pick.label}${retry ? ` (Versuch ${retry.attempt})` : ''} (${runText(progress)})`;
           const raw = await sample.json(prompt, searchMode === 'browser' ? { signal: item.signal, tools: browserTools(mcp!) } : { signal: item.signal, web: true, label });
           const parsed = parseFound(raw);
@@ -433,11 +468,18 @@ export function DesignPanel() {
           const run = useDesignStore.getState().result;
           if (run && !t.kitchen) {
             const line = latest.rooms.find((r) => r.roomId === t.roomId)?.picks[t.index];
-            const swap = { roomId: t.roomId, items: line ? pickItems(line) : [], catalogId: found[0].id };
-            const again = withProduct(run, project, swap, useCatalogStore.getState().items, roomTypes);
-            if (!again.taken) return { ok: false, reason: `passt nicht in den Raum: ${again.why ?? 'die Begehung fand einen Mangel'}` };
-            st.set({ result: again.result, proposal: replaceWithFound(latest, t.roomId, t.index, found) });
-            return { ok: true };
+            // the best hit first; when it does not fit the room, the next one (#436)
+            let why = '';
+            for (const [k, hit] of found.entries()) {
+              const again = withProduct(run, project, { roomId: t.roomId, items: line ? pickItems(line) : [], catalogId: hit.id }, useCatalogStore.getState().items, roomTypes);
+              if (!again.taken) {
+                why ||= again.why ?? 'die Begehung fand einen Mangel';
+                continue;
+              }
+              st.set({ result: again.result, proposal: replaceWithFound(latest, t.roomId, t.index, [hit, ...found.slice(0, k), ...found.slice(k + 1)]) });
+              return { ok: true };
+            }
+            return { ok: false, reason: `passt nicht in den Raum: ${why}` };
           }
           st.set({ proposal: t.kitchen ? replaceKitchenWithFound(latest, t.roomId, t.kitchen, found) : replaceWithFound(latest, t.roomId, t.index, found) });
           return { ok: true };
@@ -495,12 +537,13 @@ export function DesignPanel() {
     }
   };
 
-  const placeholders = proposal ? openPlaceholders(proposal) : [];
+  // the ideal plan is shown as it is: searching and swapping work on the buyable one
+  const placeholders = proposal && !showIdeal ? openPlaceholders(proposal) : [];
   /** Placeholders not settled yet: never searched, or the last search failed for a technical reason (not „nothing in the shop“). */
   const stillOpen = placeholders.filter((p) => !notFound.get(targetKey(p)) || notFound.get(targetKey(p))!.error);
 
   const swap = (roomId: string, index: number, alt: number) => {
-    if (!proposal) return;
+    if (!proposal || showIdeal) return;
     clearPreview();
     st.set({ proposal: swapPick(proposal, roomId, index, alt), preview: null });
     setOpenAlt(null);
@@ -607,6 +650,23 @@ export function DesignPanel() {
           <div className="assistant-card" data-testid="design-proposal">
             <h4>Einrichtungsvorschlag</h4>
             <Badge kind="info">Vorschlag von Claude – bitte selbst prüfen</Badge>
+            {st.ideal && (
+              <div className="design-variant" data-testid="design-variant">
+                <div className="btn-row" role="group" aria-label="Fassung des Vorschlags">
+                  <button className={showIdeal ? 'primary' : undefined} aria-pressed={showIdeal} disabled={!!search} onClick={() => variant('ideal')}>
+                    Ideal
+                  </button>
+                  <button className={!showIdeal ? 'primary' : undefined} aria-pressed={!showIdeal} disabled={!!search} onClick={() => variant('kaufbar')}>
+                    Kaufbar
+                  </button>
+                </div>
+                <p className="muted small">
+                  {showIdeal
+                    ? 'Ideal: Claudes Plan mit Soll-Möbeln (Art, Maße, Optik, Funktionen) als Platzhalter – so würde eine Innenarchitektin den Raum planen.'
+                    : 'Kaufbar: die bestpassenden gefundenen IKEA-/Möbelix-Produkte, der Raum mit ihnen neu aufgestellt und begangen; Abweichungen stehen beim Möbel.'}
+                </p>
+              </div>
+            )}
             {proposal.summary && <p>{proposal.summary}</p>}
             {proposal.rooms.map((r) => (
               <div key={r.roomId} className="design-room" data-testid="design-room">
@@ -616,6 +676,11 @@ export function DesignPanel() {
                 {r.concept && <p className="muted">{r.concept}</p>}
                 {r.brief && <BriefView brief={r.brief} />}
                 {review(r.roomId) && <ReviewView review={review(r.roomId)!} />}
+                {idealScore(r.roomId) !== undefined && idealScore(r.roomId) !== review(r.roomId)?.score && (
+                  <p className="muted small" data-testid="design-ideal-score">
+                    Ideal: {idealScore(r.roomId)} Punkte – mit den echten Produkten {review(r.roomId)!.score}.
+                  </p>
+                )}
                 {r.fixes && r.fixes.length > 0 && (
                   <div className="design-fixes" data-testid="design-fixes">
                     <strong className="small">Planer-Prüfung:</strong>
@@ -636,13 +701,18 @@ export function DesignPanel() {
                       <li key={key} data-testid="design-pick" data-placeholder={p.placeholder ? 'yes' : 'no'}>
                         <PickLine option={p} quantity={p.quantity} item={byId(p.catalogId)} retailer={w.retailer} />
                         {p.zone && <ZoneBadge zones={project.zones} id={p.zone} />}
+                        {!showIdeal && p.deviation && (
+                          <p className="muted small" data-testid="design-deviation">
+                            Abweichung vom Ideal: {p.deviation}
+                          </p>
+                        )}
                         {p.placeholder && notFound.has(key) && <p className="warning small" data-testid="design-notfound">Nicht gefunden: {notFound.get(key)!.reason} – bleibt Platzhalter, Suchlink siehe oben.</p>}
                         {p.placeholder && notSold(p.catalogId) && (
                           <p className="muted small" data-testid="design-not-sold">
                             {NOT_SOLD_TEXT}
                           </p>
                         )}
-                        {p.placeholder && !notSold(p.catalogId) && searchMode && !search && (
+                        {p.placeholder && !notSold(p.catalogId) && searchMode && !search && !showIdeal && (
                           <button className="small" onClick={() => void findReal([{ roomId: r.roomId, index: i }])}>
                             {notFound.has(key) ? 'Nochmal suchen' : 'Echtes Produkt suchen'}
                           </button>
@@ -657,7 +727,7 @@ export function DesignPanel() {
                                 {p.alternatives.map((a, k) => (
                                   <li key={a.catalogId}>
                                     <PickLine option={a} quantity={p.quantity} item={byId(a.catalogId)} retailer={w.retailer} />
-                                    <button className="small" disabled={!!search} onClick={() => swap(r.roomId, i, k)}>
+                                    <button className="small" disabled={!!search || showIdeal} onClick={() => swap(r.roomId, i, k)}>
                                       Stattdessen nehmen
                                     </button>
                                   </li>
@@ -676,7 +746,7 @@ export function DesignPanel() {
                     resolve={resolve}
                     retailer={w.retailer}
                     notFound={(key) => notFound.get(targetKey({ roomId: r.roomId, index: -1, kitchen: key }))?.reason}
-                    onSearch={searchMode && !search ? (key) => void findReal([{ roomId: r.roomId, index: -1, kitchen: key }]) : undefined}
+                    onSearch={searchMode && !search && !showIdeal ? (key) => void findReal([{ roomId: r.roomId, index: -1, kitchen: key }]) : undefined}
                   />
                 )}
               </div>

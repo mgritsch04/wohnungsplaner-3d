@@ -84,6 +84,8 @@ function expectStages(made: Call[], planned: string[]) {
   expect(concept.length).toBeGreaterThanOrEqual(1);
   expect(concept.length).toBeLessThanOrEqual(2);
   for (const room of planned) expect(made.filter((c) => c.kind === 'programm' && c.room === room).length).toBeGreaterThanOrEqual(1);
+  // das Raumprogramm sieht den leeren Raum als Bild (#436)
+  expect(made.filter((c) => c.kind === 'programm').every((c) => c.images === 1)).toBe(true);
   // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443); höchstens zwei je Raum
   const critique = made.filter((c) => c.kind === 'kritik');
   expect(critique.every((c) => c.images === (c.look ? 3 : 1) && c.picture)).toBe(true);
@@ -135,6 +137,16 @@ test('Einrichten nach Wohnkonzept (#442): Stufen, Begehung im Panel, Zonen in de
   // der Balkon wurde gefragt, aber nicht beantwortet
   expect(made.some((c) => c.kind === 'programm' && c.room === 'Balkon')).toBe(true);
   await proposal.screenshot({ path: 'test-results/design-442-konzept-panel.png' });
+
+  // zwei Fassungen (#436): Ideal zeigt Claudes Plan mit Platzhaltern, Kaufbar ist voreingestellt
+  const variant = panel.getByTestId('design-variant');
+  await expect(variant.getByRole('button', { name: 'Kaufbar' })).toHaveAttribute('aria-pressed', 'true');
+  await variant.getByRole('button', { name: 'Ideal' }).click();
+  await expect(variant).toContainText('Soll-Möbeln');
+  await expect(panel.getByTestId('design-search')).toHaveCount(0);
+  await expect(panel.locator('[data-testid="design-pick"][data-placeholder="no"]')).toHaveCount(0);
+  await variant.getByRole('button', { name: 'Kaufbar' }).click();
+  await expect(variant).toContainText('IKEA-/Möbelix-Produkte');
 
   // Vorschau: die Zonen des Raumprogramms liegen als blasse Flächen im Plan
   await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();

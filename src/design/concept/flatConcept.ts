@@ -52,6 +52,10 @@ export function parseRoomType(v: unknown): RoomType | null {
 
 /** Shares of the palette (SL2). */
 const ROLES: PaletteRole[] = ['haupt', 'zweit', 'akzent', 'neutral'];
+const SHARE: Record<PaletteRole, string> = { haupt: 'Hauptfarbe 60 %', zweit: 'Zweitfarbe 30 %', akzent: 'Akzent 10 %', neutral: 'neutral' };
+
+/** A palette colour for a prompt: „Salbei #8a9a7b (Zweitfarbe 30 %)“. */
+export const paletteText = (c: StylePlan['palette'][number]): string => `${c.name} ${c.hex}${c.role ? ` (${SHARE[c.role]})` : ''}`;
 
 const FORMAT = `{"living":"2–3 Sätze",
  "style":{"idea":"Leitidee in einem Satz","materials":["Eiche hell geölt","…"],"forms":"ein Satz","palette":[{"name":"…","hex":"#rrggbb","role":"haupt"}]},

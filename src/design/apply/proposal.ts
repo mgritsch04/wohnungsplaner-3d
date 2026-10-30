@@ -70,6 +70,7 @@ function picksOf(room: RoomResult, catalog: CatalogItem[]): DesignPick[] {
       label: it.label ?? item.name,
       search: it.label ?? item.name,
       ...(it.color ? { color: it.color } : {}),
+      ...(it.features?.length ? { features: it.features } : {}),
       zone: it.zone,
       alternatives: [],
       items: [it.id],
