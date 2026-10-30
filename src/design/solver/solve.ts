@@ -295,6 +295,16 @@ function importance(u: Unit): number {
   return (u.required ? 20 : 0) + base + Math.min(2, n.spec.width * n.spec.depth);
 }
 
+/**
+ * Members a seating group keeps (#436): the coffee table and the rug under the sofa. Leaving them
+ * out first took the coffee table from every tight living room; now the group moves or a lesser
+ * piece goes. A rug under a bed still goes first, before the bed.
+ */
+function groupCore(m: Model, n: Node): boolean {
+  if (n.spec.role === 'coffee-table') return true;
+  return n.spec.role === 'rug' && !!n.parent && m.nodes.get(n.parent)?.spec.role === 'sofa';
+}
+
 /** Kitchen modules a run can do without when it does not fit (sink, cooker and fridge stay). */
 const STORAGE_MODULES = new Set(['base', 'wall']);
 
@@ -328,7 +338,8 @@ function settle(st: State, seed: number): DroppedItem[] {
     const involved = new Map<string, Violation>();
     for (const v of vs) for (const id of v.items) if (m.nodes.has(id) && !involved.has(id)) involved.set(id, v);
     // 1. a dependent piece that breaks a rule on its own: leave it out
-    const dep = [...involved.keys()].map((id) => m.nodes.get(id)!).find((n) => m.units[n.unit].main !== n && !n.prog?.required && n.run === undefined);
+    // the coffee table and rug of a seating group are not loose pieces: the group moves or something else goes (#436)
+    const dep = [...involved.keys()].map((id) => m.nodes.get(id)!).find((n) => m.units[n.unit].main !== n && !n.prog?.required && n.run === undefined && !groupCore(m, n));
     if (dep) {
       dropNode(st, dep, reasonFor(involved.get(dep.id), false), dropped);
       continue;

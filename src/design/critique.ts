@@ -6,6 +6,7 @@
  * placement run on it. No coordinates are patched by hand: Claude moves zones, changes
  * relations, swaps, drops or adds pieces, and stage 3 places everything anew.
  */
+import { FLANK_GAP } from './concept/groups';
 import type { SampleImage } from '../assistant/claude';
 import { sideOfRotation, toRoomCm } from './coords';
 import { buildRoomProgramPrompt, parseRoomProgram, type RoomProgramInput } from './concept/roomProgram';
@@ -44,9 +45,10 @@ export const LOOK_CHECKS: readonly [string, string][] = [
   ['wege', 'Wege frei: Man kommt von der Tür überall hin, Türen und Fenster bleiben frei, nichts versperrt den Durchgang.'],
   ['funktionen', 'Funktionen erkennbar: Man sieht sofort, wo man schläft, sitzt, isst, kocht oder arbeitet; jede Zone ist vollständig.'],
   ['blickfang', 'Blickfang: Es gibt einen klaren Mittelpunkt (Sofa mit Teppich, Bett mit Kopfteil, Esstisch mit Leuchte), auf den der Raum ausgerichtet ist.'],
-  ['proportionen', 'Proportionen: Die Möbel passen in Größe und Menge zum Raum, weder leer noch vollgestellt; Abstände wirken bewusst.'],
+  ['proportionen', 'Proportionen: Die Möbel passen in Größe und Menge zum Raum, weder leer noch vollgestellt; Abstände wirken bewusst. Ein freier Laufweg von der Tür zu den Zonen ist gewollt und keine leere Fläche.'],
   ['licht', 'Licht: Grundlicht und Leselicht oder Arbeitslicht sind da, wo man sie braucht; Fenster werden genutzt, nicht zugestellt.'],
   ['ordnung', 'Ordnung: Möbel stehen gerade an Wänden oder bewusst frei, Gruppen sind geschlossen, nichts steht zufällig herum.'],
+  ['stil', 'Stil: Farben, Materialien und Formen passen zusammen (eine Hauptfarbe, eine Zweitfarbe, ein Akzent; wenige Holztöne, die sich wiederholen; Rundes zu Eckigem, Textur zu glatten Flächen); der Raum wirkt aus einem Guss, nicht zusammengewürfelt.'],
   ['abgabe', '„Würde eine Innenarchitektin das so abgeben?“ – als Ganzes stimmig, wohnlich und durchdacht.'],
 ];
 
@@ -65,6 +67,7 @@ export function programAsAnswer(program: RoomProgram, origin: { x: number; y: nu
       ...(at ? { x: at.x, y: at.y, facing: sideOfRotation(i.hint!.rotation) } : {}),
       ...(i.label ? { label: i.label } : {}),
       ...(i.color ? { color: i.color } : {}),
+      ...(i.features?.length ? { features: i.features } : {}),
       why: i.why,
       ...(i.required ? { anchor: true } : {}),
       ...(i.fallbacks?.length ? { fallbacks: i.fallbacks } : {}),
@@ -103,6 +106,8 @@ export function programAsAnswer(program: RoomProgram, origin: { x: number; y: nu
       case 'left-of':
       case 'right-of':
         return [r.item, r.kind, r.target, ...(r.gap === undefined ? [] : [cm(r.gap)])];
+      case 'flank':
+        return [r.item, 'flank', r.target, cm(r.gap ?? FLANK_GAP), ...(r.side ? [r.side] : [])];
       default:
         return [r.item, r.kind, r.target];
     }

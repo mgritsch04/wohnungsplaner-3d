@@ -14,6 +14,8 @@ describe.each(FLAT_KEYS)('Begehung der leeren Testwohnung %s', (key) => {
   }));
 
   it('reviews every room without error in under 100 ms and gives consistent points', () => {
+    // the first call pays for loading and compiling the rules (46–76 ms locally, 103 on a CI runner): not timed
+    reviewFlat(inputs.slice(0, 1));
     for (const input of inputs) {
       const t0 = performance.now();
       const review = reviewFlat([input]);

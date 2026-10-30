@@ -18,6 +18,7 @@ import { parseFlatConcept } from '../concept/flatConcept';
 import { testFlatInput } from '../concept/testFlats';
 import type { RoomType } from '../../suggest/furnishing';
 import { pickItems, placedRooms, proposalFrom, withProduct } from './proposal';
+import { furnishingSheet } from './sheet';
 
 /** A whole run built from the recorded answers, without asking Claude. */
 function recordedRun(key: 'B' = 'B'): { result: FurnishRunResult; project: ReturnType<typeof TEST_FLATS.B.build> } {
@@ -129,5 +130,23 @@ describe('withProduct', () => {
     const r = withProduct(result, project, { roomId: 'gibt-es-nicht', items: [], catalogId: p.id }, [p]);
     expect(r.taken).toBe(false);
     expect(r.result).toBe(result);
+  });
+});
+
+describe('Einrichtungsblatt (#436)', () => {
+  const { result, project } = recordedRun();
+  const names = Object.fromEntries(project.rooms.map((r) => [r.id, r.name]));
+
+  it('names each room, what stands where with its measures and why, and the lights with height and colour temperature', () => {
+    const sheet = furnishingSheet(result, names);
+    expect(sheet).toContain('# Einrichtungsblatt (Kaufbar)');
+    expect(sheet).toContain(result.concept.style.idea);
+    for (const r of result.rooms) expect(sheet).toContain(`## ${names[r.roomId]}`);
+    // the sofa of the living kitchen: measures, wall or free place, which way it faces, its reason
+    expect(sheet).toMatch(/\| Schlafsofa[^|]*\| 210 × 90 × 82 \| (an W\d \([A-Za-zü]+\), Mitte \d+ cm von der Ecke mit W\d|frei im Raum[^|]*); Blick nach [A-Za-zü]+ \| .+\|/);
+    // the chairs of the dining table counted once
+    expect(sheet).toMatch(/Dazu: 4 × Stuhl/);
+    expect(sheet).toMatch(/Pendelleuchte[^\n]*Unterkante \d+ cm über dem Boden[^\n]*2700 K, dimmbar/);
+    expect(furnishingSheet(result, names, [], [result.rooms[0].roomId], 'Ideal')).not.toContain(`## ${names[result.rooms[1].roomId]}`);
   });
 });

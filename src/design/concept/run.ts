@@ -7,7 +7,7 @@
  */
 import type { CatalogItem } from '../../catalog/types';
 import type { DesignWishes } from '../../assistant/design';
-import type { Sample, SampleError, SampleOptions } from '../../assistant/claude';
+import type { Sample, SampleError, SampleImage, SampleOptions } from '../../assistant/claude';
 import { runPool } from '../../assistant/pool';
 import type { Project } from '../../model/schema';
 import type { FlatAnalysis, FlatConcept, RoomProgram } from '../types';
@@ -28,6 +28,8 @@ export interface ConceptRunInput {
   /** Text forms of stage 0: overview of the flat and the sketch of one room. */
   flatSketch: string;
   roomSketch: (roomId: string) => string;
+  /** Picture of the empty room (walls, openings, what stays) for stage 2; none when the model cannot see. */
+  roomImage?: (roomId: string) => Promise<SampleImage | undefined>;
   wishes: DesignWishes;
   products?: CatalogItem[];
   /** Rooms to plan (default: all rooms of the analysis). */
@@ -115,8 +117,9 @@ async function askChecked<T>(
   model: 'opus' | 'sonnet',
   label: string,
   calls: CallLog[],
+  images?: SampleImage[],
 ): Promise<Checked<T> & { repaired: boolean }> {
-  const opts: SampleOptions = { model, modelTier: model === 'opus' ? 'complex' : 'default', label };
+  const opts: SampleOptions = { model, modelTier: model === 'opus' ? 'complex' : 'default', label, ...(images?.length ? { images } : {}) };
   const timeoutMs = (run.timeouts ?? TIMEOUTS)[model];
   const call = async (p: string, round: number) => {
     const t0 = Date.now();
@@ -174,10 +177,11 @@ export async function runConcept(input: ConceptRunInput): Promise<ConceptRunResu
     async (roomId) => {
       const room = input.analysis.rooms.find((r) => r.roomId === roomId);
       if (!room) return;
-      const roomInput: RoomProgramInput = { project: input.project, concept: concept.value, room, sketch: input.roomSketch(roomId), wishes: input.wishes, products: input.products };
+      const image = await input.roomImage?.(roomId).catch(() => undefined);
+      const roomInput: RoomProgramInput = { project: input.project, concept: concept.value, room, sketch: input.roomSketch(roomId), wishes: input.wishes, products: input.products, ...(image ? { image: true } : {}) };
       const m = programModel(roomConceptOf(concept.value, room), room, input.wishes.quality);
       try {
-        const r = await askChecked(input, buildRoomProgramPrompt(roomInput), (raw) => parseRoomProgram(raw, roomInput), m, room.name, calls);
+        const r = await askChecked(input, buildRoomProgramPrompt(roomInput), (raw) => parseRoomProgram(raw, roomInput), m, room.name, calls, image ? [image] : undefined);
         result.programs.push(r.value);
         result.rooms.push({ roomId, model: m, problems: r.problems, notes: r.notes, repaired: r.repaired });
       } catch (e) {

@@ -248,6 +248,15 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
       const room = analysis.rooms.find((r) => r.roomId === id);
       return room ? roomSketch(ctx, room) : '';
     },
+    ...(input.toImage && input.sample.images
+      ? {
+          roomImage: async (id: string) => {
+            const room = analysis.rooms.find((r) => r.roomId === id);
+            if (!room) return undefined;
+            return input.toImage!(roomPlanSvg({ analysis: room, roomNames: Object.fromEntries(project.rooms.map((r) => [r.id, r.name])), existing: asPlaced(existingPieces(project, room)) }));
+          },
+        }
+      : {}),
     wishes,
     roomIds,
     ...(input.products ? { products: input.products } : {}),

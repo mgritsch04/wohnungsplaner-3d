@@ -28,6 +28,13 @@ interface DesignStore {
   proposal: DesignProposal | null;
   /** The whole run of the new way (#442): concept, programmes, placement and walk-through. */
   result: FurnishRunResult | null;
+  /**
+   * Claude's plan as it came (#436, „Ideal“): placeholders with the wanted size, look and functions.
+   * `result`/`proposal` become „Kaufbar“ as real products replace placeholders and rooms are placed anew.
+   */
+  ideal: { result: FurnishRunResult; proposal: DesignProposal } | null;
+  /** Which of the two the panel shows, previews and applies. */
+  variant: 'ideal' | 'kaufbar';
   preview: FurnishingSuggestion | null;
   setWishes: (patch: Partial<DesignWishes>) => void;
   set: (patch: Partial<Omit<DesignStore, 'set' | 'setWishes'>>) => void;
@@ -40,6 +47,8 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   error: null,
   proposal: null,
   result: null,
+  ideal: null,
+  variant: 'kaufbar',
   preview: null,
   setWishes: (patch) => {
     const wishes = { ...get().wishes, ...patch };

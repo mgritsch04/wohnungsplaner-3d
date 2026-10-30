@@ -133,8 +133,18 @@ export async function browserAvailable(mcp: McpRuntime | null): Promise<boolean>
 
 const cm = (v: number) => Math.round(v * 100);
 
+/** The look of the flat a product has to fit (#436): the style plan of the concept and the room's accent. */
+export interface ProductLook {
+  idea: string;
+  materials: string[];
+  forms?: string;
+  /** „Salbei #8a9a7b (Zweitfarbe 30 %)“ */
+  palette: string[];
+  accent?: string;
+}
+
 /** Request for one placeholder: find up to three fitting real products and read their data from the product pages. */
-export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes: DesignWishes, retailer: RetailerChoice, mode: 'browser' | 'web', roomName: string, retry?: RetryHint | null): string {
+export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes: DesignWishes, retailer: RetailerChoice, mode: 'browser' | 'web', roomName: string, retry?: RetryHint | null, look?: ProductLook | null): string {
   const terms = searchTerms(option, item);
   const term = retry ? (terms[retry.attempt - 1] ?? terms[terms.length - 1]) : terms[0];
   const links = searchLinks(term, retailer).map((l) => l.url);
@@ -147,14 +157,23 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     '',
     `Gesucht für „${roomName}“: ${option.label}${option.reason ? ` – ${option.reason}` : ''}`,
     `Platz eingeplant für ca. ${cm(item.width)}×${cm(item.depth)}×${cm(item.height)} cm (Breite×Tiefe×Höhe); Das ist ein Richtwert: Produkte mit bis zu 20 % Abweichung in jeder Richtung sind gut brauchbar, das passendste verfügbare Produkt zählt mehr als die genauen Maße.`,
-    `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
+    ...(look
+      ? [
+          `Optik dieses Stücks: ${option.label}${option.color ? `, Farbe ${option.color}` : ''}.${option.features?.length ? ` Muss haben: ${option.features.join(', ')}.` : ''}`,
+          `Stil der Wohnung (alle Möbel sollen zusammenpassen): ${look.idea}${look.materials.length ? ` Materialien: ${look.materials.join(', ')}.` : ''}${look.forms ? ` Formen: ${look.forms}` : ''} Palette: ${look.palette.join(', ')}${look.accent ? `; Akzent des Raums ${look.accent}` : ''}.${wishes.budget > 0 ? ` Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig.` : ''}`,
+        ]
+      : [
+          ...(option.features?.length ? [`Muss haben: ${option.features.join(', ')}.`] : []),
+          `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
+        ]),
     `Suchseiten: ${links.join(' , ')}`,
     how,
     ...(terms.length > 1 ? [`Findest du mit „${term}“ nichts, probier andere Begriffe: ${terms.filter((t) => t !== term).map((t) => `„${t}“`).join(', ')}.`] : []),
     ...(retry ? ['', ...retryLines(retry)] : []),
     '',
     'Regeln:',
-    `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst.`,
+    `- Höchstens ${MAX_FOUND} Produkte, das am besten passende zuerst. Wähle wie eine Innenarchitektin, nicht nur nach Maßen: Art und Funktionen müssen stimmen, dann Optik (Farbe, Material, Form) und wie es zum Stil der Wohnung passt, dann die Maße.`,
+    '- Bewerte jedes Produkt in "fit" von 1 (passt nicht) bis 5 (passt genau): "masse", "optik", "funktionen", "stil"; und sag in "abweichung" in einem kurzen Satz, was vom Gesuchten abweicht (leer, wenn nichts).',
     ...(retailer === 'both' ? ['- Schau in BEIDEN Shops (IKEA und Möbelix). Gibt es in beiden passende Produkte, nimm mindestens eines von jedem Shop in die Liste.'] : []),
     '- Nur Angaben, die du auf der Produktseite gelesen hast: Name, Adresse der Produktseite, Preis in Euro, Breite/Tiefe/Höhe in cm. Nichts schätzen oder erfinden; fehlt eine Angabe, lass das Produkt weg.',
     '- Maße immer als Breite (links-rechts), Tiefe (vorn-hinten) und Höhe (oben-unten): Bei Vorhängen/Gardinen ist die Länge bzw. Fallhöhe die Höhe_cm (z. B. 250), die Tiefe nur wenige cm; bei Paaren/Sets die Breite eines Stücks. Bei Teppichen sind Länge/Breite die Fläche und die Höhe die Flordicke (wenige mm); bei Bildern ist die Tiefe die Rahmendicke.',
@@ -164,7 +183,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
     '- Keine Konten, keine Warenkörbe, nichts bestellen.',
     '',
     'Antworte zuletzt nur mit JSON in genau dieser Form:',
-    '{"products":[{"name":"…","url":"https://…","price":199.99,"pack_size":1,"width_cm":200,"depth_cm":90,"height_cm":80,"why":"1 kurzer Satz"}]}',
+    '{"products":[{"name":"…","url":"https://…","price":199.99,"pack_size":1,"width_cm":200,"depth_cm":90,"height_cm":80,"why":"1 kurzer Satz","fit":{"masse":4,"optik":5,"funktionen":5,"stil":4},"abweichung":"…"}]}',
   ].join('\n');
 }
 
@@ -225,6 +244,10 @@ export interface FoundProduct {
   depth: number;
   height: number;
   why: string;
+  /** Claude's rating 1–5 (mean of size, look, functions, style), when given. */
+  fit?: number;
+  /** What differs from the wanted piece, in Claude's words. */
+  deviation?: string;
 }
 
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' ? Number(v.replace(',', '.').replace(/[^\d.]/g, '')) : NaN);
@@ -244,10 +267,35 @@ export function parseFound(raw: unknown): FoundProduct[] {
     if (!shop || !name || out.some((x) => x.url === url)) continue;
     if (![w, d, h].every((v) => Number.isFinite(v) && v >= 1 && v <= 600)) continue;
     if (!Number.isFinite(price) || price <= 0 || price > 50_000) continue;
-    out.push({ name, url, shop, price: Math.round(price * 100) / 100, packSize: normalizePackSize(p.pack_size) ?? 1, width: w / 100, depth: d / 100, height: h / 100, why: typeof p.why === 'string' ? p.why.trim().slice(0, 200) : '' });
+    const fit = fitOf(p.fit);
+    const deviation = typeof p.abweichung === 'string' ? p.abweichung.trim().slice(0, 200) : '';
+    out.push({ name, url, shop, price: Math.round(price * 100) / 100, packSize: normalizePackSize(p.pack_size) ?? 1, width: w / 100, depth: d / 100, height: h / 100, why: typeof p.why === 'string' ? p.why.trim().slice(0, 200) : '', ...(fit ? { fit } : {}), ...(deviation ? { deviation } : {}) });
     if (out.length >= MAX_FOUND) break;
   }
-  return out;
+  // the best fit first; without ratings Claude's order stays
+  return out.map((f, i) => ({ f, i })).sort((a, b) => (b.f.fit ?? 0) - (a.f.fit ?? 0) || a.i - b.i).map(({ f }) => f);
+}
+
+/** Mean of Claude's 1–5 ratings (size, look, functions, style); a function the product lacks weighs double. */
+function fitOf(v: unknown): number | undefined {
+  if (typeof v === 'number') return v >= 1 && v <= 5 ? v : undefined;
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const vals = ['masse', 'optik', 'funktionen', 'stil'].map((k) => num(o[k])).filter((x) => Number.isFinite(x) && x >= 1 && x <= 5);
+  if (!vals.length) return undefined;
+  const f = num(o.funktionen);
+  const weighted = Number.isFinite(f) && f >= 1 && f <= 5 ? [...vals, f] : vals;
+  return Math.round((weighted.reduce((a, b) => a + b, 0) / weighted.length) * 10) / 10;
+}
+
+/** How a real product differs from the planned piece: sizes from the catalogue (3 cm and more), then Claude's note. */
+export function deviationText(product: Pick<CatalogItem, 'width' | 'depth' | 'height'>, planned: Pick<CatalogItem, 'width' | 'depth' | 'height'>, note = ''): string {
+  const d = (a: number, b: number, more: string, less: string) => {
+    const v = Math.round((a - b) * 100);
+    return Math.abs(v) >= 3 ? `${Math.abs(v)} cm ${v > 0 ? more : less}` : '';
+  };
+  const parts = [d(product.width, planned.width, 'breiter', 'schmaler'), d(product.depth, planned.depth, 'tiefer', 'weniger tief'), d(product.height, planned.height, 'höher', 'niedriger')].filter(Boolean);
+  return [parts.length ? parts.join(', ') : '', note].filter(Boolean).join('; ');
 }
 
 /** Why nothing usable came back: no hit at all, or hits without complete data from the product page. */
@@ -378,16 +426,18 @@ export function foundToCatalog(f: FoundProduct, placeholder: CatalogItem, today 
  * The placeholder at `index` in room `roomId` becomes the first found product; the other found
  * products and the placeholder itself become alternatives (placeholder first among the old ones).
  */
-export function replaceWithFound(p: DesignProposal, roomId: string, index: number, found: { id: string; why: string }[]): DesignProposal {
+export function replaceWithFound(p: DesignProposal, roomId: string, index: number, found: { id: string; why: string; deviation?: string }[]): DesignProposal {
   if (!found.length) return p;
   return {
     ...p,
     rooms: p.rooms.map((r) => {
       if (r.roomId !== roomId || !r.picks[index]) return r;
       const { quantity, alternatives, ...old } = r.picks[index];
-      const real = found.map((f) => ({ catalogId: f.id, reason: f.why || old.reason, placeholder: false, label: '', search: '' }));
+      const real = found.map((f) => ({ catalogId: f.id, reason: f.why || old.reason, placeholder: false, label: '', search: '', ...(f.deviation ? { deviation: f.deviation } : {}) }));
       const rest = [...real.slice(1), old, ...alternatives].filter((a, i, all) => a.catalogId !== real[0].catalogId && all.findIndex((x) => x.catalogId === a.catalogId) === i);
-      const picks = r.picks.map((x, i) => (i === index ? { ...real[0], quantity, alternatives: rest.slice(0, MAX_ALTERNATIVES + MAX_FOUND) } : x));
+      // the line keeps its zone and the programme pieces it stands for (the new way, #442)
+      const keep = { ...(old.zone ? { zone: old.zone } : {}), ...((old as { items?: string[] }).items ? { items: (old as { items?: string[] }).items } : {}) };
+      const picks = r.picks.map((x, i) => (i === index ? { ...real[0], ...keep, quantity, alternatives: rest.slice(0, MAX_ALTERNATIVES + MAX_FOUND) } : x));
       return { ...r, picks };
     }),
   };

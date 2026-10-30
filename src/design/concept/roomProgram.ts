@@ -15,12 +15,17 @@ import { add, dot, pointInPolygon, scale, sub, type Vec2 } from '../../model/vec
 import { fromRoomCm, parseSide, rotationForSide, toRoomCm } from '../coords';
 import type { FlatConcept, KitchenRun, ProgramItem, ProgramZone, RoomAnalysis, RoomConcept, RoomProgram, RoomType } from '../types';
 import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, strList, type Thing, thingOf } from './common';
-import { existingIn, roomConceptOf, wantsHandBasin } from './flatConcept';
+import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
+import { rulebookPrompt } from '../rulebook';
+import { completeGroups, groupLines } from './groups';
+import { extraAreas, roomFacts } from './roomFacts';
 import { parseRelations, type RelationItem } from './relations';
 
 export interface RoomProgramInput {
   project: Project;
+  /** The empty room from above (stage 0 picture), when this Claude can see pictures. */
+  image?: boolean;
   concept: FlatConcept;
   room: RoomAnalysis;
   /** Room sketch as text for Claude (stage 0): walls, doors, windows, free stretches, walkways. */
@@ -96,11 +101,11 @@ Andere Wörter (next-to, beside, against …) versteht der Aufsteller nicht. Tü
 
 const format = (userZone: string | null) => `{"reading":"2–4 Sätze: was diesen Raum prägt (Licht, Wege, ruhige Seite, Blick beim Hereinkommen)",
  "zones":[{"id":"sitzen","function":"Sitzen/Fernsehen","rect":[x0,y0,x1,y1],"why":"…"${userZone ? `,"userZone":"${userZone}"` : ''}}],
- "items":[{"id":"sofa","catalogId":"generic-sofa-3","zone":"sitzen","x":215,"y":140,"facing":"S","label":"kurze Produktbeschreibung","color":"#rrggbb","why":"…","anchor":true,"fallbacks":["generic-sofa-2"]}],
+ "items":[{"id":"sofa","catalogId":"generic-sofa-3","zone":"sitzen","x":215,"y":140,"facing":"S","label":"Art, Material, Farbe, Form","color":"#rrggbb","features":["Schlaffunktion"],"why":"…","anchor":true,"fallbacks":["generic-sofa-2"]}],
  "relations":[["coffee","front-of","sofa",45],["rug","under-front","sofa"],["ns1","pair","ns2","bed"],["pendant","above","table",160],["plant1","corner","W1","W2"],["tv","facing","sofa",250],["curtain1","window","F1","over"]],
  "kitchen":[{"wall":"W2","from":[x,y],"to":[x,y],"modules":["generic-k-fridge","…"]}],
  "walk":"wie man durch den eingerichteten Raum geht (Wege, Breiten)",
- "check":["was du bei der Begehung geprüft hast, Punkt für Punkt"]}`;
+ "check":["W2: was du geprüft hast, je Regel-Kennung"]}`;
 
 /** The prompt for one room programme. */
 export function buildRoomProgramPrompt(input: RoomProgramInput): string {
@@ -114,28 +119,39 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
   const needs = roomNeeds(rc, room.area);
   const own = preselect(input.products ?? [], [rc.type], 0, MAX_ROOM_PRODUCTS);
   const zones = room.userZones.filter((z) => !z.keepFree).map((z) => z.id);
-  const palette = concept.style.palette.map((c) => `${c.name} ${c.hex}`).join(', ');
-  return `Du bist eine erfahrene Innenarchitektin und richtest jetzt EINEN Raum ein, passend zum Wohnkonzept. Arbeite in dieser Reihenfolge:
-1. Raum lesen: Wo sind Türen und Fenster, welche Wege laufen durch, welche Wände sind frei, woher kommt das Licht, was sieht man beim Hereinkommen?
-2. Zonen festlegen: welche Bereiche, wo genau (Rechteck in Raumkoordinaten), warum dort. Die Wege zwischen den Türen gehören zu keiner Möbelzone.
-3. Je Zone zuerst das Ankermöbel ("anchor":true), mit Startplatz und Blickrichtung.
-4. Dann die Begleitmöbel mit klaren Beziehungen (Couchtisch 45 cm vor dem Sofa, Nachttische als Paar am Bett, Stühle um den Tisch).
-5. Erst dann Licht, Textilien und Deko, jedes Teil mit Platz und Grund.
-6. Begehung im Kopf: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Würde jemand das wirklich so einrichten?
+  const palette = concept.style.palette.map(paletteText).join(', ');
+  return `Du bist eine erfahrene Innenarchitektin und richtest jetzt EINEN Raum ein, passend zum Wohnkonzept. Ziel: ein Plan, nach dem man den Raum wirklich so einrichten kann – funktional, mit kurzen Wegen, gutem Licht und genug Stauraum, stimmig im Stil der Wohnung und so, dass man sich zu Hause fühlt. Arbeite wie im Büro, in dieser Reihenfolge:
+1. Raum lesen: Wo sind Türen und Fenster, welche Wege laufen durch, welche Wände sind frei, woher kommt das Tageslicht (siehe Raumfakten), welche Wände sind laut, was sieht man beim Hereinkommen?
+2. Zonen festlegen: welche Bereiche, wo genau (Rechteck in Raumkoordinaten), warum dort. Die Wege zwischen den Türen gehören zu keiner Möbelzone. Die Zonen verteilen sich über den Raum; jede Zone hat ein Ziel (Blickpunkt, Fenster, Licht).
+3. Je Zone ein Baustein (siehe unten) mit seinem Ankermöbel ("anchor":true), Startplatz und Blickrichtung. Plane die Teile des Bausteins mit, in der Ausführung, die du willst; was du weglässt, ergänzt die App nach dem Regelwerk.
+4. Lichtplan: Grundlicht, Licht für jede Zone, Stimmungslicht (L1, L2).
+5. Stauraum: wohin kommen Kleidung, Bücher, Vorräte, Alltagskram (ST1–ST3)?
+6. Stil: jedes Teil mit Farbe aus der Palette (60/30/10, SL2), Material und Form im "label" (z. B. „Sofa 3-Sitzer, Leinen hellgrau, schmale Eichenfüße“), dazu "features" mit den Funktionen, die es haben muss (z. B. „Schlaffunktion“, „Stauraum“, „Schubladen“, „dimmbar“). Wiederkehrende Materialien, höchstens 2–3 Holztöne (SL3), Formen und Texturen gemischt (SL4).
+7. Textilien und Deko: Teppiche, Vorhänge, Bilder, Pflanzen, jedes Teil mit Platz und Grund; lieber wenige gute Stücke (SL6).
+8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
-Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''} Palette: ${palette}.
+Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.
 Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Nicht hierher: ${rc.avoid.join(', ') || '–'}.
 In anderen Räumen (hier NICHT planen): ${elsewhere.join('; ') || '–'}
 ${room.passThrough ? 'Dieser Raum ist ein Durchgangszimmer: die Wege zwischen seinen Türen bleiben 90 cm breit frei.\n' : ''}
 Raumskizze:
 ${sketch}
+${input.image ? 'Das Bild zeigt denselben Raum leer von oben, mit Wänden, Türen, Fenstern, den Wegen zwischen den Türen und den Raumkoordinaten in cm; was bleibt, ist eingezeichnet. Lies Maße aus der Skizze, das Bild ist für den Überblick.\n' : ''}
+Raumfakten:
+${roomFacts(room, project, concept)}
 ${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}
 ${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
 Küchenmodule (nur in "kitchen"):
 ${summarizePlaceholders(KITCHEN_MODULES)}
 ` : all.some((f) => !!f.kitchen) ? 'Die Küchenzeile ist vorhanden (Bestand): keine neue planen, nur Essplatz und Rest.\n' : ''}
-Feste Regeln:
+Bausteine (eine Zone = ein Baustein; die Maße kommen aus dem Regelwerk):
+${groupLines(rc.type)}
+
+Regelwerk (mit Kennungen, wie eine Innenarchitektin plant):
+${rulebookPrompt(rc.type, extraAreas(rc.functions))}
+
+Feste Regeln für die Umsetzung:
 ${RULES}
 
 Möbel (Format „id: Art, Breite×Tiefe×Höhe cm, Kategorie, Richtwert“; nur diese catalogIds):
@@ -290,11 +306,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     else if (!side) problems.push(`Teil „${id}“: Blickrichtung „${str(e.facing, 10)}“ ist keine Himmelsrichtung (N, O, S, W).`);
     else hint = { ...f.P(x, y), rotation: rotationForSide(side) };
     const color = hex(e.color);
+    const features = strList(e.features, 40, 6);
     const fallbacks = strList(e.fallbacks, 120, 4).filter((id2) => {
       const fc = lookup(id2);
       return !!fc && fc.category === c.category && !isKitchenModule(fc);
     });
-    const item: ProgramItem = { id, catalogId: c.id, zone, ...(hint ? { hint } : {}), ...(label ? { label } : {}), ...(color ? { color } : {}), why: str(e.why, 500), ...(fallbacks.length ? { fallbacks } : {}), ...(e.anchor === true || e.required === true ? { required: true } : {}) };
+    const item: ProgramItem = { id, catalogId: c.id, zone, ...(hint ? { hint } : {}), ...(label ? { label } : {}), ...(color ? { color } : {}), ...(features.length ? { features } : {}), why: str(e.why, 500), ...(fallbacks.length ? { fallbacks } : {}), ...(e.anchor === true || e.required === true ? { required: true } : {}) };
     items.push(item);
     things.set(id, { thing: t, ...(hint ? { hint } : {}) });
   }
@@ -344,7 +361,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     for (const [type, label] of [['sink', 'Spüle'], ['fridge', 'Kühlschrank']] as const) if (!mods.some((m) => m.kitchen?.type === type)) problems.push(`Die Küchenzeile hat keine ${label}.`);
   }
 
-  const value: RoomProgram = {
+  const parsed: RoomProgram = {
     roomId: room.roomId,
     reading: str(o.reading, 1200),
     zones,
@@ -354,7 +371,10 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     walk: str(o.walk, 1200),
     check: strList(o.check, 300, 30),
   };
-  return { value, problems, notes };
+  // every furniture group complete and bound as a designer plans it (Sitzgruppe, Schlafplatz …)
+  const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products);
+  notes.push(...groups.notes);
+  return { value: groups.program, problems, notes };
 }
 
 const thingOfFurniture = (f: Furniture): Thing => ({ category: f.category, shape: shapeOf(f), height: f.height, width: f.width, depth: f.depth, name: f.name });

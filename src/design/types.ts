@@ -216,9 +216,15 @@ export interface FlatAnalysis {
 export interface StylePlan {
   /** Guiding idea in one or two sentences. */
   idea: string;
+  /** Woods, one metal, textiles that recur through the flat (SL3). */
   materials: string[];
-  palette: { name: string; hex: string }[];
+  /** Colours with their share (SL2): main 60 %, second 30 %, accent 10 %, or a neutral. */
+  palette: { name: string; hex: string; role?: PaletteRole }[];
+  /** Form language in one sentence: lines, legs, round against square, textures (SL4, SL5). */
+  forms?: string;
 }
+
+export type PaletteRole = 'haupt' | 'zweit' | 'akzent' | 'neutral';
 
 /** A function of the flat (from the wishes and the room types) and the one room it goes to. */
 export interface FunctionAssignment {
@@ -280,6 +286,8 @@ export interface ProgramItem {
   label?: string;
   /** Colour as #rrggbb. */
   color?: string;
+  /** Functions the real product must have („Schlaffunktion“, „Stauraum“), for the product search. */
+  features?: string[];
   why: string;
   /** Smaller pieces of the same kind (catalogue ids, preferred first) for when it does not fit. */
   fallbacks?: string[];
@@ -307,6 +315,8 @@ export type Relation =
   | { kind: 'pair'; item: string; item2: string; target: string }
   /** `item` faces `target`, `distance` between their fronts (TV and sofa). */
   | { kind: 'facing'; item: string; target: string; distance?: number }
+  /** Seat at one end of `target` (armchair at the coffee table), turned towards it, `gap` between them; `side` as seen from the target's front. */
+  | { kind: 'flank'; item: string; target: string; side?: 'left' | 'right'; gap?: number }
   /** Seats spread around the free sides of a table. */
   | { kind: 'around'; items: string[]; target: string }
   /** Hangs centred above `target` (picture over the sofa, pendant over the table); `height` = lower edge above the floor. */
