@@ -172,7 +172,20 @@ Antworte nur mit JSON in dieser Form:
 }
 
 /** Plan X against plan Y for one room, asked in both orders; a winner only if both answers agree. */
+/** The placed pieces of a room, rounded to the centimetre: two runs with the same list show the same room. */
+export function layoutKey(run, roomName) {
+  const id = run.analysis.rooms.find((a) => a.name === roomName)?.roomId;
+  const items = run.rooms.find((r) => r.roomId === id)?.layout?.items ?? [];
+  const cm = (v) => Math.round(v * 100);
+  return JSON.stringify(items.map((i) => [i.id, i.catalogId, cm(i.x), cm(i.y), cm(i.rotation), cm(i.elevation ?? 0), cm(i.width), cm(i.depth)]).sort());
+}
+
 async function compareRoom(dirs, runs, room, type, area) {
+  // the same pieces in the same places need no reviewer (and cost no usage)
+  if (layoutKey(runs[0], room) === layoutKey(runs[1], room)) {
+    const same = { besser: 'gleich', abstand: 'gleiche Aufstellung', warum: 'Beide Läufe stellen jedes Teil gleich auf, ohne Prüfer verglichen.', punkte: {} };
+    return { room, type, verdict: 'gleich', xy: same, yx: same };
+  }
   const images = dirs.map((d) => imagesOf(d, room));
   if (images.some((i) => !i)) return { room, type, error: 'Bilder fehlen' };
   const facts = runs.map((r) => roomFacts(r, room));
