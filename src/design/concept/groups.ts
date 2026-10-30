@@ -117,6 +117,10 @@ function rebind(c: Ctx, id: string, rel: Relation): void {
 }
 
 const inZone = (c: Ctx, zone: string, roles: Role[]) => c.items.filter((i) => i.zone === zone && roles.includes(roleOfItem(c, i)!));
+/** Pieces near `it` by the start places (any zone; unplaced pieces count as near). */
+const near = (c: Ctx, it: ProgramItem, is: (i: ProgramItem) => boolean, range: number) =>
+  c.items.filter((i) => i !== it && is(i) && (!i.hint || !it.hint || Math.hypot(i.hint.x - it.hint.x, i.hint.y - it.hint.y) <= range));
+const hasRole = (c: Ctx, roles: Role[]) => (i: ProgramItem) => roles.includes(roleOfItem(c, i)!);
 
 /**
  * How much of a group a room gets: `full` in a living room with space, `compact` where several
@@ -150,7 +154,10 @@ function seatingGroup(c: Ctx, sofa: ProgramItem, scope: GroupScope): void {
   // rug centred under the group, wider than the sofa (W6)
   const wantRug = corner ? 'generic-rug-240' : sofaWidth >= 1.9 ? 'generic-rug-200' : 'generic-rug-160';
   const fallbackRugs = ['generic-rug-240', 'generic-rug-200', 'generic-rug-160', 'generic-rug-120'].filter((r) => r !== wantRug && (lookup(c, r)?.depth ?? 0) <= (lookup(c, wantRug)?.depth ?? 0));
-  let rug = inZone(c, sofa.zone, ['rug']).find((r) => !targetsOf(c, r.id).some((t) => t !== sofa.id && t !== coffee.id));
+  // Claude's rug may lie in another zone (the way between the zones): any rug of no other group near the sofa
+  const inGroup = (t: string) => t === sofa.id || t === coffee.id || ['armchair', 'sofa'].includes(roleOfItem(c, c.items.find((i) => i.id === t) ?? sofa) ?? '');
+  const free = (r: ProgramItem) => targetsOf(c, r.id).every(inGroup);
+  let rug = inZone(c, sofa.zone, ['rug']).find(free) ?? near(c, sofa, hasRole(c, ['rug']), 2.5).find((r) => free(r) && !placedBy(c, r.id));
   if (!rug) rug = add(c, sofa, g, wantRug, `${sofa.id}_teppich`, 'Gehört zur Sitzgruppe: Teppich mittig unter Sofa-Vorderfüßen und Couchtisch, breiter als das Sofa (W6).', { fallbacks: fallbackRugs })!;
   else if (isGeneric(rug) && Math.max(lookup(c, rug.catalogId)?.width ?? 0, lookup(c, rug.catalogId)?.depth ?? 0) < sofaWidth + 0.3) {
     rug.fallbacks = [rug.catalogId, ...fallbackRugs.filter((f) => f !== rug!.catalogId)];

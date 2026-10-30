@@ -22,6 +22,16 @@ describe('furniture groups (#436)', () => {
     expect(notes.join(' ')).toContain('Sitzgruppe „sofa“ ergänzt');
   });
 
+  it('takes Claude\'s rug from another zone or under the armchair instead of laying a second one', () => {
+    const { program: p } = completeGroups(
+      program([item('sofa', 'generic-sofa-3'), item('chair', 'generic-armchair'), item('rug', 'generic-rug-200', 'weg')], [{ kind: 'under-front', item: 'rug', target: 'chair' }]),
+      'living',
+      22,
+      2,
+    );
+    expect(p.items.filter((i) => i.catalogId.startsWith('generic-rug')).map((i) => i.id)).toEqual(['rug']);
+  });
+
   it('keeps what Claude planned and binds loose pieces: coffee table gap, armchair at the table end, bigger rug', () => {
     const { program: p } = completeGroups(
       program(

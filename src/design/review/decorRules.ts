@@ -56,7 +56,12 @@ export function checkLight(ctx: RoomCtx): void {
 
 /** D5: rugs. */
 export function checkRugs(ctx: RoomCtx): void {
-  for (const r of ctx.items.filter((i) => i.role === 'rug')) {
+  const rugs = ctx.items.filter((i) => i.role === 'rug');
+  // two rugs on top of each other: one too many (W6)
+  for (const [k, r] of rugs.entries())
+    for (const q of rugs.slice(k + 1))
+      if (dist(r, q) < Math.min(r.width, r.depth, q.width, q.depth) / 2) ctx.add('D5', 'M', `${ctx.label(r)} und ${ctx.label(q)} liegen übereinander, ein Teppich reicht.`, [r, q], r);
+  for (const r of rugs) {
     for (const d of ctx.doors) if (d.swing && overlaps(d.swing, r.poly, 1e-3) && r.height > 0.005) ctx.add('D5', 'L', `${ctx.label(r)} liegt im Aufschwung der Tür ${d.label} und bleibt hängen.`, [r], r);
     const sofa = ctx.items.filter((s) => s.role === 'sofa' && s.floor && polyDist(r.poly, s.poly) < 1.5).sort((p, q) => polyDist(r.poly, p.poly) - polyDist(r.poly, q.poly))[0];
     const groupRug = ctx.items.some((t) => t.role === 'coffee-table' && overlaps(r.poly, t.poly, -0.05));

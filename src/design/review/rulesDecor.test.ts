@@ -65,6 +65,11 @@ describe('D3 / D4 Licht', () => {
 
 describe('D5 Teppich', () => {
   const rugRoom = (rugY: number) => living([sofa, put('generic-coffee-table', { x: 2.5, y: 2.3, face: 'N' }), put('generic-rug-160', { x: 2.5, y: rugY, face: 'N' })]);
+  it('two rugs on top of each other are one too many (#436)', () => {
+    const r = living([sofa, put('generic-rug-160', { x: 2.5, y: 2.6, face: 'N' }), put('generic-rug-200', { x: 2.6, y: 2.5, face: 'N' })]);
+    expect(r.findings.find((f) => /übereinander/.test(f.text))?.severity).toBe('M');
+    expect(has(rugRoom(2.6), 'D5', /übereinander/)).toBe(false);
+  });
   it('the sofa stands with its front feet on the rug', () => {
     expect(has(rugRoom(2.6), 'D5')).toBe(false);
     expect(has(rugRoom(1.5), 'D5', /Vorderfüßen/)).toBe(true);

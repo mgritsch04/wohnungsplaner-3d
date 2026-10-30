@@ -59,6 +59,19 @@ export function checkSeating(ctx: RoomCtx): void {
       const to = sub(centre, a);
       if (Math.hypot(to.x, to.y) > 0.4 && angleBetween(a.front, to) > deg(70)) ctx.add('C2', 'M', `${ctx.label(a)} schaut nicht zur Sitzgruppe, man sitzt mit dem Rücken zu den anderen.`, [a], a);
     }
+  // nobody sits looking at the back of a sofa or armchair (W7, R2; #436: a reading chair behind the sofa)
+  const seats = ctx.items.filter((i) => (i.role === 'armchair' || i.role === 'sofa') && i.floor);
+  for (const a of seats)
+    for (const b of seats) {
+      if (a === b) continue;
+      const to = sub(b, a);
+      const d = Math.hypot(to.x, to.y);
+      // b ahead of a and turned away from it: a sees b's back
+      if (d < 3 && angleBetween(a.front, to) < deg(55) && angleBetween(b.front, to) < deg(60)) {
+        ctx.add('C2', 'M', `${ctx.label(a)} schaut auf die Rückseite von ${ctx.label(b)}, wer dort sitzt, sieht nur die Lehne.`, [a, b], a);
+        break;
+      }
+    }
 }
 
 /** How far a sofa looks for its focal point (m), and how wide its view is. */

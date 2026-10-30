@@ -36,6 +36,11 @@ describe('C2 Sitzgruppe', () => {
     expect(has(living(2.3, [put('generic-armchair', { x: 4.5, y: 2.2, face: 'W' })]), 'C2', /Sessel|schaut/)).toBe(false);
     expect(has(living(2.3, [put('generic-armchair', { x: 4.5, y: 2.2, face: 'O' })]), 'C2', /schaut nicht/)).toBe(true);
   });
+  it('an armchair behind the sofa looks at its back (#436)', () => {
+    const behind = review({ room: rectRoom(5, 5, { doors: [{ wall: 'S', at: 4.5 }] }), type: 'living', items: [put('generic-sofa-3', { x: 2.5, y: 2, face: 'N' }), put('generic-armchair', { x: 2, y: 4.2, face: 'N' })] });
+    expect(behind.findings.find((f) => /Rückseite/.test(f.text))?.severity).toBe('M');
+    expect(has(living(2.3, [put('generic-armchair', { x: 4.5, y: 2.2, face: 'W' })]), 'C2', /Rückseite/)).toBe(false);
+  });
   it('a sofa with its back directly in front of the room door is light', () => {
     const sofaAt = (x: number) => review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }] }), type: 'living', items: [put('generic-sofa-3', { x, y: 2.4, face: 'N' })] });
     const back = (r: ReturnType<typeof sofaAt>) => r.findings.find((f) => f.rule === 'C2' && /Rücken/.test(f.text));
