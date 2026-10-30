@@ -22,6 +22,14 @@ describe('furniture groups (#436)', () => {
     expect(notes.join(' ')).toContain('Sitzgruppe „sofa“ ergänzt');
   });
 
+  it('puts only as many pieces at the sofa arms as its zone holds (flat B, #436)', () => {
+    // zone 2.8 m along the sofa (rotation 90°: its width runs along y), a plant of Claude's already at one arm
+    const narrow: RoomProgram = { ...program([item('sofa', 'generic-sofa-3', 'z', { hint: { x: 1, y: 2, rotation: Math.PI / 2 } }), item('plant', 'generic-plant')], [{ kind: 'right-of', item: 'plant', target: 'sofa' }]), zones: [{ id: 'z', function: 'Sitzen', rect: { x0: 0, y0: 0.6, x1: 5, y1: 3.4 }, why: '' }] };
+    const { program: p } = completeGroups(narrow, 'living', 25, 2);
+    expect(ids(p, 'generic-side-table')).toEqual([]);
+    expect(ids(p, 'generic-floor-lamp')).toEqual([]);
+  });
+
   it('takes Claude\'s rug from another zone or under the armchair instead of laying a second one', () => {
     const { program: p } = completeGroups(
       program([item('sofa', 'generic-sofa-3'), item('chair', 'generic-armchair'), item('rug', 'generic-rug-200', 'weg')], [{ kind: 'under-front', item: 'rug', target: 'chair' }]),

@@ -550,9 +550,6 @@ function plainRelationCost(m: Model, s: SoftRelation): number {
       const f = axisY(B.rotation);
       let cost = 0.6 * (1 - (f.x * dx + f.y * dy) / len);
       if (r.distance !== undefined) cost += 0.4 * Math.abs(len - B.hd - T.hd - r.distance);
-      // straight across, not just turned towards it: the screen in the middle of the seat (W5)
-      const side = axisX(B.rotation);
-      cost += 0.5 * Math.max(0, Math.abs(side.x * dx + side.y * dy) - 0.1);
       return cost;
     }
     case 'near': {

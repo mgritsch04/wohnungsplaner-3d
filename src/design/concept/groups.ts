@@ -129,6 +129,21 @@ const hasRole = (c: Ctx, roles: Role[]) => (i: ProgramItem) => roles.includes(ro
  */
 export type GroupScope = 'full' | 'compact' | 'light';
 
+/** Width a lamp or side table takes at the arm of a sofa, with its gap (W4). */
+const ARM_PIECE = 0.45;
+
+/**
+ * Pieces that fit beside a sofa (0–2): the length of its zone along the sofa's width, less the
+ * sofa. Without a zone or a start place the room decides later; then both fit.
+ */
+function armSlots(c: Ctx, sofa: ProgramItem): number {
+  const zone = c.program.zones.find((z) => z.id === sofa.zone);
+  if (!zone || !sofa.hint) return 2;
+  const alongX = Math.abs(Math.cos(sofa.hint.rotation)) > 0.5;
+  const length = alongX ? zone.rect.x1 - zone.rect.x0 : zone.rect.y1 - zone.rect.y0;
+  return Math.max(0, Math.min(2, Math.floor((length - widthOf(c, sofa) + 0.05) / ARM_PIECE)));
+}
+
 function seatingGroup(c: Ctx, sofa: ProgramItem, scope: GroupScope): void {
   const g = `Sitzgruppe „${sofa.id}“`;
   if (scope === 'light') {
@@ -171,12 +186,15 @@ function seatingGroup(c: Ctx, sofa: ProgramItem, scope: GroupScope): void {
   const lamps = inZone(c, sofa.zone, ['floor-lamp']);
   let lamp = lamps.find((l) => beside(l.id)) ?? lamps.find((l) => !bound(c, l.id) && !placedBy(c, l.id) && !targetsOf(c, l.id).length);
   const tableLamp = inZone(c, sofa.zone, ['table-lamp']).some((l) => targetsOf(c, l.id).some((t) => inZone(c, sofa.zone, ['side-table']).some((s) => s.id === t)));
-  if (!lamp && !tableLamp) lamp = add(c, sofa, g, 'generic-floor-lamp', `${sofa.id}_stehlampe`, 'Gehört zur Sitzgruppe: Steh- oder Leselampe an der Armlehne, Zonenlicht für Lesen und Plaudern (L2, L4).')!;
+  // only as many pieces at the arms as the zone holds beside the sofa (a plant Claude put there counts)
+  let slots = armSlots(c, sofa) - c.items.filter((i) => beside(i.id) && !['floor-lamp', 'side-table'].includes(roleOfItem(c, i) ?? '')).length;
+  if (lamp) slots--;
+  if (!lamp && !tableLamp && slots-- > 0) lamp = add(c, sofa, g, 'generic-floor-lamp', `${sofa.id}_stehlampe`, 'Gehört zur Sitzgruppe: Steh- oder Leselampe an der Armlehne, Zonenlicht für Lesen und Plaudern (L2, L4).')!;
   const lampSide = lamp ? (beside(lamp.id)?.kind ?? 'left-of') : 'left-of';
   if (lamp && !beside(lamp.id)) rebind(c, lamp.id, { kind: lampSide, item: lamp.id, target: sofa.id, gap: ARM_GAP });
   const otherSide = lampSide === 'left-of' ? 'right-of' : 'left-of';
   let side = inZone(c, sofa.zone, ['side-table']).find((s) => beside(s.id) || !bound(c, s.id));
-  if (!side && scope === 'full' && !corner) side = add(c, sofa, g, 'generic-side-table', `${sofa.id}_beistelltisch`, 'Gehört zur Sitzgruppe: Beistelltisch an der Armlehne für Tasse und Buch (W4).')!;
+  if (!side && scope === 'full' && !corner && slots > 0) side = add(c, sofa, g, 'generic-side-table', `${sofa.id}_beistelltisch`, 'Gehört zur Sitzgruppe: Beistelltisch an der Armlehne für Tasse und Buch (W4).')!;
   if (side && !beside(side.id)) rebind(c, side.id, { kind: otherSide, item: side.id, target: sofa.id, gap: ARM_GAP });
 
   // armchairs of the zone that stand loose: at the ends of the coffee table, turned to it (W1)

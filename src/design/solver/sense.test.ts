@@ -372,7 +372,7 @@ describe('what is left out', () => {
 });
 
 describe('the seating group holds together (#436)', () => {
-  it('an armchair at the end of the coffee table turns to it, the TV hangs straight across from the sofa', () => {
+  it('an armchair at the end of the coffee table turns to it', () => {
     const room = rectRoom(5.5, 4.5, { doors: [{ wall: 'S', at: 4.8 }], windows: [{ wall: 'N', at: 1.5 }] });
     const layout = solveRoom(
       room,
@@ -399,8 +399,7 @@ describe('the seating group holds together (#436)', () => {
     expect(angleTo(chair, ct)).toBeLessThan(25);
     const along = Math.abs((chair.x - ct.x) * Math.cos(ct.rotation) + (chair.y - ct.y) * Math.sin(ct.rotation));
     expect(Math.abs(along - (0.55 + 0.4 + 0.41))).toBeLessThan(0.03);
-    // the screen sits on the sofa's axis, not off to one side
-    const board = byId(layout, 'board');
-    expect(Math.abs(board.x - sofa.x)).toBeLessThan(0.25);
+    // the screen stays turned to the sofa; centring it is the walk-through's job (C3), a cost for it turned free sofas away (#436)
+    expect(angleTo(byId(layout, 'board'), sofa)).toBeLessThan(45);
   });
 });
