@@ -65,6 +65,8 @@ const PENDANT_OVER_TABLE = 1.4;
 const ROOMS: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen', 'other'];
 /** Rooms that get a ceiling light as their main light when none is planned (L1). */
 const MAIN_LIGHT: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen'];
+/** Rooms that get curtains at every window when none are planned (R8). */
+const CURTAINED: RoomType[] = ['living', 'bedroom', 'kids', 'office'];
 /** Below this room area (m²) per function the room is compact (studio, living kitchen). */
 const AREA_PER_FUNCTION = 8;
 /** A living room below this area (m²) is compact. */
@@ -291,7 +293,7 @@ function readingCorner(c: Ctx, chair: ProgramItem, scope: GroupScope): void {
  * `area` the room's floor area in m². Returns a new programme and notes for the panel and the
  * critique; the input stays as it is.
  */
-export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = []): { program: RoomProgram; notes: string[] } {
+export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = [], windows: { id: string; x: number; y: number; rotation: number }[] = []): { program: RoomProgram; notes: string[] } {
   if (!ROOMS.includes(type)) return { program, notes: [] };
   const c: Ctx = { program, items: program.items.map((i) => ({ ...i })), relations: program.relations.map((r) => structuredClone(r)), catalog: [...PLACEHOLDERS, ...products], notes: [], added: new Map() };
   const anchors = (roles: Role[]) => c.items.filter((i) => roles.includes(roleOfItem(c, i)!));
@@ -309,6 +311,20 @@ export function completeGroups(program: RoomProgram, type: RoomType, area: numbe
   if (MAIN_LIGHT.includes(type) && area >= 6 && !c.items.some((i) => roleOfItem(c, i) === 'pendant' && !bound(c, i.id))) {
     const anchor = c.items.find((i) => i.required) ?? c.items[0];
     if (anchor) add(c, anchor, 'Grundlicht', 'generic-pendant', 'deckenlicht', 'Grundlicht des Raums an der Decke, warmweiß und dimmbar (L1, L3).');
+  }
+  // curtains as a pair at every window of a room one lives or sleeps in (R8)
+  if (CURTAINED.includes(type)) {
+    const anchor = c.items.find((i) => i.required) ?? c.items[0];
+    // the zone the window lights, so the curtains belong to it
+    const off = (z: RoomProgram['zones'][number], p: { x: number; y: number }) => Math.hypot(Math.max(z.rect.x0 - p.x, 0, p.x - z.rect.x1), Math.max(z.rect.y0 - p.y, 0, p.y - z.rect.y1));
+    for (const w of windows) {
+      if (!anchor || c.relations.some((r) => r.kind === 'window' && r.window === w.id && roleOfItem(c, c.items.find((i) => i.id === r.item) ?? anchor) === 'curtain')) continue;
+      const zone = [...program.zones].sort((a, b) => off(a, w) - off(b, w))[0]?.id ?? anchor.zone;
+      for (const k of [1, 2]) {
+        const it = add(c, anchor, `Fenster ${w.id}`, 'generic-curtain', `vorhang_${w.id.toLowerCase()}_${k}`, 'Vorhänge als Paar neben dem Glas, Stange über das Fenster hinaus: das Fenster wirkt größer, abends wird es wohnlich (R8).', { zone, hint: { x: w.x, y: w.y, rotation: w.rotation } });
+        if (it) c.relations.push({ kind: 'window', item: it.id, window: w.id, place: 'over' });
+      }
+    }
   }
   for (const [g, names] of c.added) c.notes.push(`${g} ergänzt: ${names.join(', ')}.`);
   return { program: { ...program, items: c.items, relations: c.relations }, notes: c.notes };
