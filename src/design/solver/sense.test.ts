@@ -70,6 +70,35 @@ describe('the sofa looks at the TV', () => {
   });
 });
 
+describe('no dead strip behind a back (W9)', () => {
+  it('a sofa Claude puts 65 cm in front of the wall goes to the wall or leaves a passage', () => {
+    const room = rectRoom(5, 4.2, { doors: [{ wall: 'O', at: 3.4 }], windows: [{ wall: 'W', at: 2.0 }] });
+    for (const seed of [1, 2, 3]) {
+      const p = program(
+        room,
+        [item('sofa', 'generic-sofa-3', [2.2, 1.1, S]), item('coffee', 'generic-coffee-table'), item('board', 'generic-tv-sideboard', [2.2, 4.0, N]), item('tv', 'generic-tv')],
+        [
+          { kind: 'front-of', item: 'coffee', target: 'sofa', gap: 0.45 },
+          { kind: 'above', item: 'tv', target: 'board' },
+        ],
+      );
+      const layout = solveRoom(room, p, { seed });
+      const sofa = byId(layout, 'sofa');
+      const gap = sofa.y - sofa.depth / 2;
+      expect(gap <= 0.1 || gap >= 0.75, `seed ${seed}: ${Math.round(gap * 100)} cm hinter dem Sofa`).toBe(true);
+    }
+  });
+
+  it('a desk does not stand a hand\'s width off the wall', () => {
+    const room = rectRoom(3.5, 3.2, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'W', at: 1.6 }] });
+    const p = program(room, [item('desk', 'generic-desk', [1.9, 0.6, S])]);
+    const layout = solveRoom(room, p, { seed: 4 });
+    const desk = byId(layout, 'desk');
+    const gap = Math.min(desk.x, desk.y, room.size.x - desk.x, room.size.y - desk.y) - desk.depth / 2;
+    expect(gap <= 0.1 || gap >= 0.75, `${Math.round(gap * 100)} cm hinter dem Schreibtisch`).toBe(true);
+  });
+});
+
 describe('a tight room keeps its double bed', () => {
   it('three doors round the bed: a nightstand or the shelf stays out, the 180 bed keeps its size', () => {
     const room = rectRoom(4.59, 4.08, {

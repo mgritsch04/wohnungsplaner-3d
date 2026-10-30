@@ -201,6 +201,19 @@ export function checkWallFit(ctx: RoomCtx): void {
   }
 }
 
+/**
+ * C8 (L), W9: a sofa or desk with its back to a wall stands at it or leaves a passage (75 cm);
+ * 15–70 cm in between is a strip nobody can use (image review: sofa 65 cm before the window).
+ */
+export function checkBackGap(ctx: RoomCtx): void {
+  for (const i of ctx.placed) {
+    if (!i.floor || !(i.role === 'sofa' || i.category === 'desk')) continue;
+    const behind = ctx.freeDepth(i, 'back', 0.8);
+    if (behind.blocker === 'wall' && behind.depth >= 0.15 - 1e-6 && behind.depth <= 0.7 + 1e-6)
+      ctx.add('C8', 'L', `Hinter ${ctx.label(i)} bleiben ${cm(behind.depth)} cm bis zur Wand: zu schmal für einen Gang, zu breit für „an der Wand“.`, [i], i);
+  }
+}
+
 /** C9 (M): wedged in. */
 export function checkWedged(ctx: RoomCtx): void {
   const list = ctx.items.filter((i) => i.floor && !isKitchenModule(i) && !isLamp(i) && !isPlant(i) && i.category !== 'decor');

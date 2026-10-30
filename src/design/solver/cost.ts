@@ -7,11 +7,11 @@
  * The total splits into a part per unit (`unitCost`), a part per pair of units (`pairCost`) and
  * the walking grid (`gridCost`), so the search can recompute only what a move touches.
  */
-import { add, closestPointOnSegment, pointInPolygon, scale, type Vec2 } from '../../model/vec';
+import { add, closestPointOnSegment, dot, pointInPolygon, scale, type Vec2 } from '../../model/vec';
 import { axisX, axisY, distToBox, gapBetween, outsideAmount, overlapDepth, WALL_TOL, wrapAngle, type Box } from './geom';
 import type { Model, Node, SoftRelation, Unit } from './model';
 import { usesWater } from '../../model/fixtures';
-import { doorSeed, sideStrip, wallStrip } from './room';
+import { alongWall, doorSeed, offWall, sideStrip, wallStrip } from './room';
 
 /** How far a piece may reach out of the user's marked area (m) before it counts as outside. */
 export const USER_ZONE_SLACK = 0.6;
@@ -301,7 +301,46 @@ function designCost(m: Model, u: Unit, n: Node): number {
     if (u.mode !== 'wall') s += 1.0;
   }
   if (n.spec.shape === 'plant' && isFloor(n)) s += plantPlaceCost(m, n);
+  s += backGapCost(m, n);
   return s;
+}
+
+/** Pieces whose back belongs at a wall or behind a passage (W9). */
+const BACKED_SHAPES = new Set(['cabinet', 'dresser', 'shelf', 'wardrobe']);
+const backed = (n: Node) => isFloor(n) && (n.spec.role === 'sofa' || n.spec.category === 'desk' || (n.spec.category === 'storage' && BACKED_SHAPES.has(n.spec.shape)));
+/** Gap behind a back (m) that is neither at the wall nor a passage. */
+export const DEAD_GAP = { lo: 0.1, hi: 0.75 };
+
+/**
+ * Space between a piece's back and the wall behind it (m), Infinity when no wall faces its back.
+ * Only walls the back runs parallel to count: a sofa set at an angle has no gap to judge.
+ */
+export function backGap(m: Model, n: Node): number {
+  const back = scale(axisY(n.box.rotation), -1);
+  const side = axisX(n.box.rotation);
+  let gap = Infinity;
+  for (const w of m.ctx.walls) {
+    if (dot(w.inward, back) > -0.97) continue;
+    const g = offWall(w, n.box) - n.box.hd;
+    if (g < -0.01 || g >= gap) continue;
+    const t = alongWall(w, n.box);
+    const half = Math.abs(dot(side, w.dir)) * n.box.hw;
+    if (t + half < 0.1 || t - half > w.length - 0.1) continue;
+    gap = g;
+  }
+  return gap;
+}
+
+/**
+ * W9: a sofa, desk or cabinet has its back at the wall or leaves a passage behind it (75 cm
+ * and more); 15–70 cm in between is a dead strip nobody can use or clean (image review: the sofa
+ * 65 cm in front of the window).
+ */
+function backGapCost(m: Model, n: Node): number {
+  if (!backed(n)) return 0;
+  const g = backGap(m, n);
+  if (!(g > DEAD_GAP.lo && g < DEAD_GAP.hi)) return 0;
+  return 0.6 * Math.min(1, Math.min(g - DEAD_GAP.lo, DEAD_GAP.hi - g) / 0.15);
 }
 
 /** D1: a plant stands in a corner, at a window or at a wall, never free in the room. */

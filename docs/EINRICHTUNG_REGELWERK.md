@@ -18,7 +18,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | W6 | W | Teppich der Sitzgruppe: mindestens die Vorderfüße aller Sitzmöbel liegen 15–20 cm darauf; er ist breiter als das Sofa (je Seite 15–45 cm) und liegt mittig unter der Gruppe; 30–45 cm Bodenrand zur Wand. | Ein zu kleiner Teppich zerteilt die Gruppe statt sie zu fassen. | Bed Bath & Beyond, livingetc, Houzz | Prompt, Löser, Begehung |
 | W7 | W | Ein Blickpunkt je Raum (Fenster mit Ausblick, Medienwand, großes Bild); das Sofa schaut darauf, nie auf eine leere Wand, Türen oder den Rücken eines anderen Möbels. | Der Raum bekommt eine Ordnung, der Blick ruht. | Vinterior, Rovelab | Prompt, Begehung |
 | W8 | H | Der Laufweg führt um die Sitzgruppe herum, nie zwischen Sofa und Couchtisch oder zwischen Sofa und Fernseher. | Sonst läuft man durchs Gespräch und durchs Bild. | Houzz („around, not through“) | Prompt, Begehung |
-| W9 | W | Sofa frei im Raum nur mit 75–90 cm Gang dahinter und mit etwas, das den Rücken fasst (Konsole, Sideboard, Leseecke); sonst mit dem Rücken an die Wand. | Ein frei stehendes Sofa ohne Halt wirkt verloren. | coohom, livingetc | Prompt |
+| W9 | W | Sofa frei im Raum nur mit 75–90 cm Gang dahinter und mit etwas, das den Rücken fasst (Konsole, Sideboard, Leseecke); sonst mit dem Rücken an die Wand; kein Spalt von 15–70 cm dahinter (gilt auch für Schreibtisch und Schränke). | Ein frei stehendes Sofa ohne Halt wirkt verloren; ein schmaler Spalt ist weder Gang noch Wand und sammelt nur Staub. | coohom, livingetc | Prompt, Löser, Begehung |
 
 ## Schlafen
 
