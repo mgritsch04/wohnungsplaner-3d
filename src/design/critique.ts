@@ -6,6 +6,7 @@
  * placement run on it. No coordinates are patched by hand: Claude moves zones, changes
  * relations, swaps, drops or adds pieces, and stage 3 places everything anew.
  */
+import { FLANK_GAP } from './concept/groups';
 import type { SampleImage } from '../assistant/claude';
 import { sideOfRotation, toRoomCm } from './coords';
 import { buildRoomProgramPrompt, parseRoomProgram, type RoomProgramInput } from './concept/roomProgram';
@@ -103,6 +104,8 @@ export function programAsAnswer(program: RoomProgram, origin: { x: number; y: nu
       case 'left-of':
       case 'right-of':
         return [r.item, r.kind, r.target, ...(r.gap === undefined ? [] : [cm(r.gap)])];
+      case 'flank':
+        return [r.item, 'flank', r.target, cm(r.gap ?? FLANK_GAP), ...(r.side ? [r.side] : [])];
       default:
         return [r.item, r.kind, r.target];
     }

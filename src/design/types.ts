@@ -307,6 +307,8 @@ export type Relation =
   | { kind: 'pair'; item: string; item2: string; target: string }
   /** `item` faces `target`, `distance` between their fronts (TV and sofa). */
   | { kind: 'facing'; item: string; target: string; distance?: number }
+  /** Seat at one end of `target` (armchair at the coffee table), turned towards it, `gap` between them; `side` as seen from the target's front. */
+  | { kind: 'flank'; item: string; target: string; side?: 'left' | 'right'; gap?: number }
   /** Seats spread around the free sides of a table. */
   | { kind: 'around'; items: string[]; target: string }
   /** Hangs centred above `target` (picture over the sofa, pendant over the table); `height` = lower edge above the floor. */

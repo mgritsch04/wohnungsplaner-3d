@@ -17,6 +17,7 @@ import type { FlatConcept, KitchenRun, ProgramItem, ProgramZone, RoomAnalysis, R
 import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, strList, type Thing, thingOf } from './common';
 import { existingIn, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
+import { completeGroups } from './groups';
 import { parseRelations, type RelationItem } from './relations';
 
 export interface RoomProgramInput {
@@ -344,7 +345,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     for (const [type, label] of [['sink', 'Spüle'], ['fridge', 'Kühlschrank']] as const) if (!mods.some((m) => m.kitchen?.type === type)) problems.push(`Die Küchenzeile hat keine ${label}.`);
   }
 
-  const value: RoomProgram = {
+  const parsed: RoomProgram = {
     roomId: room.roomId,
     reading: str(o.reading, 1200),
     zones,
@@ -354,7 +355,10 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     walk: str(o.walk, 1200),
     check: strList(o.check, 300, 30),
   };
-  return { value, problems, notes };
+  // every furniture group complete and bound as a designer plans it (Sitzgruppe, Schlafplatz …)
+  const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products);
+  notes.push(...groups.notes);
+  return { value: groups.program, problems, notes };
 }
 
 const thingOfFurniture = (f: Furniture): Thing => ({ category: f.category, shape: shapeOf(f), height: f.height, width: f.width, depth: f.depth, name: f.name });

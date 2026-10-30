@@ -241,6 +241,22 @@ function deriveNode(m: Model, n: Node): void {
       n.box = !r.pair && insideScore(m, a) > 0 && insideScore(m, place(-side)) === 0 ? place(-side) : a;
       return;
     }
+    case 'flank': {
+      // at the end of the table, turned towards it: the armchair that closes a seating group (W1)
+      let side = r.side === 'left' ? 1 : r.side === 'right' ? -1 : 1;
+      if (!r.side && hint) {
+        const rel = (hint.x - P.x) * x.x + (hint.y - P.y) * x.y;
+        if (Math.abs(rel) > 0.05) side = rel > 0 ? 1 : -1;
+      }
+      // level with the far half of the table: clear of the sofa's legroom, the group a U
+      const place = (sd: number): Box => {
+        const c = at(sd * (P.hw + r.gap + s.depth / 2), P.hd);
+        return { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: rotationFacing(scale(x, -sd)) };
+      };
+      const a = place(side);
+      n.box = insideScore(m, a) > 0 && insideScore(m, place(-side)) === 0 ? place(-side) : a;
+      return;
+    }
     case 'front': {
       if (s.role === 'seat') {
         // desk chair: faces the piece, pushed in a little

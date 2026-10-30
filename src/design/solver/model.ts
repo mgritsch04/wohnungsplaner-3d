@@ -16,6 +16,8 @@ export type Rule =
   | { kind: 'around'; index: number; count: number }
   | { kind: 'beside'; side: 'left' | 'right'; gap: number; pair: boolean }
   | { kind: 'front'; gap: number }
+  /** At one end of the parent (armchair at the coffee table), turned towards it. */
+  | { kind: 'flank'; side: 'left' | 'right' | null; gap: number }
   | { kind: 'under-front' | 'under-all' }
   | { kind: 'above'; height?: number }
   | { kind: 'on'; index: number; count: number }
@@ -253,6 +255,9 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
       case 'under-front':
       case 'under-all':
         if (isTarget(rel.target)) used = setRule(rel.item, rel.target, { kind: rel.kind });
+        break;
+      case 'flank':
+        if (nodes.has(rel.target)) used = setRule(rel.item, rel.target, { kind: 'flank', side: rel.side ?? null, gap: rel.gap ?? 0.4 });
         break;
       case 'window':
         if (windows.has(rel.window) && (rel.place === 'over' || nodes.get(rel.item)?.spec.base === 'curtain')) {

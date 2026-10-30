@@ -23,6 +23,7 @@ const DEFS: Def[] = [
   ['generic-round-table', 'Runder Tisch Ø 110', 'table', 1.1, 1.1, 0.75, 'table-round', '#b8946a', 250, { tags: ['tisch', 'rund'] }],
   ['generic-coffee-table', 'Couchtisch', 'table', 1.1, 0.6, 0.42, 'table', '#a88a68', 120, { tags: ['couchtisch'] }],
   // a place for a cup next to sofa or armchair, a seat on a play rug (#443: the image review missed both)
+  ['generic-coffee-table-round', 'Couchtisch rund Ø 80', 'table', 0.8, 0.8, 0.42, 'table-round', '#b89a76', 110, { tags: ['couchtisch'] }],
   ['generic-side-table', 'Beistelltisch Ø 45', 'table', 0.45, 0.45, 0.52, 'table-round', '#a88a68', 50, { tags: ['beistelltisch'] }],
   ['generic-pouf', 'Pouf / Sitzsack Ø 55', 'chair', 0.55, 0.55, 0.42, 'pouf', '#c9b79c', 60, { tags: ['pouf', 'sitzsack', 'hocker'] }],
   ['generic-chair', 'Stuhl', 'chair', 0.45, 0.52, 0.86, 'chair', '#a88a68', 70, { tags: ['stuhl', 'esszimmer'] }],
@@ -43,7 +44,9 @@ const DEFS: Def[] = [
   ['generic-table-lamp', 'Tischlampe', 'lighting', 0.25, 0.25, 0.45, 'table-lamp', '#e7e2d8', 35, { solid: false, elevation: 0.75, tags: ['lampe'] }],
   ['generic-pendant', 'Pendelleuchte', 'lighting', 0.4, 0.4, 0.5, 'pendant', '#2d2d2d', 70, { solid: false, elevation: 1.9, tags: ['lampe', 'decke'] }],
   ['generic-rug-200', 'Teppich 200×300', 'textile', 2.0, 3.0, 0.01, 'rug', '#bfb3a2', 150, { solid: false, tags: ['teppich'] }],
+  ['generic-rug-240', 'Teppich 240×340', 'textile', 2.4, 3.4, 0.01, 'rug', '#b7aea2', 230, { solid: false, tags: ['teppich'] }],
   ['generic-rug-160', 'Teppich 160×230', 'textile', 1.6, 2.3, 0.01, 'rug', '#9aa5a0', 100, { solid: false, tags: ['teppich'] }],
+  ['generic-rug-120', 'Teppich 120×170', 'textile', 1.2, 1.7, 0.01, 'rug', '#a9a39a', 50, { solid: false, tags: ['teppich'] }],
   ['generic-runner', 'Läufer 80×200', 'textile', 0.8, 2.0, 0.01, 'rug', '#a89f91', 40, { solid: false, tags: ['läufer', 'teppich', 'flur'] }],
   ['generic-curtain', 'Vorhang 140×250', 'textile', 1.4, 0.06, 2.5, 'curtain', '#e8e1d4', 40, { solid: false, tags: ['vorhang', 'gardine'] }],
   ['generic-plant', 'Zimmerpflanze groß', 'decor', 0.5, 0.5, 1.4, 'plant', '#4f7a43', 45, { solid: false, tags: ['pflanze'] }],

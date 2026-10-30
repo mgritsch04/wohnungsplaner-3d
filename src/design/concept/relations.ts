@@ -45,6 +45,9 @@ const WORDS: Record<string, RelationKind | 'next-to' | 'under' | 'around-one'> =
   by: 'next-to',
   adjacent: 'next-to',
   'adjacent-to': 'next-to',
+  flank: 'flank',
+  'end-of': 'flank',
+  stirnseite: 'flank',
   pair: 'pair',
   'both-sides': 'pair',
   flanking: 'pair',
@@ -349,6 +352,12 @@ export function parseRelations(raw: unknown, ctx: RelationContext): ParsedRelati
         out.push({ kind, item, target, ...(gap !== undefined ? { gap } : {}) });
         break;
       }
+      case 'flank': {
+        const gap = metres(r[3]);
+        const side = str(r[4], 10).toLowerCase();
+        out.push({ kind: 'flank', item, target, ...(side === 'left' || side === 'right' ? { side } : {}), ...(gap !== undefined ? { gap } : {}) });
+        break;
+      }
       case 'pair': {
         const second = label(r[3]);
         if (isItem(second)) out.push({ kind: 'pair', item, item2: target, target: second });
@@ -407,7 +416,7 @@ export function parseRelations(raw: unknown, ctx: RelationContext): ParsedRelati
     const kind = str(o.kind, 30) as RelationKind;
     const ids = ['item', 'item2', 'target'].map((k) => (o[k] === undefined ? undefined : label(o[k])));
     const bad = ids.filter((id): id is string => id !== undefined && !isItem(id) && !(ids.indexOf(id) === 2 && (isWindow(id) || isWall(id))));
-    const known: RelationKind[] = ['wall', 'corner', 'center', 'front-of', 'left-of', 'right-of', 'pair', 'facing', 'around', 'above', 'under-front', 'under-all', 'on', 'window', 'near', 'away', 'align'];
+    const known: RelationKind[] = ['wall', 'corner', 'center', 'front-of', 'left-of', 'right-of', 'pair', 'flank', 'facing', 'around', 'above', 'under-front', 'under-all', 'on', 'window', 'near', 'away', 'align'];
     if (!known.includes(kind)) {
       drop(o, `„${kind}“ gehört nicht zum Vokabular`);
       return null;

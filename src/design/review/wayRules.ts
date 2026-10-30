@@ -110,12 +110,17 @@ export function checkClearances(ctx: RoomCtx): void {
   clearances(ctx);
 }
 
+const SERVED = new Set(['side-table', 'floor-lamp']);
+const SEATS = new Set(['sofa', 'armchair']);
+
 /** B7 (M) not reachable, B8 (L) no window reachable. */
 export function checkReach(ctx: RoomCtx): void {
   if (!ctx.doors.length) return;
   const g = ctx.grid;
   for (const i of ctx.placed) {
     if (!i.floor || i.category === 'decor' || isKitchenModule(i)) continue;
+    // a side table or lamp at the arm of a seat is used from the seat (W4, L4)
+    if (SERVED.has(i.role) && ctx.placed.some((s) => SEATS.has(s.role) && pointPolyDist({ x: i.x, y: i.y }, s.poly) < 0.25 + Math.max(i.width, i.depth) / 2)) continue;
     // to a chair one sidesteps along the table (40 cm); everything else needs the 50 cm way
     const seen = i.role === 'seat' ? ctx.reachSideways : ctx.reach;
     if (!g.touches(seen, i, Math.max(i.width, i.depth) / 2 + 0.5)) ctx.add('B7', 'M', `${ctx.label(i)} ist nicht erreichbar, der Weg dorthin ist zugestellt.`, [i], i);

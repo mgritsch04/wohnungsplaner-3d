@@ -370,3 +370,37 @@ describe('what is left out', () => {
     expect(layout.dropped.find((d) => d.id === 'pendant')?.reason).toMatch(/gehört zu/);
   });
 });
+
+describe('the seating group holds together (#436)', () => {
+  it('an armchair at the end of the coffee table turns to it, the TV hangs straight across from the sofa', () => {
+    const room = rectRoom(5.5, 4.5, { doors: [{ wall: 'S', at: 4.8 }], windows: [{ wall: 'N', at: 1.5 }] });
+    const layout = solveRoom(
+      room,
+      program(
+        room,
+        [item('sofa', 'generic-sofa-3', [1.6, 3.9, N]), item('ct', 'generic-coffee-table', [1.6, 2.9, N]), item('chair', 'generic-armchair', [3.2, 2.9, N]), item('board', 'generic-tv-sideboard', [3.5, 0.3, S]), item('tv', 'generic-tv', [3.5, 0.1, S])],
+        [
+          { kind: 'wall', item: 'sofa', wall: 'W3' },
+          { kind: 'front-of', item: 'ct', target: 'sofa', gap: 0.45 },
+          { kind: 'flank', item: 'chair', target: 'ct', gap: 0.4 },
+          { kind: 'wall', item: 'board', wall: 'W1' },
+          { kind: 'above', item: 'tv', target: 'board' },
+          { kind: 'facing', item: 'board', target: 'sofa' },
+        ],
+      ),
+      { seed: 3 },
+    );
+    expect(layout.unsolved).toEqual([]);
+    expect(layout.dropped).toEqual([]);
+    const sofa = byId(layout, 'sofa');
+    const ct = byId(layout, 'ct');
+    const chair = byId(layout, 'chair');
+    // the chair looks at the table, from its end, 40 cm away
+    expect(angleTo(chair, ct)).toBeLessThan(25);
+    const along = Math.abs((chair.x - ct.x) * Math.cos(ct.rotation) + (chair.y - ct.y) * Math.sin(ct.rotation));
+    expect(Math.abs(along - (0.55 + 0.4 + 0.41))).toBeLessThan(0.03);
+    // the screen sits on the sofa's axis, not off to one side
+    const board = byId(layout, 'board');
+    expect(Math.abs(board.x - sofa.x)).toBeLessThan(0.25);
+  });
+});
