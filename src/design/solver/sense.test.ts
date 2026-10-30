@@ -403,3 +403,25 @@ describe('the seating group holds together (#436)', () => {
     expect(angleTo(byId(layout, 'board'), sofa)).toBeLessThan(45);
   });
 });
+
+describe('a tight living room keeps its seating group (#436)', () => {
+  it('leaves out a shelf or the sideboard before the coffee table in front of the sofa', () => {
+    // 3.4 × 2.5 m, door in the south wall: sofa, coffee table, TV board opposite and two shelves do not all fit
+    const room = rectRoom(3.4, 2.5, { doors: [{ wall: 'S', at: 0.6 }] });
+    const layout = solveRoom(
+      room,
+      program(
+        room,
+        [item('sofa', 'generic-sofa-3', [1.9, 2.05, N]), item('ct', 'generic-coffee-table', [1.9, 1.9, N]), item('board', 'generic-tv-sideboard', [1.9, 0.25, S]), item('shelf1', 'generic-shelf-80', [0.2, 1.2, S]), item('shelf2', 'generic-shelf-80', [3.2, 1.2, S])].map((i) => (i.id === 'sofa' ? { ...i, required: true } : i)),
+        [
+          { kind: 'wall', item: 'sofa', wall: 'W3' },
+          { kind: 'front-of', item: 'ct', target: 'sofa', gap: 0.45 },
+          { kind: 'wall', item: 'board', wall: 'W1' },
+          { kind: 'facing', item: 'board', target: 'sofa' },
+        ],
+      ),
+      { seed: 3 },
+    );
+    expect(layout.items.some((i) => i.id === 'ct')).toBe(true);
+  });
+});
