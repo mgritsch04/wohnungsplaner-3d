@@ -23,7 +23,7 @@ describe('room programme prompt', () => {
   it('works in designer order with concept, sketch, rules, catalogue and vocabulary', () => {
     const i = input('B', 'Wohnküche');
     const p = buildRoomProgramPrompt(i);
-    const order = ['1. Raum lesen', '2. Zonen festlegen', '3. Je Zone zuerst das Ankermöbel', '4. Dann die Begleitmöbel', '5. Erst dann Licht', '6. Begehung im Kopf'];
+    const order = ['1. Raum lesen', '2. Zonen festlegen', '3. Je Zone ein Baustein', '4. Lichtplan', '5. Stauraum', '6. Stil', '7. Textilien', '8. Begehung im Kopf', 'Raumfakten:', 'Bausteine', 'Regelwerk (mit Kennungen'];
     expect(order.map((s) => p.indexOf(s)).every((at, k, all) => at > 0 && (k === 0 || at > all[k - 1]))).toBe(true);
     expect(p).toContain(i.sketch);
     expect(p).toContain(concepts.B.living);

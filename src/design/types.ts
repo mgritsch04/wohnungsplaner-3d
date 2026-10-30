@@ -280,6 +280,8 @@ export interface ProgramItem {
   label?: string;
   /** Colour as #rrggbb. */
   color?: string;
+  /** Functions the real product must have („Schlaffunktion“, „Stauraum“), for the product search. */
+  features?: string[];
   why: string;
   /** Smaller pieces of the same kind (catalogue ids, preferred first) for when it does not fit. */
   fallbacks?: string[];

@@ -66,6 +66,7 @@ export function programAsAnswer(program: RoomProgram, origin: { x: number; y: nu
       ...(at ? { x: at.x, y: at.y, facing: sideOfRotation(i.hint!.rotation) } : {}),
       ...(i.label ? { label: i.label } : {}),
       ...(i.color ? { color: i.color } : {}),
+      ...(i.features?.length ? { features: i.features } : {}),
       why: i.why,
       ...(i.required ? { anchor: true } : {}),
       ...(i.fallbacks?.length ? { fallbacks: i.fallbacks } : {}),

@@ -34,6 +34,25 @@ export const GROUPS: Record<GroupKind, { anchor: string; members: string }> = {
   leseecke: { anchor: 'Sessel für sich', members: 'Leselampe neben oder leicht hinter dem Sessel (L4), Beistelltisch an der anderen Seite (W4), gern am Fenster (R6)' },
 };
 
+/** Which groups suit a room type, for the prompt. */
+const GROUPS_OF: Partial<Record<RoomType, GroupKind[]>> = {
+  living: ['sitzgruppe', 'leseecke', 'essplatz', 'arbeitsplatz', 'schlafplatz'],
+  bedroom: ['schlafplatz', 'leseecke', 'arbeitsplatz'],
+  kids: ['schlafplatz', 'arbeitsplatz', 'leseecke'],
+  office: ['arbeitsplatz', 'leseecke', 'sitzgruppe'],
+  dining: ['essplatz', 'sitzgruppe'],
+  kitchen: ['essplatz'],
+  other: ['sitzgruppe', 'leseecke', 'arbeitsplatz'],
+};
+
+/** The groups of a room type as prompt lines („- Sitzgruppe (Anker Sofa): Couchtisch …“). */
+export function groupLines(type: RoomType): string {
+  const kinds = GROUPS_OF[type] ?? [];
+  if (!kinds.length) return '- keine festen Bausteine: jedes Teil an seinen Platz nach Funktion';
+  const title: Record<GroupKind, string> = { sitzgruppe: 'Sitzgruppe', schlafplatz: 'Schlafplatz', essplatz: 'Essplatz', arbeitsplatz: 'Arbeitsplatz', leseecke: 'Leseecke' };
+  return kinds.map((k) => `- ${title[k]} (Anker ${GROUPS[k].anchor}): ${GROUPS[k].members}`).join('\n');
+}
+
 /** Gap between a coffee table and the sofa front (W2). */
 export const COFFEE_GAP = 0.45;
 /** Gap between an armchair at the end of the coffee table and the table (W1, W2). */
