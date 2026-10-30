@@ -61,6 +61,8 @@ import { designWishes, runDesign } from './designRun';
 import { pickItems, placedRooms, proposalFrom, withProduct } from '../design/apply/proposal';
 import { roomShots } from './roomShots';
 import { layoutSuggestion } from '../design/apply';
+import { furnishingSheet } from '../design/apply/sheet';
+import { downloadBlob } from '../ui/fileUtils';
 import { svgToPng } from '../design/render';
 import { runFurnishing, type Stage } from '../design/run';
 import { paletteText, roomConceptOf } from '../design/concept/flatConcept';
@@ -350,6 +352,13 @@ export function DesignPanel() {
     useFurnishStore.getState().setPreview(preview);
     st.set({ preview });
     if (!preview.items.length) useUiStore.getState().toast('Für diese Möbel wurde kein freier Platz gefunden – die Gründe stehen beim Vorschlag.', 'info');
+  };
+
+  /** Einrichtungsblatt of the shown version (#436): what goes where, to furnish the flat by. */
+  const downloadSheet = () => {
+    if (!shownResult) return;
+    const names = Object.fromEntries(rooms.map((r) => [r.id, r.name]));
+    downloadBlob(furnishingSheet(shownResult, names, catalog, undefined, showIdeal ? 'Ideal' : 'Kaufbar'), `einrichtungsblatt-${showIdeal ? 'ideal' : 'kaufbar'}.md`, 'text/markdown;charset=utf-8');
   };
 
   const take = () => {
@@ -818,6 +827,11 @@ export function DesignPanel() {
                 <button disabled={!!search} onClick={showPreview}>
                   Vorschau im Plan
                 </button>
+                {shownResult && (
+                  <button title="Was wohin kommt, mit Maßen, Abständen, Licht und Begründung – zum Nachbauen (Markdown)" onClick={downloadSheet}>
+                    Einrichtungsblatt
+                  </button>
+                )}
               </div>
             ) : (
               st.preview && (
