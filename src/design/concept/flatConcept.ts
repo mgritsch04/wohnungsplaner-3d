@@ -8,6 +8,7 @@
 import { clipLines, type DesignWishes, MAX_FIELD, apartmentPalette } from '../../assistant/design';
 import type { Furniture, Project } from '../../model/schema';
 import { guessRoomType, ROOM_TYPES } from '../../suggest/furnishing';
+import { parseScheme } from './scheme';
 import type { FlatAnalysis, FlatConcept, FunctionAssignment, RoomAnalysis, PaletteRole, RoomConcept, RoomType, StylePlan } from '../types';
 import { type Checked, hex, key, SANITARY, shapeOf, str, strList } from './common';
 import { isCooking, isSleeping, SINGLE_FUNCTIONS } from './needs';
@@ -82,7 +83,7 @@ Aufgabe:
 1. Nutzung: Beschreibe in 2–3 Sätzen, wie hier gewohnt wird (Alltag, Gäste, Hobbys).
 2. Funktionen verteilen: Ordne jede Funktion GENAU EINEM Raum zu, mit Grund. Funktionen sind zum Beispiel Schlafen, Kleidung, Kochen, Essen, Sitzen/Fernsehen, Lesen, Arbeiten/PC, Gästeschlafplatz, Vorräte/Stauraum, Garderobe/Schuhe, Wäsche, Körperpflege, Draußen sitzen, dazu jede Funktion aus den Wünschen. "wishes" nennt die Nummern der Wünsche, die diese Funktion erfüllt.
 3. Esstisch, Gästeschlafplatz und Küchenzeile gibt es in der Wohnung nur einmal. Plane nichts doppelt, was niemand doppelt braucht (zwei Esstische, zwei Gästebetten, zwei Fernsehplätze).
-4. Je Raum: Raumtyp (${ROOM_TYPE_IDS.join(', ')}; ein WC ist bath), Rolle in einem Satz, Funktionen, 1–3 Ankermöbel (das, worum der Raum gebaut wird), Akzentfarbe aus der Palette und was dort ausdrücklich NICHT hinkommt. Ein Schlafzimmer bekommt die Funktion Schlafen. Jeder Raum der Wohnung kommt genau einmal vor, mit seinem Namen wie oben.
+4. Je Raum: Raumtyp (${ROOM_TYPE_IDS.join(', ')}; ein WC ist bath), Rolle in einem Satz, Funktionen, 1–3 Ankermöbel (das, worum der Raum gebaut wird), Akzentfarbe aus der Palette, ein Farbschema des Raums ("scheme": wall, furniture, textile, accent – alle aus der Palette, die Wand darf eine hellere Abstufung der Hauptfarbe sein; Räume dürfen unterschiedlich wirken, gehören aber zur selben Palette, und innerhalb des Raums passen Wand, Möbel, Textilien und Deko zusammen; "note": die Stimmung in einem Satz) und was dort ausdrücklich NICHT hinkommt. Ein Schlafzimmer bekommt die Funktion Schlafen. Jeder Raum der Wohnung kommt genau einmal vor, mit seinem Namen wie oben.
 5. Stil wie ein Profi, für die ganze Wohnung (SL1): Leitidee in einem Satz. Palette mit 4–5 Farben (Hex), jede mit Rolle: "haupt" (60 %: Wände, große Flächen, große Möbel), "zweit" (30 %: Möbel, Textilien), "akzent" (10 %: Kissen, Sessel, Bild, Vase), dazu "neutral" (SL2). Materialien, die wiederkehren: höchstens 2–3 Holztöne, eine Metallfarbe, 2–3 Textilien (SL3). "forms": Formensprache in einem Satz, z. B. schlanke Beine, Rundes zu Eckigem, Texturen zu glatten Flächen (SL4, SL5). Daran richten sich später alle Möbel und die echten Produkte aus.
 6. Grenzen: WC, Waschtisch, Dusche und Wanne sind fest eingebaut und werden nicht dazugeplant und nicht verschoben. Nur in einem WC ohne Waschbecken kommt ein kleines Handwaschbecken dazu. Ein Durchgangszimmer behält seinen Weg frei. Eine vorhandene Küche bleibt, wie sie ist.
 
@@ -158,7 +159,9 @@ export function parseFlatConcept(raw: unknown, input: FlatConceptInput): Checked
     const accent = hex(e.accent);
     if (e.accent !== undefined && !accent) notes.push(`Raum „${room.name}“: Akzentfarbe „${str(e.accent, 20)}“ ist kein Hex-Wert, weggelassen.`);
     const anchors = strList(e.anchors ?? e.anchor, 200, 5);
-    rooms.push({ roomId: room.roomId, type: type ?? guessRoomType(room.name), role: str(e.role, 300), functions: strList(e.functions, 80, 15), anchors, ...(accent ? { accent } : {}), avoid: strList(e.avoid, 200, 12) });
+    const roomType = type ?? guessRoomType(room.name);
+    const scheme = parseScheme(e.scheme ?? e.farbschema, style, roomType, accent ?? undefined, room.name, notes);
+    rooms.push({ roomId: room.roomId, type: roomType, role: str(e.role, 300), functions: strList(e.functions, 80, 15), anchors, ...(accent ? { accent } : {}), ...(scheme ? { scheme } : {}), avoid: strList(e.avoid, 200, 12) });
   }
   for (const r of f.rooms) if (!rooms.some((x) => x.roomId === r.roomId)) problems.push(`Raum „${r.name}“ fehlt in "rooms".`);
 
