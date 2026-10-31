@@ -2613,3 +2613,29 @@ code {
     padding: var(--space-4) var(--space-4) var(--space-2);
   }
 }
+
+/* ---------- optischer Feinschliff (#461) ---------- */
+/* Symbolleiste: Fläche einen Hauch abgesetzt */
+.app:not(.phone) .panel.left .tabs.rail {
+  background: var(--color-surface-sunken, var(--color-bg));
+}
+/* Werkzeug-Hinweis im Plan: bricht um statt abgeschnitten zu werden und lässt die Nordnadel frei */
+.editor-hint {
+  white-space: normal;
+  text-align: center;
+  max-width: min(520px, calc(100% - 140px));
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-md);
+  line-height: 1.35;
+}
+/* Werkzeugknöpfe: weicher Hover, aktiver Knopf mit Akzentrand */
+.tool-btn {
+  transition: background-color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.tool-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--color-border-strong, var(--color-text-subtle));
+  box-shadow: var(--shadow-sm);
+}
+.tool-btn.active {
+  border-color: var(--color-accent);
+}
