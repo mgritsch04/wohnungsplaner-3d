@@ -60,6 +60,7 @@ import { implausibleSize } from './designGuide';
 import { designWishes, runDesign } from './designRun';
 import { pickItems, placedRooms, proposalFrom, withProduct } from '../design/apply/proposal';
 import { roomShots } from './roomShots';
+import { CompareVariants, type VariantKey } from './CompareVariants';
 import { layoutSuggestion } from '../design/apply';
 import { furnishingSheet } from '../design/apply/sheet';
 import { downloadBlob } from '../ui/fileUtils';
@@ -123,6 +124,7 @@ export function DesignPanel() {
   const [hidden, setHidden] = useState(false);
   const [checked, setChecked] = useState(false);
   const [missing, setMissing] = useState<'helper' | 'claude'>('helper');
+  const [comparing, setComparing] = useState(false);
   const [openAlt, setOpenAlt] = useState<string | null>(null);
   const [mcp, setMcp] = useState<McpRuntime | null>(null);
   const [browser, setBrowser] = useState(false);
@@ -371,6 +373,23 @@ export function DesignPanel() {
     st.set({ preview: null });
     useUiStore.getState().selectFurniture(ids);
     useUiStore.getState().toast(`${ids.length} Möbel aus dem Einrichtungsvorschlag übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
+  };
+
+  /** „Diesen übernehmen“ in the side-by-side view: the whole version goes into the plan in one step. */
+  const takeVariant = (v: VariantKey) => {
+    const result = v === 'ideal' ? st.ideal?.result : st.result;
+    if (!result) return;
+    const inPlan = placedRooms(result, roomTypes).filter((r) => rooms.some((x) => x.id === r.analysis.roomId));
+    const preview = layoutSuggestion(project, inPlan, own);
+    clearPreview();
+    let ids: string[] = [];
+    apply((d) => {
+      ids = applyFurnishing(d, preview);
+    });
+    st.set({ variant: v, preview: null });
+    setComparing(false);
+    useUiStore.getState().selectFurniture(ids);
+    useUiStore.getState().toast(`${ids.length} Möbel aus der Fassung „${v === 'ideal' ? 'Ideal' : 'Kaufbar'}“ übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
   };
 
   const discard = () => {
@@ -669,12 +688,20 @@ export function DesignPanel() {
                     Kaufbar
                   </button>
                 </div>
+                {st.result && (
+                  <button disabled={!!search} onClick={() => { clearPreview(); st.set({ preview: null }); setComparing(true); }} data-testid="design-compare-open">
+                    Nebeneinander vergleichen
+                  </button>
+                )}
                 <p className="muted small">
                   {showIdeal
                     ? 'Ideal: Claudes Plan mit Soll-Möbeln (Art, Maße, Optik, Funktionen) als Platzhalter – so würde eine Innenarchitektin den Raum planen.'
                     : 'Kaufbar: die bestpassenden gefundenen IKEA-/Möbelix-Produkte, der Raum mit ihnen neu aufgestellt und begangen; Abweichungen stehen beim Möbel.'}
                 </p>
               </div>
+            )}
+            {comparing && st.ideal && st.result && (
+              <CompareVariants ideal={st.ideal.result} kaufbar={st.result} roomTypes={roomTypes} rooms={rooms} catalog={own} onTake={takeVariant} onClose={() => setComparing(false)} />
             )}
             {proposal.summary && <p>{proposal.summary}</p>}
             {proposal.rooms.map((r) => (
