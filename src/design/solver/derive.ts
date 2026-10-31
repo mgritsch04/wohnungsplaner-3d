@@ -40,6 +40,9 @@ function parentBox(m: Model, id: string): { box: Box; top: number; elevation: nu
   return null;
 }
 
+/** The fabric ends this far below the window sill (m), the rod sits this far above the window (m). */
+const CURTAIN_BELOW_SILL = 0.15;
+const CURTAIN_ROD_ABOVE = 0.1;
 /** How far an open curtain panel covers the frame of its window (m). */
 const CURTAIN_OVERLAP = 0.08;
 /** Width of an open, gathered curtain panel: about a third of its fabric, 30 to 50 cm. */
@@ -215,7 +218,11 @@ function deriveNode(m: Model, n: Node): void {
       const side = r.count === 1 ? (win.t0 >= w.length - win.t1 ? left : right) : r.index % 2 === 0 ? left : right;
       const t = clamp(side, g / 2, w.length - g / 2);
       n.box = boxOnWall(w, t, g, s.depth, 0.08);
-      n.elevation = Math.max(0, Math.min(0.02, ctx.height - s.height - 0.02));
+      // rod just above the window, fabric down to just below the sill (to the floor at a floor-length window)
+      const low = win.sill < 0.05 ? 0 : Math.max(0, win.sill - CURTAIN_BELOW_SILL);
+      const rod = Math.min(ctx.height - 0.02, Math.max(low + 0.4, win.top + CURTAIN_ROD_ABOVE));
+      n.spec = { ...s, height: Math.round((rod - low) * 100) / 100 };
+      n.elevation = low;
     }
     return;
   }

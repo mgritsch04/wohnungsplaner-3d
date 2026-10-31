@@ -40,6 +40,8 @@ export interface WindowInfo {
   t0: number;
   t1: number;
   sill: number;
+  /** Top edge above the floor (m). */
+  top: number;
   /** Strip in front of the window (0.5 m deep): nothing higher than the sill stands in it. */
   zone: Vec2[];
 }
@@ -149,7 +151,7 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
         const mid = pointOnWall(w, (o.t0 + o.t1) / 2);
         doors.push({ label: o.id, wall: wi, opening: o, mid, entry: wallStrip(w, o.t0, o.t1, ENTRY_DEPTH) });
       } else {
-        if (o.kind === 'window') windows.push({ label: o.id, wall: wi, t0: o.t0, t1: o.t1, sill: o.sill ?? 0.9, zone: wallStrip(w, o.t0, o.t1, WINDOW_DEPTH) });
+        if (o.kind === 'window') windows.push({ label: o.id, wall: wi, t0: o.t0, t1: o.t1, sill: o.sill ?? 0.9, top: o.top ?? (o.sill ?? 0.9) + 1.2, zone: wallStrip(w, o.t0, o.t1, WINDOW_DEPTH) });
       }
     }
     gaps.sort((p, q) => p.t0 - q.t0);
