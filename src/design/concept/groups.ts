@@ -72,7 +72,7 @@ const AREA_PER_FUNCTION = 8;
 /** A living room below this area (m²) is compact. */
 const SMALL_LIVING = 14;
 
-interface Ctx {
+export interface Ctx {
   program: RoomProgram;
   items: ProgramItem[];
   relations: Relation[];
@@ -81,8 +81,8 @@ interface Ctx {
   added: Map<string, string[]>;
 }
 
-const lookup = (c: Ctx, id: string) => c.catalog.find((x) => x.id === id) ?? findCatalogItem(id);
-const roleOfItem = (c: Ctx, it: ProgramItem): Role | null => {
+export const lookup = (c: Ctx, id: string) => c.catalog.find((x) => x.id === id) ?? findCatalogItem(id);
+export const roleOfItem = (c: Ctx, it: ProgramItem): Role | null => {
   const item = lookup(c, it.catalogId);
   return item ? roleOf({ ...item, catalogId: item.id }) : null;
 };
@@ -91,19 +91,19 @@ const isGeneric = (it: ProgramItem) => it.catalogId.startsWith('generic-');
 
 /** Relations that bind `id` to something else (it is derived from a parent in the solver). */
 const DERIVED: Relation['kind'][] = ['front-of', 'left-of', 'right-of', 'pair', 'flank', 'above', 'under-front', 'under-all', 'on', 'around'];
-const bound = (c: Ctx, id: string) =>
+export const bound = (c: Ctx, id: string) =>
   c.relations.some((r) => (r.kind === 'around' ? r.items.includes(id) : r.kind === 'pair' ? r.item === id || r.item2 === id : 'item' in r && r.item === id && DERIVED.includes(r.kind)));
 const placedBy = (c: Ctx, id: string) => c.relations.some((r) => 'item' in r && r.item === id && (r.kind === 'wall' || r.kind === 'corner' || r.kind === 'window'));
 const targetsOf = (c: Ctx, id: string): string[] =>
   c.relations.flatMap((r) => (r.kind === 'around' ? (r.items.includes(id) ? [r.target] : []) : r.kind === 'pair' ? (r.item === id || r.item2 === id ? [r.target] : []) : 'item' in r && r.item === id && 'target' in r ? [r.target] : []));
 
-function uniqueId(c: Ctx, base: string): string {
+export function uniqueId(c: Ctx, base: string): string {
   let id = base;
   for (let k = 2; c.items.some((i) => i.id === id); k++) id = `${base}${k}`;
   return id;
 }
 
-function add(c: Ctx, anchor: ProgramItem, group: string, catalogId: string, idBase: string, why: string, extra: Partial<ProgramItem> = {}): ProgramItem | null {
+export function add(c: Ctx, anchor: ProgramItem, group: string, catalogId: string, idBase: string, why: string, extra: Partial<ProgramItem> = {}): ProgramItem | null {
   const item = lookup(c, catalogId);
   if (!item) return null;
   const it: ProgramItem = { id: uniqueId(c, idBase), catalogId, zone: anchor.zone, ...(anchor.hint ? { hint: { ...anchor.hint } } : {}), label: item.name, why, ...extra };
@@ -288,6 +288,10 @@ function readingCorner(c: Ctx, chair: ProgramItem, scope: GroupScope): void {
   }
 }
 
+export function makeCtx(program: RoomProgram, products: CatalogItem[] = []): Ctx {
+  return { program, items: program.items.map((i) => ({ ...i })), relations: program.relations.map((r) => structuredClone(r)), catalog: [...PLACEHOLDERS, ...products], notes: [], added: new Map() };
+}
+
 /**
  * Completes the furniture groups of a room programme. `type` is the room type of the concept,
  * `area` the room's floor area in m². Returns a new programme and notes for the panel and the
@@ -295,7 +299,7 @@ function readingCorner(c: Ctx, chair: ProgramItem, scope: GroupScope): void {
  */
 export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = [], windows: { id: string; x: number; y: number; rotation: number }[] = []): { program: RoomProgram; notes: string[] } {
   if (!ROOMS.includes(type)) return { program, notes: [] };
-  const c: Ctx = { program, items: program.items.map((i) => ({ ...i })), relations: program.relations.map((r) => structuredClone(r)), catalog: [...PLACEHOLDERS, ...products], notes: [], added: new Map() };
+  const c = makeCtx(program, products);
   const anchors = (roles: Role[]) => c.items.filter((i) => roles.includes(roleOfItem(c, i)!));
   const compact = area / Math.max(1, functions) < AREA_PER_FUNCTION || area < SMALL_LIVING;
   const scope: GroupScope = compact ? 'compact' : 'full';

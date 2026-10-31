@@ -158,6 +158,7 @@ const SMALLER: Record<string, string[]> = {
   'generic-rug-160': ['generic-outdoor-rug'],
   'generic-utility-shelf': ['generic-shelf-80'],
   'generic-plant': ['generic-plant-small'],
+  'generic-picture-wide': ['generic-picture-large'],
   'generic-picture-large': ['generic-picture'],
   'generic-coffee-table': ['generic-balcony-table'],
   'generic-washbasin': ['generic-washbasin-40'],
