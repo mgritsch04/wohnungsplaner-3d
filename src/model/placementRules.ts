@@ -70,7 +70,7 @@ export function pairRule(a: Item, b: Item): PairRule {
 /** Categories that never stand on other furniture, however small (stools stay under tables). */
 const NOT_STACKABLE = new Set(['textile', 'chair', 'table', 'desk', 'sofa', 'bed', 'bathroom', 'kitchen', 'stairs']);
 /** Shapes that hang, stand on the floor or on the wall even when small. */
-const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'wall-shelf', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop']);
+const NOT_STACKABLE_SHAPES = new Set(['floor-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'picture-set', 'wall-shelf', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop']);
 
 /**
  * Small items that are put ON furniture (table lamps, decor, boxes, small appliances,
@@ -89,7 +89,7 @@ export function isStackable(f: Pick<Furniture, 'category' | 'width' | 'depth' | 
 
 /** Categories and shapes of imported models that never offer a top to put things on. */
 const NO_SURFACE_CATEGORIES = new Set(['textile', 'chair', 'sofa', 'bed', 'lighting']);
-const NO_SURFACE_SHAPES = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop', 'sofa', 'bed', 'armchair', 'chair', 'stool', 'office-chair', 'wc', 'toilet', 'shower', 'bathtub']);
+const NO_SURFACE_SHAPES = new Set(['plant', 'floor-lamp', 'table-lamp', 'pendant', 'panel', 'tv', 'curtain', 'rug', 'picture', 'picture-set', 'decor', 'coat-rack', 'mattress', 'vacuum', 'k-wall', 'k-hood', 'k-cooktop', 'sofa', 'bed', 'armchair', 'chair', 'stool', 'office-chair', 'wc', 'toilet', 'shower', 'bathtub']);
 
 /** Furniture that offers a top surface for stackable items. */
 export function isSurface(f: Item & { width?: number; depth?: number }): boolean {

@@ -44,7 +44,7 @@ const FREE_ROLES = new Set<Role>(['table', 'coffee-table', 'seat', 'armchair', '
 const WALL_TABLE_ROOMS = new Set<RoomType>(['bedroom', 'kids', 'office', 'hall', 'utility', 'bath']);
 /** Pieces one has to get to: their front (bed: foot or sides) must be reachable from a door. */
 const REACH_ROLES = new Set<Role>(['bed', 'sofa', 'corner', 'wall', 'tv-board', 'table', 'nightstand']);
-const HANGING_SHAPES = new Set(['tv', 'panel', 'picture', 'wall-shelf', 'coat-rack']);
+const HANGING_SHAPES = new Set(['tv', 'panel', 'picture', 'picture-set', 'wall-shelf', 'coat-rack']);
 
 const isFloor = (f: Furniture) => f.elevation < 0.05 && f.height > 0.05;
 const blocks = (f: Furniture) => isFloor(f) && f.solid !== false;

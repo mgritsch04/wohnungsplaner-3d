@@ -48,7 +48,9 @@ export function roleOf(f: RoleInput): Role {
   if (item.category === 'chair') return 'seat';
   if (shape === 'rug') return 'rug';
   if (shape === 'curtain') return 'curtain';
-  if (shape === 'picture' || shape === 'wall-shelf') return 'wall-art';
+  if (shape === 'picture' || shape === 'picture-set' || shape === 'wall-shelf') return 'wall-art';
+  // a still life (vase, books, bowl) stands on a piece like a box
+  if (shape === 'decor') return 'box';
   if (shape === 'coat-rack') return 'coat-rack';
   // a small mirror hangs (bath: above the washbasin); a tall one stands on the floor against a wall
   if (shape === 'panel' && (item.elevation ?? 0) >= 0.8) return 'mirror';

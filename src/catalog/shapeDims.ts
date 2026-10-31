@@ -32,7 +32,7 @@ export function normalizeShapeDims(shape: string | undefined, d: Dims3): Dims3 {
     const [a, b, c] = [d.width, d.depth, d.height].sort((x, y) => y - x);
     return { width: round(a), depth: round(b), height: c <= 0.05 ? round(c) : RUG_THICKNESS };
   }
-  if (shape === 'picture') {
+  if (shape === 'picture' || shape === 'picture-set') {
     // thickness is the smallest side
     const min = Math.min(d.width, d.depth, d.height);
     if (d.depth <= min) return d;

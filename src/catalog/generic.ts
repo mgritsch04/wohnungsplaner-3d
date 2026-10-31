@@ -58,6 +58,10 @@ const DEFS: Def[] = [
   ['generic-mattress', 'Matratze 160×200', 'textile', 1.6, 2.0, 0.2, 'mattress', '#f5f3ee', 250, { solid: false, tags: ['matratze', 'bett'] }],
   ['generic-picture', 'Bild/Poster 50×70', 'decor', 0.5, 0.03, 0.7, 'picture', '#c9a27e', 30, { elevation: 1.35, solid: false, tags: ['bild', 'poster', 'wanddeko', 'deko'] }],
   ['generic-picture-large', 'Wandbild 100×70', 'decor', 1.0, 0.03, 0.7, 'picture', '#7f9c8e', 70, { elevation: 1.4, solid: false, tags: ['bild', 'leinwand', 'wanddeko', 'deko'] }],
+  // decoration (G, 31.10.): a picture in the measure of a large bed or sofa, a group of frames, a still life of three
+  ['generic-picture-xl', 'Wandbild 120×80', 'decor', 1.2, 0.03, 0.8, 'picture', '#b4876a', 110, { elevation: 1.3, solid: false, tags: ['bild', 'leinwand', 'gemälde', 'wanddeko', 'deko'] }],
+  ['generic-picture-set', 'Bildergruppe (3 Rahmen)', 'decor', 1.2, 0.03, 0.6, 'picture-set', '#8f9f86', 90, { elevation: 1.2, solid: false, tags: ['bilder', 'bilderrahmen', 'galeriewand', 'wanddeko', 'deko'] }],
+  ['generic-decor-set', 'Deko-Set (Vase, Bücher, Schale)', 'decor', 0.45, 0.22, 0.35, 'decor', '#d9cbb8', 40, { solid: false, elevation: 0.8, tags: ['vase', 'bücher', 'schale', 'deko'] }],
   ['generic-wall-shelf', 'Wandregal 80 cm', 'decor', 0.8, 0.2, 0.25, 'wall-shelf', '#c8b59a', 35, { elevation: 1.45, solid: false, tags: ['wandboard', 'wanddeko', 'deko'] }],
   ['generic-coat-rack', 'Wandgarderobe mit Haken', 'storage', 0.8, 0.1, 0.2, 'coat-rack', '#b8946a', 40, { elevation: 1.6, solid: false, tags: ['garderobe', 'haken', 'flur'] }],
   ['generic-shoe-cabinet', 'Schuhschrank schmal', 'storage', 0.8, 0.3, 1.0, 'cabinet', '#ece8e1', 120, { tags: ['schuhschrank', 'kommode', 'flur'] }],
