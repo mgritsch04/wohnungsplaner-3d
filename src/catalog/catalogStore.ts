@@ -19,6 +19,8 @@ interface CatalogStore {
   addItems: (items: CatalogItem[]) => Promise<number>;
   removeSource: (sourceName: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
+  /** Replace the whole imported list (used when merging duplicates). */
+  replaceItems: (items: CatalogItem[]) => Promise<void>;
 }
 
 /** User-imported catalog entries, persisted locally (IndexedDB). */
@@ -46,5 +48,9 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
     const next = get().items.filter((i) => i.id !== id);
     set({ items: next });
     await db.putMeta(KEY, next);
+  },
+  replaceItems: async (items) => {
+    set({ items });
+    await db.putMeta(KEY, items);
   },
 }));
