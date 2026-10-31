@@ -462,6 +462,23 @@ export function freeOpeningStation(d: Project, wallId: string, width: number, s:
   return roundMm(cands[0]);
 }
 
+/**
+ * New width/centre for an existing opening after a panel edit (`width` and/or centre `offset`),
+ * clamped to its wall and moved clear of the wall's other openings. Null if it cannot fit.
+ */
+export function resolveOpeningSpan(d: Project, openingId: string, patch: { width?: number; offset?: number }): { width: number; offset: number } | null {
+  const o = d.openings.find((x) => x.id === openingId);
+  const w = o && d.walls.find((x) => x.id === o.wallId);
+  const a = w && nodeById(d, w.a);
+  const b = w && nodeById(d, w.b);
+  if (!o || !a || !b) return null;
+  const L = dist(a, b);
+  const width = Math.min(patch.width ?? o.width, L);
+  const centre = Math.max(width / 2, Math.min(L - width / 2, patch.offset ?? o.offset));
+  const free = freeOpeningStation(d, o.wallId, width, centre, o.id);
+  return free === null ? null : { width, offset: free };
+}
+
 /** Add an opening centered at station s of a wall, clamped to fit. Returns the id or null. */
 export function addOpening(d: Project, wallId: string, kind: OpeningKind, s: number, overrides: Partial<Opening> = {}): string | null {
   const w = d.walls.find((x) => x.id === wallId);
