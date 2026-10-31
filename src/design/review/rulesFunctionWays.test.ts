@@ -6,13 +6,14 @@ import { reviewFlat } from './index';
 
 const room = (w = 4, d = 3.5) => rectRoom(w, d, { doors: [{ wall: 'S', at: d === 3.5 ? 3.2 : 3.2 }], windows: [{ wall: 'N', at: 2 }] });
 
-/** A bedroom without findings: bed head at the east wall, wardrobe at the west wall, two lights. */
+/** A bedroom without findings: bed head at the east wall with a picture over it, wardrobe at the west wall, two lights. */
 function bedroom(extra: ReturnType<typeof put>[] = [], skip: string[] = []) {
   const base = [
     put('generic-bed-140', { x: 2.975, y: 1.6, face: 'W', id: 'bed' }),
     put('generic-wardrobe-150', { x: 0.3, y: 1.75, face: 'O', id: 'wardrobe' }),
     put('generic-pendant', { x: 2, y: 1.75, id: 'pendant' }),
     put('generic-floor-lamp', { x: 0.3, y: 0.3, id: 'lamp' }),
+    put('generic-picture-large', { x: 3.985, y: 1.6, face: 'W', elevation: 1.15, parent: 'bed', id: 'art' }),
   ].filter((i) => !skip.includes(i.id));
   return review({ room: room(), type: 'bedroom', items: [...base, ...extra] });
 }

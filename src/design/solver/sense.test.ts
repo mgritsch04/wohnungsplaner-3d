@@ -99,6 +99,20 @@ describe('no dead strip behind a back (W9)', () => {
   });
 });
 
+describe('pictures hang at eye height over their piece (R7)', () => {
+  it('a picture over the sideboard: middle near 1.5 m, 15–30 cm above the top', () => {
+    const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
+    const p = program(room, [item('board', 'generic-sideboard', [4.2, 2.0, Math.PI / 2]), item('art', 'generic-picture-large')], [{ kind: 'above', item: 'art', target: 'board' }]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const art = byId(layout, 'art');
+    const board = byId(layout, 'board');
+    const gap = art.elevation - board.height;
+    expect(gap).toBeGreaterThanOrEqual(0.15 - 1e-6);
+    expect(gap).toBeLessThanOrEqual(0.3 + 1e-6);
+    expect(art.elevation + art.height / 2).toBeGreaterThan(1.35);
+  });
+});
+
 describe('a tight room keeps its double bed', () => {
   it('three doors round the bed: a nightstand or the shelf stays out, the 180 bed keeps its size', () => {
     const room = rectRoom(4.59, 4.08, {

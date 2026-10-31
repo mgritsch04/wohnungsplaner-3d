@@ -97,6 +97,11 @@ export function checkPictures(ctx: RoomCtx): void {
     for (const w of ctx.windows) if (overlaps(w.strip, p.poly, 1e-3) && p.elevation + p.height > w.sill) ctx.add('D6', 'L', `${ctx.label(p)} hängt über dem Fenster ${w.label}.`, [p], p);
     for (const d of ctx.doors) if (Math.abs(dot(sub(p, d.mid), d.wall.dir)) < d.width / 2 && dot(sub(p, d.mid), d.wall.inward) < 0.3) ctx.add('D6', 'L', `${ctx.label(p)} hängt über der Tür ${d.label}.`, [p], p);
     const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
+    // R7: a picture belongs to the piece under it, 15–30 cm above it; from half a metre it floats
+    if (under && p.role === 'wall-art' && under.floor) {
+      const gap = p.elevation - (under.elevation + under.height);
+      if (gap > 0.5) ctx.add('D6', 'L', `${ctx.label(p)} hängt ${cm(gap)} cm über ${ctx.label(under)}, schön sind 15 bis 30 cm.`, [p, under], p);
+    }
     if (under && (under.role === 'sofa' || under.shape === 'bed')) {
       const off = Math.abs(toLocal(under, p).u);
       const ratio = p.width / under.width;
@@ -108,6 +113,13 @@ export function checkPictures(ctx: RoomCtx): void {
       if (basin && Math.abs(toLocal(basin, p).u) > 0.3) ctx.add('D6', 'L', 'Der Badspiegel hängt nicht über dem Waschtisch.', [p, basin], p);
     }
   }
+}
+
+/** D6, SL6: a room one lives or sleeps in has at least one picture on its walls. */
+export function checkWallArt(ctx: RoomCtx): void {
+  if (!['living', 'bedroom', 'kids', 'office', 'dining'].includes(ctx.type) || ctx.an.area < 8) return;
+  if (ctx.items.some((i) => i.role === 'wall-art' && i.shape !== 'wall-shelf')) return;
+  ctx.add('D6', 'L', 'An den Wänden hängt kein Bild, der Raum wirkt unbewohnt (SL6).');
 }
 
 /** D7: curtains. */

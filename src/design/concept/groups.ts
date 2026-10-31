@@ -67,6 +67,8 @@ const ROOMS: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kit
 const MAIN_LIGHT: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen'];
 /** Rooms that get curtains at every window when none are planned (R8). */
 const CURTAINED: RoomType[] = ['living', 'bedroom', 'kids', 'office'];
+/** Rooms that get pictures and a still life where a piece invites them (SL6, R7, S6). */
+const DECORATED: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'other'];
 /** Below this room area (m²) per function the room is compact (studio, living kitchen). */
 const AREA_PER_FUNCTION = 8;
 /** A living room below this area (m²) is compact. */
@@ -288,6 +290,51 @@ function readingCorner(c: Ctx, chair: ProgramItem, scope: GroupScope): void {
   }
 }
 
+/** The picture for a piece of `width`: about ⅔ of it, never wider (R7, S6). */
+function pictureFor(width: number): string {
+  if (width >= 1.75) return 'generic-picture-xl';
+  if (width >= 1.4) return 'generic-picture-large';
+  return 'generic-picture';
+}
+
+/**
+ * Decoration (SL6, wish of G 31.10.): a picture over the bed (S6), over a sideboard or chest and
+ * over a sofa standing at a wall (R7), a still life of three on every sideboard, chest and
+ * lowboard that has nothing on it but a lamp. Claude's own pictures and pieces stay.
+ */
+function decoration(c: Ctx): void {
+  const role = (id: string) => {
+    const it = c.items.find((i) => i.id === id);
+    return it ? roleOfItem(c, it) : null;
+  };
+  const hangsOver = (t: ProgramItem) => c.relations.some((r) => r.kind === 'above' && r.target === t.id && ['wall-art', 'mirror', 'tv', 'coat-rack'].includes(role(r.item) ?? ''));
+  const standsOn = (t: ProgramItem) => c.relations.filter((r) => r.kind === 'on' && r.target === t.id).map((r) => role((r as Extract<Relation, { kind: 'on' }>).item));
+  const hang = (t: ProgramItem, catalogId: string, why: string) => {
+    // a picture Claude planned in the zone without a place goes there instead of a second one
+    const loose = c.items.find((i) => i.zone === t.zone && role(i.id) === 'wall-art' && shapeOf(lookup(c, i.catalogId)!) !== 'wall-shelf' && !bound(c, i.id) && !placedBy(c, i.id));
+    if (loose) return rebind(c, loose.id, { kind: 'above', item: loose.id, target: t.id });
+    const it = add(c, t, 'Deko', catalogId, `${t.id}_bild`, why);
+    if (it) c.relations.push({ kind: 'above', item: it.id, target: t.id });
+  };
+  for (const t of [...c.items]) {
+    const r = roleOfItem(c, t);
+    const item = lookup(c, t.catalogId);
+    if (!item) continue;
+    const shape = shapeOf(item);
+    const chest = r === 'wall' && item.category === 'storage' && (shape === 'cabinet' || shape === 'dresser') && item.height <= 1.1;
+    if (r === 'bed' && !hangsOver(t)) hang(t, pictureFor(item.width), 'Deko: Bild über dem Kopfteil, etwa ⅔ der Bettbreite, 15–25 cm darüber (S6).');
+    if (chest && !hangsOver(t)) hang(t, pictureFor(item.width), 'Deko: Bild über dem Möbel, etwa ⅔ seiner Breite, Mitte auf Augenhöhe (R7).');
+    // a sofa only when Claude put it at a wall: over a free sofa nothing hangs
+    if (r === 'sofa' && shape === 'sofa' && placedBy(c, t.id) && !hangsOver(t)) hang(t, item.width >= 1.9 ? 'generic-picture-set' : 'generic-picture-large', 'Deko: Bildergruppe über dem Sofa an der Wand, etwa ⅔ seiner Breite (R7).');
+    // a narrow chest with a lamp is full: a still life beside it would crowd the picture (image review)
+    const on = standsOn(t);
+    if ((chest || r === 'tv-board') && on.every((x) => x === 'table-lamp') && (item.width >= 1.2 || on.length === 0)) {
+      const it = add(c, t, 'Deko', 'generic-decor-set', `${t.id}_deko`, 'Deko: Vase, Bücher und Schale als Dreiergruppe in verschiedenen Höhen auf der Ablage (SL6).');
+      if (it) c.relations.push({ kind: 'on', item: it.id, target: t.id });
+    }
+  }
+}
+
 /**
  * Completes the furniture groups of a room programme. `type` is the room type of the concept,
  * `area` the room's floor area in m². Returns a new programme and notes for the panel and the
@@ -326,6 +373,7 @@ export function completeGroups(program: RoomProgram, type: RoomType, area: numbe
       }
     }
   }
+  if (DECORATED.includes(type)) decoration(c);
   for (const [g, names] of c.added) c.notes.push(`${g} ergänzt: ${names.join(', ')}.`);
   return { program: { ...program, items: c.items, relations: c.relations }, notes: c.notes };
 }

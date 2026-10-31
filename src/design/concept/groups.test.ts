@@ -101,6 +101,29 @@ describe('furniture groups (#436)', () => {
     expect(completeGroups(plan, 'kitchen', 14, 2, [], windows).program.items.filter((i) => i.catalogId === 'generic-curtain')).toHaveLength(1);
   });
 
+  it('decorates: a picture over the bed and the chest, a still life on chest and lowboard, Claude\'s loose picture used (SL6, S6, R7)', () => {
+    const { program: p } = completeGroups(
+      program([item('bed', 'generic-bed-160', 'z', { required: true }), item('chest', 'generic-dresser'), item('board', 'generic-tv-sideboard'), item('tv', 'generic-tv'), item('art', 'generic-picture-large')], [{ kind: 'above', item: 'tv', target: 'board' }]),
+      'bedroom',
+      16,
+      1,
+    );
+    // Claude's picture without a place goes over the bed, no second one
+    expect(rel(p, 'above', 'art')).toMatchObject({ target: 'bed' });
+    expect(p.items.filter((i) => i.catalogId.startsWith('generic-picture')).length).toBe(2);
+    // the chest gets a picture of about ⅔ its width, the lowboard keeps its TV
+    expect(rel(p, 'above', ids(p, 'generic-picture')[0])).toMatchObject({ target: 'chest' });
+    const sets = ids(p, 'generic-decor-set');
+    expect(sets.map((id) => (rel(p, 'on', id) as { target: string }).target).sort()).toEqual(['board', 'chest']);
+  });
+
+  it('hangs a picture group over a sofa Claude put at a wall, nothing over a free one', () => {
+    const atWall = completeGroups(program([item('sofa', 'generic-sofa-3')], [{ kind: 'wall', item: 'sofa', wall: 'W1' }]), 'living', 22, 2).program;
+    expect(rel(atWall, 'above', ids(atWall, 'generic-picture-set')[0])).toMatchObject({ target: 'sofa' });
+    const free = completeGroups(program([item('sofa', 'generic-sofa-3')]), 'living', 22, 2).program;
+    expect(free.items.filter((i) => i.catalogId.startsWith('generic-picture'))).toEqual([]);
+  });
+
   it('leaves baths, halls and balconies as planned', () => {
     const plan = program([item('sofa', 'generic-sofa-2')]);
     expect(completeGroups(plan, 'balcony', 6, 1).program).toBe(plan);
