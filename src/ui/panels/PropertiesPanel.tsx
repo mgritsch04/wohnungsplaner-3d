@@ -15,7 +15,7 @@ import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import { packsNeeded } from '../../catalog/packSize';
 import { catalogColors } from '../../catalog/generic';
 import { useCatalogStore } from '../../catalog/catalogStore';
-import { defaultLeafOpen, openingLabel, type Furniture, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
+import { defaultLeafOpen, openingLabel, type Furniture, type FurniturePackage, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
 import { useProjectStore } from '../../store/projectStore';
@@ -27,6 +27,7 @@ import { InteriorSection } from './InteriorSection';
 import { PhotosSection } from '../../photos/PhotosSection';
 import { NotesSection } from '../../planning/NotesSection';
 import { RoomTasksSection } from '../../planning/TaskSections';
+import { setPackages } from '../../planning/planning';
 import { deleteSelection, duplicateSelection, rotateSelection, setFurnitureRotation } from '../actions';
 import { confirmDialog, useDialogStore } from '../dialogStore';
 import { AngleSlider, Badge, CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
@@ -758,6 +759,7 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         )}
       </PanelGroup>
       <DeliveryGroup f={f} />
+      <PackagesGroup f={f} />
       <PanelGroup groupKey="furniture.advanced" title="Erweitert" defaultOpen={false}>
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
@@ -788,6 +790,36 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
       </div>
       <p className="muted small padded">Tipp: Q/E dreht in 15°-Schritten, Pfeiltasten verschieben um 1 cm (Shift: 10 cm).</p>
     </div>
+  );
+}
+
+function PackagesGroup({ f }: { f: Furniture }) {
+  const list = f.packages ?? [];
+  const patch = (i: number, fn: (p: FurniturePackage) => void) => {
+    const next = list.map((p) => ({ ...p }));
+    fn(next[i]);
+    setPackages(f.id, next);
+  };
+  return (
+    <PanelGroup groupKey="furniture.packages" title="Pakete (Umzug)" defaultOpen={false}>
+      <p className="muted small">Kartons oder Einzelteile mit Maßen (steht meist auf der Verpackung). Der Aufbauplan prüft dann jedes Paket einzeln.</p>
+      {list.map((p, i) => (
+        <div key={i} data-testid="package-row">
+          <TextField label="Name" value={p.name} onChange={(v) => patch(i, (x) => (x.name = v))} />
+          <div className="field-row">
+            <NumberField label="B" value={p.width} factor={100} unit="cm" min={1} max={500} onChange={(v) => patch(i, (x) => (x.width = v))} />
+            <NumberField label="T" value={p.depth} factor={100} unit="cm" min={1} max={500} onChange={(v) => patch(i, (x) => (x.depth = v))} />
+            <NumberField label="H" value={p.height} factor={100} unit="cm" min={1} max={500} onChange={(v) => patch(i, (x) => (x.height = v))} />
+          </div>
+          <button type="button" onClick={() => setPackages(f.id, list.filter((_, j) => j !== i))}>
+            Paket entfernen
+          </button>
+        </div>
+      ))}
+      <button className="block" type="button" onClick={() => setPackages(f.id, [...list, { name: `Paket ${list.length + 1}`, width: Math.max(f.width, f.depth), depth: Math.min(f.width, f.depth) / 2, height: f.height / 2 }])}>
+        + Paket
+      </button>
+    </PanelGroup>
   );
 }
 
