@@ -2553,3 +2553,10 @@ code {
   color: var(--color-text-muted);
   border-top: 1px solid var(--color-border);
 }
+
+/* Platz in der Kopfzeile: die Lupe entfällt in schmalen Fenstern, Strg+K bleibt (am Handy: „Mehr“ › „Funktionen suchen…“) */
+@media (max-width: 1100px) {
+  .toolbar button[aria-label='Funktionen suchen'] {
+    display: none;
+  }
+}
