@@ -67,15 +67,6 @@ export const IconWalk = () => (
   </Svg>
 );
 
-/** Walking person with a path: automatic tour (Rundgang). */
-export const IconTour = () => (
-  <Svg>
-    <circle cx="8" cy="4.5" r="1.8" />
-    <path d="m7 8-1 5 2.5 2.5.8 4M6 13l-1.5 3M5.5 10.5 8 8l2 2.5" />
-    <path d="M13 20c3 0 3-4 5.5-4s2.5 3 2.5 3" strokeDasharray="2 2" />
-  </Svg>
-);
-
 /** Person next to a measuring rod: real size (#256). */
 export const IconTrueScale = () => (
   <Svg>
