@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { derivePlan } from '../model/derived';
-import { addOpening, addRectRoom, closestWall, insertWall, mergeNodes, moveNode, moveWallLine, snapToGrid } from '../model/operations';
+import { addOpening, addRectRoom, freeOpeningStation, closestWall, insertWall, mergeNodes, moveNode, moveWallLine, snapToGrid } from '../model/operations';
 import { faceAtPoint, sameCycle } from '../model/roomDetection';
 import { newId } from '../model/ids';
 import { add, boundsOf, dist, dot, normalize, perp, rotate, scale, sub, type Vec2 } from '../model/vec';
@@ -444,8 +444,13 @@ export function Editor2D() {
         }
         let id: string | null = null;
         const kind = tool;
+        const free = freeOpeningStation(project, hit.wall.id, Math.min(OPENING_DEFAULTS[kind].width, Math.max(0.1, hit.length - 0.02)), hit.s);
+        if (free === null) {
+          ui().toast('Hier ist kein Platz mehr: an dieser Wand überschneidet sich sonst die Öffnung mit einer anderen', 'info');
+          return;
+        }
         apply((d) => {
-          id = addOpening(d, hit.wall.id, kind, hit.s);
+          id = addOpening(d, hit.wall.id, kind, free);
         });
         if (id) ui().setSelection({ type: 'opening', id });
         return;
@@ -614,7 +619,10 @@ export function Editor2D() {
           if (grid && !e.altKey) s = Math.round(s / 0.01) * 0.01;
           updateTx((d) => {
             const o = d.openings.find((x) => x.id === dr.id);
-            if (o) o.offset = roundMm(Math.max(o.width / 2, Math.min(fp.length - o.width / 2, s)));
+            if (!o) return;
+            const clamped = Math.max(o.width / 2, Math.min(fp.length - o.width / 2, s));
+            // never slide onto a neighbouring door/window of the same wall
+            o.offset = freeOpeningStation(d, o.wallId, o.width, clamped, o.id) ?? o.offset;
           });
           return;
         }
@@ -927,12 +935,15 @@ export function Editor2D() {
     const fp = derived.footprints.get(op.wallId);
     if (!fp) return null;
     const width = Math.min(OPENING_DEFAULTS[op.kind].width, fp.length);
-    const s = Math.max(width / 2, Math.min(fp.length - width / 2, op.s));
+    const wanted = Math.max(width / 2, Math.min(fp.length - width / 2, op.s));
+    const placed = freeOpeningStation(project, op.wallId, width, wanted);
+    const blocked = placed === null;
+    const s = placed ?? wanted;
     const p0 = add(fp.a, scale(fp.dir, s - width / 2));
     const p1 = add(fp.a, scale(fp.dir, s + width / 2));
     const h = scale(fp.normal, fp.thickness / 2 + 2 * px);
     const poly = [add(p0, h), add(p1, h), sub(p1, h), sub(p0, h)];
-    return <polygon points={poly.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(37,99,235,0.35)" stroke="#2563eb" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />;
+    return <polygon points={poly.map((p) => `${p.x},${p.y}`).join(' ')} fill={blocked ? 'rgba(220,38,38,0.3)' : 'rgba(37,99,235,0.35)'} stroke={blocked ? '#dc2626' : '#2563eb'} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />;
   })();
 
   // ---------- catalog drag and drop (#131) ----------

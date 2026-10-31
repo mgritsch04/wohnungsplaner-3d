@@ -752,3 +752,31 @@ test('Plan-Hintergrund-Schalter liegt nicht hinter dem Zoomregler und ist per Ma
   await toggle.click();
   expect((await getProject(page)).underlay.visible).toBe(false);
 });
+
+test('Tür/Fenster setzen: zweiter Klick auf dieselbe Stelle überlagert keine bestehende Öffnung', async ({ page }) => {
+  await freshStart(page);
+  const panel = page.locator('.panel.left');
+  await panel.getByLabel('Name').fill('Testraum');
+  await panel.getByLabel('Breite').fill('400');
+  await panel.getByLabel('Tiefe').fill('300');
+  await panel.getByLabel('Tiefe').blur();
+  await panel.getByRole('button', { name: 'Raum anlegen' }).click();
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.waitForTimeout(600);
+  const before = await getProject(page);
+  const oldIds = new Set((before.openings as { id: string }[]).map((o) => o.id));
+  const nodes = before.nodes as { id: string; x: number; y: number }[];
+  const top = Math.min(...nodes.map((n) => n.y));
+  const xs = nodes.map((n) => n.x);
+  const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const at = await planToScreen(page, mid, top);
+  await panel.getByRole('button', { name: /^Tür/ }).first().click();
+  await page.mouse.move(at.x, at.y, { steps: 3 });
+  await page.mouse.click(at.x, at.y);
+  await page.mouse.click(at.x, at.y);
+  const p = await getProject(page);
+  const ops = (p.openings as { id: string; wallId: string; offset: number; width: number }[]).filter((o) => !oldIds.has(o.id));
+  expect(ops.length).toBe(2);
+  const [a, b] = ops;
+  expect(Math.abs(a.offset - b.offset)).toBeGreaterThanOrEqual((a.width + b.width) / 2);
+});
