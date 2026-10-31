@@ -25,6 +25,8 @@ import { useFurnishStore } from '../suggest/furnishStore';
 import { useSceneSnap } from './sceneSnap';
 import { Devices3D } from '../smarthome/Devices3D';
 import { Fixtures3D } from '../installation/Fixtures3D';
+import { TourDriver } from './TourDriver';
+import { TourBanner } from './TourBanner';
 import { BASE_LOOK_SENSITIVITY, WalkControls } from './WalkControls';
 import { eyeFromBody } from '../model/body';
 import { RefFigure } from './RefFigure';
@@ -153,6 +155,7 @@ export function Scene3D() {
       {!session && <BookmarksMenu />}
       {!session && <TapeMeasureButton />}
       {session && <CompareBar />}
+      <TourBanner />
       {cameraMode === 'walk' && <div className="crosshair" data-testid="crosshair" aria-hidden />}
       {cameraMode === 'walk' && feelReal && aimHint && <AimReadout />}
       {cameraMode === 'walk' && ducking && (
@@ -448,6 +451,7 @@ function SceneContent({
         </EffectsBoundary>
       )}
       <CameraBookmarkDriver />
+      <TourDriver />
       {cameraMode === 'orbit' ? (
         <>
           <OrbitCamera key="orbit" controlsRef={orbitRef} center={center} span={span} exterior={exteriorOn} entrance={entrance} rotateSpeed={project.settings.mouseSensitivity} />
