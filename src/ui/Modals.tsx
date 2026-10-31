@@ -11,13 +11,16 @@ import { ModelImportModal } from './ModelImportModal';
 import { BugReportModal } from './BugReportModal';
 import { SHORTCUT_GROUPS } from './shortcutCatalog';
 import { HELP_TEXTS } from './helpTexts';
+import { CommandPalette } from './palette/CommandPalette';
 import { VersionsModal } from '../versions/VersionsModal';
 
 export function ModalHost() {
   const modal = useDialogStore((s) => s.modal);
   const confirm = useDialogStore((s) => s.confirmRequest);
+  const palette = useDialogStore((s) => s.paletteOpen);
   return (
     <>
+      {palette && <CommandPalette />}
       {modal === 'projects' && <ProjectsModal />}
       {modal === 'help' && <HelpModal />}
       {modal === 'pdfPage' && <PdfPageModal />}

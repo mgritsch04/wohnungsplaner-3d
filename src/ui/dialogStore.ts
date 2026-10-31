@@ -12,6 +12,9 @@ interface DialogStore {
   confirmRequest: ConfirmRequest | null;
   modal: 'projects' | 'help' | 'pdfPage' | 'product' | 'model' | 'bugReport' | 'versions' | null;
   modalData: unknown;
+  /** Command palette (Strg+K) open. */
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
   openModal: (m: DialogStore['modal'], data?: unknown) => void;
   closeModal: () => void;
 }
@@ -20,6 +23,8 @@ export const useDialogStore = create<DialogStore>((set) => ({
   confirmRequest: null,
   modal: null,
   modalData: null,
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   openModal: (modal, modalData = null) => set({ modal, modalData }),
   closeModal: () => set({ modal: null, modalData: null }),
 }));

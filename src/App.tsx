@@ -9,6 +9,7 @@ import { FurnitureHoverCard } from './ui/FurnitureHoverCard';
 import { ObjectContextMenu } from './ui/ObjectContextMenu';
 import { useObjectMenuStore } from './ui/objectMenu';
 import { SaveErrorBanner } from './ui/SaveErrorBanner';
+import { OPEN_PANEL_EVENT } from './ui/palette/commands';
 import { useShortcuts } from './ui/useShortcuts';
 import { useAutosave } from './persistence/useAutosave';
 import { noteSaveState } from './ui/bugReport';
@@ -91,6 +92,14 @@ export default function App() {
   // phone view (#129): plan/3D get the whole screen, the side panels open as a sheet from the bottom
   const phone = usePhoneLayout();
   const [sheet, setSheet] = useState<PhoneSheet>(null);
+  // the command palette opens a side panel (on the phone: as a sheet)
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      if (isPhoneLayout()) setSheet((e as CustomEvent<'left' | 'right'>).detail);
+    };
+    window.addEventListener(OPEN_PANEL_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PANEL_EVENT, onOpen);
+  }, []);
   // shop mode (#361): `?laden` opens it right away (e.g. as a home-screen shortcut)
   const [shop, setShop] = useState(() => new URLSearchParams(location.search).has('laden'));
   const hasSelection = useUiStore((s) => s.selection !== null);

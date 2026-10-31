@@ -17,7 +17,15 @@ import { copySelection, deleteSelection, duplicateSelection, nudgeSelection, pas
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // command palette: Strg+K works everywhere, also while typing in a field (the palette handles its own keys)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const d = useDialogStore.getState();
+        if (!d.confirmRequest && (!d.modal || d.paletteOpen)) d.setPaletteOpen(!d.paletteOpen);
+        return;
+      }
       const t = e.target as HTMLElement;
+      if (useDialogStore.getState().paletteOpen) return;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const ui = useUiStore.getState();
       const ps = useProjectStore.getState();

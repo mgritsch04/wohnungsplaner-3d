@@ -15,7 +15,7 @@ import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } f
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
 import { usePhoneLayout } from './phoneLayout';
-import { IconCutaway, IconExterior, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
+import { IconCutaway, IconExterior, IconHelp, IconMore, IconSearch, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
 
 /**
  * Button that shows only an icon (#103). The name is the `aria-label` (screen readers, tests),
@@ -243,6 +243,9 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
                 Realismus
               </button>
             </div>
+            <IconButton label="Funktionen suchen" tip="Funktionen suchen (Strg+K)" keys="Control+K" onClick={() => useDialogStore.getState().setPaletteOpen(true)}>
+              <IconSearch />
+            </IconButton>
             <IconButton label="Hilfe & Tastenkürzel" tip="Hilfe & Tastenkürzel (?)" keys="?" onClick={() => openModal('help')}>
               <IconHelp />
             </IconButton>
@@ -259,6 +262,8 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
         >
           {phone && (
             <>
+              <button onClick={closeAfter(() => useDialogStore.getState().setPaletteOpen(true))}>Funktionen suchen…</button>
+              <hr />
               <div className="menu-heading">Darstellung</div>
               <div className="segmented menu-segmented" role="group" aria-label="Qualität">
                 <button className={quality === 'planning' ? 'active' : ''} aria-pressed={quality === 'planning'} onClick={() => setQuality('planning')}>

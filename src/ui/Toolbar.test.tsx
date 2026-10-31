@@ -45,7 +45,7 @@ describe('toolbar (#100, #103)', () => {
 
   it('labels every icon button with a name and a tooltip and hides the drawing from screen readers', () => {
     const icons = [...header().querySelectorAll('button.icon-btn')];
-    expect(icons.map(nameOf)).toEqual(['Rückgängig', 'Wiederholen', '2D + 3D', 'Übersicht', 'Begehen', 'Schnitt', 'Außen', 'Kamera zurücksetzen', 'Hilfe & Tastenkürzel', 'Mehr']);
+    expect(icons.map(nameOf)).toEqual(['Rückgängig', 'Wiederholen', '2D + 3D', 'Übersicht', 'Begehen', 'Schnitt', 'Außen', 'Kamera zurücksetzen', 'Funktionen suchen', 'Hilfe & Tastenkürzel', 'Mehr']);
     for (const b of icons) {
       const label = b.getAttribute('aria-label')!;
       expect(label.length).toBeGreaterThan(1);

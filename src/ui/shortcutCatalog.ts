@@ -68,6 +68,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'O / Doppelklick in 3D', action: 'Ausgewählte Tür / ausgewähltes Fenster öffnen oder schließen', match: ['o'] },
       { keys: 'Rechtsklick / Menütaste / Umschalt+F10', action: 'Kontextmenü des Objekts: Name, Maße, Preis und Schnellaktionen (Drehen, Duplizieren, Öffnen/Schließen, Löschen, Eigenschaften)', match: ['contextmenu', 'f10'] },
       { keys: 'Strg+S', action: 'Speichern', match: ['s'] },
+      { keys: 'Strg+K', action: 'Funktionen suchen (Befehlspalette): Werkzeuge, Ansichten, Export, Einstellungen finden und direkt ausführen', match: ['k'] },
     ],
   },
   {
