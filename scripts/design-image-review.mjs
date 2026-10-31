@@ -98,14 +98,17 @@ export function roomFacts(run, roomName) {
   return [`Raum ${cmOf(a.size.x)} × ${cmOf(a.size.y)} cm (x nach Osten, y nach Süden, ab der Nordwest-Ecke).`, ...openings, 'Möbel:', ...pieces].join('\n');
 }
 
-const PLACEHOLDER = 'Die Möbel sind einfache Platzhalter-Modelle ohne Kissen, Plaids, Bettwäsche, Deko und Stoffstruktur. Bewerte Anordnung, Auswahl, Größe, Menge und die Farben der Möbel, nicht was Platzhalter nicht zeigen können; bemängle also keine fehlenden Kissen, Plaids oder Accessoires.';
+const PLACEHOLDER = 'Die Möbel sind einfache Platzhalter-Modelle ohne Kissen, Plaids, Bettwäsche und Stoffstruktur. Bewerte Anordnung, Auswahl, Größe, Menge und die Farben der Möbel, nicht was Platzhalter nicht zeigen können; bemängle also keine fehlenden Kissen oder Plaids. Bilder, Vorhänge, Pflanzen und Deko-Sets (Vase, Bücher, Schale) sind eingezeichnet und zählen mit.';
 const VIEWS = `Bild 1 zeigt den Raum schräg von oben, so wie man ihn beim Hereinkommen sieht. Es ist in 1,20 m Höhe waagrecht aufgeschnitten: Alles darüber fehlt dort (Hängeleuchten, Deckenleuchten, Oberschränke, Vorhänge, Bilder und die oberen Teile von Kühlschrank, Hochschrank, Kleiderschrank und hohen Regalen); hohe Möbel sehen darin wie niedrige Kästen aus. Bild 2 zeigt denselben Raum ungeschnitten fast senkrecht von oben, mit allem, was hängt; dort verdecken die Wände den Rand des Raums ein wenig. Urteile über Licht, Oberschränke und hohe Möbel nach Bild 2. Andere Räume am Bildrand gehören nicht dazu.`;
 
-function prompt(room, type, area, facts = '') {
+/** The third view, when a run has it: eye height from the door, where pictures and decoration on the walls show. */
+const EYE = ' Bild 3 zeigt den Raum ungeschnitten auf Augenhöhe (1,60 m) von der Tür aus: Nur dort sieht man Bilder, Vorhänge und Deko an den Wänden; urteile über Wanddeko nach Bild 3.';
+
+function prompt(room, type, area, facts = '', eye = false) {
   return `Du bist eine erfahrene Innenarchitektin und prüfst einen Einrichtungsvorschlag unabhängig.
 
 Raum: „${room}“, ${MAIN[type]}, ${area.toFixed(1).replace('.', ',')} m².
-${VIEWS}
+${VIEWS}${eye ? EYE : ''}
 ${PLACEHOLDER}
 ${facts ? `\nDie Aufstellung in Zahlen (gleicher Raum, so kannst du Abstände nachrechnen):\n${facts}\n` : ''}
 Miss den Raum an diesen Regeln (Kennung, Stufe hart/Profi/Tipp). Ein Plan, der die harten und die Profi-Regeln einhält und die Checkliste erfüllt, verdient 8 oder mehr; eine Regel kann bewusst gebrochen sein, wenn der Raum es verlangt und das Ergebnis gut ist.
@@ -120,10 +123,13 @@ Antworte nur mit JSON in dieser Form:
 {"punkte":{"wege":{"note":7,"warum":"…"},…},"gesamt":7,"staerken":["…"],"maengel":["…"],"regeln":[{"kennung":"W5","wo":"…"}]}`;
 }
 
-/** Both pictures of a room in a run, or null. */
-function imagesOf(dir, room) {
-  const files = [`3d-${fileOf(room)}.png`, `3d-${fileOf(room)}-oben.png`].map((f) => join(dir, f)).filter((f) => existsSync(f));
-  return files.length < 2 ? null : files.map((f) => ({ data: readFileSync(f).toString('base64') }));
+/** The pictures of a room in a run (the eye view only when `eye` and the run has it), or null. */
+function imagesOf(dir, room, eye = true) {
+  const views = [`3d-${fileOf(room)}.png`, `3d-${fileOf(room)}-oben.png`].map((f) => join(dir, f));
+  if (!views.every((f) => existsSync(f))) return null;
+  const third = join(dir, `3d-${fileOf(room)}-auge.png`);
+  if (eye && existsSync(third)) views.push(third);
+  return views.map((f) => ({ data: readFileSync(f).toString('base64') }));
 }
 
 async function askJson(text, images) {
@@ -142,17 +148,17 @@ async function reviewRoom(dir, room, type, area, facts) {
   if (!images) return { room, type, error: 'Bilder fehlen' };
   const started = Date.now();
   try {
-    return { room, type, area, ...(await askJson(prompt(room, type, area, facts), images)), ms: Date.now() - started };
+    return { room, type, area, ...(await askJson(prompt(room, type, area, facts, images.length === 3), images)), ms: Date.now() - started };
   } catch (e) {
     return { room, type, error: String(e?.message ?? e) };
   }
 }
 
-function comparePrompt(room, type, area, facts) {
+function comparePrompt(room, type, area, facts, eye = false) {
   return `Du bist eine erfahrene Innenarchitektin und vergleichst zwei Einrichtungsvorschläge für denselben Raum.
 
 Raum: „${room}“, ${MAIN[type]}, ${area.toFixed(1).replace('.', ',')} m².
-Bild 1 und 2 zeigen Plan 1, Bild 3 und 4 zeigen Plan 2, jeweils zuerst den Blick beim Hereinkommen und dann den Blick von oben. ${VIEWS.replace(/^Bild 1 zeigt/, 'Der erste Blick zeigt').replace(/Bild 2 zeigt/, 'Der zweite zeigt').replace(/nach Bild 2/, 'nach dem Blick von oben')}
+${eye ? 'Bild 1 bis 3 zeigen Plan 1, Bild 4 bis 6 zeigen Plan 2, jeweils zuerst den Blick beim Hereinkommen, dann den Blick von oben, dann den Blick auf Augenhöhe.' : 'Bild 1 und 2 zeigen Plan 1, Bild 3 und 4 zeigen Plan 2, jeweils zuerst den Blick beim Hereinkommen und dann den Blick von oben.'} ${VIEWS.replace(/^Bild 1 zeigt/, 'Der erste Blick zeigt').replace(/Bild 2 zeigt/, 'Der zweite zeigt').replace(/nach Bild 2/, 'nach dem Blick von oben')}${eye ? EYE.replace('Bild 3 zeigt', 'Der dritte zeigt').replace('nach Bild 3', 'nach dem Blick auf Augenhöhe') : ''}
 ${PLACEHOLDER}
 
 Plan 1 in Zahlen:
@@ -186,13 +192,15 @@ async function compareRoom(dirs, runs, room, type, area) {
     const same = { besser: 'gleich', abstand: 'gleiche Aufstellung', warum: 'Beide Läufe stellen jedes Teil gleich auf, ohne Prüfer verglichen.', punkte: {} };
     return { room, type, verdict: 'gleich', xy: same, yx: same };
   }
-  const images = dirs.map((d) => imagesOf(d, room));
+  // the eye view only when both runs have it, so each plan shows the same views
+  const eye = dirs.every((d) => existsSync(join(d, `3d-${fileOf(room)}-auge.png`)));
+  const images = dirs.map((d) => imagesOf(d, room, eye));
   if (images.some((i) => !i)) return { room, type, error: 'Bilder fehlen' };
   const facts = runs.map((r) => roomFacts(r, room));
   try {
     const [xy, yx] = await Promise.all([
-      askJson(comparePrompt(room, type, area, facts), [...images[0], ...images[1]]),
-      askJson(comparePrompt(room, type, area, [facts[1], facts[0]]), [...images[1], ...images[0]]),
+      askJson(comparePrompt(room, type, area, facts, eye), [...images[0], ...images[1]]),
+      askJson(comparePrompt(room, type, area, [facts[1], facts[0]], eye), [...images[1], ...images[0]]),
     ]);
     const swap = { 1: '2', 2: '1', gleich: 'gleich' };
     const a = String(xy.besser), b = swap[String(yx.besser)] ?? 'gleich';

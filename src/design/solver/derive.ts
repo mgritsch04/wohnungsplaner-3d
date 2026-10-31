@@ -82,6 +82,9 @@ function insideScore(m: Model, b: Box): number {
  * Where a wall piece hangs above its parent: on the wall behind it (a free-standing parent: the
  * nearest wall to its place), never lower than the parent's top (Claude's height can be too low).
  */
+/** Height of a picture's middle above the floor (R7: 145–155 cm). */
+const ART_MIDDLE = 1.5;
+
 function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number): { box: Box; elevation: number } {
   const s = n.spec;
   const ctx = m.ctx;
@@ -92,7 +95,10 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   const w = ctx.walls[wi];
   const t = clamp((P.x - w.a.x) * w.dir.x + (P.y - w.a.y) * w.dir.y, s.width / 2, Math.max(s.width / 2, w.length - s.width / 2));
   const gap = s.role === 'tv' ? 0.05 : 0.2;
-  const want = Math.max(height ?? Math.max(s.elevation, parentTop + gap), parentTop + 0.02);
+  // a picture over a piece: middle at eye height, but 15–30 cm over the piece so it belongs to it (R7)
+  const art = s.shape === 'picture' || s.shape === 'picture-set';
+  const fallback = art ? clamp(ART_MIDDLE - s.height / 2, parentTop + 0.15, parentTop + 0.3) : Math.max(s.elevation, parentTop + gap);
+  const want = Math.max(height ?? fallback, parentTop + 0.02);
   return { box: boxOnWall(w, t, s.width, s.depth, 0.002), elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
 }
 
@@ -154,8 +160,8 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
   // the pieces that take another branch of the `on` rule do not share the row
   const inRow = (s: Node) => s.spec.role !== 'mattress' && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
   const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
-  // a screen hanging over the piece takes its middle: what stands on it goes to the ends (#443)
-  const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && s.spec.role === 'tv');
+  // a screen or a picture hanging over the piece takes its middle: what stands on it goes to the ends (#443, R7)
+  const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && (s.spec.role === 'tv' || s.spec.shape === 'picture' || s.spec.shape === 'picture-set'));
   if (sibs.length < 2 && !screenAbove) return null;
   sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
   const widths = sibs.reduce((v, s) => v + s.spec.width, 0);

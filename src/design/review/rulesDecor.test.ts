@@ -99,6 +99,11 @@ describe('D6 Bild und Spiegel', () => {
     expect(has(living([sofa, pic(2.5, 'generic-picture')]), 'D6', /zu klein/)).toBe(true);
     expect(has(living([sofa, pic(2.5, 'generic-picture-large', 2.0)]), 'D6', /zu breit/)).toBe(true);
   });
+  it('a picture floating far above its piece and a living room without any picture are light (R7, SL6)', () => {
+    expect(has(living([sofa, pic(2.5, 'generic-picture-large')]), 'D6', /schön sind 15 bis 30 cm/)).toBe(false);
+    expect(has(living([sofa, put('generic-picture-large', { x: 2.5, y: 3.97, face: 'N', elevation: 1.5, parent: 'sofa' })]), 'D6', /schön sind 15 bis 30 cm/)).toBe(true);
+    expect(has(living([sofa]), 'D6', /kein Bild/)).toBe(true);
+  });
   it('a picture over a window or a door is light', () => {
     expect(has(living([sofa, put('generic-picture', { x: 2.5, y: 0.02, face: 'S', elevation: 1.35 })]), 'D6', /Fenster/)).toBe(true);
     expect(has(living([sofa, put('generic-picture', { x: 1.0, y: 3.98, face: 'N', elevation: 1.35 })]), 'D6', /Tür/)).toBe(true);

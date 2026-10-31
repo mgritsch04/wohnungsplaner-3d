@@ -62,4 +62,22 @@ describe('Wanddeko und Pflanzen (#436)', () => {
     const { program: p } = completeDecor(program([item('sb', 'generic-sideboard')]), 'dining', 14, []);
     expect(above(p, 'sb')).toMatchObject({ height: 1 });
   });
+
+  it('wählt für ein 1,8-m-Möbel das Bild 120×80', () => {
+    expect(pictureFor(1.8)).toBe('generic-picture-xl');
+  });
+
+  it('stellt ein Deko-Set auf Lowboard und breites Sideboard mit Lampe, nicht auf eine schmale Kommode mit Lampe (SL6)', () => {
+    const { program: p } = completeDecor(
+      program(
+        [item('tvb', 'generic-tv-sideboard'), item('tv', 'generic-tv'), item('sb', 'generic-sideboard'), item('lsb', 'generic-table-lamp'), item('kom', 'generic-dresser'), item('lk', 'generic-table-lamp')],
+        [{ kind: 'above', item: 'tv', target: 'tvb' }, { kind: 'on', item: 'lsb', target: 'sb' }, { kind: 'on', item: 'lk', target: 'kom' }],
+      ),
+      'living',
+      22,
+      [],
+    );
+    const targets = p.items.filter((i) => i.catalogId === 'generic-decor-set').map((i) => (p.relations.find((r) => r.kind === 'on' && r.item === i.id) as { target: string }).target);
+    expect(targets.sort()).toEqual(['sb', 'tvb']);
+  });
 });

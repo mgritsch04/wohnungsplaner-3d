@@ -299,6 +299,67 @@ function turningStairParts(shape: string, w: number, d: number, h: number, color
   return parts;
 }
 
+/** Number of motifs a print can show (`artwork`). */
+const MOTIFS = 4;
+/** A motif per picture that stays the same between renders: from its colour and size. */
+function motifOf(color: string, w: number, h: number): number {
+  let n = Math.round(w * 100) * 7 + Math.round(h * 100) * 13;
+  for (const ch of color) n = (n * 31 + ch.charCodeAt(0)) % 9973;
+  return n % MOTIFS;
+}
+
+/**
+ * The picture itself on the canvas from (x0, y0) to (x1, y1) at the front `z`: a landscape with a
+ * sun, two arches, a botanical stem or three colour fields, in the item colour and its shades.
+ */
+function artwork(x0: number, y0: number, x1: number, y1: number, z: number, color: string, accent: string | undefined, motif: number): Part[] {
+  const cw = x1 - x0;
+  const ch = y1 - y0;
+  const cx = (x0 + x1) / 2;
+  const dark = shade(color, 0.62);
+  const light = shade(color, 1.35);
+  const spot = accent ?? '#d4a94a';
+  const flat = { rough: 0.85 };
+  const disc = (x: number, y: number, r: number, c: string, dz: number): Part => ({ geo: CYL, p: [x, y, z + dz], s: [r * 2, 0.002, r * 2], r: [Math.PI / 2, 0, 0], color: c, rough: 0.85 });
+  const ground: Part = box(x0, y0, z, x1, y1, z + 0.002, light, flat);
+  switch (motif) {
+    case 0:
+      // landscape: sky, hills, a low sun
+      return [ground, box(x0, y0, z + 0.001, x1, y0 + ch * 0.42, z + 0.003, color, flat), box(x0, y0, z + 0.002, x1, y0 + ch * 0.22, z + 0.004, dark, flat), disc(x0 + cw * 0.7, y0 + ch * 0.66, Math.min(cw, ch) * 0.12, spot, 0.003)];
+    case 1:
+      // two arches side by side
+      return [
+        ground,
+        ...[-1, 1].flatMap((k, i) => {
+          const r = Math.min(cw * 0.2, ch * 0.3);
+          const x = cx + k * cw * 0.2;
+          const c = i ? dark : color;
+          return [box(x - r, y0 + ch * 0.12, z + 0.002, x + r, y0 + ch * 0.5, z + 0.004, c, flat), disc(x, y0 + ch * 0.5, r, c, 0.003)];
+        }),
+        disc(cx, y0 + ch * 0.82, Math.min(cw, ch) * 0.06, spot, 0.003),
+      ];
+    case 2: {
+      // botanical: a stem with leaves left and right
+      const parts: Part[] = [ground, box(cx - 0.004, y0 + ch * 0.08, z + 0.002, cx + 0.004, y0 + ch * 0.92, z + 0.004, dark, flat)];
+      for (let i = 0; i < 4; i++) {
+        const y = y0 + ch * (0.25 + i * 0.18);
+        const k = i % 2 ? 1 : -1;
+        const lw = Math.min(cw * 0.22, ch * 0.16) * (1 - i * 0.12);
+        parts.push({ geo: SPHERE, p: [cx + k * lw * 0.55, y, z + 0.004], s: [lw * 1.1, lw * 0.45, 0.002], r: [0, 0, k * 0.5], color: i % 2 ? color : dark, rough: 0.85 });
+      }
+      return parts;
+    }
+    default:
+      // three colour fields
+      return [
+        ground,
+        box(x0 + cw * 0.08, y0 + ch * 0.55, z + 0.002, x1 - cw * 0.08, y1 - ch * 0.08, z + 0.004, color, flat),
+        box(x0 + cw * 0.08, y0 + ch * 0.3, z + 0.002, x1 - cw * 0.08, y0 + ch * 0.5, z + 0.004, spot, flat),
+        box(x0 + cw * 0.08, y0 + ch * 0.08, z + 0.002, x1 - cw * 0.08, y0 + ch * 0.25, z + 0.004, dark, flat),
+      ];
+  }
+}
+
 function shapeParts(shape: string, w: number, d: number, h: number, color: string, accent?: string, look: ProceduralLook = {}): Part[] {
   if (shape.startsWith('stairs-')) return turningStairParts(shape, w, d, h, color, { detail: 'woodgrain', detailRepeat: 1 });
   const W = w / 2;
@@ -575,15 +636,53 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       return parts;
     }
     case 'picture': {
-      // framed print (#350): thin frame, light mat, a simple two-tone motif in the item colour
+      // framed print (#350): thin frame, light mat, a motif in the item colour (G 31.10.: paintings, not one stripe)
       const f = Math.min(0.03, w / 12, h / 12);
       const m = Math.min(0.06, w / 8, h / 8);
       return [
         rbox(-W, 0, -D, W, h, D, 0.004, '#2f2a26', { rough: 0.6 }),
         box(-W + f, f, D - 0.004, W - f, h - f, D + 0.001, '#f4f1ea', { rough: 0.9 }),
-        box(-W + f + m, f + m, D, W - f - m, h - f - m, D + 0.002, color, { rough: 0.85 }),
-        box(-W + f + m, f + m, D + 0.001, W - f - m, f + m + (h - 2 * (f + m)) * 0.42, D + 0.003, shade(color, 0.72), { rough: 0.85 }),
+        ...artwork(-W + f + m, f + m, W - f - m, h - f - m, D, color, accent, motifOf(color, w, h)),
       ];
+    }
+    case 'picture-set': {
+      // a group of three frames on one axis: the large one in the middle, two smaller ones beside it
+      const gap = Math.min(0.08, w * 0.06);
+      const big = Math.min(h, (w - 2 * gap) * 0.42);
+      const small = Math.min(h * 0.72, (w - 2 * gap - big) / 2);
+      const frames: [number, number, number][] = [
+        [-big / 2 - gap - small, small, h / 2 - small * 0.62],
+        [-big / 2, big, h / 2 - big / 2],
+        [big / 2 + gap, small, h / 2 - small * 0.45],
+      ];
+      return frames.flatMap(([x0, fw, y0], i) => {
+        const fh = i === 1 ? big : fw * 1.25 > h ? h : fw * 1.25;
+        const y = i === 1 ? Math.max(0, h / 2 - fh / 2) : Math.max(0, Math.min(h - fh, y0));
+        const f = Math.min(0.02, fw / 12);
+        const mat = Math.min(0.04, fw / 8);
+        const tone = i === 1 ? color : shade(color, i === 0 ? 0.75 : 1.2);
+        return [
+          rbox(x0, y, -D, x0 + fw, y + fh, D, 0.003, i === 1 ? '#2f2a26' : '#b89a72', { rough: 0.6 }),
+          box(x0 + f, y + f, D - 0.004, x0 + fw - f, y + fh - f, D + 0.001, '#f4f1ea', { rough: 0.9 }),
+          ...artwork(x0 + f + mat, y + f + mat, x0 + fw - f - mat, y + fh - f - mat, D, tone, accent, (motifOf(color, w, h) + i) % MOTIFS),
+        ];
+      });
+    }
+    case 'decor': {
+      // still life of three on a sideboard: a tall vase with twigs, a stack of books, a low bowl
+      const vr = Math.min(0.06, w * 0.14);
+      const vx = -W + vr + 0.02;
+      const parts: Part[] = [
+        { geo: TAPER, p: [vx, h * 0.3, 0], s: [vr * 2, h * 0.6, vr * 2], r: [Math.PI, 0, 0], color, rough: 0.35 },
+        cyl(vx, h * 0.6, 0, vr * 0.35, h * 0.66, color, { rough: 0.35 }),
+      ];
+      for (let i = 0; i < 3; i++) parts.push(box(vx - 0.004, h * 0.6, -0.004, vx + 0.004, h, 0.004, '#6b5a43', { r: [0, i * 1.1, (i - 1) * 0.28] }));
+      const bx = 0.03;
+      const covers = ['#3f5f45', '#c9b79a', '#7b3f2f'];
+      covers.forEach((c, i) => parts.push(box(bx - 0.11 + i * 0.006, i * 0.03, -D + 0.02, bx + 0.11 - i * 0.008, (i + 1) * 0.03, D - 0.02, c, { rough: 0.8 })));
+      const br = Math.min(0.07, (W - bx - 0.12) * 0.9);
+      if (br > 0.03) parts.push({ geo: SPHERE, p: [W - br - 0.01, 0.035, 0], s: [br * 2, 0.07, br * 2], color: shade(color, 0.8), rough: 0.4 });
+      return parts;
     }
     case 'wall-shelf': {
       // floating board with a few objects on it

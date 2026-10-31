@@ -1,8 +1,8 @@
 /**
  * Wall decoration and plants as a designer adds them at the end (mgritsch04/wohnungsplaner-3d#436):
  * a room is not finished with furniture alone. `completeDecor` hangs a picture over the sofa, the
- * bed and a sideboard, a mirror in the hall and at the wardrobe, and gives a room that is lived in
- * one large plant. Few good pieces rather than many (SL6): every room has a budget, what Claude
+ * bed and a sideboard, a mirror in the hall and at the wardrobe, a still life of three (vase, books,
+ * bowl) on a sideboard, chest or lowboard, and gives a room that is lived in one large plant. Few good pieces rather than many (SL6): every room has a budget, what Claude
  * already planned counts against it. Pictures take the accent colour of the palette (SL2); sizes
  * follow the piece below (R7: about two thirds of its width, lower edge 15–25 cm above it).
  * Everything added is named in the notes and carries the rule id in its reason.
@@ -19,7 +19,9 @@ const PLANT_ROOMS: RoomType[] = ['living', 'bedroom', 'office', 'dining', 'kids'
 /** Smallest floor area (m²) for a plant of one's own. */
 const PLANT_MIN_AREA = 10;
 /** Picture widths in the catalogue, narrow to wide. */
-const PICTURES = ['generic-picture', 'generic-picture-large', 'generic-picture-wide'];
+const PICTURES = ['generic-picture', 'generic-picture-large', 'generic-picture-xl', 'generic-picture-wide'];
+/** Rooms whose sideboards, chests and lowboards get a still life when nothing but a lamp stands on them. */
+const STILL_LIFE_ROOMS: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'other'];
 /** Lower edge of a picture above a piece: this much above its top (R7). */
 const HANG_GAP = 0.2;
 
@@ -27,7 +29,7 @@ const shapeOfProgramItem = (c: Ctx, i: ProgramItem): string => {
   const item = lookup(c, i.catalogId);
   return item ? shapeOf(item) : '';
 };
-const isPicture = (c: Ctx, i: ProgramItem) => shapeOfProgramItem(c, i) === 'picture';
+const isPicture = (c: Ctx, i: ProgramItem) => ['picture', 'picture-set'].includes(shapeOfProgramItem(c, i));
 /** A mirror of any kind: hung (role `mirror`) or the full-length one that leans on the floor. */
 const isMirror = (c: Ctx, i: ProgramItem) => shapeOfProgramItem(c, i) === 'panel' && /spiegel/i.test(lookup(c, i.catalogId)?.name ?? '');
 
@@ -37,7 +39,7 @@ export function pictureFor(width: number): string | null {
   if (!cand.length) return null;
   return cand.sort((a, b) => Math.abs(a.w - (2 * width) / 3) - Math.abs(b.w - (2 * width) / 3))[0].id;
 }
-const PICTURE_WIDTH: Record<string, number> = { 'generic-picture': 0.5, 'generic-picture-large': 1.0, 'generic-picture-wide': 1.4 };
+const PICTURE_WIDTH: Record<string, number> = { 'generic-picture': 0.5, 'generic-picture-large': 1.0, 'generic-picture-xl': 1.2, 'generic-picture-wide': 1.4 };
 
 export function completeDecor(program: RoomProgram, type: RoomType, area: number, products: CatalogItem[] = [], accent?: string): { program: RoomProgram; notes: string[] } {
   const budget = PICTURE_BUDGET[type];
@@ -69,6 +71,22 @@ export function completeDecor(program: RoomProgram, type: RoomType, area: number
     for (const s of withRole(['sofa'])) if (type === 'living' || type === 'other' || area >= 12) hangOver(s, 'R7', 'dem Sofa');
     for (const s of c.items.filter((i) => ['cabinet', 'dresser'].includes(shapeOfProgramItem(c, i)) && lookup(c, i.catalogId)?.category === 'storage' && (lookup(c, i.catalogId)?.height ?? 9) <= 1.1 && roleOfItem(c, i) !== 'tv-board' && !c.relations.some((r) => r.kind === 'above' && r.target === i.id)))
       if ((lookup(c, s.catalogId)?.width ?? 0) >= 0.8 && !c.relations.some((r) => r.kind === 'on' && r.target === s.id && roleOfItem(c, c.items.find((i) => i.id === r.item) ?? s) === 'tv')) hangOver(s, 'R7', 'dem Sideboard');
+  }
+
+  // a still life of three heights on a sideboard, chest or lowboard (SL6); a narrow piece with a lamp
+  // is full already, a still life beside the lamp would crowd the picture above it (image review)
+  if (STILL_LIFE_ROOMS.includes(type)) {
+    for (const s of [...c.items]) {
+      const item = lookup(c, s.catalogId);
+      const role = roleOfItem(c, s);
+      const chest = role === 'wall' && item?.category === 'storage' && ['cabinet', 'dresser'].includes(shapeOfProgramItem(c, s)) && item.height <= 1.1;
+      if (!item || !(chest || role === 'tv-board')) continue;
+      const on = c.relations.flatMap((r) => (r.kind === 'on' && r.target === s.id ? [c.items.find((i) => i.id === r.item)] : []));
+      const onlyLamps = on.every((i) => i && roleOfItem(c, i) === 'table-lamp');
+      if (!onlyLamps || (on.length > 0 && item.width < 1.2)) continue;
+      const set = add(c, s, 'Wanddeko', 'generic-decor-set', `${s.id}_deko`, 'Deko: Vase, Bücher und Schale als Dreiergruppe in verschiedenen Höhen auf der Ablage (SL6).', { fallbacks: [] });
+      if (set) c.relations.push({ kind: 'on', item: set.id, target: s.id });
+    }
   }
 
   // mirror: in the hall a last look when leaving (ST3), in a bedroom at the wardrobe to dress (S7)

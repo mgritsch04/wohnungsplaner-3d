@@ -437,6 +437,35 @@ async function roomShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
       },
     });
   }
+  await eyeShots(page, dir, rooms);
+}
+
+/**
+ * Dritter Blick je Raum: auf Augenhöhe (1,60 m) von der Haupttür aus, ungeschnitten, auf die
+ * gegenüberliegende Wand – so sieht man Bilder, Vorhänge und Deko an den Wänden, die von oben
+ * und im Schnitt fehlen (Wunsch von G, 31.10.).
+ */
+async function eyeShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
+  const canvas = page.getByTestId("scene3d");
+  for (const room of rooms) {
+    const view = room.entryView;
+    if (!view) continue;
+    const xs = room.polygon.map((p) => p.x);
+    const ys = room.polygon.map((p) => p.y);
+    // from just inside the door at eye height towards the middle of the room
+    const c = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    const from = { x: view.at.x + view.dir.x * 0.15, y: 1.6, z: view.at.y + view.dir.y * 0.15 };
+    const to = { x: c.x, y: 1.2, z: c.y };
+    await page.evaluate(
+      ([p, t]) =>
+        (window as unknown as { __wp: Wp }).__wp.useCameraRig
+          .getState()
+          .orbit?.set(p, t),
+      [from, to] as const,
+    );
+    await page.waitForTimeout(1500);
+    await canvas.screenshot({ path: `${dir}/3d-${fileOf(room.name)}-auge.png` });
+  }
 }
 
 /** How much farther than needed the top view stands (and how much of the picture is cut out). */
