@@ -265,8 +265,9 @@ export async function compareRooms(input: FurnishRunInput, work: RoomWork, a: Ro
 /**
  * Two designs, one choice (#436): Claude writes a second, fundamentally different programme
  * for a main room, both are placed and walked through, and the better one goes on: passing the
- * walk-through beats failing it, then the pictures decide, and where they cannot, the rules
- * (`better`). Any error keeps the first design.
+ * walk-through beats failing it; where both fail, the rules decide (`better`: the critique has
+ * to repair it); where both pass, the pictures decide, and where they cannot, the rules. Any
+ * error keeps the first design.
  */
 async function secondDesign(input: FurnishRunInput, work: RoomWork, first: RoomResult, calls: CallLog[]): Promise<RoomResult> {
   let second: RoomResult;
@@ -288,6 +289,12 @@ async function secondDesign(input: FurnishRunInput, work: RoomWork, first: RoomR
   if (first.review.passed !== second.review.passed) {
     note(`Entwurf ${first.review.passed ? 1 : 2} (nur er besteht die Begehung)`);
     return first.review.passed ? first : second;
+  }
+  // both fail: the critique rounds still have to repair one, and the one closer to passing has the better chance
+  if (!first.review.passed) {
+    const pick = better(first, second);
+    note(`Entwurf ${pick === first ? 1 : 2} (beide nicht bestanden, Begehung entscheidet)`);
+    return pick;
   }
   const v = await compareRooms(input, work, first, second, calls, 'Entwürfe');
   if (v === 'first' || v === 'second') {
