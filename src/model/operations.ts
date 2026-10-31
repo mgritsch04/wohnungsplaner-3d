@@ -233,6 +233,27 @@ export function moveNode(d: Project, nodeId: string, p: Vec2) {
   if (!n) return;
   n.x = roundMm(p.x);
   n.y = roundMm(p.y);
+  keepOpeningsOnWalls(d, nodeId);
+}
+
+/**
+ * After a wall end moved: openings of the walls at that node slide back onto the shortened wall
+ * (and get narrower if the wall became shorter than they are) instead of sticking out past its end.
+ */
+export function keepOpeningsOnWalls(d: Project, nodeId: string) {
+  for (const w of d.walls) {
+    if (w.a !== nodeId && w.b !== nodeId) continue;
+    const a = nodeById(d, w.a);
+    const b = nodeById(d, w.b);
+    if (!a || !b) continue;
+    const L = dist(a, b);
+    for (const o of d.openings) {
+      if (o.wallId !== w.id) continue;
+      if (o.offset - o.width / 2 >= -1e-6 && o.offset + o.width / 2 <= L + 1e-6) continue;
+      o.width = roundMm(Math.min(o.width, Math.max(0.1, L)));
+      o.offset = roundMm(Math.max(o.width / 2, Math.min(L - o.width / 2, o.offset)));
+    }
+  }
 }
 
 /**
