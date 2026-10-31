@@ -389,6 +389,28 @@ export async function searchWithRetry(
   return { ok: false, attempts: tries, ...last, reason: tries > 1 ? `${last.reason} – nach ${tries} Versuchen` : last.reason };
 }
 
+/** Comparable form of a product page: no protocol/www/query/hash/trailing slash, lower case. */
+export function normalizeProductUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+}
+
+/** IKEA article digits at the end of a product URL (`…-10409932/`, `…-s89579219/`), without a leading `s`. */
+const ikeaDigits = (url: string): string | undefined => /ikea\.com\/.*-s?(\d{8})\/?(?:[?#].*)?$/i.exec(url.trim())?.[1];
+
+/**
+ * The product the user already has in the catalogue for this page (own IKEA/Möbelix import or an earlier find):
+ * same normalised URL, or the same IKEA article number. Such a product is proposed as is, not imported again.
+ */
+export function findOwnedByUrl(items: CatalogItem[], url: string): CatalogItem | undefined {
+  const key = normalizeProductUrl(url);
+  const digits = ikeaDigits(url);
+  return items.find((c) => {
+    if (!c.productUrl) return false;
+    if (normalizeProductUrl(c.productUrl) === key) return true;
+    return !!digits && ikeaDigits(c.productUrl) === digits;
+  });
+}
+
 /** Stable catalogue id per product page. */
 export function foundId(url: string): string {
   let h = 0;
