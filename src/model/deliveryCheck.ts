@@ -15,7 +15,7 @@
  *   All doors are treated as opened (the leaves can be taken off or swung open).
  *   Turning long pieces around corners is NOT simulated.
  * - Every door/passage the route crosses must be higher than the vertical cross-section.
- * - Stairs are not part of the model yet and are not checked.
+ * - Stairs are not part of this check (the moving plan checks stairwell and lift, see movePlan.ts).
  */
 import type { DerivedPlan } from './derived';
 import { derivePlan } from './derived';
@@ -147,6 +147,12 @@ function attempts(f: Furniture): Attempt[] {
 export function checkDelivery(project: Project, derived: DerivedPlan, furnitureId: string): DeliveryResult {
   const f = project.furniture.find((x) => x.id === furnitureId);
   if (!f) return { ok: false, reason: 'Möbel nicht gefunden' };
+  return checkPieceDelivery(project, derived, f);
+}
+
+/** Same check for a piece with other dimensions than the placed furniture (a package of it, #487); `f` keeps the place and id. */
+export function checkPieceDelivery(project: Project, derived: DerivedPlan, f: Furniture): DeliveryResult {
+  const furnitureId = f.id;
   const entrance = findEntrance(project, derived);
   if (!entrance) return { ok: false, reason: 'Keine Eingangstür gefunden (eine Tür, die von einem Raum nach außen führt)' };
   const goal: Vec2 = { x: f.x, y: f.y };

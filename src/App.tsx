@@ -35,9 +35,12 @@ import { MobileBar } from './ui/MobileBar';
 import { ShopMode } from './shop/ShopMode';
 import { isEditableTarget, isPhoneLayout, usePhoneLayout, useTouchUi, type PhoneSheet } from './ui/phoneLayout';
 import { SplitDivider } from './ui/SplitDivider';
+import { TabIcon } from './ui/tabIcons';
 import { loadSplit, saveSplit } from './ui/splitPreference';
 import { FileFormatError } from './formats/zodErrors';
 import './ui/phone.css';
+import { FeatureSearch, useFeatureSearchShortcut } from './ui/search/FeatureSearch';
+import { usePaletteStore } from './ui/search/paletteStore';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -48,6 +51,7 @@ if (isPhoneLayout() && useUiStore.getState().viewMode === 'split') useUiStore.se
 export default function App() {
   const [ready, setReady] = useState(false);
   useShortcuts();
+  useFeatureSearchShortcut();
   const autosave = useAutosave(ready);
   useEffect(() => noteSaveState(autosave.state), [autosave.state]);
 
@@ -109,6 +113,8 @@ export default function App() {
   }, [touchUi]);
   // the object menu's „Eigenschaften“ opens the Details sheet on the phone (#235)
   useEffect(() => useObjectMenuStore.setState({ onDetails: phone ? () => setSheet('right') : null }), [phone]);
+  // the feature search (#461) opens the sheet with the found tab on the phone
+  useEffect(() => usePaletteStore.setState({ onShowPanel: phone ? (side) => setSheet(side) : null }), [phone]);
   const [split, setSplit] = useState(() => loadSplit());
   const changeSplit = (r: number) => {
     setSplit(r);
@@ -125,23 +131,26 @@ export default function App() {
       <div className="main">
         <aside className={`panel left ${locked ?? ''}`.trim()} aria-label="Werkzeuge und Katalog" inert={comparing}>
           {grip}
-          <nav className="tabs">
+          <nav className="tabs rail" aria-label="Bereiche">
             {(
               [
-                ['tools', 'Werkzeuge'],
-                ['catalog', 'Katalog'],
-                ['kitchen', 'Küche'],
-                ['furnish', 'Einrichten'],
-                ['smarthome', 'Smart Home'],
-                ['check', 'Check'],
-                ['import', hasDraft ? 'Import •' : 'Import'],
+                ['tools', 'Werkzeuge', 'Zeichnen, messen, Räume anlegen'],
+                ['catalog', 'Katalog', 'Möbel und Produkte einfügen'],
+                ['kitchen', 'Küche', 'Küchenzeile planen'],
+                ['furnish', 'Einrichten', 'Einrichtungsvorschlag, Claude fragen'],
+                ['smarthome', 'Smart Home', 'Geräte, Regeln, Simulation'],
+                ['check', 'Check', 'Wohnung prüfen'],
+                ['import', 'Import', 'Grundriss aus PDF/Bild einlesen'],
               ] as const
-            ).map(([id, label]) => (
-              <button key={id} className={leftTab === id ? 'active' : ''} onClick={() => setLeftTab(id)}>
-                {label}
+            ).map(([id, label, tip]) => (
+              <button key={id} className={leftTab === id ? 'active' : ''} aria-current={leftTab === id ? 'page' : undefined} title={tip} onClick={() => setLeftTab(id)}>
+                <TabIcon tab={id} />
+                <span className="rail-label">{label}</span>
+                {id === 'import' && hasDraft && <span className="rail-dot" aria-label="Import offen" />}
               </button>
             ))}
           </nav>
+          <div className="panel-content">
           {leftTab === 'tools' && <ToolsPanel />}
           {leftTab === 'catalog' && <CatalogPanel />}
           {leftTab === 'kitchen' && <KitchenPanel />}
@@ -149,6 +158,7 @@ export default function App() {
           {leftTab === 'smarthome' && <SmartHomePanel />}
           {leftTab === 'check' && <CheckPanel />}
           {leftTab === 'import' && <ImportPanel />}
+          </div>
         </aside>
         <main className={`workspace view-${viewMode}`} style={{ '--split': `${(split * 100).toFixed(2)}%` } as CSSProperties}>
           <StartCard />
@@ -193,6 +203,7 @@ export default function App() {
       </div>
       {shop && <ShopMode onClose={() => setShop(false)} />}
       <ModalHost />
+      <FeatureSearch />
       <PrintViewHost />
       <HandoverViewHost />
       <Toasts />

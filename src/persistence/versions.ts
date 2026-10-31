@@ -124,3 +124,30 @@ export function replaceVersions(projectId: string, versions: PackageVersion[]): 
     return metas;
   });
 }
+
+/** Rename a saved state (variant). Returns the updated entry or null when it does not exist. */
+export function renameVersion(projectId: string, versionId: string, name: string): Promise<VersionMeta | null> {
+  return serial(async () => {
+    const list = await listVersions(projectId);
+    const i = list.findIndex((m) => m.id === versionId);
+    if (i < 0) return null;
+    const updated = { ...list[i], name: cleanVersionName(name, list[i].name) };
+    await set(listKey(projectId), list.map((m, j) => (j === i ? updated : m)), versionStore);
+    return updated;
+  });
+}
+
+/** Copy a saved state under a new name (a new variant to work from). Throws VersionLimitError at the limit. */
+export function duplicateVersion(projectId: string, versionId: string, name: string): Promise<VersionMeta | null> {
+  return serial(async () => {
+    const list = await listVersions(projectId);
+    const src = list.find((m) => m.id === versionId);
+    const json = src && (await get<string>(dataKey(versionId), versionStore));
+    if (!src || !json) return null;
+    if (list.length >= VERSION_LIMIT) throw new VersionLimitError();
+    const meta: VersionMeta = { ...src, id: newId('ver'), name: cleanVersionName(name, `${src.name} (Kopie)`), createdAt: new Date().toISOString(), auto: false };
+    await set(dataKey(meta.id), json, versionStore);
+    await set(listKey(projectId), [meta, ...list], versionStore);
+    return meta;
+  });
+}

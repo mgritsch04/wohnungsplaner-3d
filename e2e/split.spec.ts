@@ -28,8 +28,9 @@ test('divider drags, clamps, resets, persists and works by keyboard (#368)', asy
   await page.mouse.move(box.x - 200, y, { steps: 5 });
   await page.mouse.up();
   const left = await widths(page);
-  expect(left.w2d).toBeLessThan(start.w2d - 150);
-  expect(left.w3d).toBeGreaterThan(start.w3d + 150);
+  // seit der Symbolleiste links (#461) ist die Arbeitsfläche schmaler: die Mindestbreite (240 px) bremst früher
+  expect(left.w2d).toBeLessThan(Math.max(start.w2d - 150, 241));
+  expect(left.w3d).toBeGreaterThan(start.w3d + 100);
   await page.waitForTimeout(600);
   // the 3D canvas follows the pane (no stretching): drawing buffer matches the displayed size
   const ratio = await page.evaluate(() => {

@@ -2468,3 +2468,174 @@ code {
 .plan-compass { position: absolute; top: 10px; right: 10px; pointer-events: none; z-index: 2; }
 .compass-rose { position: relative; display: inline-block; flex: none; }
 .compass-rose img { display: block; }
+
+.tour-banner {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--panel, rgba(30, 30, 30, 0.85));
+  color: var(--text, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 5;
+  max-width: 90%;
+  font-size: 13px;
+}
+.tour-banner button {
+  font: inherit;
+  padding: 2px 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------- linke Leiste als senkrechte Symbolleiste (#461) ---------- */
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.rail-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+.app:not(.phone) .panel.left {
+  flex-direction: row;
+  width: 376px;
+}
+.app:not(.phone) .panel.left .tabs.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 76px;
+  flex-shrink: 0;
+  padding: var(--space-3) 6px;
+  border-bottom: none;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+}
+.app:not(.phone) .panel.left .tabs.rail button {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--space-3) 2px var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: normal;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.app:not(.phone) .panel.left .tabs.rail button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.app:not(.phone) .panel.left .tabs.rail button.active,
+.app:not(.phone) .panel.left .tabs.rail button.active:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+}
+.app:not(.phone) .panel.left .tabs.rail .rail-dot {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+}
+@media (max-width: 1200px) {
+  .app:not(.phone) .panel.left {
+    width: 328px;
+  }
+  .app:not(.phone) .panel.left .tabs.rail {
+    width: 68px;
+  }
+}
+/* phone: the tabs stay a scrolling row of words */
+.app.phone .rail-icon {
+  display: none;
+}
+.app.phone .rail-dot {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Werkzeuge-Reiter aufgeräumt (#461): Werkzeuge in zwei benannten Gruppen, Fachfunktionen und Einstellungen eingeklappt darunter */
+.tool-group + .tool-group {
+  margin-top: var(--space-4);
+}
+.tool-group-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+}
+.tool-group[aria-label='Messen & markieren'] .tool-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+.panel-divider {
+  margin: 0;
+  padding: var(--space-5) var(--space-6) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+.panel-divider + .panel-group-collapsed,
+.panel-group-collapsed + .panel-group-collapsed {
+  padding-top: var(--space-3);
+}
+.panel-group-collapsed {
+  padding-bottom: var(--space-3);
+}
+.panel-group-collapsed header {
+  margin-bottom: 0;
+}
+@media (max-width: 760px) {
+  .panel-divider {
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+}
+
+/* ---------- optischer Feinschliff (#461) ---------- */
+/* Symbolleiste: Fläche einen Hauch abgesetzt */
+.app:not(.phone) .panel.left .tabs.rail {
+  background: var(--color-surface-sunken, var(--color-bg));
+}
+/* Werkzeug-Hinweis im Plan: bricht um statt abgeschnitten zu werden und lässt die Nordnadel frei */
+.editor-hint {
+  white-space: normal;
+  text-align: center;
+  max-width: min(520px, calc(100% - 140px));
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-md);
+  line-height: 1.35;
+}
+/* Werkzeugknöpfe: weicher Hover, aktiver Knopf mit Akzentrand */
+.tool-btn {
+  transition: background-color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.tool-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--color-border-strong, var(--color-text-subtle));
+  box-shadow: var(--shadow-sm);
+}
+.tool-btn.active {
+  border-color: var(--color-accent);
+}

@@ -85,6 +85,8 @@ interface Preview {
   measure?: { a: Vec2; b: Vec2 } | null;
   /** Walls a dragged item is snapped to (highlighted). */
   snapWalls?: string[];
+  /** Alignment guide lines to other furniture while dragging. */
+  guides?: { a: Vec2; b: Vec2 }[];
   /** Items being dragged: show their clearances (#50; a multi-selection or group as a whole, #94). */
   clearanceIds?: string[];
 }
@@ -547,10 +549,11 @@ export function Editor2D() {
             return;
           }
           let snapped: string[] = [];
+          const guides: { a: Vec2; b: Vec2 }[] = [];
           updateTx((d) => {
-            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls, collide: !e.altKey, stack: !e.altKey });
+            snapped = moveFurnitureTo(d, derived, obstacles, dr.id, c, { snap: fs.walls, collide: !e.altKey, stack: !e.altKey, guides, align: true });
           });
-          setPreview({ snapWalls: snapped, clearanceIds: [dr.id] });
+          setPreview({ snapWalls: snapped, guides, clearanceIds: [dr.id] });
           return;
         }
         case 'box': {
@@ -1151,6 +1154,10 @@ export function Editor2D() {
               <polygon key={`snap-${id}`} points={fp.polygon.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#f97316" strokeWidth={2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
             ) : null;
           })}
+
+          {(preview.guides ?? []).map((g, i) => (
+            <line key={`fg-${i}`} x1={g.a.x} y1={g.a.y} x2={g.b.x} y2={g.b.y} stroke="#db2777" strokeWidth={1.2} strokeDasharray="5 3" vectorEffect="non-scaling-stroke" pointerEvents="none" data-testid="furniture-guide" />
+          ))}
 
           {/* snap indicator + guides */}
           {preview.snap && tool !== 'select' && (

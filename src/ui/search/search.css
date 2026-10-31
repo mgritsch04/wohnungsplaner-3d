@@ -1,0 +1,186 @@
+/* Feature search (#461) */
+.search-backdrop {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+.search-dialog {
+  width: 600px;
+  max-width: 100%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: ui-pop-in var(--motion-dur) ease-out;
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.search-dialog .search-field input,
+.search-dialog .search-field input:focus,
+.search-dialog .search-field input:focus-visible {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
+  outline: none;
+  box-shadow: none;
+  padding: var(--space-1) 0;
+  min-width: 0;
+}
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+}
+.search-results li {
+  display: grid;
+  grid-template-columns: 104px 1fr auto;
+  grid-template-areas: 'group title keys' 'group hint keys';
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.search-results li.active {
+  background: var(--color-accent-soft);
+}
+.search-results li.search-empty {
+  display: block;
+  cursor: default;
+  color: var(--color-text-muted);
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+}
+.search-group {
+  grid-area: group;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-title {
+  grid-area: title;
+  font-weight: var(--font-weight-medium);
+}
+.search-results li.active .search-title {
+  color: var(--color-accent-soft-text);
+}
+.search-hint {
+  grid-area: hint;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.search-results kbd,
+.search-field kbd,
+.search-foot kbd,
+.search-trigger kbd {
+  grid-area: keys;
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+.search-foot {
+  display: flex;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+.search-foot kbd {
+  margin-right: 2px;
+}
+
+/* the button in the toolbar */
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+.search-trigger .search-trigger-text {
+  flex: 1;
+  text-align: left;
+}
+/* the key hint only where the toolbar has room, the caption only on wider screens */
+.search-trigger kbd {
+  display: none;
+}
+@media (min-width: 1680px) {
+  .search-trigger {
+    min-width: 200px;
+  }
+  .search-trigger kbd {
+    display: inline;
+  }
+}
+@media (max-width: 1360px) {
+  .search-trigger .search-trigger-text {
+    display: none;
+  }
+}
+
+/* a section found by the search lights up briefly */
+.panel-section.search-flash {
+  animation: search-flash 1.6s ease-out;
+}
+@keyframes search-flash {
+  0%,
+  30% {
+    background: var(--color-accent-soft);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-section.search-flash {
+    animation-duration: 0.01s;
+  }
+}
+.app.phone .search-trigger kbd,
+.app.phone .search-trigger .search-trigger-text {
+  display: none;
+}
+.app.phone .search-results li {
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'title keys' 'hint keys';
+}
+.app.phone .search-foot,
+.app.phone .search-group {
+  display: none;
+}
+@media (max-width: 1700px) {
+  .toolbar:has(.time-control) .search-trigger .search-trigger-text {
+    display: none;
+  }
+}
+/* narrow window with the time-of-day slider: a shorter name field makes room for the search button */
+@media (max-width: 1180px) {
+  .toolbar:has(.time-control) .project-name {
+    width: 80px !important;
+  }
+}

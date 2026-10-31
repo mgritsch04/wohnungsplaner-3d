@@ -1,6 +1,6 @@
 import { newId } from '../model/ids';
 import type { DerivedPlan } from '../model/derived';
-import type { Note, Project, Task } from '../model/schema';
+import type { FurniturePackage, Note, Project, Task } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 
@@ -110,3 +110,32 @@ export function isOverdue(t: Task, today: string): boolean {
 }
 
 export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+// ---------- moving plan (#487) ----------
+
+/** Set one building-access measurement (m); a value ≤ 0 clears it. */
+export function setMoveAccess(key: keyof NonNullable<Project['moveAccess']>, value: number) {
+  store().apply((d) => {
+    const a = (d.moveAccess ??= {});
+    if (value > 0) a[key] = value;
+    else delete a[key];
+  });
+}
+
+/** Tick a piece as set up / not set up in the moving plan. */
+export function setMoveDone(furnitureId: string, done: boolean) {
+  store().apply((d) => {
+    const set = new Set(d.moveDone ?? []);
+    if (done) set.add(furnitureId);
+    else set.delete(furnitureId);
+    d.moveDone = [...set];
+  });
+}
+
+/** Package/part list of a piece (#487); an empty list removes the field. */
+export function setPackages(furnitureId: string, packages: FurniturePackage[]) {
+  store().apply((d) => {
+    const f = d.furniture.find((x) => x.id === furnitureId);
+    if (f) f.packages = packages.length ? packages.slice(0, 30) : undefined;
+  });
+}

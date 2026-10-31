@@ -10,7 +10,7 @@ import { addRectRoom } from '../model/operations';
 import { jsonFromText, localSample, type McpRuntime } from './claude';
 import { EMPTY_WISHES, parseDesignAnswer, PLACEHOLDERS, realProducts, swapPick } from './design';
 import { summarizePlan } from './planSummary';
-import { browserTools, buildFindPrompt, deviationText, foundId, foundToCatalog, parseFound, replaceWithFound, searchTargets, shopOf } from './productSearch';
+import { browserTools, findOwnedByUrl, buildFindPrompt, deviationText, foundId, foundToCatalog, parseFound, replaceWithFound, searchTargets, shopOf } from './productSearch';
 
 const SOFA = PLACEHOLDERS.find((c) => c.id === 'generic-sofa-3')!;
 
@@ -51,6 +51,16 @@ describe('Produktsuche durch Claude (#350, Stufe 3)', () => {
     expect(realProducts([item]).map((c) => c.id)).toEqual([item.id]);
     const [ik] = parseFound({ products: [{ name: 'TESTSOFA', url: 'https://www.ikea.com/at/de/p/x-12345678/', price: 499, width_cm: 228, depth_cm: 95, height_cm: 83 }] });
     expect(isIkeaItem(foundToCatalog(ik, SOFA))).toBe(true);
+  });
+
+  it('schon importierte Produkte werden erkannt (URL oder IKEA-Artikelnummer) und nicht erneut angelegt', () => {
+    const mine = { ...foundToCatalog(parseFound({ products: [{ name: 'A', url: 'https://www.ikea.com/at/de/p/regal-weiss-10409932/', price: 9, width_cm: 50, depth_cm: 30, height_cm: 80 }] })[0], SOFA), id: 'ik-10409932' };
+    const moe = { ...mine, id: 'mx-1', productUrl: 'https://www.moebelix.at/p/c-1/', retailer: 'Möbelix Österreich' };
+    const items = [mine, moe];
+    expect(findOwnedByUrl(items, 'https://www.ikea.com/at/de/p/regal-weiss-10409932/')?.id).toBe('ik-10409932');
+    expect(findOwnedByUrl(items, 'https://www.ikea.com/at/de/p/anderer-name-10409932?x=1')?.id).toBe('ik-10409932');
+    expect(findOwnedByUrl(items, 'http://moebelix.at/p/c-1')?.id).toBe('mx-1');
+    expect(findOwnedByUrl(items, 'https://www.ikea.com/at/de/p/regal-20000000/')).toBeUndefined();
   });
 
   it('Platzhalter wird durch den Fund ersetzt; weitere Funde und Platzhalter werden Alternativen', () => {

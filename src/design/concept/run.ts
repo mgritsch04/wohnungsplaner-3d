@@ -49,6 +49,8 @@ export interface CallLog {
   ms: number;
   problems: string[];
   error?: string;
+  /** What a comparison decided (two designs, the look), in everyday words. */
+  note?: string;
 }
 
 export interface RoomOutcome {
@@ -110,7 +112,7 @@ async function ask(sample: Pick<Sample, 'json'>, prompt: string, opts: SampleOpt
 }
 
 /** Asks, checks, and repairs once when the check finds problems; keeps the better of the two answers. */
-async function askChecked<T>(
+export async function askChecked<T>(
   run: Pick<ConceptRunInput, 'sample' | 'signal' | 'timeouts'>,
   prompt: string,
   parse: (raw: unknown) => Checked<T>,

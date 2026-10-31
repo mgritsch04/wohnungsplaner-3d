@@ -5,6 +5,7 @@
  * functions only once, a bedroom sleeps, no new sanitary objects) and asks Claude once to repair
  * what is wrong. From here on the room type of the concept is the one the whole pipeline uses.
  */
+import { tierPromptLine } from '../tiers';
 import { clipLines, type DesignWishes, MAX_FIELD, apartmentPalette } from '../../assistant/design';
 import type { Furniture, Project } from '../../model/schema';
 import { guessRoomType, ROOM_TYPES } from '../../suggest/furnishing';
@@ -77,7 +78,8 @@ ${sketch}
 Wünsche der Bewohner (jeder Wunsch muss in "functions" bei "wishes" mindestens einmal vorkommen):
 ${wl.length ? wl.map((w) => `Wunsch ${w.n}: ${w.text}`).join('\n') : '(keine besonderen Wünsche – plane, was man zum Wohnen braucht)'}
 Stil: ${str(wishes.style, MAX_FIELD) || 'frei'}. Farbideen: ${palette.join(', ')}.
-${wishes.budget > 0 ? `Budget für alles zusammen: ${Math.round(wishes.budget)} € – lieber weniger, dafür passend.` : 'Kein festes Budget, aber nichts Überflüssiges.'}
+${wishes.budget > 0 ? `Budget für alles zusammen: ${Math.round(wishes.budget)} € – lieber weniger, dafür passend.` : 'Kein festes Budget, aber nichts Überflüssiges.'}${wishes.tier ? `
+${tierPromptLine(wishes.tier)}` : ''}
 ${zones.length ? `Vom Nutzer im Plan markierte Bereiche (gelten so):\n${zones.join('\n')}\n` : ''}
 Aufgabe:
 1. Nutzung: Beschreibe in 2–3 Sätzen, wie hier gewohnt wird (Alltag, Gäste, Hobbys).

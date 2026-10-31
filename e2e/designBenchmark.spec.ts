@@ -58,10 +58,16 @@ const OUT =
   `local-analysis/benchmark/${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}`;
 /** Ordner eines früheren Laufs: Claudes Antworten von dort statt echter Aufrufe (gleiche Antworten, neuer Code). */
 const REPLAY = process.env.WP_REPLAY;
+/**
+ * Nur diese Stufen aus dem früheren Lauf (z. B. `konzept,programm`), alles andere fragt den echten
+ * Claude über den Helfer: misst eine spätere Stufe neu, ohne Wohnkonzept und Raumprogramme neu zu bezahlen.
+ */
+const REPLAY_KINDS = process.env.WP_REPLAY_KINDS?.split(",").filter(Boolean);
+const LIVE = !REPLAY || !!REPLAY_KINDS;
 
 /** Eine Antwort von Claude, wie der Helfer sie zurückgab, mit Stufe und Raum aus dem Prompt. */
 interface Answer {
-  kind: "konzept" | "programm" | "kritik";
+  kind: "konzept" | "programm" | "kritik" | "variante" | "vergleich";
   room: string;
   label: string;
   model?: string;
@@ -72,11 +78,15 @@ interface Answer {
 
 /** Stufe und Raum am Prompt erkennen; die Laufzeit des Artefakts bekommt kein Etikett. */
 const kindOf = (prompt: string): Answer["kind"] =>
-  prompt.includes("Wohnkonzept für die ganze Wohnung")
-    ? "konzept"
-    : prompt.includes("Dein bisheriges Programm")
-      ? "kritik"
-      : "programm";
+  prompt.includes("vergleichst zwei Einrichtungsvorschläge")
+    ? "vergleich"
+    : prompt.includes("Wohnkonzept für die ganze Wohnung")
+      ? "konzept"
+      : prompt.includes("Dein bisheriges Programm")
+        ? "kritik"
+        : prompt.includes("Zweiter Entwurf:")
+          ? "variante"
+          : "programm";
 const roomOf = (prompt: string) => /Raum „([^“]+)“/.exec(prompt)?.[1] ?? "";
 
 /** Alle Anfragen an den Helfer mitschreiben (Prompt und Antworttext), für Wiederholung und Fixtures. */
@@ -128,6 +138,7 @@ function recordAnswers(page: Page) {
 async function replayClaude(page: Page, answers: Answer[]) {
   const queues: Record<string, unknown[]> = {};
   for (const a of answers) {
+    if (REPLAY_KINDS && !REPLAY_KINDS.includes(a.kind)) continue;
     let value: unknown;
     try {
       value = jsonFromText(a.text);
@@ -138,17 +149,75 @@ async function replayClaude(page: Page, answers: Answer[]) {
       value,
     );
   }
-  await page.addInitScript((q) => {
+  await page.addInitScript(([q, kinds]) => {
     const kindOf = (prompt: string) =>
-      prompt.includes("Wohnkonzept für die ganze Wohnung")
-        ? "konzept"
-        : prompt.includes("Dein bisheriges Programm")
-          ? "kritik"
-          : "programm";
+      prompt.includes("vergleichst zwei Einrichtungsvorschläge")
+        ? "vergleich"
+        : prompt.includes("Wohnkonzept für die ganze Wohnung")
+          ? "konzept"
+          : prompt.includes("Dein bisheriges Programm")
+            ? "kritik"
+            : prompt.includes("Zweiter Entwurf:")
+              ? "variante"
+              : "programm";
+    const base64 = (b: Blob) =>
+      new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+        r.readAsDataURL(b);
+      });
+    /** Der echte Claude über den lokalen Helfer, für die Stufen, die nicht aus dem früheren Lauf kommen. */
+    const live = async (
+      prompt: string,
+      opts: { modelTier?: string; images?: Blob[] } = {},
+    ) => {
+      const images = await Promise.all(
+        (opts.images ?? []).map(async (b) => ({
+          mediaType: "image/png",
+          data: await base64(b),
+        })),
+      );
+      for (;;) {
+        const res = await fetch("http://127.0.0.1:4791/claude", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            // die Laufzeit des Artefakts bekommt nur die Stufe, nicht das Modell
+            model: opts.modelTier === "complex" ? "opus" : "sonnet",
+            ...(images.length ? { images } : {}),
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          text?: string;
+          error?: string;
+          busy?: boolean;
+        };
+        if (res.status === 429 && body.busy) {
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
+        }
+        if (!res.ok || typeof body.text !== "string")
+          throw {
+            code: "upstream_error",
+            message: body.error ?? `HTTP ${res.status}`,
+          };
+        const m = /\{[\s\S]*\}/.exec(body.text);
+        try {
+          return JSON.parse(m?.[0] ?? "");
+        } catch {
+          throw { code: "invalid_json", message: "Antwort ist kein JSON." };
+        }
+      }
+    };
     const sample = {
       limits: async () => ({ images: true }),
-      json: async (prompt: string) => {
+      json: async (
+        prompt: string,
+        opts?: { modelTier?: string; images?: Blob[] },
+      ) => {
         const kind = kindOf(prompt);
+        if (kinds && !kinds.includes(kind)) return live(prompt, opts);
         const room =
           kind === "konzept" ? "" : (/Raum „([^“]+)“/.exec(prompt)?.[1] ?? "");
         await new Promise((r) => setTimeout(r, 10));
@@ -166,7 +235,7 @@ async function replayClaude(page: Page, answers: Answer[]) {
     (window as unknown as { claude: unknown }).claude = {
       use: async (name: string) => (name === "sample" ? sample : null),
     };
-  }, queues);
+  }, [queues, REPLAY_KINDS ?? null] as const);
 }
 /** Ein Raum braucht mit Opus ein paar Minuten, dazu bis zu zwei Kritikrunden. */
 const PER_ROOM_MS = 12 * 60_000;
@@ -526,10 +595,22 @@ test.describe("Benchmark mit echtem Claude", () => {
       const result = (await runResult(page)) as FurnishRunResult | null;
       expect(result, "Der Lauf hat kein Ergebnis hinterlegt.").toBeTruthy();
       writeFileSync(`${dir}/lauf.json`, JSON.stringify(result, null, 1));
-      if (!REPLAY)
+      if (LIVE)
         writeFileSync(
           `${dir}/antworten.json`,
-          JSON.stringify(await answers(), null, 1),
+          JSON.stringify(
+            [
+              // wiederholte Stufen mitschreiben, damit auch dieser Lauf wiederholbar bleibt
+              ...(replayFile && REPLAY_KINDS
+                ? (
+                    JSON.parse(readFileSync(replayFile, "utf8")) as Answer[]
+                  ).filter((a) => REPLAY_KINDS.includes(a.kind))
+                : []),
+              ...(await answers()),
+            ],
+            null,
+            1,
+          ),
         );
       writeFileSync(
         `${dir}/programme.json`,

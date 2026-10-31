@@ -19,6 +19,8 @@ export interface PlacedRoom {
   type: RoomType;
   layout: Layout;
   program?: RoomProgram;
+  /** Wall colour of the room's colour scheme (#462). */
+  wall?: string;
 }
 
 export interface RoomFurniture {
@@ -99,5 +101,6 @@ export function layoutSuggestion(project: Project, rooms: PlacedRoom[], catalog:
       ],
     })),
   );
-  return { rooms: out, items: out.flatMap((r) => r.placed), replaces: suggestedIn(project, rooms.map((r) => r.analysis.roomId)), zones };
+  const walls = rooms.flatMap((r) => (r.wall ? [{ roomId: r.analysis.roomId, color: r.wall }] : []));
+  return { rooms: out, items: out.flatMap((r) => r.placed), ...(walls.length ? { walls } : {}), replaces: suggestedIn(project, rooms.map((r) => r.analysis.roomId)), zones };
 }

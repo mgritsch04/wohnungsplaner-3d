@@ -15,6 +15,7 @@ import { GraphicsTierSelect, LampsSelect, TimeOfDayControl, TimePresetSelect } f
 import { ToolbarMenu } from './ToolbarMenu';
 import { isProjectEmpty, reopenStartCard } from './StartCard';
 import { usePhoneLayout } from './phoneLayout';
+import { usePaletteStore } from './search/paletteStore';
 import { IconCutaway, IconExterior, IconHelp, IconMore, IconOrbit, IconRedo, IconResetCamera, IconSit, IconSplitView, IconStand, IconTrueScale, IconUndo, IconWalk } from './icons';
 
 /**
@@ -233,6 +234,22 @@ export function Toolbar({ saveState }: { saveState: SaveState }) {
       )}
 
       <div className="toolbar-group right">
+        <button
+          type="button"
+          className="search-trigger"
+          aria-label="Funktion suchen"
+          aria-keyshortcuts="Control+K"
+          title="Funktion suchen (Strg+K)"
+          data-tip="Funktion suchen (Strg+K)"
+          onClick={() => usePaletteStore.getState().setOpen(true)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          <span className="search-trigger-text">Suchen…</span>
+          <kbd>Strg K</kbd>
+        </button>
         {!phone && (
           <>
             <div className="segmented" role="group" aria-label="Qualität">

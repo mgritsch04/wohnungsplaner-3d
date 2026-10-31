@@ -155,7 +155,7 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     ]);
     const f = fake(recorded, true);
     await run(f.sample, { toImage, toRoomShots });
-    const looks = f.calls.filter((c) => c.label.includes('(Blick'));
+    const looks = f.calls.filter((c) => c.label.startsWith('Kritik: ') && c.label.includes('(Blick'));
     expect(looks.length).toBeGreaterThan(0);
     for (const c of looks) {
       expect(c.images).toBe(3);
@@ -174,6 +174,64 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     expect(lookKeeps(room(95, true), room(97, false))).toBe(false);
     expect(lookKeeps(room(95, true), room(96, true, 6, 1))).toBe(false);
     expect(lookKeeps(room(95, true), room(96, true, 2))).toBe(false);
+  });
+
+  it('a main room gets a second design, and the pictures choose between them (both orders must agree)', async () => {
+    const toImage = vi.fn(async () => ({ mediaType: 'image/png' as const, data: 'AAAA' }));
+    let n = 0;
+    // every set of pictures is different, so the comparison can tell the two designs apart
+    const toRoomShots = vi.fn(async () => [
+      { mediaType: 'image/png' as const, data: `E${n}` },
+      { mediaType: 'image/png' as const, data: `O${n++}` },
+    ]);
+    /** The second design: the first with the main zone's pieces left as they are but one piece fewer (another layout). */
+    const second = (_p: string, o: SampleOptions) => {
+      const room = (o.label ?? '').slice('Entwurf 2: '.length);
+      const prog = structuredClone(answers.programs[room]) as { items: unknown[] };
+      prog.items = prog.items.slice(0, -1);
+      return prog;
+    };
+    const judge = (answer: '1' | '2' | 'gleich') => ({ besser: answer, abstand: 'deutlich', warum: '-' });
+    const reply =
+      (pick: (o: SampleOptions) => '1' | '2' | 'gleich'): Reply =>
+      (p, o) => {
+        const label = o.label ?? '';
+        if (label.startsWith('Entwurf 2: ')) return second(p, o);
+        if (label.startsWith('Vergleich: ')) return judge(pick(o));
+        return recorded(p, o);
+      };
+    // pictures are numbered in the order they were taken: the first design's come first
+    const shotNo = (o: SampleOptions, i: number) => Number(o.images![i].data.slice(1));
+    // the judge always prefers the design shot later (the second), whichever order it sees them in
+    const prefersSecond = fake(
+      reply((o) => (shotNo(o, 0) < shotNo(o, 2) ? '2' : '1')),
+      true,
+    );
+    const r = await run(prefersSecond.sample, { toImage, toRoomShots });
+    const variants = prefersSecond.calls.filter((c) => c.label.startsWith('Entwurf 2: '));
+    expect(variants.length).toBeGreaterThan(0);
+    for (const c of variants) {
+      expect(c.prompt).toContain('Zweiter Entwurf:');
+      expect(c.prompt).toContain('Dein erster Entwurf:');
+      expect(c.prompt).not.toContain('Dein bisheriges Programm');
+    }
+    const compared = prefersSecond.calls.filter((c) => c.label.endsWith('(Entwürfe)'));
+    for (const c of compared) expect(c.images).toBe(4);
+    const notes = r.calls.filter((c) => c.label.startsWith('Entwurf 2: ')).map((c) => c.note ?? '');
+    // where both designs pass the walk-through, the pictures chose the second
+    expect(notes).toContain('Entwurf 2 (Bildvergleich)');
+    for (const x of notes.filter((x) => x.includes('Bildvergleich)'))) expect(x).toBe('Entwurf 2 (Bildvergleich)');
+    // a judge that answers „1“ in both orders is split: then the walk-through decides
+    const split = fake(reply(() => '1'), true);
+    const r2 = await run(split.sample, { toImage, toRoomShots });
+    expect(r2.calls.filter((c) => c.label.endsWith('(Entwürfe)')).every((c) => c.note === 'uneinig')).toBe(true);
+    // fast runs and runs without 3D pictures ask for one design only
+    const fast = fake(reply(() => '1'), true);
+    await run(fast.sample, { toImage, toRoomShots, wishes: { ...flat.wishes, quality: 'fast' } });
+    expect(fast.calls.filter((c) => c.label.startsWith('Entwurf 2: '))).toEqual([]);
+    const flatOnly = fake(reply(() => '1'), true);
+    await run(flatOnly.sample, { toImage });
+    expect(flatOnly.calls.filter((c) => c.label.startsWith('Entwurf 2: '))).toEqual([]);
   });
 
   it('stops when the user cancels', async () => {

@@ -28,6 +28,7 @@ import {
   type AttemptResult,
   type SearchOutcome,
   type RetryHint,
+  findOwnedByUrl,
   parseFound,
   replaceKitchenWithFound,
   replaceWithFound,
@@ -58,6 +59,7 @@ import {
 } from './design';
 import { implausibleSize } from './designGuide';
 import { designWishes, runDesign } from './designRun';
+import { tierInfo, tierPrice, tierTotals } from '../design/tiers';
 import { pickItems, placedRooms, proposalFrom, withProduct } from '../design/apply/proposal';
 import { roomShots } from './roomShots';
 import { layoutSuggestion } from '../design/apply';
@@ -119,6 +121,7 @@ function labelPreview(preview: FurnishingSuggestion, proposal: DesignProposal) {
  * it over in one undo step. Hidden where the Claude artifact runtime is not available.
  */
 export function DesignPanel() {
+  const [takeWalls, setTakeWalls] = useState(true);
   const [sample, setSample] = useState<Sample | null>(null);
   const [hidden, setHidden] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -316,6 +319,8 @@ export function DesignPanel() {
 
   const proposal = showIdeal ? st.ideal!.proposal : st.proposal;
   const total = proposal ? proposalTotal(proposal, catalog) : null;
+  const tier = tierInfo(w.tier);
+  const tierSum = tierPrice(total ?? { real: 0, placeholder: 0, unpriced: 0 }, w.tier);
 
   const showPreview = () => {
     if (!proposal) return;
@@ -365,12 +370,13 @@ export function DesignPanel() {
     const preview = st.preview;
     if (!preview || !previewActive) return;
     let ids: string[] = [];
+    const toTake = takeWalls ? preview : { ...preview, walls: [] };
     apply((d) => {
-      ids = applyFurnishing(d, preview);
+      ids = applyFurnishing(d, toTake);
     });
     st.set({ preview: null });
     useUiStore.getState().selectFurniture(ids);
-    useUiStore.getState().toast(`${ids.length} Möbel aus dem Einrichtungsvorschlag übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
+    useUiStore.getState().toast(`${ids.length} Möbel${toTake.walls?.length ? ` und ${toTake.walls.length === 1 ? 'eine Wandfarbe' : `${toTake.walls.length} Wandfarben`}` : ''} aus dem Einrichtungsvorschlag übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
   };
 
   const discard = () => {
@@ -407,6 +413,12 @@ export function DesignPanel() {
     };
     const add: CatalogItem[] = [];
     for (const f of found) {
+      // already in the catalogue (own import or earlier find): use it, do not import it a second time
+      const owned = findOwnedByUrl([...useCatalogStore.getState().items, ...add], f.url);
+      if (owned) {
+        out.push({ id: owned.id, why: f.why, ...deviation(owned, f) });
+        continue;
+      }
       if (searchMode === 'web' && f.shop === 'IKEA') {
         const { outcomes } = await addIkeaArticles(f.url, { model: true }).catch(() => ({ outcomes: [] }));
         const ok = outcomes.find((o) => o.ok && o.id);
@@ -805,16 +817,28 @@ export function DesignPanel() {
                 {searchMode && !search && <p className="muted small">Claude öffnet dazu Such- und Produktseiten von IKEA bzw. Möbelix und liest Name, Maße und Preis ab (dauert je Möbel etwa eine Minute, braucht Claude-Kontingent).</p>}
               </div>
             )}
+            <div className="design-tiers" data-testid="design-tiers">
+              <div className="btn-row" role="group" aria-label="Preisstufe">
+                {tierTotals(total).map(({ tier: t, sum }) => (
+                  <button key={t.id} className={tier.id === t.id ? 'primary' : undefined} aria-pressed={tier.id === t.id} disabled={!!search || st.asking} onClick={() => st.setWishes({ tier: t.id })} data-testid={`design-tier-${t.id}`} title={t.blurb}>
+                    {t.label} · ca. {formatEuro(sum)}
+                  </button>
+                ))}
+              </div>
+              <p className="muted small">
+                Preisstufe „{tier.label}“: {tier.blurb}. Sie gilt für die Richtpreise der Platzhalter, die Produktsuche und den nächsten Entwurf („Neu einrichten lassen“); gefundene Produkte behalten ihren Preis von der Produktseite.
+              </p>
+            </div>
             <p>
               Eigene Produkte laut Produktseiten: <strong data-testid="design-total">{formatEuro(total.real)}</strong>
               {total.placeholder > 0 && (
                 <>
                   {' '}
-                  · Platzhalter ca. <strong data-testid="design-total-placeholder">{formatEuro(total.placeholder)}</strong> <span className="muted">(Richtwerte, keine Angebote)</span>
+                  · Platzhalter ca. <strong data-testid="design-total-placeholder">{formatEuro(tierSum.placeholder)}</strong> <span className="muted">(Richtwerte, keine Angebote)</span>
                 </>
               )}
               {total.unpriced > 0 && <span className="muted"> · {total.unpriced === 1 ? '1 Stück' : `${total.unpriced} Stück`} ohne Preis</span>}
-              {w.budget > 0 && total.real + total.placeholder > w.budget && <span className="warning"> – über dem Budget von {formatEuro(w.budget)}</span>}
+              {w.budget > 0 && tierSum.sum > w.budget && <span className="warning"> – über dem Budget von {formatEuro(w.budget)}</span>}
             </p>
             {proposal.dropped > 0 && <p className="muted">{proposal.dropped === 1 ? 'Ein genannter Eintrag war' : `${proposal.dropped} genannte Einträge waren`} nicht in den Listen – weggelassen.</p>}
             {scope !== ALL && !proposal.rooms.some((r) => r.roomId === scope) && (
@@ -857,6 +881,20 @@ export function DesignPanel() {
                         </ul>
                       </div>
                     ))}
+                  {(st.preview.walls?.length ?? 0) > 0 && (
+                    <div data-testid="design-walls">
+                      <label className="check">
+                        <input type="checkbox" checked={takeWalls} onChange={(e) => setTakeWalls(e.target.checked)} /> Wandfarben der Räume mit übernehmen
+                      </label>
+                      <ul className="small">
+                        {st.preview.walls!.map((w) => (
+                          <li key={w.roomId}>
+                            <span className="design-swatch" style={{ background: w.color }} aria-hidden="true" /> {roomName(w.roomId)}: {w.color}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="btn-row">
                     <button className="primary" disabled={!st.preview.items.length} onClick={take}>
                       Übernehmen

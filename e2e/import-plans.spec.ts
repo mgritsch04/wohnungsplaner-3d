@@ -727,13 +727,19 @@ test('catalog: while dragging, the item itself is previewed in 2D and 3D instead
   await page.mouse.move(ebox.x + 20, ebox.y + ebox.height / 2);
   await page.mouse.down();
   await page.mouse.move(ebox.x + 40, ebox.y + ebox.height / 2, { steps: 3 });
-  const target = await planToScreen(page, 2.5, 2.05);
+  const target = await planToScreen(page, 1.2, 1.2);
   await page.mouse.move(target.x, target.y, { steps: 8 });
-  await expect(ghost).toBeVisible();
-  await expect(ghost).toHaveAttribute('data-level', 'ok');
+  // Chromium sends dragover only now and then while a drag is emulated – nudge until the plan has seen one
+  let nudge = 0;
+  const hold = (x: number, y: number, check: () => Promise<unknown>) =>
+    expect(async () => {
+      await page.mouse.move(x + (nudge++ % 2), y);
+      await check();
+    }).toPass();
+  await hold(target.x, target.y, () => expect(ghost).toHaveAttribute('data-level', 'ok', { timeout: 500 }));
   // outside every room: marked as outside (would be rejected)
   await page.mouse.move(box.x + 12, box.y + box.height / 2, { steps: 8 });
-  await expect(ghost).toHaveAttribute('data-level', 'outside');
+  await hold(box.x + 12, box.y + box.height / 2, () => expect(ghost).toHaveAttribute('data-level', 'outside', { timeout: 500 }));
   // back over the catalog and released there: preview gone, nothing added
   await page.mouse.move(ebox.x + 20, ebox.y + ebox.height / 2, { steps: 8 });
   await page.mouse.up();
@@ -752,7 +758,7 @@ test('catalog: while dragging, the item itself is previewed in 2D and 3D instead
   await page.mouse.down();
   await page.mouse.move(ebox.x + 40, ebox.y + ebox.height / 2, { steps: 3 });
   await page.mouse.move(s.x, s.y, { steps: 8 });
-  await expect.poll(ghost3d).not.toBeNull();
+  await hold(s.x, s.y, async () => expect(await ghost3d()).not.toBeNull());
   const g = (await ghost3d())!;
   await page.mouse.up();
   await expect.poll(count).toBe(before + 1);

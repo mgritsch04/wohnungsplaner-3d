@@ -7,6 +7,7 @@
  * leaves out what is already there and lists what Claude has to repair (unknown ids, zones
  * outside the room, required pieces missing, functions of other rooms, new sanitary objects).
  */
+import { tierPromptLine } from '../tiers';
 import { type DesignWishes, PLACEHOLDERS, preselect, summarizePlaceholders, summarizeProducts } from '../../assistant/design';
 import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
@@ -18,6 +19,7 @@ import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, s
 import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
 import { rulebookPrompt } from '../rulebook';
+import { completeDecor } from './decor';
 import { fitToScheme, schemeOf, schemeText } from './scheme';
 import { completeGroups, groupLines } from './groups';
 import { extraAreas, roomFacts } from './roomFacts';
@@ -132,7 +134,7 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
 8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
-Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.
+Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.${input.wishes.tier ? `\n${tierPromptLine(input.wishes.tier)}` : ''}
 Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Farbschema des Raums: ${schemeText(schemeOf(rc, concept.style), concept.style)}. Nicht hierher: ${rc.avoid.join(', ') || '–'}.
 In anderen Räumen (hier NICHT planen): ${elsewhere.join('; ') || '–'}
 ${room.passThrough ? 'Dieser Raum ist ein Durchgangszimmer: die Wege zwischen seinen Türen bleiben 90 cm breit frei.\n' : ''}
@@ -383,7 +385,10 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y) })));
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);
   notes.push(...groups.notes);
-  return { value: groups.program, problems, notes };
+  // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
+  const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, schemeOf(f.rc, input.concept.style).accent);
+  notes.push(...decor.notes);
+  return { value: decor.program, problems, notes };
 }
 
 const thingOfFurniture = (f: Furniture): Thing => ({ category: f.category, shape: shapeOf(f), height: f.height, width: f.width, depth: f.depth, name: f.name });

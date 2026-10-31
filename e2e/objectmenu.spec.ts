@@ -89,7 +89,9 @@ test('2D: right-click on furniture opens the context menu; rotate, duplicate and
   // delete the copy from its menu
   const copy = (await getSelection(page)) as { id: string };
   const c = (await getProject(page)).furniture.find((f: { id: string }) => f.id === copy.id);
-  const cAt = await planToScreen(page, c.x, c.y);
+  // the copy lies 30 cm off the original: click its outer corner, where the original does not reach
+  const m = Math.min(c.width, c.depth) / 2 - 0.05;
+  const cAt = await planToScreen(page, c.x + m, c.y + m);
   await page.mouse.click(cAt.x, cAt.y, { button: 'right' });
   await expect(page.getByTestId('object-menu-title')).toHaveText(c.name);
   await menu.locator('[data-action="delete"]').click();
