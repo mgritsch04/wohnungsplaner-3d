@@ -9,7 +9,7 @@ import { DEFAULT_WALL_MATERIAL_ID, ensureWallPaint, materialById } from '../../m
 import { statedAreaSummary } from '../../model/statedArea';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
-import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode } from '../../model/operations';
+import { deleteRoomWithWalls, setRectRoomSize, setWallAngle, setWallLength, splitWall, moveNode, resolveOpeningSpan } from '../../model/operations';
 import { degToRad, formatArea, formatEuro, formatLength, radToDeg } from '../../model/units';
 import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import { packsNeeded } from '../../catalog/packSize';
@@ -384,6 +384,18 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
       const x = d.openings.find((q) => q.id === id);
       if (x) fn(x);
     });
+  // width / position edits keep the opening on its wall and clear of the wall's other openings
+  const setSpan = (patch: { width?: number; offset?: number }) => {
+    const r = resolveOpeningSpan(project, id, patch);
+    if (!r) {
+      useUiStore.getState().toast('Hier ist kein Platz: die Öffnung würde sich mit einer anderen an dieser Wand überschneiden', 'error');
+      return;
+    }
+    upd((x) => {
+      x.width = r.width;
+      x.offset = r.offset;
+    });
+  };
   const issues = validateModel(project).filter((i) => i.elementId === id);
   return (
     <div className="panel-scroll">
@@ -421,7 +433,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
       </PanelGroup>
       <PanelGroup groupKey="opening.size" title="Maße und Lage">
         <div className="field-row">
-          <NumberField label="Breite" value={o.width} factor={100} unit="cm" min={10} max={Math.max(10, L * 100)} onChange={(v) => upd((x) => (x.width = v))} />
+          <NumberField label="Breite" value={o.width} factor={100} unit="cm" min={10} max={Math.max(10, L * 100)} onChange={(v) => setSpan({ width: v })} />
           <NumberField label="Höhe" value={o.height} factor={100} unit="cm" min={10} max={1000} onChange={(v) => upd((x) => (x.height = v))} />
         </div>
         <div className="field-row">
@@ -434,7 +446,7 @@ function OpeningProps({ id, project }: { id: string; project: Project }) {
             min={0}
             max={Math.max(0, (L - o.width) * 100)}
             title="Abstand vom Wand-Startpunkt bis zur Öffnungskante (Achsmaß)"
-            onChange={(v) => upd((x) => (x.offset = v + x.width / 2))}
+            onChange={(v) => setSpan({ offset: v + o.width / 2 })}
           />
         </div>
       </PanelGroup>
