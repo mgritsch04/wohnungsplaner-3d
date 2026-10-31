@@ -5,6 +5,7 @@ import { DeviceInfo } from '../../smarthome/DeviceInfo';
 import { FixtureProps } from '../../installation/FixtureProps';
 import { ASSEMBLIES, estimateInsulation, ratingOf, soundIssues, wallRooms, type WallAssembly } from '../../model/acoustics';
 import { derivePlan } from '../../model/derived';
+import { DEFAULT_WALL_MATERIAL_ID, ensureWallPaint, materialById } from '../../model/materials';
 import { statedAreaSummary } from '../../model/statedArea';
 import { wallLength } from '../../model/graph';
 import { rectangularRoomSize } from '../../model/geometry/rooms';
@@ -94,6 +95,22 @@ function MaterialSelect({ label, value, materials, kinds, onChange, emptyLabel }
         </select>
       </span>
     </label>
+  );
+}
+
+/** Free wall colour of a room (#462): pick, then „Anwenden“ (one undo step, not one per colour dragged over). */
+function WallColorField({ current, onApply }: { current: string; onApply: (color: string) => void }) {
+  const [c, setC] = useState(current);
+  return (
+    <div className="field" data-testid="wall-color-field">
+      <span className="field-label">Eigene Wandfarbe</span>
+      <span className="field-input">
+        <input type="color" aria-label="Wandfarbe wählen" value={c} onChange={(e) => setC(e.target.value)} />
+        <button disabled={c.toLowerCase() === current.toLowerCase()} onClick={() => onApply(c)} data-testid="wall-color-apply">
+          Anwenden
+        </button>
+      </span>
+    </div>
   );
 }
 
@@ -328,6 +345,10 @@ function RoomProps({ id, project, area }: { id: string; project: Project; area?:
       <PanelGroup groupKey="room.surfaces" title="Oberflächen">
         <MaterialSelect label="Boden" value={r.floorMaterialId} materials={project.materials} kinds={['wood', 'tile', 'stone', 'carpet', 'concrete']} emptyLabel="Standard (Eiche)" onChange={(m) => upd((x) => (x.floorMaterialId = m))} />
         <MaterialSelect label="Wände" value={r.wallMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'tile', 'wood', 'stone']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.wallMaterialId = m))} />
+        <WallColorField key={`${id}-${r.wallMaterialId ?? ""}`} current={materialById(project.materials, r.wallMaterialId, DEFAULT_WALL_MATERIAL_ID).color} onApply={(c) => apply((d) => {
+          const x = d.rooms.find((q) => q.id === id);
+          if (x) x.wallMaterialId = ensureWallPaint(d, c);
+        })} />
         <MaterialSelect label="Decke" value={r.ceilingMaterialId} materials={project.materials} kinds={['paint', 'concrete', 'wood']} emptyLabel="Standard (Weiß)" onChange={(m) => upd((x) => (x.ceilingMaterialId = m))} />
       </PanelGroup>
       <RoomTasksSection project={project} roomId={id} />
