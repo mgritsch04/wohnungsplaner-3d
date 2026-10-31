@@ -18,6 +18,7 @@ import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, s
 import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
 import { rulebookPrompt } from '../rulebook';
+import { fitToScheme, schemeOf, schemeText } from './scheme';
 import { completeGroups, groupLines } from './groups';
 import { extraAreas, roomFacts } from './roomFacts';
 import { parseRelations, type RelationItem } from './relations';
@@ -126,13 +127,13 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
 3. Je Zone ein Baustein (siehe unten) mit seinem Ankermöbel ("anchor":true), Startplatz und Blickrichtung. Plane die Teile des Bausteins mit, in der Ausführung, die du willst; was du weglässt, ergänzt die App nach dem Regelwerk.
 4. Lichtplan: Grundlicht, Licht für jede Zone, Stimmungslicht (L1, L2).
 5. Stauraum: wohin kommen Kleidung, Bücher, Vorräte, Alltagskram (ST1–ST3)?
-6. Stil: jedes Teil mit Farbe aus der Palette (60/30/10, SL2), Material und Form im "label" (z. B. „Sofa 3-Sitzer, Leinen hellgrau, schmale Eichenfüße“), dazu "features" mit den Funktionen, die es haben muss (z. B. „Schlaffunktion“, „Stauraum“, „Schubladen“, „dimmbar“). Wiederkehrende Materialien, höchstens 2–3 Holztöne (SL3), Formen und Texturen gemischt (SL4).
+6. Stil: jedes Teil mit Farbe aus dem Farbschema des Raums (60/30/10, SL2; große Möbel in der Möbelfarbe, Teppich, Vorhänge und Kissen in der Textilfarbe, Deko in der Akzentfarbe, nichts gegen die Wandfarbe), Material und Form im "label" (z. B. „Sofa 3-Sitzer, Leinen hellgrau, schmale Eichenfüße“), dazu "features" mit den Funktionen, die es haben muss (z. B. „Schlaffunktion“, „Stauraum“, „Schubladen“, „dimmbar“). Wiederkehrende Materialien, höchstens 2–3 Holztöne (SL3), Formen und Texturen gemischt (SL4).
 7. Textilien und Deko: Teppiche, Vorhänge, Bilder, Pflanzen, jedes Teil mit Platz und Grund; lieber wenige gute Stücke (SL6).
 8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
 Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.
-Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Nicht hierher: ${rc.avoid.join(', ') || '–'}.
+Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Farbschema des Raums: ${schemeText(schemeOf(rc, concept.style), concept.style)}. Nicht hierher: ${rc.avoid.join(', ') || '–'}.
 In anderen Räumen (hier NICHT planen): ${elsewhere.join('; ') || '–'}
 ${room.passThrough ? 'Dieser Raum ist ein Durchgangszimmer: die Wege zwischen seinen Türen bleiben 90 cm breit frei.\n' : ''}
 Raumskizze:
@@ -305,7 +306,14 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     else if (!inRoom(room, x, y, 20)) problems.push(`Teil „${id}“ bei (${x},${y}) liegt außerhalb des Raums (Innenmaß ${cm(room.size.x)} × ${cm(room.size.y)} cm).`);
     else if (!side) problems.push(`Teil „${id}“: Blickrichtung „${str(e.facing, 10)}“ ist keine Himmelsrichtung (N, O, S, W).`);
     else hint = { ...f.P(x, y), rotation: rotationForSide(side) };
-    const color = hex(e.color);
+    let color = hex(e.color);
+    if (color) {
+      const fit = fitToScheme(color, schemeOf(f.rc, input.concept.style));
+      if (fit.changed) {
+        notes.push(`Teil „${id}“: Farbe ${color} passt nicht zum Farbschema des Raums, ersetzt durch ${fit.color}.`);
+        color = fit.color;
+      }
+    }
     const features = strList(e.features, 40, 6);
     const fallbacks = strList(e.fallbacks, 120, 4).filter((id2) => {
       const fc = lookup(id2);
