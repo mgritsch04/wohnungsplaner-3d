@@ -58,7 +58,8 @@ const PORT = Number(portArg >= 0 ? args[portArg + 1] : process.env.IKEA_HELPER_P
 const CACHE = resolve(process.env.IKEA_HELPER_CACHE || join('ikea-import', 'auswahl'));
 const ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
 const VERSION = 4;
-const MAX_BODY = 3 * 1024 * 1024;
+// vier Raumbilder (Paarvergleich zweier Entwürfe, #436) brauchen mehr als 3 MB
+const MAX_BODY = 12 * 1024 * 1024;
 /** Shops whose product pages the bookmarklet may send (the page the user has open, one per click). */
 const SHOP_ORIGINS = ['https://www.ikea.com', 'https://www.moebelix.at'];
 
