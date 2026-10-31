@@ -106,3 +106,14 @@ describe('furniture groups (#436)', () => {
     expect(completeGroups(plan, 'balcony', 6, 1).program).toBe(plan);
   });
 });
+
+describe('curtain sizes (R8)', () => {
+  it('picks the panel by window width: fabric of the pair about 1.6 times the rod', async () => {
+    const { curtainFor } = await import('./groups');
+    expect(curtainFor(0.8).id).toBe('generic-curtain-100');
+    expect(curtainFor(1.2).id).toBe('generic-curtain');
+    expect(curtainFor(2.2).id).toBe('generic-curtain-200');
+    expect(curtainFor(3.5).id).toBe('generic-curtain-280');
+    expect(curtainFor(2.2).fallbacks[0]).toBe('generic-curtain');
+  });
+});

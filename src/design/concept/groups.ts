@@ -67,6 +67,15 @@ const ROOMS: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kit
 const MAIN_LIGHT: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen'];
 /** Rooms that get curtains at every window when none are planned (R8). */
 const CURTAINED: RoomType[] = ['living', 'bedroom', 'kids', 'office'];
+/** Curtain panels of the catalogue by fabric width (m). */
+const CURTAINS: [string, number][] = [['generic-curtain-100', 1.0], ['generic-curtain', 1.4], ['generic-curtain-200', 2.0], ['generic-curtain-280', 2.8]];
+/** The panel for one side of a pair at a window of `width`: fabric of both about 1.6 × (window + 20 cm). */
+export function curtainFor(width = 1.4): { id: string; fallbacks: string[] } {
+  const want = (1.6 * (width + 0.2)) / 2;
+  const i = Math.max(0, CURTAINS.findIndex(([, w]) => w >= want - 0.01));
+  const k = CURTAINS.findIndex(([, w]) => w >= want - 0.01) < 0 ? CURTAINS.length - 1 : i;
+  return { id: CURTAINS[k][0], fallbacks: CURTAINS.slice(0, k).reverse().map(([id]) => id) };
+}
 /** Below this room area (m²) per function the room is compact (studio, living kitchen). */
 const AREA_PER_FUNCTION = 8;
 /** A living room below this area (m²) is compact. */
@@ -297,7 +306,7 @@ export function makeCtx(program: RoomProgram, products: CatalogItem[] = []): Ctx
  * `area` the room's floor area in m². Returns a new programme and notes for the panel and the
  * critique; the input stays as it is.
  */
-export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = [], windows: { id: string; x: number; y: number; rotation: number }[] = []): { program: RoomProgram; notes: string[] } {
+export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = [], windows: { id: string; x: number; y: number; rotation: number; width?: number }[] = []): { program: RoomProgram; notes: string[] } {
   if (!ROOMS.includes(type)) return { program, notes: [] };
   const c = makeCtx(program, products);
   const anchors = (roles: Role[]) => c.items.filter((i) => roles.includes(roleOfItem(c, i)!));
@@ -324,8 +333,10 @@ export function completeGroups(program: RoomProgram, type: RoomType, area: numbe
     for (const w of windows) {
       if (!anchor || c.relations.some((r) => r.kind === 'window' && r.window === w.id && roleOfItem(c, c.items.find((i) => i.id === r.item) ?? anchor) === 'curtain')) continue;
       const zone = [...program.zones].sort((a, b) => off(a, w) - off(b, w))[0]?.id ?? anchor.zone;
+      // fabric of the pair about 1.6 times the rod (window plus 20 cm), so it hangs in folds (R8)
+      const panel = curtainFor(w.width);
       for (const k of [1, 2]) {
-        const it = add(c, anchor, `Fenster ${w.id}`, 'generic-curtain', `vorhang_${w.id.toLowerCase()}_${k}`, 'Vorhänge als Paar neben dem Glas, Stange über das Fenster hinaus: das Fenster wirkt größer, abends wird es wohnlich (R8).', { zone, hint: { x: w.x, y: w.y, rotation: w.rotation } });
+        const it = add(c, anchor, `Fenster ${w.id}`, panel.id, `vorhang_${w.id.toLowerCase()}_${k}`, 'Vorhänge als Paar neben dem Glas, Stange über das Fenster hinaus: das Fenster wirkt größer, abends wird es wohnlich (R8).', { zone, hint: { x: w.x, y: w.y, rotation: w.rotation }, ...(panel.fallbacks.length ? { fallbacks: panel.fallbacks } : {}) });
         if (it) c.relations.push({ kind: 'window', item: it.id, window: w.id, place: 'over' });
       }
     }

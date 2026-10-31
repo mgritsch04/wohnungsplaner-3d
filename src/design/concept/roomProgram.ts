@@ -382,7 +382,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     check: strList(o.check, 300, 30),
   };
   // every furniture group complete and bound as a designer plans it (Sitzgruppe, Schlafplatz …)
-  const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y) })));
+  const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y), width: o.t1 - o.t0 })));
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);
   notes.push(...groups.notes);
   // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
