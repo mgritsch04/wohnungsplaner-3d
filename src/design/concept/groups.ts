@@ -65,6 +65,8 @@ const PENDANT_OVER_TABLE = 1.4;
 const ROOMS: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen', 'other'];
 /** Rooms that get a ceiling light as their main light when none is planned (L1). */
 const MAIN_LIGHT: RoomType[] = ['living', 'bedroom', 'kids', 'office', 'dining', 'kitchen'];
+/** Rooms without furniture groups that still need their ceiling light, however small (L1): bath, WC, hall, store room. */
+const BASIC_LIGHT: RoomType[] = ['bath', 'hall', 'utility'];
 /** Rooms that get curtains at every window when none are planned (R8). */
 const CURTAINED: RoomType[] = ['living', 'bedroom', 'kids', 'office'];
 /** Below this room area (m²) per function the room is compact (studio, living kitchen). */
@@ -298,7 +300,8 @@ export function makeCtx(program: RoomProgram, products: CatalogItem[] = []): Ctx
  * critique; the input stays as it is.
  */
 export function completeGroups(program: RoomProgram, type: RoomType, area: number, functions: number, products: CatalogItem[] = [], windows: { id: string; x: number; y: number; rotation: number }[] = []): { program: RoomProgram; notes: string[] } {
-  if (!ROOMS.includes(type)) return { program, notes: [] };
+  const grouped = ROOMS.includes(type);
+  if (!grouped && !BASIC_LIGHT.includes(type)) return { program, notes: [] };
   const c = makeCtx(program, products);
   const anchors = (roles: Role[]) => c.items.filter((i) => roles.includes(roleOfItem(c, i)!));
   const compact = area / Math.max(1, functions) < AREA_PER_FUNCTION || area < SMALL_LIVING;
@@ -306,13 +309,15 @@ export function completeGroups(program: RoomProgram, type: RoomType, area: numbe
   const sofas = anchors(['sofa']);
   // the sofa of a living room makes a seating group; in a study or bedroom it is a place to read
   for (const s of sofas) seatingGroup(c, s, ['living', 'dining', 'kitchen', 'other'].includes(type) ? scope : 'light');
-  for (const b of anchors(['bed'])) sleepingPlace(c, b, type === 'bedroom' || type === 'kids' ? (area < 10 ? 'compact' : 'full') : 'compact');
-  for (const t of anchors(['table']).filter((t) => c.items.some((i) => roleOfItem(c, i) === 'seat' && targetsOf(c, i.id).includes(t.id)))) diningPlace(c, t);
-  for (const d of c.items.filter((i) => lookup(c, i.catalogId)?.category === 'desk')) workPlace(c, d);
-  // an armchair outside a seating group: a reading corner
-  for (const a of anchors(['armchair']).filter((a) => !bound(c, a.id))) readingCorner(c, a, scope);
+  if (grouped) {
+    for (const b of anchors(['bed'])) sleepingPlace(c, b, type === 'bedroom' || type === 'kids' ? (area < 10 ? 'compact' : 'full') : 'compact');
+    for (const t of anchors(['table']).filter((t) => c.items.some((i) => roleOfItem(c, i) === 'seat' && targetsOf(c, i.id).includes(t.id)))) diningPlace(c, t);
+    for (const d of c.items.filter((i) => lookup(c, i.catalogId)?.category === 'desk')) workPlace(c, d);
+    // an armchair outside a seating group: a reading corner
+    for (const a of anchors(['armchair']).filter((a) => !bound(c, a.id))) readingCorner(c, a, scope);
+  }
   // the room's main light (L1): a ceiling light that is not the pendant over a table
-  if (MAIN_LIGHT.includes(type) && area >= 6 && !c.items.some((i) => roleOfItem(c, i) === 'pendant' && !bound(c, i.id))) {
+  if ((BASIC_LIGHT.includes(type) || (MAIN_LIGHT.includes(type) && area >= 6)) && !c.items.some((i) => roleOfItem(c, i) === 'pendant' && !bound(c, i.id))) {
     const anchor = c.items.find((i) => i.required) ?? c.items[0];
     if (anchor) add(c, anchor, 'Grundlicht', 'generic-pendant', 'deckenlicht', 'Grundlicht des Raums an der Decke, warmweiß und dimmbar (L1, L3).');
   }
