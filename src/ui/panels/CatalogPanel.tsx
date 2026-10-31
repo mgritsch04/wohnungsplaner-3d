@@ -10,12 +10,18 @@ import { useDialogStore } from '../dialogStore';
 import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
 import { useIkeaDrafts } from '../../catalog/ikeaDrafts';
 import { isMoebelixDraft } from '../../catalog/ikeaSelection';
+import { findDuplicateGroups } from '../../catalog/duplicates';
+import { useProjectStore } from '../../store/projectStore';
+import { DuplicatesSection } from './DuplicatesSection';
 import { IkeaSection, MoebelixSection } from './IkeaSection';
 import s from './IkeaSection.module.css';
 
 export function CatalogPanel() {
-  const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix'>('catalog');
+  const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix' | 'duplicates'>('catalog');
   const drafts = useIkeaDrafts((st) => st.drafts);
+  const importedItems = useCatalogStore((st) => st.items);
+  const furniture = useProjectStore((st) => st.project.furniture);
+  const dupCount = useMemo(() => findDuplicateGroups(importedItems, { furniture }).length, [importedItems, furniture]);
   const waiting = { ikea: drafts.filter((d) => !isMoebelixDraft(d.draft)).length, moebelix: drafts.filter((d) => isMoebelixDraft(d.draft)).length };
   return (
     <div className="panel-scroll catalog">
@@ -29,6 +35,11 @@ export function CatalogPanel() {
         <button className={view === 'moebelix' ? 'active' : ''} aria-pressed={view === 'moebelix'} onClick={() => setView('moebelix')}>
           Möbelix{waiting.moebelix ? ` (${waiting.moebelix} ohne Maße)` : ''}
         </button>
+        {dupCount > 0 && (
+          <button className={view === 'duplicates' ? 'active' : ''} aria-pressed={view === 'duplicates'} onClick={() => setView('duplicates')}>
+            Doppelte ({dupCount})
+          </button>
+        )}
       </div>
       {view === 'catalog' && (waiting.ikea > 0 || waiting.moebelix > 0) && (
         <p className={s.empty} data-testid="missing-dims-hint">
@@ -37,7 +48,7 @@ export function CatalogPanel() {
           {waiting.moebelix > 0 && <button onClick={() => setView('moebelix')}>Möbelix › Maße fehlen</button>}
         </p>
       )}
-      {view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : <CatalogList />}
+      {view === 'duplicates' ? <DuplicatesSection /> : view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : <CatalogList />}
     </div>
   );
 }
