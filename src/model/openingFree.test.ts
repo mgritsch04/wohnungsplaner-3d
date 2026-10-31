@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject as emptyProject } from './factory';
-import { addOpening, addRectRoom, closestWall, freeOpeningStation, resolveOpeningSpan } from './operations';
+import { addOpening, addRectRoom, closestWall, freeOpeningStation, moveNode, resolveOpeningSpan } from './operations';
 
 function room() {
   const p = emptyProject();
@@ -52,5 +52,20 @@ describe('resolveOpeningSpan', () => {
     const id = addOpening(p, wallId, 'window', 3)!;
     const r = resolveOpeningSpan(p, id, { offset: 1.2 })!;
     expect(r.offset - 1).toBeGreaterThanOrEqual(0.9 / 2 + 1.2 / 2);
+  });
+});
+
+describe('moving a wall end keeps openings on the wall', () => {
+  it('slides a window back when the wall is shortened', () => {
+    const { p, wallId, L } = room();
+    const id = addOpening(p, wallId, 'window', L - 0.7, { width: 1 })!;
+    const w = p.walls.find((x) => x.id === wallId)!;
+    const b = p.nodes.find((n) => n.id === w.b)!;
+    const a = p.nodes.find((n) => n.id === w.a)!;
+    const dir = { x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) };
+    moveNode(p, w.b, { x: a.x + dir.x * 1.5, y: a.y + dir.y * 1.5 });
+    const o = p.openings.find((x) => x.id === id)!;
+    expect(o.offset + o.width / 2).toBeLessThanOrEqual(1.5 + 1e-6);
+    expect(o.offset - o.width / 2).toBeGreaterThanOrEqual(-1e-6);
   });
 });
