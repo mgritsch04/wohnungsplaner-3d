@@ -28,6 +28,7 @@ import {
   type AttemptResult,
   type SearchOutcome,
   type RetryHint,
+  findOwnedByUrl,
   parseFound,
   replaceKitchenWithFound,
   replaceWithFound,
@@ -412,6 +413,12 @@ export function DesignPanel() {
     };
     const add: CatalogItem[] = [];
     for (const f of found) {
+      // already in the catalogue (own import or earlier find): use it, do not import it a second time
+      const owned = findOwnedByUrl([...useCatalogStore.getState().items, ...add], f.url);
+      if (owned) {
+        out.push({ id: owned.id, why: f.why, ...deviation(owned, f) });
+        continue;
+      }
       if (searchMode === 'web' && f.shop === 'IKEA') {
         const { outcomes } = await addIkeaArticles(f.url, { model: true }).catch(() => ({ outcomes: [] }));
         const ok = outcomes.find((o) => o.ok && o.id);
