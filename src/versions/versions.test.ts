@@ -7,11 +7,12 @@ import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { db } from '../persistence/db';
 import { deleteProject, loadProject, saveProject } from '../persistence/projects';
-import { deleteAllVersions, deleteVersion, exportVersions, listVersions, loadVersion, replaceVersions, saveVersion } from '../persistence/versions';
+import { deleteAllVersions, deleteVersion, duplicateVersion, exportVersions, listVersions, loadVersion, renameVersion, replaceVersions, saveVersion } from '../persistence/versions';
 import { buildPackage, parsePackageOrProject } from '../formats/project/packageFile';
 import { parseProjectJson, serializeProject } from '../formats/project/projectFile';
 import { openVersion } from './versionActions';
 import { VERSION_LIMIT, VersionLimitError, autoVersionName, contentHash, restoreVersionContent } from './versions';
+import { buildVariantPlans } from './variantPlan';
 import { occupiedFraction, pairRooms, summarizeVariant } from './compare';
 
 const walls = { thickness: 0.1, height: 2.5 };
@@ -285,5 +286,35 @@ describe('comparing variants (#58)', () => {
     expect(same.every((r) => r.a?.roomId === r.b?.roomId)).toBe(true);
     const onlyB = pairRooms({ ...a, rooms: [] }, b);
     expect(onlyB.every((r) => r.a === null && r.b)).toBe(true);
+  });
+});
+
+describe('Varianten: umbenennen, duplizieren, Grundrisse nebeneinander (#58)', () => {
+  it('renames and duplicates a saved state', async () => {
+    const p = apartment('Varianten');
+    const a = await saveVersion(p, 'Layout A');
+    const renamed = await renameVersion(p.id, a.id, '  Layout   A2 ');
+    expect(renamed?.name).toBe('Layout A2');
+    const copy = await duplicateVersion(p.id, a.id, 'Layout B');
+    expect(copy?.name).toBe('Layout B');
+    expect(copy?.id).not.toBe(a.id);
+    expect(contentHash((await loadVersion(copy!.id))!)).toBe(contentHash((await loadVersion(a.id))!));
+    expect((await listVersions(p.id)).map((m) => m.name)).toEqual(['Layout B', 'Layout A2']);
+    expect(await renameVersion(p.id, 'nope', 'x')).toBeNull();
+    await deleteAllVersions(p.id);
+  });
+
+  it('draws both plans on one frame and lists the differences', () => {
+    const a = apartment();
+    const b = structuredClone(a);
+    b.furniture[0].x += 1;
+    b.furniture.push(item({ id: 'lamp', name: 'Stehlampe', x: 1, y: 3, width: 0.3, depth: 0.3 }));
+    const plans = buildVariantPlans(a, b);
+    expect(plans.diff.counts).toMatchObject({ moved: 1, added: 1, removed: 0 });
+    expect(plans.changes).toEqual(['sofa: 1 m verschoben', 'neu in B: Stehlampe']);
+    expect(plans.svgA).toContain('data-status="moved"');
+    expect(plans.svgB).toContain('data-status="added"');
+    expect(plans.svgA).not.toContain('Stehlampe');
+    expect(plans.svgA.match(/viewBox="[^"]+"/)![0]).toBe(plans.svgB.match(/viewBox="[^"]+"/)![0]);
   });
 });

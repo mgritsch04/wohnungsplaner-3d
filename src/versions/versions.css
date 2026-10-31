@@ -188,3 +188,55 @@
   font-size: var(--font-size-sm);
   color: var(--color-warning);
 }
+
+/* Varianten nebeneinander (#58) */
+.variant-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+.variant-plan {
+  border: 1px solid var(--color-border);
+  border-radius: var(--control-radius);
+  padding: var(--space-2);
+  background: var(--color-surface, transparent);
+}
+.variant-plan h4 {
+  margin: 0 0 var(--space-2);
+}
+.variant-changes {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--font-size-sm, 0.9em);
+}
+.variant-legend {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.variant-legend i {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: var(--space-1);
+  border-radius: 2px;
+}
+.versions-list .btn-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.versions-list li.editing {
+  flex-wrap: wrap;
+}
+.versions-list li > form {
+  flex-basis: 100%;
+}
+.versions-list li {
+  flex-shrink: 0;
+}
+.versions-modal .modal-body > * {
+  flex-shrink: 0;
+}

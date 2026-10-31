@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatArea, formatEuro } from '../model/units';
 import type { Project } from '../model/schema';
-import { listVersions, loadVersion, type VersionMeta } from '../persistence/versions';
+import { duplicateVersion, listVersions, loadVersion, renameVersion, type VersionMeta } from '../persistence/versions';
 import { useProjectStore } from '../store/projectStore';
 import { confirmDialog, useDialogStore } from '../ui/dialogStore';
 import { pairRooms, summarizeVariant, type VariantSummary } from './compare';
+import { buildVariantPlans } from './variantPlan';
 import { compareVersionsIn3d, openVersion, removeVersion, saveCurrentVersion } from './versionActions';
 import { VERSION_LIMIT, VERSION_NAME_MAX, defaultVersionName } from './versions';
 import './versions.css';
@@ -19,6 +20,7 @@ export function VersionsModal() {
   const [items, setItems] = useState<VersionMeta[] | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'copy'; text: string } | null>(null);
 
   const refresh = useCallback(() => {
     listVersions(projectId)
@@ -89,7 +91,7 @@ export function VersionsModal() {
           {!!items?.length && (
             <ul className="project-list versions-list">
               {items.map((m) => (
-                <li key={m.id} data-testid="version-item">
+                <li key={m.id} data-testid="version-item" className={edit?.id === m.id ? 'editing' : undefined}>
                   <div>
                     <strong>
                       {m.name} {m.auto && <span className="version-badge">automatisch</span>}
@@ -112,6 +114,12 @@ export function VersionsModal() {
                     >
                       Öffnen
                     </button>
+                    <button disabled={busy} onClick={() => setEdit({ id: m.id, mode: 'rename', text: m.name })}>
+                      Umbenennen
+                    </button>
+                    <button disabled={busy || full} title="Kopie als neue Variante anlegen" onClick={() => setEdit({ id: m.id, mode: 'copy', text: `${m.name} (Kopie)` })}>
+                      Duplizieren
+                    </button>
                     <button
                       className="danger"
                       disabled={busy}
@@ -125,6 +133,35 @@ export function VersionsModal() {
                       Löschen
                     </button>
                   </div>
+                  {edit?.id === m.id && (
+                    <form
+                      className="versions-save"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const { mode, text } = edit;
+                        setEdit(null);
+                        setBusy(true);
+                        if (mode === 'rename') await renameVersion(m.projectId, m.id, text).catch((err) => console.error(err));
+                        else await duplicateVersion(m.projectId, m.id, text).catch((err) => console.error(err));
+                        setBusy(false);
+                        refresh();
+                      }}
+                    >
+                      <input
+                        aria-label={edit.mode === 'rename' ? 'Neuer Name' : 'Name der Kopie'}
+                        autoFocus
+                        value={edit.text}
+                        maxLength={VERSION_NAME_MAX}
+                        onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+                      />
+                      <button type="submit" className="primary">
+                        {edit.mode === 'rename' ? 'Umbenennen' : 'Kopie anlegen'}
+                      </button>
+                      <button type="button" onClick={() => setEdit(null)}>
+                        Abbrechen
+                      </button>
+                    </form>
+                  )}
                 </li>
               ))}
             </ul>
@@ -137,21 +174,21 @@ export function VersionsModal() {
   );
 }
 
-function useVariant(id: string, current: Project): { summary: VariantSummary | null; error: string | null } {
-  const [loaded, setLoaded] = useState<{ id: string; summary: VariantSummary | null; error: string | null }>({ id: '', summary: null, error: null });
+function useVariant(id: string, current: Project): { summary: VariantSummary | null; project: Project | null; error: string | null } {
+  const [loaded, setLoaded] = useState<{ id: string; summary: VariantSummary | null; project: Project | null; error: string | null }>({ id: '', summary: null, project: null, error: null });
   const currentSummary = useMemo(() => (id === CURRENT ? summarizeVariant(current) : null), [id, current]);
   useEffect(() => {
     if (id === CURRENT) return;
     let cancelled = false;
     loadVersion(id)
-      .then((p) => !cancelled && setLoaded({ id, summary: p ? summarizeVariant(p) : null, error: p ? null : 'Stand nicht gefunden' }))
-      .catch((e) => !cancelled && setLoaded({ id, summary: null, error: e instanceof Error ? e.message : String(e) }));
+      .then((p) => !cancelled && setLoaded({ id, summary: p ? summarizeVariant(p) : null, project: p, error: p ? null : 'Stand nicht gefunden' }))
+      .catch((e) => !cancelled && setLoaded({ id, summary: null, project: null, error: e instanceof Error ? e.message : String(e) }));
     return () => {
       cancelled = true;
     };
   }, [id]);
-  if (id === CURRENT) return { summary: currentSummary, error: null };
-  return loaded.id === id ? loaded : { summary: null, error: null };
+  if (id === CURRENT) return { summary: currentSummary, project: current, error: null };
+  return loaded.id === id ? loaded : { summary: null, project: null, error: null };
 }
 
 function CompareSection({ items, onCompare3d }: { items: VersionMeta[]; onCompare3d: () => void }) {
@@ -215,7 +252,10 @@ function CompareSection({ items, onCompare3d }: { items: VersionMeta[]; onCompar
       </div>
       {(a.error || b.error) && <p className="warning small">Stand konnte nicht gelesen werden: {a.error ?? b.error}</p>}
       {a.summary && b.summary ? (
-        <CompareTable a={a.summary} b={b.summary} labelA={label(validA)} labelB={label(validB)} />
+        <>
+          <CompareTable a={a.summary} b={b.summary} labelA={label(validA)} labelB={label(validB)} />
+          {a.project && b.project && <SideBySide a={a.project} b={b.project} labelA={label(validA)} labelB={label(validB)} />}
+        </>
       ) : (
         !(a.error || b.error) && <p className="muted small">Berechne…</p>
       )}
@@ -280,5 +320,39 @@ function RoomRows({ name, a, b }: { name: string; a: VariantSummary['rooms'][num
       <Row label="belegt" a={a?.occupied ?? null} b={b?.occupied ?? null} fmt={formatArea} sub />
       <Row label="frei" a={a?.free ?? null} b={b?.free ?? null} fmt={formatArea} sub />
     </>
+  );
+}
+
+function SideBySide({ a, b, labelA, labelB }: { a: Project; b: Project; labelA: string; labelB: string }) {
+  const plans = useMemo(() => buildVariantPlans(a, b), [a, b]);
+  return (
+    <section className="variant-side-by-side" aria-label="Grundrisse nebeneinander" data-testid="variant-plans">
+      <h3>Grundrisse nebeneinander</h3>
+      <ul className="variant-legend muted small" aria-label="Legende">
+        <li><i style={{ background: '#16a34a' }} />neu in B</li>
+        <li><i style={{ background: '#dc2626' }} />nur in A</li>
+        <li><i style={{ background: '#ea580c' }} />verschoben/gedreht</li>
+        <li><i style={{ background: '#9ca3af' }} />unverändert</li>
+      </ul>
+      <div className="variant-plans">
+        <figure className="variant-plan" data-testid="variant-plan-a">
+          <h4>A: {labelA}</h4>
+          <div dangerouslySetInnerHTML={{ __html: plans.svgA }} />
+        </figure>
+        <figure className="variant-plan" data-testid="variant-plan-b">
+          <h4>B: {labelB}</h4>
+          <div dangerouslySetInnerHTML={{ __html: plans.svgB }} />
+        </figure>
+      </div>
+      {plans.changes.length ? (
+        <ul className="variant-changes" data-testid="variant-changes">
+          {plans.changes.map((c, i) => (
+            <li key={i}>{c}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">Keine Unterschiede bei den Möbeln.</p>
+      )}
+    </section>
   );
 }
