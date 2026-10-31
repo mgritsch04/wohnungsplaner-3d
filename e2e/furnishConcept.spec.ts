@@ -18,7 +18,7 @@ import type { Project } from '../src/model/schema';
  * Kein echter Claude-Aufruf.
  */
 interface Call {
-  kind: 'konzept' | 'programm' | 'kritik';
+  kind: 'konzept' | 'programm' | 'kritik' | 'variante' | 'vergleich';
   room: string;
   images: number;
   picture: boolean;
@@ -40,11 +40,21 @@ async function fakeClaude(page: Page, answers: RecordedRun) {
         // dieser Claude kann Bilder ansehen (#442): die Kritik schickt das Raumbild statt der Textkarte
         limits: async () => ({ images: true }),
         json: async (prompt: string, opts: { images?: Blob[] } = {}) => {
-          const kind = prompt.includes('Wohnkonzept für die ganze Wohnung') ? 'konzept' : prompt.includes('Dein bisheriges Programm') ? 'kritik' : 'programm';
-          const room = /Raum „([^“]+)“/.exec(prompt)?.[1] ?? '';
+          const kind = prompt.includes('vergleichst zwei Einrichtungsvorschläge')
+            ? 'vergleich'
+            : prompt.includes('Wohnkonzept für die ganze Wohnung')
+              ? 'konzept'
+              : prompt.includes('Dein bisheriges Programm')
+                ? 'kritik'
+                : prompt.includes('Zweiter Entwurf:')
+                  ? 'variante'
+                  : 'programm';
+          const room = /Raum:? „([^“]+)“/.exec(prompt)?.[1] ?? '';
           w.__calls.push({ kind, room, images: opts.images?.length ?? 0, picture: /beigefügten? Bild/.test(prompt), look: prompt.includes('Blick vor der Abgabe') });
           await new Promise((r) => setTimeout(r, 10));
           if (kind === 'konzept') return rec.concept;
+          // zwei Entwürfe (#436): der zweite ist hier der aufgezeichnete, der Vergleich findet beide gleich
+          if (kind === 'vergleich') return { besser: 'gleich', abstand: 'knapp', warum: '-' };
           const program = rec.programs[room];
           if (!program) throw { code: 'upstream_error', message: `keine aufgezeichnete Antwort für ${room}` };
           return structuredClone(program);
@@ -85,7 +95,9 @@ function expectStages(made: Call[], planned: string[]) {
   expect(concept.length).toBeLessThanOrEqual(2);
   for (const room of planned) expect(made.filter((c) => c.kind === 'programm' && c.room === room).length).toBeGreaterThanOrEqual(1);
   // das Raumprogramm sieht den leeren Raum als Bild (#436)
-  expect(made.filter((c) => c.kind === 'programm').every((c) => c.images === 1)).toBe(true);
+  expect(made.filter((c) => c.kind === 'programm' || c.kind === 'variante').every((c) => c.images === 1)).toBe(true);
+  // der Bildvergleich zweier Fassungen sieht je Fassung zwei 3D-Bilder
+  expect(made.filter((c) => c.kind === 'vergleich').every((c) => c.images === 4)).toBe(true);
   // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443); höchstens zwei je Raum
   const critique = made.filter((c) => c.kind === 'kritik');
   expect(critique.every((c) => c.images === (c.look ? 3 : 1) && c.picture)).toBe(true);

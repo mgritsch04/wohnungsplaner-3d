@@ -271,7 +271,10 @@ export async function compareRooms(input: FurnishRunInput, work: RoomWork, a: Ro
 async function secondDesign(input: FurnishRunInput, work: RoomWork, first: RoomResult, calls: CallLog[]): Promise<RoomResult> {
   let second: RoomResult;
   try {
-    const got = await askChecked(input, buildVariantPrompt(work.base, first.program), (raw) => parseRoomProgram(raw, work.base), 'opus', `Entwurf 2: ${work.analysis.name}`, calls);
+    // like the first design, the second sees the empty room (stage 2)
+    const empty = input.toImage && input.sample.images ? await input.toImage(roomPlanSvg({ analysis: work.analysis, roomNames: Object.fromEntries(input.project.rooms.map((r) => [r.id, r.name])), existing: asPlaced(work.existing) })).catch(() => undefined) : undefined;
+    const base: RoomProgramInput = { ...work.base, ...(empty ? { image: true } : {}) };
+    const got = await askChecked(input, buildVariantPrompt(base, first.program), (raw) => parseRoomProgram(raw, base), 'opus', `Entwurf 2: ${work.analysis.name}`, calls, empty ? [empty] : undefined);
     second = placeAndReview(work, got.value, input.seed ?? 1, 0);
   } catch (e) {
     if (isCancel(e)) throw e;
