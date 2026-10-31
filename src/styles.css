@@ -2572,3 +2572,44 @@ code {
   margin-left: 4px;
   vertical-align: middle;
 }
+
+/* Werkzeuge-Reiter aufgeräumt (#461): Werkzeuge in zwei benannten Gruppen, Fachfunktionen und Einstellungen eingeklappt darunter */
+.tool-group + .tool-group {
+  margin-top: var(--space-4);
+}
+.tool-group-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+}
+.tool-group[aria-label='Messen & markieren'] .tool-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+.panel-divider {
+  margin: 0;
+  padding: var(--space-5) var(--space-6) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+.panel-divider + .panel-group-collapsed,
+.panel-group-collapsed + .panel-group-collapsed {
+  padding-top: var(--space-3);
+}
+.panel-group-collapsed {
+  padding-bottom: var(--space-3);
+}
+.panel-group-collapsed header {
+  margin-bottom: 0;
+}
+@media (max-width: 760px) {
+  .panel-divider {
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+}
