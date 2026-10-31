@@ -234,6 +234,24 @@ export interface FunctionAssignment {
   why: string;
 }
 
+/**
+ * Colour scheme of one room (SL2 per room): all colours come from the flat's palette, so the
+ * rooms differ in mood but belong together. Walls, big furniture, textiles and the accent are
+ * what furniture and décor of the room are coloured by.
+ */
+export interface RoomScheme {
+  /** Wall colour (#rrggbb): the main colour or a tint of it. */
+  wall: string;
+  /** Big furniture and shelves (the second colour or a wood tone). */
+  furniture: string;
+  /** Curtains, rug, cushions. */
+  textile: string;
+  /** Few small accents (vase, picture, one cushion). */
+  accent: string;
+  /** One sentence: the mood this combination gives the room. */
+  note?: string;
+}
+
 export interface RoomConcept {
   roomId: string;
   /** Room type the whole pipeline uses from here on (guidelines, required pieces, checks). */
@@ -245,6 +263,8 @@ export interface RoomConcept {
   anchors: string[];
   /** Accent colour from the palette (hex). */
   accent?: string;
+  /** Colour scheme of the room; derived from the palette when the answer has none. */
+  scheme?: RoomScheme;
   /** What does not belong here, so no function appears twice in the flat. */
   avoid: string[];
 }
