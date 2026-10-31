@@ -3,7 +3,7 @@ import { derivePlan } from "../../model/derived";
 import { zoneArea, zoneColor, zoneRoomId } from "../../model/zones";
 import { useProjectStore } from "../../store/projectStore";
 import { useUiStore } from "../../store/uiStore";
-import { Section } from "../fields";
+import { PanelGroup } from "../fields";
 
 /**
  * Marked areas (#416): draw an area in the plan and write what it is for; the Claude furnishing
@@ -21,7 +21,7 @@ export function ZonesSection() {
       : "außerhalb der Räume";
 
   return (
-    <Section title="Bereiche für Claude">
+    <PanelGroup groupKey="tools.zones" title="Bereiche für Claude" defaultOpen={false}>
       <p className="muted small">
         Bereich im Plan aufziehen und dazuschreiben, wofür er ist
         („Arbeitsecke“, „Essbereich“, „frei lassen“). Der Einrichtungsvorschlag
@@ -77,6 +77,6 @@ export function ZonesSection() {
           </div>
         );
       })}
-    </Section>
+    </PanelGroup>
   );
 }

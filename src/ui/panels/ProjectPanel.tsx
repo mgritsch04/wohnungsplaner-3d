@@ -16,6 +16,7 @@ import { DaylightSection } from './DaylightSection';
 import { LuxSection } from './LuxSection';
 import { HeatingSection } from './HeatingSection';
 import { CircuitsSection } from '../../installation/CircuitsSection';
+import { MovePlanSection } from '../../planning/MovePlanSection';
 import { MoveChecklistSection } from '../../planning/TaskSections';
 import { MotionControl } from '../MotionControl';
 import { HintsControl } from '../HintsControl';
@@ -87,6 +88,7 @@ export function ProjectPanel() {
 
       <CircuitsSection />
       <MoveChecklistSection project={project} />
+      <MovePlanSection project={project} />
 
       <SightlineSection />
 

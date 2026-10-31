@@ -8,6 +8,7 @@ import { findCatalogItem } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
 import { roleOf, type Role } from '../../suggest/roomGeometry';
 import { paletteText, roomConceptOf } from '../concept/flatConcept';
+import { schemeOf, schemeText } from '../concept/scheme';
 import { sideOfRotation, toRoomCm } from '../coords';
 import type { FurnishRunResult } from '../run';
 import type { PlacedItem, RoomAnalysis, RoomType, WallInfo } from '../types';
@@ -70,7 +71,7 @@ export function furnishingSheet(result: FurnishRunResult, names: Record<string, 
       const c = item(p.catalogId);
       return c ? roleOf({ ...c, catalogId: c.id }) : null;
     };
-    out.push('', `## ${names[r.roomId] ?? room.name}`, '', r.program.reading);
+    out.push('', `## ${names[r.roomId] ?? room.name}`, '', r.program.reading, '', `**Farbschema:** ${schemeText(schemeOf(roomConceptOf(result.concept, room), style), style)}`);
     if (r.program.zones.length) out.push('', '**Zonen:**', ...r.program.zones.map((z) => `- ${z.function}: ${z.why}`));
     if (r.program.walk) out.push('', `**Wege:** ${r.program.walk}`);
     const curtain = (p: PlacedItem) => roleOfPlaced(p) === 'curtain';

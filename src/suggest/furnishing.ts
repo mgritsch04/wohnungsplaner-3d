@@ -19,6 +19,7 @@ import { derivePlan, type DerivedPlan } from '../model/derived';
 import { buildPlacementObstacles, placementIssues, type Obstacle } from '../model/placement';
 import { frontClearance, isSurface } from '../model/placementRules';
 import { newId } from '../model/ids';
+import { ensureWallPaint } from '../model/materials';
 import type { Furniture, PlanZone, Project } from '../model/schema';
 import { isKeepFree, polygonsOverlap, zoneRoomId } from '../model/zones';
 import { add, boundsOf, dist, dot, normalize, pointInPolygon, polygonCentroid, rotate, scale, sub, type Vec2 } from '../model/vec';
@@ -175,6 +176,8 @@ export interface FurnishingSuggestion {
   replaces?: string[];
   /** Zones of the new proposal (#442): drawn as faint areas under the preview in 2D, never applied. */
   zones?: { roomId: string; id: string; label: string; points: Vec2[] }[];
+  /** Wall colour the proposal recommends per room (#462); „Übernehmen“ paints the room's walls with it. */
+  walls?: { roomId: string; color: string }[];
 }
 
 /** Which room an item stands in (by its centre). */
@@ -920,6 +923,10 @@ export function applyFurnishing(d: Project, s: FurnishingSuggestion): string[] {
     taken.add(item.id);
     d.furniture.push(item);
     ids.push(item.id);
+  }
+  for (const w of s.walls ?? []) {
+    const room = d.rooms.find((r) => r.id === w.roomId);
+    if (room) room.wallMaterialId = ensureWallPaint(d, w.color);
   }
   return ids;
 }

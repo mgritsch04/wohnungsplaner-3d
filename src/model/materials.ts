@@ -1,4 +1,4 @@
-import type { Material } from './schema';
+import type { Material, Project } from './schema';
 
 /** Built-in material library. Ids are stable and referenced from projects. */
 export const DEFAULT_MATERIALS: Material[] = [
@@ -28,4 +28,19 @@ export function materialById(materials: Material[], id: string | undefined, fall
     DEFAULT_MATERIALS.find((m) => m.id === fallbackId) ??
     DEFAULT_MATERIALS[0]
   );
+}
+
+const norm = (c: string) => c.toLowerCase();
+
+/**
+ * Id of a wall paint with exactly this colour (#hex): an existing paint material, else a new one
+ * is added to the project (stable id from the colour, so applying twice does not stack copies).
+ */
+export function ensureWallPaint(d: Pick<Project, 'materials'>, color: string, name?: string): string {
+  const c = norm(color);
+  const same = d.materials.find((m) => m.kind === 'paint' && norm(m.color) === c && m.id.startsWith('mat_wall_'));
+  if (same) return same.id;
+  const id = `mat_wall_${c.slice(1)}`;
+  if (!d.materials.some((m) => m.id === id)) d.materials.push({ id, name: name ?? `Wandfarbe ${c}`, kind: 'paint', color: c, roughness: 0.9, metalness: 0, textureScale: 1 });
+  return id;
 }

@@ -9,6 +9,7 @@
  * www.ikea.com/at and www.moebelix.at may be opened. Everything Claude reports is checked here
  * (shop host, plausible size and price) before it becomes a catalogue entry.
  */
+import { tierPromptLine } from '../design/tiers';
 import { isPanelPair, normalizeShapeDims } from '../catalog/shapeDims';
 import { z } from 'zod';
 import { normalizePackSize } from '../catalog/packSize';
@@ -166,6 +167,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
           ...(option.features?.length ? [`Muss haben: ${option.features.join(', ')}.`] : []),
           `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
         ]),
+    ...(wishes.tier ? [tierPromptLine(wishes.tier)] : []),
     `Suchseiten: ${links.join(' , ')}`,
     how,
     ...(terms.length > 1 ? [`Findest du mit „${term}“ nichts, probier andere Begriffe: ${terms.filter((t) => t !== term).map((t) => `„${t}“`).join(', ')}.`] : []),
@@ -385,6 +387,28 @@ export async function searchWithRetry(
   }
   const tries = offset + n;
   return { ok: false, attempts: tries, ...last, reason: tries > 1 ? `${last.reason} – nach ${tries} Versuchen` : last.reason };
+}
+
+/** Comparable form of a product page: no protocol/www/query/hash/trailing slash, lower case. */
+export function normalizeProductUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+}
+
+/** IKEA article digits at the end of a product URL (`…-10409932/`, `…-s89579219/`), without a leading `s`. */
+const ikeaDigits = (url: string): string | undefined => /ikea\.com\/.*-s?(\d{8})\/?(?:[?#].*)?$/i.exec(url.trim())?.[1];
+
+/**
+ * The product the user already has in the catalogue for this page (own IKEA/Möbelix import or an earlier find):
+ * same normalised URL, or the same IKEA article number. Such a product is proposed as is, not imported again.
+ */
+export function findOwnedByUrl(items: CatalogItem[], url: string): CatalogItem | undefined {
+  const key = normalizeProductUrl(url);
+  const digits = ikeaDigits(url);
+  return items.find((c) => {
+    if (!c.productUrl) return false;
+    if (normalizeProductUrl(c.productUrl) === key) return true;
+    return !!digits && ikeaDigits(c.productUrl) === digits;
+  });
 }
 
 /** Stable catalogue id per product page. */

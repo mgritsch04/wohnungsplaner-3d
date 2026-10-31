@@ -15,7 +15,9 @@ import type { Project } from '../model/schema';
 import type { RoomType } from '../suggest/furnishing';
 import { analyzeFlat, flatSketch, roomSketch } from './analysis';
 import { roomConceptOf } from './concept/flatConcept';
-import { runConcept, TIMEOUTS, type CallLog, type ConceptRunResult } from './concept/run';
+import { askChecked, runConcept, TIMEOUTS, type CallLog, type ConceptRunResult } from './concept/run';
+import { parseRoomProgram } from './concept/roomProgram';
+import { buildComparePrompt, buildVariantPrompt, layoutKey, planFacts, verdictOf, type Verdict } from './choose';
 import type { RoomProgramInput } from './concept/roomProgram';
 import { buildCritiquePrompt, LOOK_ENOUGH, parseCritique, type CritiqueInput } from './critique';
 import { roomPlanSvg, roomTextMap, type RoomPlan } from './render';
@@ -207,12 +209,101 @@ async function critique(input: FurnishRunInput, work: RoomWork, first: RoomResul
     for (let round = 1; round <= LOOK_ROUNDS; round++) {
       const got = await ask(best, round, true);
       if (!got) break;
-      if (lookKeeps(best, got.result)) best = got.result;
+      // the rules must keep it, and in the pictures it must look better than before (#436)
+      if (lookKeeps(best, got.result) && lookWins(await compareRooms(input, work, best, got.result, calls, 'Blick'))) best = got.result;
       // Claude rates the room it looked at, before its changes: good enough means hand it over
       if (got.note !== null && got.note >= LOOK_ENOUGH) break;
     }
   }
   return { ...best, rounds };
+}
+
+/** Whether main rooms get a second design to choose from (#436). */
+export const VARIANTS = true;
+
+/** The look's change is kept when the pictures show it better, or when there are no pictures to compare (the rules decided). */
+export const lookWins = (v: Verdict | null) => v === null || v === 'second';
+
+/**
+ * Which of two placed versions of a room looks better: the pair comparison of the image review,
+ * in both orders, with the 3D pictures of both. Null when there are no pictures or a request
+ * failed (the caller then decides by the rules). Two layouts with every piece in the same place
+ * are „same“ without asking.
+ */
+export async function compareRooms(input: FurnishRunInput, work: RoomWork, a: RoomResult, b: RoomResult, calls: CallLog[], what: string): Promise<Verdict | null> {
+  if (layoutKey(a) === layoutKey(b)) return 'same';
+  if (!input.toRoomShots || !input.sample.images) return null;
+  const shots = async (r: RoomResult) => input.toRoomShots!({ analysis: work.analysis, type: work.type, layout: r.layout, program: r.program }).catch(() => undefined);
+  const sa = await shots(a);
+  const sb = sa?.length === 2 ? await shots(b) : undefined;
+  if (sa?.length !== 2 || sb?.length !== 2) return null;
+  const facts: [string, string] = [planFacts(work.analysis, a), planFacts(work.analysis, b)];
+  const label = `Vergleich: ${work.analysis.name} (${what})`;
+  const log: CallLog = { label, model: 'opus', round: 1, attempts: 0, ms: 0, problems: [] };
+  calls.push(log);
+  const t0 = Date.now();
+  try {
+    const one = (f: [string, string], images: SampleImage[]) => {
+      log.attempts++;
+      return withTimeout(input.sample.json(buildComparePrompt(work.analysis, work.type, f), { model: 'opus', modelTier: 'complex', label, images, signal: input.signal }), (input.timeouts ?? TIMEOUTS).sonnet, input.signal);
+    };
+    // one after the other: the local helper takes only a few requests at a time
+    const ab = await one(facts, [...sa, ...sb]);
+    const ba = await one([facts[1], facts[0]], [...sb, ...sa]);
+    const v = verdictOf(ab, ba);
+    log.note = { first: 'erster besser', second: 'zweiter besser', same: 'gleich gut', split: 'uneinig' }[v];
+    return v;
+  } catch (e) {
+    log.error = codeOf(e);
+    if (isCancel(e)) throw e;
+    return null;
+  } finally {
+    log.ms = Date.now() - t0;
+  }
+}
+
+/**
+ * Two designs, one choice (#436): Claude writes a second, fundamentally different programme
+ * for a main room, both are placed and walked through, and the better one goes on: passing the
+ * walk-through beats failing it; where both fail, the rules decide (`better`: the critique has
+ * to repair it); where both pass, the pictures decide, and where they cannot, the rules. Any
+ * error keeps the first design.
+ */
+async function secondDesign(input: FurnishRunInput, work: RoomWork, first: RoomResult, calls: CallLog[]): Promise<RoomResult> {
+  let second: RoomResult;
+  try {
+    // like the first design, the second sees the empty room (stage 2)
+    const empty = input.toImage && input.sample.images ? await input.toImage(roomPlanSvg({ analysis: work.analysis, roomNames: Object.fromEntries(input.project.rooms.map((r) => [r.id, r.name])), existing: asPlaced(work.existing) })).catch(() => undefined) : undefined;
+    const base: RoomProgramInput = { ...work.base, ...(empty ? { image: true } : {}) };
+    const got = await askChecked(input, buildVariantPrompt(base, first.program), (raw) => parseRoomProgram(raw, base), 'opus', `Entwurf 2: ${work.analysis.name}`, calls, empty ? [empty] : undefined);
+    second = placeAndReview(work, got.value, input.seed ?? 1, 0);
+  } catch (e) {
+    if (isCancel(e)) throw e;
+    return first;
+  }
+  const note = (text: string) => {
+    const log = [...calls].reverse().find((c) => c.label === `Entwurf 2: ${work.analysis.name}`);
+    if (log) log.note = text;
+  };
+  if (second.layout.items.length * 2 < first.layout.items.length) return note('Entwurf 1 (Entwurf 2 fast leer)'), first;
+  if (first.review.passed !== second.review.passed) {
+    note(`Entwurf ${first.review.passed ? 1 : 2} (nur er besteht die Begehung)`);
+    return first.review.passed ? first : second;
+  }
+  // both fail: the critique rounds still have to repair one, and the one closer to passing has the better chance
+  if (!first.review.passed) {
+    const pick = better(first, second);
+    note(`Entwurf ${pick === first ? 1 : 2} (beide nicht bestanden, Begehung entscheidet)`);
+    return pick;
+  }
+  const v = await compareRooms(input, work, first, second, calls, 'Entwürfe');
+  if (v === 'first' || v === 'second') {
+    note(`Entwurf ${v === 'first' ? 1 : 2} (Bildvergleich)`);
+    return v === 'first' ? first : second;
+  }
+  const pick = better(first, second);
+  note(`Entwurf ${pick === first ? 1 : 2} (Begehung, Bildvergleich ${v ?? 'ohne Ergebnis'})`);
+  return pick;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
@@ -307,7 +398,8 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
         }
       };
       try {
-        const first = placeAndReview(work, program, input.seed ?? 1, 0);
+        let first = placeAndReview(work, program, input.seed ?? 1, 0);
+        if (VARIANTS && LOOK_TYPES.has(type) && wishes.quality !== 'fast' && input.toRoomShots && input.sample.images) first = await secondDesign(input, work, first, concept.calls);
         report('review', done, total, room.name);
         results.push(await critique(input, work, first, image, concept.calls));
       } catch (e) {

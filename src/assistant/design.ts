@@ -20,6 +20,7 @@ import { MAX_QUANTITY } from './answer';
 import { KITCHEN_JSON_HINT, kitchenPromptPart, kitchenTotal, parseKitchen, resolveWith, type DesignKitchen, type KitchenFace } from './kitchenDesign';
 import { guidePrompt, implausibleSize, type RoomFix } from './designGuide';
 import type { PlanSummary } from './planSummary';
+import type { Tier } from '../design/tiers';
 
 export type RetailerChoice = 'both' | 'ikea' | 'moebelix';
 
@@ -65,6 +66,8 @@ export interface DesignWishes {
   quality: DesignQuality;
   /** Which way the proposal is made (#442): the new one with concept, placement and walk-through, or the old one. */
   method?: DesignMethod;
+  /** Price tier (günstig / mittel / schön, #436); default „mittel“. */
+  tier?: Tier;
 }
 
 /** „konzept“ = the new run (stages 0–5, `design/run.ts`); „liste“ = the old one (Claude picks a list). */

@@ -12,6 +12,7 @@ import type { DesignBrief, DesignPick, DesignProposal, DesignRoom } from '../../
 import type { Project } from '../../model/schema';
 import type { RoomType } from '../../suggest/furnishing';
 import { roomConceptOf } from '../concept/flatConcept';
+import { schemeOf } from '../concept/scheme';
 import { reviewFlat, reviewRoom } from '../review';
 import { BALANCED } from '../review/overallRules';
 import { asPlaced, reviewInputOf, type FurnishRunResult } from '../run';
@@ -25,7 +26,8 @@ export function placedRooms(result: FlatResult, roomTypes: Record<string, RoomTy
     const analysis = result.analysis.rooms.find((a) => a.roomId === r.roomId);
     if (!analysis) return [];
     const type = (roomTypes[r.roomId] ?? roomConceptOf(result.concept, analysis).type) as RoomType;
-    return [{ analysis, type, layout: r.layout, program: r.program }];
+    const wall = schemeOf(roomConceptOf(result.concept, analysis), result.concept.style).wall;
+    return [{ analysis, type, layout: r.layout, program: r.program, wall }];
   });
 }
 

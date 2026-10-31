@@ -25,6 +25,8 @@ test('Bereiche für Claude: aufziehen, Textfenster beim Loslassen, freie Form, b
   const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
 
   // 1. Rechteck aufziehen → beim Loslassen öffnet sich sofort das Textfenster
+  // „Bereiche für Claude“ ist eingeklappt (#461): aufklappen, dann den Knopf in der Gruppe nehmen
+  await page.getByRole('button', { name: 'Bereiche für Claude' }).click();
   await page.getByTestId('zone-tool').click();
   let p = at(0.38, 0.4);
   await page.mouse.move(p.x, p.y);

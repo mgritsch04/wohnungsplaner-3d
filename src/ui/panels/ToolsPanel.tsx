@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { addRectRoom } from '../../model/operations';
 import { boundsOf } from '../../model/vec';
 import { DEFAULT_FLOOR_MATERIAL_ID } from '../../model/materials';
@@ -10,19 +10,20 @@ import { ZonesSection } from './ZonesSection';
 import { FIXTURE_KINDS, FIXTURE_LABEL } from '../../model/fixtures';
 import { guessAndPlaceSockets } from '../../installation/actions';
 import { useFixtureStore } from '../../installation/fixtureStore';
+import { usePanelGroupStore } from '../panelGroupStore';
 import { CheckField, NumberField, PanelGroup, Section, SelectField, TextField } from '../fields';
 
-const TOOLS: { id: Tool; label: string; key: string; hint: string }[] = [
-  { id: 'select', label: 'Auswählen', key: 'V', hint: 'Elemente auswählen, verschieben, Ecken und Wände ziehen' },
-  { id: 'wall', label: 'Wand', key: 'W', hint: 'Wände zeichnen – Länge numerisch eingeben möglich' },
-  { id: 'room', label: 'Raum', key: 'R', hint: 'Rechteckigen Raum aufziehen oder umschlossene Fläche anklicken' },
-  { id: 'door', label: 'Tür', key: 'T', hint: 'Tür in eine Wand setzen' },
-  { id: 'window', label: 'Fenster', key: 'F', hint: 'Fenster in eine Wand setzen' },
-  { id: 'passage', label: 'Durchgang', key: 'G', hint: 'Türlose Öffnung in eine Wand setzen' },
-  { id: 'measure', label: 'Messen', key: 'M', hint: 'Abstand zwischen zwei Punkten messen' },
-  { id: 'walkpath', label: 'Laufweg', key: 'L', hint: 'Kürzesten begehbaren Weg zwischen zwei Punkten messen' },
-  { id: 'zone', label: 'Bereich', key: '', hint: 'Bereich aufziehen (oder Punkte klicken für eine freie Form, Doppelklick schließt) und dazuschreiben, wofür er ist – für den Einrichtungsvorschlag mit Claude' },
-  { id: 'mark', label: 'Markierung', key: '', hint: 'Mieter-Paket: Zustand, Bohrloch oder Klebestelle im Plan setzen' },
+const TOOLS: { id: Tool; label: string; key: string; hint: string; group: 'draw' | 'mark' }[] = [
+  { group: 'draw', id: 'select', label: 'Auswählen', key: 'V', hint: 'Elemente auswählen, verschieben, Ecken und Wände ziehen' },
+  { group: 'draw', id: 'wall', label: 'Wand', key: 'W', hint: 'Wände zeichnen – Länge numerisch eingeben möglich' },
+  { group: 'draw', id: 'room', label: 'Raum', key: 'R', hint: 'Rechteckigen Raum aufziehen oder umschlossene Fläche anklicken' },
+  { group: 'draw', id: 'door', label: 'Tür', key: 'T', hint: 'Tür in eine Wand setzen' },
+  { group: 'draw', id: 'window', label: 'Fenster', key: 'F', hint: 'Fenster in eine Wand setzen' },
+  { group: 'draw', id: 'passage', label: 'Durchgang', key: 'G', hint: 'Türlose Öffnung in eine Wand setzen' },
+  { group: 'mark', id: 'measure', label: 'Messen', key: 'M', hint: 'Abstand zwischen zwei Punkten messen' },
+  { group: 'mark', id: 'walkpath', label: 'Laufweg', key: 'L', hint: 'Kürzesten begehbaren Weg zwischen zwei Punkten messen' },
+  { group: 'mark', id: 'zone', label: 'Bereich', key: '', hint: 'Bereich aufziehen (oder Punkte klicken für eine freie Form, Doppelklick schließt) und dazuschreiben, wofür er ist – für den Einrichtungsvorschlag mit Claude' },
+  { group: 'mark', id: 'mark', label: 'Markierung', key: '', hint: 'Mieter-Paket: Zustand, Bohrloch oder Klebestelle im Plan setzen' },
 ];
 
 export function ToolsPanel() {
@@ -34,6 +35,12 @@ export function ToolsPanel() {
   const apply = useProjectStore((s) => s.apply);
   const fixtureCount = useProjectStore((s) => s.project.fixtures.length);
   const [room, setRoom] = useState({ name: 'Neuer Raum', width: 4, depth: 3.5 });
+
+  // Bereich/Markierung brauchen ihre Einstellungen und Listen: Gruppe beim Wählen des Werkzeugs aufklappen (#461)
+  useEffect(() => {
+    const key = TOOL_GROUP[tool];
+    if (key) usePanelGroupStore.getState().setOpen(key, true);
+  }, [tool]);
 
   const createRoom = () => {
     let id = '';
@@ -59,15 +66,8 @@ export function ToolsPanel() {
   return (
     <div className="panel-scroll">
       <Section title="Werkzeuge">
-        <div className="tool-grid">
-          {TOOLS.map((t) => (
-            <button key={t.id} className={`tool-btn ${tool === t.id ? 'active' : ''}`} onClick={() => setTool(t.id)} title={t.key ? `${t.hint} (${t.key})` : t.hint}>
-              <ToolIcon id={t.id} />
-              <span>{t.label}</span>
-              {t.key && <kbd>{t.key}</kbd>}
-            </button>
-          ))}
-        </div>
+        <ToolGrid label="Zeichnen" tools={TOOLS.filter((t) => t.group === 'draw')} active={tool} onPick={setTool} />
+        <ToolGrid label="Messen & markieren" tools={TOOLS.filter((t) => t.group === 'mark')} active={tool} onPick={setTool} />
         <p className="tool-hint muted small" data-testid="tool-hint">
           {TOOLS.find((t) => t.id === tool)?.hint}
         </p>
@@ -77,10 +77,6 @@ export function ToolsPanel() {
           </button>
         )}
       </Section>
-
-      <ZonesSection />
-
-      <MarksSection />
 
       <PanelGroup groupKey="tools.room" title="Raum mit Maßen anlegen">
         <p className="muted small">Innenmaße (lichte Weite). Der neue Raum erscheint rechts neben dem Plan und lässt sich danach verschieben.</p>
@@ -93,6 +89,23 @@ export function ToolsPanel() {
           Raum anlegen
         </button>
       </PanelGroup>
+
+      <p className="panel-divider">Weitere Funktionen</p>
+
+      <ZonesSection />
+
+      <MarksSection />
+
+      <InstallationGroup count={fixtureCount} />
+
+      <PanelGroup groupKey="tools.lights" title="Beleuchtung" defaultOpen={false}>
+        <button className="block" onClick={addLight}>
+          + Deckenleuchte hinzufügen
+        </button>
+        <p className="muted small">Leuchten wirken in der 3D-Ansicht (Lichtfarbe und Helligkeit rechts einstellbar).</p>
+      </PanelGroup>
+
+      <p className="panel-divider">Einstellungen</p>
 
       <PanelGroup groupKey="tools.walls" title="Neue Wände" defaultOpen={false}>
         <div className="field-row">
@@ -186,15 +199,25 @@ export function ToolsPanel() {
           title="Lücken zwischen Möbeln, Möbel und Wand sowie Türen schmaler als die Mindestbreite rot markieren (2D und 3D)"
         />
       </PanelGroup>
+    </div>
+  );
+}
 
-      <PanelGroup groupKey="tools.lights" title="Beleuchtung" defaultOpen={false}>
-        <button className="block" onClick={addLight}>
-          + Deckenleuchte hinzufügen
-        </button>
-        <p className="muted small">Leuchten wirken in der 3D-Ansicht (Lichtfarbe und Helligkeit rechts einstellbar).</p>
-      </PanelGroup>
+const TOOL_GROUP: Partial<Record<Tool, string>> = { zone: 'tools.zones', mark: 'tools.marks' };
 
-      <InstallationGroup count={fixtureCount} />
+function ToolGrid({ label, tools, active, onPick }: { label: string; tools: typeof TOOLS; active: Tool; onPick: (t: Tool) => void }) {
+  return (
+    <div className="tool-group" role="group" aria-label={label}>
+      <p className="tool-group-label">{label}</p>
+      <div className="tool-grid">
+        {tools.map((t) => (
+          <button key={t.id} className={`tool-btn ${active === t.id ? 'active' : ''}`} aria-pressed={active === t.id} onClick={() => onPick(t.id)} title={t.key ? `${t.hint} (${t.key})` : t.hint}>
+            <ToolIcon id={t.id} />
+            <span>{t.label}</span>
+            {t.key && <kbd>{t.key}</kbd>}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -291,6 +314,13 @@ function ToolIcon({ id }: { id: Tool }) {
         <svg {...common}>
           <rect x="4" y="5" width="16" height="14" rx="1" strokeDasharray="3 2" fill="currentColor" fillOpacity={0.15} />
           <path d="M8 12h8" />
+        </svg>
+      );
+    case 'mark':
+      return (
+        <svg {...common}>
+          <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
+          <circle cx="12" cy="11" r="2" />
         </svg>
       );
     default:

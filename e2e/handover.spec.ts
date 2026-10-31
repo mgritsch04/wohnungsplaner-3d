@@ -21,6 +21,9 @@ test('Mieter-Paket: Markierungen mit Notiz und Foto, Bohrloch-Plan, Übergabepro
   page.on('pageerror', (e) => errors.push(e.message));
   await freshStart(page);
   await page.getByRole('button', { name: 'Werkzeuge', exact: true }).first().click().catch(() => {});
+  // Mieter-Paket ist eingeklappt (#461): Werkzeug „Markierung“ klappt die Gruppe auf
+  await page.getByRole('button', { name: 'Markierung', exact: true }).click();
+  await expect(page.getByTestId('mark-kind')).toBeVisible();
 
   // 1. Zustand setzen, Notiz + Foto
   const editor = page.getByTestId('editor2d');
