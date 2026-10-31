@@ -9,6 +9,8 @@ import { sideOfVector } from '../coords';
 import type { FlatConcept, RoomAnalysis, RoomType, Side } from '../types';
 import { roomConceptOf } from './flatConcept';
 import type { RuleArea } from '../rulebook';
+import { planBearing } from '../../model/daylight';
+import { roomSun, roomSunLabel } from '../../model/sunPath';
 import { isCooking, isDining, isSleeping } from './needs';
 
 const DAYLIGHT: Record<Side, string> = {
@@ -35,6 +37,12 @@ export function roomFacts(room: RoomAnalysis, project: Project, concept: FlatCon
       const side = outward(room, w.id);
       lines.push(`- ${o.id} (${w.id}): ${side ? DAYLIGHT[side] : 'schräg gestellt, Licht je nach Tageszeit'}.`);
     }
+  }
+  const bearings = room.walls.flatMap((w) =>
+    w.openings.filter((o) => o.kind === 'window').map(() => planBearing({ x: -w.inward.x, y: -w.inward.y }, project.settings.northDirection)),
+  );
+  if (bearings.length) {
+    lines.push(`- Direkte Sonne im Raum: Sommer ${roomSunLabel(roomSun(bearings, 'summer'))}; Winter ${roomSunLabel(roomSun(bearings, 'winter'))}. Sonnige Ecken für Sitzplatz, Essen und Pflanzen; Bildschirme und Bett nicht in die tiefe Sonne.`);
   }
   if (!lines.length) lines.push('- Kein Fenster: der Raum lebt vom Kunstlicht, hell und gleichmäßig beleuchten.');
   const typeOf = (id: string) => roomConceptOf(concept, { roomId: id, name: project.rooms.find((r) => r.id === id)?.name ?? '' }).type;

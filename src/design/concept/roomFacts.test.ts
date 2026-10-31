@@ -12,6 +12,7 @@ describe('room facts', () => {
   it('names the daylight of each window, the loud walls and the area to furnish', () => {
     const t = roomFacts(room, f.project, concept);
     expect(t).toMatch(/F1 \(W\d\): (Nord|Ost|Süd|West)fenster/);
+    expect(t).toMatch(/Direkte Sonne im Raum: Sommer (ca\. [\d,]+ Std\.|keine)/);
     expect(t).toContain('„Bad“ dahinter');
     expect(t).toMatch(/Fläche \d+,\d m²: gut möbliert sind etwa \d+–\d+ m²/);
   });

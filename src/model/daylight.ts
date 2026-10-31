@@ -86,6 +86,8 @@ export interface RoomDaylight {
   level: DaylightLevel;
   /** Hours with direct sun through at least one window. */
   sunHours: number[];
+  /** Compass bearing (degrees) each window faces, for the sun path (sunPath.ts). */
+  windowBearings: number[];
 }
 
 export interface OutdoorSun {
@@ -182,6 +184,7 @@ export function computeDaylight(project: Project, plan: DerivedPlan): Daylight {
     }
     const byDirection = new Map<Compass, number>();
     const hours = new Set<number>();
+    const windowBearings: number[] = [];
     let effective = 0;
     let glassArea = 0;
     for (const e of edges) {
@@ -191,6 +194,7 @@ export function computeDaylight(project: Project, plan: DerivedPlan): Daylight {
         if (o.wallId !== e.wallId || o.kind !== 'window') continue;
         const area = o.width * o.height;
         glassArea += area;
+        windowBearings.push(bearing);
         effective += area * directionFactor(bearing);
         const dir = compassOf(bearing);
         byDirection.set(dir, (byDirection.get(dir) ?? 0) + area);
@@ -206,6 +210,7 @@ export function computeDaylight(project: Project, plan: DerivedPlan): Daylight {
       directions: [...byDirection.entries()].sort((x, y) => y[1] - x[1]).map(([d]) => d),
       level,
       sunHours: [...hours].sort((x, y) => x - y),
+      windowBearings,
     });
   }
   return { rooms, outdoor };
