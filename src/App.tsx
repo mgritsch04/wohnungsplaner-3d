@@ -38,6 +38,8 @@ import { SplitDivider } from './ui/SplitDivider';
 import { loadSplit, saveSplit } from './ui/splitPreference';
 import { FileFormatError } from './formats/zodErrors';
 import './ui/phone.css';
+import { FeatureSearch, useFeatureSearchShortcut } from './ui/search/FeatureSearch';
+import { usePaletteStore } from './ui/search/paletteStore';
 
 // The 3D scene (three.js) is loaded lazily so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D').then((m) => ({ default: m.Scene3D })));
@@ -48,6 +50,7 @@ if (isPhoneLayout() && useUiStore.getState().viewMode === 'split') useUiStore.se
 export default function App() {
   const [ready, setReady] = useState(false);
   useShortcuts();
+  useFeatureSearchShortcut();
   const autosave = useAutosave(ready);
   useEffect(() => noteSaveState(autosave.state), [autosave.state]);
 
@@ -109,6 +112,8 @@ export default function App() {
   }, [touchUi]);
   // the object menu's „Eigenschaften“ opens the Details sheet on the phone (#235)
   useEffect(() => useObjectMenuStore.setState({ onDetails: phone ? () => setSheet('right') : null }), [phone]);
+  // the feature search (#461) opens the sheet with the found tab on the phone
+  useEffect(() => usePaletteStore.setState({ onShowPanel: phone ? (side) => setSheet(side) : null }), [phone]);
   const [split, setSplit] = useState(() => loadSplit());
   const changeSplit = (r: number) => {
     setSplit(r);
@@ -193,6 +198,7 @@ export default function App() {
       </div>
       {shop && <ShopMode onClose={() => setShop(false)} />}
       <ModalHost />
+      <FeatureSearch />
       <PrintViewHost />
       <HandoverViewHost />
       <Toasts />
