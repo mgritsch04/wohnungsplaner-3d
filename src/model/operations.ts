@@ -435,6 +435,33 @@ export const OPENING_DEFAULTS: Record<OpeningKind, { width: number; height: numb
   passage: { width: 1.0, height: 2.1, sillHeight: 0 },
 };
 
+/**
+ * Nearest station s (centre) for an opening of `width` on the wall where it overlaps no other opening
+ * of that wall (a small gap is kept). Returns null if the wall has no free gap that wide.
+ * `excludeId` ignores the opening being moved.
+ */
+export function freeOpeningStation(d: Project, wallId: string, width: number, s: number, excludeId?: string): number | null {
+  const w = d.walls.find((x) => x.id === wallId);
+  const a = w && nodeById(d, w.a);
+  const b = w && nodeById(d, w.b);
+  if (!w || !a || !b) return null;
+  const L = dist(a, b);
+  const gap = 0.02;
+  const half = width / 2;
+  if (L < width) return null;
+  const blocked = d.openings
+    .filter((o) => o.wallId === wallId && o.id !== excludeId)
+    .map((o) => ({ lo: o.offset - o.width / 2 - gap - half, hi: o.offset + o.width / 2 + gap + half }))
+    .sort((p, q) => p.lo - q.lo);
+  // candidate centres: the wanted one plus every blocked-interval edge, all clamped to the wall
+  const clamp = (v: number) => Math.max(half, Math.min(L - half, v));
+  const free = (v: number) => blocked.every((r) => v <= r.lo + 1e-6 || v >= r.hi - 1e-6);
+  const cands = [clamp(s), ...blocked.flatMap((r) => [clamp(r.lo), clamp(r.hi)])].filter(free);
+  if (!cands.length) return null;
+  cands.sort((p, q) => Math.abs(p - s) - Math.abs(q - s));
+  return roundMm(cands[0]);
+}
+
 /** Add an opening centered at station s of a wall, clamped to fit. Returns the id or null. */
 export function addOpening(d: Project, wallId: string, kind: OpeningKind, s: number, overrides: Partial<Opening> = {}): string | null {
   const w = d.walls.find((x) => x.id === wallId);
