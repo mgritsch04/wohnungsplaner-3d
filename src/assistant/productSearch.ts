@@ -9,6 +9,7 @@
  * www.ikea.com/at and www.moebelix.at may be opened. Everything Claude reports is checked here
  * (shop host, plausible size and price) before it becomes a catalogue entry.
  */
+import { tierPromptLine } from '../design/tiers';
 import { isPanelPair, normalizeShapeDims } from '../catalog/shapeDims';
 import { z } from 'zod';
 import { normalizePackSize } from '../catalog/packSize';
@@ -166,6 +167,7 @@ export function buildFindPrompt(option: DesignOption, item: CatalogItem, wishes:
           ...(option.features?.length ? [`Muss haben: ${option.features.join(', ')}.`] : []),
           `Stil: ${wishes.style.slice(0, MAX_FIELD) || 'egal'}; Farben: ${clipLines(wishes.colors, MAX_FIELD) || 'egal'}${wishes.budget > 0 ? `; Gesamtbudget der Wohnung ${Math.round(wishes.budget)} €, also eher günstig` : ''}.`,
         ]),
+    ...(wishes.tier ? [tierPromptLine(wishes.tier)] : []),
     `Suchseiten: ${links.join(' , ')}`,
     how,
     ...(terms.length > 1 ? [`Findest du mit „${term}“ nichts, probier andere Begriffe: ${terms.filter((t) => t !== term).map((t) => `„${t}“`).join(', ')}.`] : []),

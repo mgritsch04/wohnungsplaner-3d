@@ -7,6 +7,7 @@
  * leaves out what is already there and lists what Claude has to repair (unknown ids, zones
  * outside the room, required pieces missing, functions of other rooms, new sanitary objects).
  */
+import { tierPromptLine } from '../tiers';
 import { type DesignWishes, PLACEHOLDERS, preselect, summarizePlaceholders, summarizeProducts } from '../../assistant/design';
 import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
@@ -132,7 +133,7 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
 8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
-Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.
+Stil: ${concept.style.idea}${concept.style.materials.length ? ` Materialien: ${concept.style.materials.join(', ')}.` : ''}${concept.style.forms ? ` Formen: ${concept.style.forms}` : ''} Palette: ${palette}.${input.wishes.tier ? `\n${tierPromptLine(input.wishes.tier)}` : ''}
 Dieser Raum: Typ ${rc.type}. ${rc.role} Funktionen: ${rc.functions.join(', ') || '–'}. Ankermöbel: ${rc.anchors.join('; ') || 'nach Funktion'}.${rc.accent ? ` Akzentfarbe ${rc.accent}.` : ''} Farbschema des Raums: ${schemeText(schemeOf(rc, concept.style), concept.style)}. Nicht hierher: ${rc.avoid.join(', ') || '–'}.
 In anderen Räumen (hier NICHT planen): ${elsewhere.join('; ') || '–'}
 ${room.passThrough ? 'Dieser Raum ist ein Durchgangszimmer: die Wege zwischen seinen Türen bleiben 90 cm breit frei.\n' : ''}

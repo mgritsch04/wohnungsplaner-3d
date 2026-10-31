@@ -188,6 +188,13 @@ test('Einrichtungsvorschlag mit Claude (#350): ganze Wohnung, eigene Produkte + 
   await expect(proposal.getByRole('link', { name: 'bei IKEA suchen' }).first()).toHaveAttribute('href', 'https://www.ikea.com/at/de/search/?q=Sessel%20Cord');
   await expect(proposal.getByRole('link', { name: 'Produktseite' })).toHaveAttribute('href', 'https://www.moebelix.at/p/testregal-e2e');
   await expect(panel.getByTestId('design-total')).toHaveText(/89,90/);
+  // Budget-Stufen: drei Preise, günstig < mittel < schön, Wahl bleibt markiert
+  const tiers = panel.getByTestId('design-tiers');
+  await expect(tiers.getByRole('button')).toHaveCount(3);
+  await expect(tiers.getByTestId('design-tier-mittel')).toHaveAttribute('aria-pressed', 'true');
+  await tiers.getByTestId('design-tier-schoen').click();
+  await expect(tiers.getByTestId('design-tier-schoen')).toHaveAttribute('aria-pressed', 'true');
+  await tiers.getByTestId('design-tier-mittel').click();
   await expect(proposal).toContainText('nicht in den Listen – weggelassen');
 
   // one request per room, run at the same time; each knows the other rooms and carries the same wishes
