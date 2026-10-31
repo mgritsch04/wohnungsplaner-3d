@@ -2468,3 +2468,30 @@ code {
 .plan-compass { position: absolute; top: 10px; right: 10px; pointer-events: none; z-index: 2; }
 .compass-rose { position: relative; display: inline-block; flex: none; }
 .compass-rose img { display: block; }
+
+.tour-banner {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--panel, rgba(30, 30, 30, 0.85));
+  color: var(--text, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 5;
+  max-width: 90%;
+  font-size: 13px;
+}
+.tour-banner button {
+  font: inherit;
+  padding: 2px 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
