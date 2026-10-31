@@ -6,7 +6,7 @@ import { openHandoverView } from '../../export/HandoverView';
 import { useAssetUrl } from '../../persistence/useAssetUrl';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
-import { Section } from '../fields';
+import { PanelGroup } from '../fields';
 import { pickMarkPhoto } from '../markPhoto';
 
 /** Mieter-Paket (#362): Markierungen für Übergabeprotokoll und Bohrloch-Plan. */
@@ -28,7 +28,7 @@ export function MarksSection() {
     });
 
   return (
-    <Section title="Mieter-Paket">
+    <PanelGroup groupKey="tools.marks" title="Mieter-Paket" defaultOpen={false}>
       <p className="muted small">Zustand beim Einzug, Bohrlöcher und Klebestellen im Plan markieren – mit Notiz und lokalem Foto. Daraus entsteht das Übergabeprotokoll (PDF).</p>
       <div className="segmented" role="group" aria-label="Art der Markierung" data-testid="mark-kind">
         {MARK_KINDS.map((k) => (
@@ -54,7 +54,7 @@ export function MarksSection() {
           ))}
         </div>
       ))}
-    </Section>
+    </PanelGroup>
   );
 }
 
