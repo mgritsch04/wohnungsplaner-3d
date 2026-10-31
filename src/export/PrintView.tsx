@@ -1,12 +1,14 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { computeBudget, groupBudgetLines } from '../budget/budget';
+import { furnitureRoomLookup } from '../budget/rooms';
 import { derivePlan } from '../model/derived';
 import { formatEuro } from '../model/units';
 import { useProjectStore } from '../store/projectStore';
 import { PAGE_MARGIN_MM, PX_PER_MM, fitPlanToBox, padBounds, planBounds, planBoxOnA4, planFileName, type PageOrientation } from './planExport';
 import { exportPlanPng } from './exportPng';
+import { captureViewShots, hasSceneSnap, type ViewShot } from './viewShots';
 import { PlanSheet, SHEET_FOOTER, SHEET_PAD } from './PlanSheet';
 
 interface PrintStore {
@@ -55,6 +57,30 @@ function PrintView() {
     () => groupBudgetLines(computeBudget(project.furniture).lines).sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel) || a.name.localeCompare(b.name)),
     [project.furniture],
   );
+  const [mappe, setMappe] = useState(false);
+  const [shots, setShots] = useState<ViewShot[] | null>(null);
+  const [shooting, setShooting] = useState<string | null>(null);
+  const rooms = useMemo(() => {
+    if (!mappe) return [];
+    const budget = computeBudget(project.furniture, furnitureRoomLookup(project, derived));
+    return budget.byRoom.map((r) => ({
+      ...r,
+      lines: groupBudgetLines(budget.lines.filter((l) => l.roomId === r.roomId), { byRoom: true }).sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+  }, [mappe, project, derived]);
+  const toggleMappe = async (on: boolean) => {
+    setMappe(on);
+    if (!on || shots) return;
+    if (!hasSceneSnap()) return;
+    setShooting('3D-Bilder werden aufgenommen …');
+    try {
+      setShots(await captureViewShots(project, (d, t) => setShooting(`3D-Bilder ${d}/${t} …`)));
+    } catch {
+      setShots(null);
+    } finally {
+      setShooting(null);
+    }
+  };
   const total = lines.reduce((s, l) => s + (l.total ?? 0), 0);
   const missing = lines.filter((l) => l.total === null).length;
 
@@ -88,6 +114,10 @@ function PrintView() {
           </button>
         </div>
         <button onClick={() => void exportPlanPng()}>Plan als PNG</button>
+        <label>
+          <input type="checkbox" data-testid="mappe-toggle" checked={mappe} onChange={(e) => void toggleMappe(e.target.checked)} /> Einrichtungsmappe (3D-Bilder, Möbel je Raum)
+        </label>
+        {shooting && <span className="muted small" data-testid="mappe-progress">{shooting}</span>}
         <button onClick={close}>Schließen</button>
         <span className="muted small">Für ein PDF im Druckdialog „Als PDF speichern“ wählen.</span>
       </div>
@@ -147,6 +177,75 @@ function PrintView() {
           </section>
         </div>
       </div>
+      {mappe && (
+        <div className={`print-page extra ${orientation}`} data-testid="mappe-shots">
+          <header className="print-header">
+            <h1>{project.name || 'Einrichtung'} · 3D-Ansichten</h1>
+            <span>{now.toLocaleDateString('de-AT')}</span>
+          </header>
+          {shots && shots.length > 0 ? (
+            <div className="print-shots">
+              {shots.map((sh) => (
+                <figure key={sh.label} data-testid="mappe-shot">
+                  <img src={sh.url} alt={`3D-Ansicht ${sh.label}`} />
+                  <figcaption>{sh.label}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Keine 3D-Bilder: Zum Aufnehmen die 3D-Ansicht öffnen (Ansicht „3D“ oder „Geteilt“), dann Druckansicht erneut öffnen und die Mappe einschalten.</p>
+          )}
+        </div>
+      )}
+      {mappe && (
+        <div className={`print-page extra ${orientation}`} data-testid="mappe-rooms">
+          <header className="print-header">
+            <h1>{project.name || 'Einrichtung'} · Möbel je Raum</h1>
+            <span>{now.toLocaleDateString('de-AT')}</span>
+          </header>
+          {rooms.length === 0 ? (
+            <p className="muted">Keine Möbel oder Geräte im Projekt.</p>
+          ) : (
+            rooms.map((r) => (
+              <section key={r.roomId ?? 'none'} className="print-list print-room" data-testid="mappe-room">
+                <h2>{r.label}</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th className="num">Menge</th>
+                      <th>Artikel</th>
+                      <th>Maße B × T × H (cm)</th>
+                      <th>Händler</th>
+                      <th className="num">Summe</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.lines.map((l) => (
+                      <tr key={l.id}>
+                        <td className="num">{l.quantity}</td>
+                        <td>{l.name}</td>
+                        <td>{l.size}</td>
+                        <td>{l.retailer}</td>
+                        <td className="num">{l.total === null ? '–' : formatEuro(l.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4}>Summe {r.label}{r.missing ? ` · ${r.missing} ohne Preis` : ''}</td>
+                      <td className="num">{formatEuro(r.total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </section>
+            ))
+          )}
+          <p className="print-total" data-testid="mappe-total">
+            Gesamtsumme (bekannte Preise): <strong>{formatEuro(total)}</strong>
+            {missing ? ` · ${missing} Position(en) ohne Preis` : ''}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
