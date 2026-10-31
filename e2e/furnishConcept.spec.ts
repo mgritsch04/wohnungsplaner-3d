@@ -210,3 +210,37 @@ test('Kritikrunde (#442): ein Raum, der die Begehung nicht besteht, geht mit sei
   await panel.getByTestId('design-proposal').screenshot({ path: 'test-results/design-442-kritik-panel.png' });
   expect(errors).toEqual([]);
 });
+
+test('Vorschläge nebeneinander: Ideal und Kaufbar in 2D und 3D, „Diesen übernehmen“ stellt die Fassung in den Plan', async ({ page }) => {
+  test.setTimeout(240_000);
+  const answers = recorded('B');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await fakeClaude(page, answers);
+  await page.goto('/?e2e');
+  await expect(page.getByText('Beispielwohnung').or(page.locator('input.project-name'))).toBeVisible();
+  await loadFlat(page, 'B');
+  await page.locator('.panel.left').getByRole('button', { name: 'Einrichten' }).click();
+  const panel = page.getByTestId('design-panel');
+  await fillWishes(panel, TEST_FLATS.B.wishes);
+  await panel.getByRole('button', { name: 'Einrichten lassen' }).click();
+  await expect(panel.getByTestId('design-proposal')).toBeVisible({ timeout: 180_000 });
+
+  await panel.getByTestId('design-compare-open').click();
+  const cmp = page.getByTestId('design-compare');
+  await expect(cmp).toBeVisible();
+  for (const v of ['ideal', 'kaufbar']) {
+    const col = page.getByTestId(`design-compare-${v}`);
+    await expect(col.locator('.compare-plan svg')).toBeVisible();
+    await expect(col.locator('.compare-3d img')).toBeVisible({ timeout: 60_000 });
+  }
+  await page.waitForTimeout(300);
+  await cmp.screenshot({ path: 'test-results/compare-variants.png' });
+
+  const before = (await getProject(page)).furniture.length;
+  await page.getByTestId('design-compare-take-kaufbar').click();
+  await expect(cmp).toHaveCount(0);
+  await expect.poll(async () => (await getProject(page)).furniture.length).toBeGreaterThan(before + 20);
+  expect(((await getProject(page)) as Project).furniture.some((f) => f.suggested)).toBe(true);
+  expect(errors).toEqual([]);
+});
