@@ -237,6 +237,28 @@ export const InteriorSchema = z.object({
 /** Phase of the purchase plan (#363): bought for moving in, in month 2, or "some time later". Absent = moving in. */
 export const BuyPhaseSchema = z.enum(['movein', 'month2', 'later']);
 
+/** One package or part of a piece of furniture (#487), e.g. a flat-pack box; used by the moving plan's fit check. */
+export const FurniturePackageSchema = z.object({
+  name: z.string().max(100),
+  width: len(0.01, 5),
+  depth: len(0.01, 5),
+  height: len(0.01, 5),
+});
+
+/** Measurements of the building's access (#487) for the moving plan; every value is optional (m). */
+export const MoveAccessSchema = z.object({
+  /** Clear width of the stairwell flights. */
+  stairWidth: len(0.3, 5).optional(),
+  /** Clear headroom in the stairwell. */
+  stairHeadroom: len(0.5, 5).optional(),
+  /** Longest piece that still gets around the landings (turn). */
+  turnLength: len(0.3, 10).optional(),
+  /** Inner size of the lift cabin. */
+  liftWidth: len(0.3, 5).optional(),
+  liftDepth: len(0.3, 5).optional(),
+  liftHeight: len(0.5, 5).optional(),
+});
+
 export const FurnitureSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().optional(),
@@ -287,6 +309,8 @@ export const FurnitureSchema = z.object({
   buyPhase: BuyPhaseSchema.optional(),
   /** Placed by a furnishing suggestion (#137, #350): a new preview of the same rooms replaces it. Optional: older files stay valid. */
   suggested: z.boolean().optional(),
+  /** Packages or parts with their sizes (#487); absent = the piece is carried in one go. Optional: older files stay valid. */
+  packages: z.array(FurniturePackageSchema).max(30).optional(),
 });
 
 /**
@@ -712,6 +736,10 @@ export const ProjectSchema = z.object({
   audioCatalog: z.array(AudioDeviceDefSchema).max(100).default([]),
   /** Budget in EUR per purchase phase (#363); a phase without an entry has no limit. Projects saved before lack the field. */
   purchaseBudgets: z.object({ movein: z.number().min(0).max(1e8).optional(), month2: z.number().min(0).max(1e8).optional(), later: z.number().min(0).max(1e8).optional() }).default({}),
+  /** Building access measurements for the moving plan (#487); projects saved before lack the field. */
+  moveAccess: MoveAccessSchema.optional(),
+  /** Furniture ids ticked off as "set up" in the moving plan (#487); projects saved before lack the field. */
+  moveDone: z.array(z.string()).max(2000).optional(),
   levels: z.array(LevelSchema).min(1).max(30).default([{ id: DEFAULT_LEVEL_ID, name: DEFAULT_LEVEL_NAME, elevation: 0 }]),
   activeLevelId: z.string().min(1).default(DEFAULT_LEVEL_ID),
 });
@@ -725,6 +753,8 @@ export type Room = z.infer<typeof RoomSchema>;
 export type MaterialKind = z.infer<typeof MaterialKindSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
 export type FurnitureFinish = z.infer<typeof FurnitureFinishSchema>;
+export type FurniturePackage = z.infer<typeof FurniturePackageSchema>;
+export type MoveAccess = z.infer<typeof MoveAccessSchema>;
 export type BuyPhase = z.infer<typeof BuyPhaseSchema>;
 export type Price = z.infer<typeof PriceSchema>;
 export type ModelRef = z.infer<typeof ModelRefSchema>;

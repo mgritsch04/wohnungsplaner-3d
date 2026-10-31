@@ -66,3 +66,26 @@ test('Notizen, Raumaufgaben und Umzugs-Checkliste (#83, #84, #91)', async ({ pag
   expect(first.done).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('Umzug: Aufbauplan mit Maßprüfung (#487)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await freshStart(page);
+  await page.locator('aside.panel.right nav.tabs button', { hasText: 'Projekt' }).click();
+  // Treppenhaus-Maße eintragen
+  await page.getByText('Maße des Hauses').click();
+  await page.getByLabel('Treppenhaus Breite').fill('80');
+  await page.getByLabel('Treppenhaus Breite').press('Enter');
+  await page.getByLabel('Treppenhaus Höhe').fill('200');
+  await page.getByLabel('Treppenhaus Höhe').press('Enter');
+  await page.getByTestId('moveplan-calc').click();
+  await expect(page.getByTestId('moveplan-summary')).toBeVisible();
+  const steps = page.getByTestId('moveplan-step');
+  const n = await steps.count();
+  if (n > 0) {
+    await steps.first().getByRole('checkbox').check();
+    await expect(page.getByTestId('moveplan-summary')).toContainText('1 aufgebaut');
+  }
+  await expect.poll(async () => (await getProject(page)).moveAccess?.stairWidth, { timeout: 5000 }).toBeCloseTo(0.8, 2);
+  expect(errors).toEqual([]);
+});
