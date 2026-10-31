@@ -15,6 +15,7 @@ import { normalizeAngle } from './units';
 import { frontClearance, isRug, isStackable, isSurface, pairRule, seatAndTable, seatBackDepth } from './placementRules';
 import { LEAF_OPEN_ANGLE, leafPolygon } from './geometry/leaves';
 import { clipFootprint } from './geometry/walls';
+import { snapToFurniture, type SnapGuide } from './furnitureSnap';
 import { coveredConnections, fixtureCenterZ, fixtureCorners, FIXTURE_LABEL } from './fixtures';
 
 export interface Obstacle {
@@ -621,6 +622,8 @@ export interface MoveOptions {
    * 3D dragging pass it separately, so it also works with „Möbel einrasten: aus“ (only Alt is free).
    */
   stack?: boolean;
+  /** Filled with the alignment guide lines when the item snapped to other furniture. */
+  guides?: SnapGuide[];
 }
 
 /**
@@ -644,6 +647,13 @@ export function moveFurnitureTo(d: Project, derived: DerivedPlan, obstacles: Obs
       goal = { x: s.x, y: s.y };
       rotation = s.rotation;
       snapped = s.wallIds;
+    }
+    // align edges/centres with other furniture on the axes the wall left free
+    if (opts.guides) opts.guides.length = 0;
+    if (!isStackable(f)) {
+      const fs = snapToFurniture(d, f, goal, { x: Math.abs(goal.x - target.x) < 1e-6, y: Math.abs(goal.y - target.y) < 1e-6 });
+      goal = { x: fs.x, y: fs.y };
+      if (opts.guides) opts.guides.push(...fs.guides);
     }
   }
   // small items (table lamps, decor) stand on the table/cabinet below them
