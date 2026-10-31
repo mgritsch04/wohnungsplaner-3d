@@ -119,6 +119,7 @@ function labelPreview(preview: FurnishingSuggestion, proposal: DesignProposal) {
  * it over in one undo step. Hidden where the Claude artifact runtime is not available.
  */
 export function DesignPanel() {
+  const [takeWalls, setTakeWalls] = useState(true);
   const [sample, setSample] = useState<Sample | null>(null);
   const [hidden, setHidden] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -365,12 +366,13 @@ export function DesignPanel() {
     const preview = st.preview;
     if (!preview || !previewActive) return;
     let ids: string[] = [];
+    const toTake = takeWalls ? preview : { ...preview, walls: [] };
     apply((d) => {
-      ids = applyFurnishing(d, preview);
+      ids = applyFurnishing(d, toTake);
     });
     st.set({ preview: null });
     useUiStore.getState().selectFurniture(ids);
-    useUiStore.getState().toast(`${ids.length} Möbel aus dem Einrichtungsvorschlag übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
+    useUiStore.getState().toast(`${ids.length} Möbel${toTake.walls?.length ? ` und ${toTake.walls.length === 1 ? 'eine Wandfarbe' : `${toTake.walls.length} Wandfarben`}` : ''} aus dem Einrichtungsvorschlag übernommen – mit Strg+Z in einem Schritt rückgängig.`, 'success');
   };
 
   const discard = () => {
@@ -857,6 +859,20 @@ export function DesignPanel() {
                         </ul>
                       </div>
                     ))}
+                  {(st.preview.walls?.length ?? 0) > 0 && (
+                    <div data-testid="design-walls">
+                      <label className="check">
+                        <input type="checkbox" checked={takeWalls} onChange={(e) => setTakeWalls(e.target.checked)} /> Wandfarben der Räume mit übernehmen
+                      </label>
+                      <ul className="small">
+                        {st.preview.walls!.map((w) => (
+                          <li key={w.roomId}>
+                            <span className="design-swatch" style={{ background: w.color }} aria-hidden="true" /> {roomName(w.roomId)}: {w.color}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="btn-row">
                     <button className="primary" disabled={!st.preview.items.length} onClick={take}>
                       Übernehmen
