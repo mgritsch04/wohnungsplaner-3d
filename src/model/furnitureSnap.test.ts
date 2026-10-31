@@ -43,7 +43,7 @@ describe('snapping to other furniture', () => {
     b.y = a.y + 0.2;
     // put b right of a, touching, 3 cm off vertically
     const target = { x: a.x + a.width / 2 + b.width / 2 + 0.02, y: a.y + 0.03 };
-    moveFurnitureTo(p, d, obs, b.id, target, { snap: true, collide: true, guides: guides as never });
+    moveFurnitureTo(p, d, obs, b.id, target, { snap: true, collide: true, align: true, guides: guides as never });
     const mb = p.furniture.find((f) => f.id === b.id)!;
     expect(mb.y).toBeCloseTo(a.y, 2);
     expect(guides.length).toBeGreaterThan(0);
