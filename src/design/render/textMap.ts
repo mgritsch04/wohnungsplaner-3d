@@ -6,6 +6,7 @@
  */
 import { dot, pointInPolygon, sub } from '../../model/vec';
 import { checkWalkways } from '../analysis';
+import { backOf, gazeOf, hasGaze, type GazePiece } from '../analysis/gaze';
 import { sideOfVector, toRoomCm } from '../coords';
 import { toRItem, type RItem } from '../review/items';
 import type { RoomAnalysis, Severity, WallInfo } from '../types';
@@ -55,6 +56,15 @@ export function roomTextMap(input: RoomPlanInput): string {
   const programItem = (id: string) => input.program?.items.find((x) => x.id === id);
   const nameOf = (i: RItem) => programItem(i.id)?.label ?? i.name;
   const floor = items.filter((i) => i.floor);
+  const gazeRef = (i: RItem) => (i.existing ? i.name : `${i.id} (${nameOf(i)})`);
+  const seen: GazePiece[] = items.map((i) => ({ ...i, ref: gazeRef(i) }));
+  /** What a seat, a bed or a desk looks at and what it turns its back to, worked out by the code. */
+  const gaze = (i: RItem): string => {
+    const piece = seen.find((x) => x.id === i.id);
+    if (!piece || !hasGaze(piece)) return '';
+    const back = piece.role === 'sofa' ? backOf(a, piece, seen) : null;
+    return `, ${gazeOf(a, piece, seen).text}${back ? `, ${back}` : ''}`;
+  };
   const lines: string[] = [`Aufstellung in „${a.name}“ (cm ab der Nordwest-Ecke wie in der Raumskizze; Mitte des Teils, Front = wohin seine Vorderseite zeigt):`];
 
   const zones = input.program?.zones ?? [];
@@ -79,7 +89,7 @@ export function roomTextMap(input: RoomPlanInput): string {
     }
     if (i.floor) {
       const wall = againstWall(a, i);
-      return `${head}, Mitte ${at(i)}${wall ? `, Rücken an ${wall.id}` : ''}, ${facing(i)}${zone}${parent}`;
+      return `${head}, Mitte ${at(i)}${wall ? `, Rücken an ${wall.id}` : ''}, ${facing(i)}${gaze(i)}${zone}${parent}`;
     }
     const base = (i.parent && items.find((x) => x.id === i.parent)) || floor.find((x) => x !== i && pointInPolygon(i, x.poly));
     const wall = onWall(a, i);

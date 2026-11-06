@@ -98,10 +98,14 @@ function expectStages(made: Call[], planned: string[]) {
   expect(made.filter((c) => c.kind === 'programm' || c.kind === 'variante').every((c) => c.images === 1)).toBe(true);
   // der Bildvergleich zweier Fassungen sieht je Fassung zwei 3D-Bilder
   expect(made.filter((c) => c.kind === 'vergleich').every((c) => c.images === 4)).toBe(true);
-  // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443); höchstens zwei je Raum
+  // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443);
+  // höchstens zwei Kritikrunden je Raum und ein Blick, wenn er danach besteht
   const critique = made.filter((c) => c.kind === 'kritik');
   expect(critique.every((c) => c.images === (c.look ? 3 : 1) && c.picture)).toBe(true);
-  for (const room of new Set(critique.map((c) => c.room))) expect(critique.filter((c) => c.room === room).length).toBeLessThanOrEqual(2);
+  for (const room of new Set(critique.map((c) => c.room))) {
+    expect(critique.filter((c) => c.room === room && !c.look).length).toBeLessThanOrEqual(2);
+    expect(critique.filter((c) => c.room === room && c.look).length).toBeLessThanOrEqual(1);
+  }
   return critique;
 }
 
@@ -163,7 +167,9 @@ test('Einrichten nach Wohnkonzept (#442): Stufen, Begehung im Panel, Zonen in de
   // Vorschau: die Zonen des Raumprogramms liegen als blasse Flächen im Plan
   await panel.getByRole('button', { name: 'Vorschau im Plan' }).click();
   await expect(panel.getByTestId('design-preview')).toContainText('noch nicht übernommen');
-  expect(await panel.getByTestId('design-missing').allInnerTexts()).toEqual([]);
+  // die Begehung wählt unter mehreren Aufstellungen (#436): eine bestandene darf ein Wandbild oder eine Pflanze weglassen, kein Möbel
+  const missing = (await panel.getByTestId('design-missing').allInnerTexts()).flatMap((t) => t.split('\n').slice(1)).filter((l) => l.trim());
+  expect(missing.filter((l) => !/bild|poster|druck|pflanze|leuchte|lampe|kissen|vase|deko/i.test(l.split(':')[0]))).toEqual([]);
   await expect(page.locator('.furnish-zone').first()).toBeVisible();
   expect(await page.locator('.furnish-zone-label').count()).toBeGreaterThan(3);
 
