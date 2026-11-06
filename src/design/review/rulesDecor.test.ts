@@ -179,6 +179,17 @@ describe('E Gesamteindruck', () => {
     expect(has(bedroom(west), 'E6', /östliche Hälfte/)).toBe(true);
     expect(has(bedroom([...west, put('generic-desk', { x: 4.6, y: 2, face: 'W' }), put('generic-office-chair', { x: 4.0, y: 2, face: 'O' }), put('generic-dresser', { x: 3.6, y: 0.25, face: 'S' })]), 'E6')).toBe(false);
   });
+  it('E7 / Q1 the free floor in pieces (a strip behind a row of wardrobes) is reported, a gap at the end keeps it whole', () => {
+    const row = (xs: number[]) => xs.map((x) => put('generic-wardrobe-200', { x, y: 1.3, face: 'S' }));
+    const cut = living([...row([1.0, 3.0]), put('generic-wardrobe-100', { x: 4.5, y: 1.3, face: 'S' }), sofa]);
+    const f = cut.findings.find((x) => x.rule === 'E7');
+    expect(f?.severity).toBe('M');
+    expect(f?.text).toMatch(/zerfällt/);
+    expect(cut.metrics.nav).toBeLessThan(0.8);
+    const open = living([...row([1.0, 3.0]), sofa]);
+    expect(has(open, 'E7')).toBe(false);
+    expect(open.metrics.nav).toBeGreaterThan(0.95);
+  });
   it('E6 an open patch more than 3.6 m across, far from every piece, is medium (#443)', () => {
     const big = (items: ReturnType<typeof put>[]) => review({ room: rectRoom(7, 5, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] }), type: 'living', items });
     const corner = [put('generic-sofa-3', { x: 1.2, y: 4.5, face: 'N' }), put('generic-shelf-80', { x: 6.5, y: 0.25, face: 'S' })];

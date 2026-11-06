@@ -134,6 +134,54 @@ export class WalkGrid {
     return seen;
   }
 
+  /**
+   * Share of the free cells (clear radius) that belong to the largest connected patch, with the
+   * floor area (m²) that lies outside it (PhyScene/SceneEval „NAV“). 1 when the free floor is one piece.
+   */
+  connectedShare(radius: number): { share: number; cut: number; at?: Vec2 } {
+    const mask = this.mask(radius);
+    const label = new Int32Array(mask.length).fill(-1);
+    const sizes: number[] = [];
+    const sums: Vec2[] = [];
+    let total = 0;
+    for (let start = 0; start < mask.length; start++) {
+      if (!mask[start] || label[start] >= 0) continue;
+      const id = sizes.length;
+      sizes.push(0);
+      sums.push({ x: 0, y: 0 });
+      label[start] = id;
+      const stack = [start];
+      while (stack.length) {
+        const k = stack.pop()!;
+        const ki = k % this.nx;
+        const kj = (k - ki) / this.nx;
+        sizes[id]++;
+        const c = this.centre(ki, kj);
+        sums[id].x += c.x;
+        sums[id].y += c.y;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          const ni = ki + di;
+          const nj = kj + dj;
+          if (ni < 0 || nj < 0 || ni >= this.nx || nj >= this.ny) continue;
+          const nk = nj * this.nx + ni;
+          if (mask[nk] && label[nk] < 0) {
+            label[nk] = id;
+            stack.push(nk);
+          }
+        }
+      }
+      total += sizes[id];
+    }
+    if (!total) return { share: 1, cut: 0 };
+    let big = 0;
+    for (let id = 1; id < sizes.length; id++) if (sizes[id] > sizes[big]) big = id;
+    // the biggest of the cut-off patches marks the place of the finding
+    let second = -1;
+    for (let id = 0; id < sizes.length; id++) if (id !== big && (second < 0 || sizes[id] > sizes[second])) second = id;
+    const cut = (total - sizes[big]) * this.cell * this.cell;
+    return { share: sizes[big] / total, cut, at: second >= 0 ? { x: sums[second].x / sizes[second], y: sums[second].y / sizes[second] } : undefined };
+  }
+
   /** Whether a reachable cell lies within `reach` of the point. */
   touches(seen: Uint8Array, p: Vec2, reach: number): boolean {
     const [ci, cj] = this.cellOf(p);

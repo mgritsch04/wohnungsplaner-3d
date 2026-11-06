@@ -89,6 +89,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | R8 | W | Vorhänge als Paar, Stange 10–15 cm über dem Fenster und 10–25 cm seitlich darüber hinaus, offen neben dem Glas, bis knapp über den Boden. | Das Fenster wirkt größer, das Licht bleibt frei. | Homes & Gardens, Taskrabbit | Prompt, Löser |
 | R9 | T | Pflanzen in Ecken, neben Fenster oder Möbel, nie frei im Raum oder im Weg; kleine Pflanzen auf Fensterbank, Regal oder Sideboard. | Sie rahmen und beleben, ohne im Weg zu stehen. | Faustregel | Prompt, Löser |
 | R10 | W | Zonen klar getrennt: zwischen zwei Möbelgruppen (Essplatz und Sitzgruppe, Sitzgruppe und Leseecke) bleibt ein Durchgang von 60–90 cm; ein Sessel gehört zu genau einer Gruppe und steht nicht zwischen zweien. | Jede Zone wirkt für sich und man kommt hinein, ohne sich an Stühlen vorbeizudrücken. | Faustregel | Prompt |
+| R11 | W | Der freie Boden bleibt zusammenhängend: bei 45 cm Gehbreite gehören mindestens 90 % der freien Fläche zu einem Stück; keine Ecke und kein Streifen (ab 0,6 m²) hinter Schrank, Sofa oder Tisch, in die man nicht hineinkommt. | Abgeschnittener Boden ist verschenkt und wird zur Abstellecke; ein Raum aus einem Stück wirkt größer. | PhyScene/SceneEval (Navigability); Schwelle eigener Startwert | Prompt, Begehung |
 
 ## Stauraum
 
