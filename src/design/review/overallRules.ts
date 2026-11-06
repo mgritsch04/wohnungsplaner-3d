@@ -32,6 +32,27 @@ export function checkOccupancy(ctx: RoomCtx): void {
   else if (o < range[0] && ['living', 'bedroom', 'kids', 'office'].includes(ctx.type)) ctx.add('E1', 'L', `Der Raum wirkt mit ${pct} % Möbelfläche eher leer, wohnlich sind ab ${Math.round(range[0] * 100)} %.`, [], ctx.an.polygon[0]);
 }
 
+/** Walking width of the free-floor measure (Q1): one person, 45 cm. */
+export const NAV_RADIUS = 0.225;
+/** Below this share the free floor is in pieces (warning), below NAV_BAD it is plainly cut up. */
+export const NAV_WARN = 0.9;
+export const NAV_BAD = 0.8;
+/** A cut-off scrap smaller than this (m²) is a niche, not a lost corner. */
+const NAV_MIN_CUT = 0.6;
+
+/**
+ * Q1 / E7 (L, M): is the free floor one piece? NAV = largest connected free patch / all free floor
+ * (45 cm walking width, PhyScene/SceneEval). Below 0.9 something cuts the room up (a corner behind a
+ * wardrobe, a strip between sofa and wall that nobody gets into): L, below 0.8 M. Cut-off floor of
+ * less than 0.6 m² is a niche and not reported. Returns the share for the key figures.
+ */
+export function checkNav(ctx: RoomCtx): number {
+  const { share, cut, at } = ctx.grid.connectedShare(NAV_RADIUS);
+  if (share < NAV_WARN - 1e-9 && cut >= NAV_MIN_CUT)
+    ctx.add('E7', share < NAV_BAD ? 'M' : 'L', `Der freie Boden zerfällt in Teile: nur ${Math.round(share * 100)} % davon hängen zusammen, ${cut.toFixed(1)} m² sind abgeschnitten (Ecke oder Streifen, in die man nicht kommt).`, [], at);
+  return share;
+}
+
 /** Room types whose floor should be furnished evenly (E6); the solver uses it too. */
 export const BALANCED: ReadonlySet<RoomType> = new Set<RoomType>(['living', 'bedroom', 'kids', 'office', 'dining']);
 

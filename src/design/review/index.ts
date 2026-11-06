@@ -10,7 +10,7 @@ import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary 
 import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
 import { checkBackGap, checkBeds, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs, checkWallArt } from './decorRules';
-import { checkBalance, checkFocus, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
+import { checkBalance, checkFocus, checkNav, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
 import { RoomCtx, type ReviewInput } from './context';
 
 export type { ReviewInput, ReviewOptions } from './context';
@@ -47,13 +47,14 @@ function run(ctx: RoomCtx): RoomReview {
   checkOccupancy(ctx);
   checkBalance(ctx);
   checkOpenPatch(ctx);
+  const nav = checkNav(ctx);
   checkZones(ctx);
   checkTogether(ctx);
   checkPalette(ctx);
   checkStyle(ctx);
   checkFocus(ctx);
   const findings = [...ctx.findings].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
-  const metrics: RoomMetrics = { occupancy: occupancy(ctx), ...walks, dropped: ctx.layout.dropped.length };
+  const metrics: RoomMetrics = { occupancy: occupancy(ctx), ...walks, dropped: ctx.layout.dropped.length, nav };
   return { roomId: ctx.roomId, findings, score: roomScore(findings), passed: passes(findings), metrics };
 }
 

@@ -453,6 +453,8 @@ export interface RoomMetrics {
   walkFurnished: number;
   /** Programme pieces that could not be placed. */
   dropped: number;
+  /** NAV (Q1): largest connected free patch of floor / all free floor at 45 cm walking width (0–1). */
+  nav: number;
 }
 
 export interface RoomReview {
