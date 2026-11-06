@@ -168,3 +168,18 @@ describe('C9 eingeklemmt', () => {
     expect(has(sc({ type: 'bedroom', items: [put('generic-bed-140', { x: 3.1, y: 1.025, face: 'S' }), put('generic-nightstand', { x: 2.1, y: 0.19, face: 'S' })] }), 'C9')).toBe(false);
   });
 });
+
+describe('R10 Zonen getrennt', () => {
+  // round table 110 at (1.5, 2), a chair east of it facing west, an armchair `gap` metres east of the chair's back
+  const zones = (gap: number) => {
+    const table = put('generic-dining-table-4', { x: 1.5, y: 2, face: 'S', id: 't' });
+    const chair = put('generic-chair', { x: 2.3, y: 2, face: 'W', parent: 't' });
+    const back = chair.x + chair.depth / 2;
+    const arm = put('generic-armchair', { x: back + gap + 0.41, y: 2, face: 'O' });
+    return review({ room: rectRoom(6, 4, { doors: [{ wall: 'S', at: 5.5 }] }), type: 'living', items: [table, chair, arm] });
+  };
+  it('a dining chair 24 cm from an armchair is light, 70 cm apart is fine (test flat B, 6.11.)', () => {
+    expect(zones(0.24).findings.find((f) => f.rule === 'R10')?.severity).toBe('L');
+    expect(has(zones(0.7), 'R10')).toBe(false);
+  });
+});

@@ -233,3 +233,28 @@ export function checkWedged(ctx: RoomCtx): void {
       if (gap > 0.05 && gap < 0.2) ctx.add('C9', 'M', `Zwischen ${ctx.label(p)} und ${ctx.label(q)} sind nur ${cm(gap)} cm, da passt niemand durch und man kommt schlecht an beide heran.`, [p, q], { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
     }
 }
+
+/** Least passage between a dining chair and a seat of another group (R10). */
+export const ZONE_GAP = 0.6;
+
+/**
+ * R10 (L): the dining place and the seating group (or a reading chair) run into each other: a
+ * dining chair less than 60 cm from a sofa or armchair that does not belong to its table. Seen in
+ * the image review of test flat B (6.11.): the armchair 24 cm behind a dining chair.
+ */
+export function checkZonesApart(ctx: RoomCtx): void {
+  const chairs = ctx.items.filter((i) => i.floor && i.role === 'seat' && !!i.parent && ctx.parentOf(i)?.role === 'table');
+  const lounge = ctx.items.filter((i) => i.floor && (i.role === 'sofa' || i.role === 'armchair'));
+  // one finding per room, at the closest pair: it is one decision (where the two zones lie), not one per chair
+  let worst: { c: RItem; s: RItem; gap: number } | null = null;
+  for (const c of chairs)
+    for (const s of lounge) {
+      if (c.existing && s.existing) continue;
+      const gap = polyDist(c.poly, s.poly);
+      if (gap < ZONE_GAP - 1e-6 && (!worst || gap < worst.gap)) worst = { c, s, gap };
+    }
+  if (worst) {
+    const { c, s, gap } = worst;
+    ctx.add('R10', 'L', `Essplatz und Sitzbereich stoßen aneinander: zwischen ${ctx.label(c)} und ${ctx.label(s)} sind nur ${cm(Math.max(0, gap))} cm; zwischen zwei Zonen bleibt ein Durchgang von 60–90 cm.`, [c, s], { x: (c.x + s.x) / 2, y: (c.y + s.y) / 2 });
+  }
+}

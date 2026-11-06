@@ -376,6 +376,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   if (kitchen?.length) {
     const mods = kitchen.flatMap((k) => k.modules.map((m) => lookup(m) ?? findCatalogItem(m)!));
     for (const [type, label] of [['sink', 'Spüle'], ['fridge', 'Kühlschrank']] as const) if (!mods.some((m) => m.kitchen?.type === type)) problems.push(`Die Küchenzeile hat keine ${label}.`);
+    // enough storage for everyday cooking (K7): the run under the window of test flat B had 80 cm of cupboards
+    const storage = kitchenStorage(kitchen, room);
+    if (room.area >= KITCHEN_STORAGE_FROM && storage < KITCHEN_STORAGE_MIN)
+      problems.push(
+        `Zu wenig Stauraum in der Küche (K7): nur etwa ${cm(storage)} cm Schrankfront (Unterschränke ohne Geräte, Spüle halb, Hochschrank 2,5-fach, Oberschränke 0,6-fach; unter einem Fenster hängt kein Oberschrank). Mindestens ${cm(KITCHEN_STORAGE_MIN)} cm: eine längere Zeile mit Schubladenschränken, ein Hochschrank (generic-k-tall-60) neben dem Kühlschrank oder eine L-Küche über die Ecke an eine Wand ohne Fenster.`,
+      );
   }
 
   const parsed: RoomProgram = {
@@ -469,6 +475,40 @@ function parseKitchen(raw: unknown, f: ProgramFacts, problems: string[], notes: 
   }
   return out;
 }
+
+/** Storage a planned kitchen offers (K7), as metres of base-cabinet front: a tall unit holds about 2.5 base units, a wall cabinet 0.6, the sink cabinet half. */
+export function kitchenStorage(kitchen: readonly KitchenRun[], room: RoomAnalysis): number {
+  let total = 0;
+  let hood = false;
+  for (const run of kitchen) {
+    const wall = room.walls.find((w) => w.id === run.wall);
+    if (!wall) continue;
+    const dir = dot(sub(run.to, run.from), wall.dir) >= 0 ? 1 : -1;
+    let t = dot(sub(run.from, wall.a), wall.dir);
+    const windows = wall.openings.filter((o) => o.kind === 'window');
+    for (const id of run.modules) {
+      const m = findCatalogItem(id);
+      const w = m?.width ?? 0;
+      const lo = dir > 0 ? t : t - w;
+      const hi = dir > 0 ? t + w : t;
+      t += dir * w;
+      const type = m?.kitchen?.type;
+      if (type === 'base') total += w;
+      else if (type === 'sink') total += 0.5 * w;
+      else if (type === 'tall') total += 2.5 * w;
+      // the app hangs a wall cabinet over base, sink, dishwasher and oven where no window is (one hood instead over the cooktop)
+      if (type && ['base', 'sink', 'dishwasher', 'oven'].includes(type) && !windows.some((o) => o.t1 > lo + 0.05 && o.t0 < hi - 0.05)) {
+        if (!hood && (type === 'oven' || type === 'base')) hood = true;
+        else total += 0.6 * w;
+      }
+    }
+  }
+  return total;
+}
+
+/** Least kitchen storage (K7) in a room of at least `KITCHEN_STORAGE_FROM` m² where the kitchen is planned new. */
+export const KITCHEN_STORAGE_MIN = 2.0;
+const KITCHEN_STORAGE_FROM = 8;
 
 /** Room types asked with the strongest model when thorough: main rooms; small rooms go to Sonnet. */
 const MAIN_TYPES: RoomType[] = ['living', 'bedroom', 'kids', 'kitchen', 'dining', 'office'];

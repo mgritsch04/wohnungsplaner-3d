@@ -3,7 +3,7 @@ import { fromRoomCm, rotationForSide } from '../coords';
 import { RECORDED, type RawKitchen, type RawProgram } from '../fixtures/recorded';
 import type { RelationKind } from '../types';
 import { parseFlatConcept, roomConceptOf } from './flatConcept';
-import { buildRoomProgramPrompt, existingLabels, parseRoomProgram, programModel, type RoomProgramInput } from './roomProgram';
+import { buildRoomProgramPrompt, existingLabels, KITCHEN_STORAGE_MIN, kitchenStorage, parseRoomProgram, programModel, type RoomProgramInput } from './roomProgram';
 import { testFlatInput } from './testFlats';
 
 const flats = { A: testFlatInput('A'), B: testFlatInput('B') };
@@ -67,7 +67,8 @@ describe('parseRoomProgram on the recorded answers', () => {
         const r = parseRoomProgram(recorded(key, name), i);
         // B's bath has a kitchen wall cabinet over the dryer: the one thing to repair
         if (key === 'B' && name === 'Bad') expect(r.problems).toEqual(['Teil „wallcab“: Küchenmodule (generic-k-wall-60) gehören in "kitchen", nicht in "items".']);
-        else expect(r.problems, `${key} ${name}`).toEqual([]);
+        // the recorded answers predate the storage check K7: the Wohnküche of B has too little (see below)
+        else expect(r.problems.filter((x) => !x.includes('(K7)')), `${key} ${name}`).toEqual([]);
         expect(r.value.roomId).toBe(i.room.roomId);
         expect(r.value.items.length, `${key} ${name}`).toBeGreaterThan(3);
         for (const rel of r.value.relations) expect(VOCABULARY).toContain(rel.kind);
@@ -126,7 +127,7 @@ describe('answers recorded with these prompts (C–F)', () => {
         const raw = run.programs[room.name];
         expect(raw, `${key} ${room.name}`).toBeDefined();
         const p = parseRoomProgram(raw, { project: f.project, concept: c.value, room, sketch: '', wishes: f.wishes });
-        expect(p.problems, `${key} ${room.name}`).toEqual([]);
+        expect(p.problems.filter((x) => !x.includes('(K7)')), `${key} ${room.name}`).toEqual([]);
       }
     }
   });
@@ -218,6 +219,22 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(r.value.items.some((it) => it.id === 'vk1')).toBe(false);
     expect(r.value.relations.some((x) => x.kind === 'window' && x.window === win!.id && r.value.items.find((it) => it.id === x.item)?.catalogId === 'generic-curtain')).toBe(false);
     expect(r.notes.some((n) => n.startsWith('Keine bodenlangen Vorhänge'))).toBe(true);
+  });
+
+  it('asks for more kitchen storage where a new run has too little (K7)', () => {
+    // B: the run lies under the window, no wall cabinets there, two narrow base units
+    const b = parseRoomProgram(recorded('B', 'Wohnküche'), input('B', 'Wohnküche'));
+    expect(b.problems.some((p) => p.startsWith('Zu wenig Stauraum in der Küche (K7)'))).toBe(true);
+    expect(kitchenStorage(b.value.kitchen!, input('B', 'Wohnküche').room)).toBeLessThan(KITCHEN_STORAGE_MIN);
+    // A: a long run at a wall without a window, with wall cabinets over it
+    const a = parseRoomProgram(recorded('A', 'Küche'), input('A', 'Küche'));
+    expect(a.problems.some((p) => p.includes('(K7)'))).toBe(false);
+    // a tall unit beside the fridge is worth two and a half base units
+    const tall = recorded('B', 'Wohnküche');
+    (tall.kitchen as RawKitchen).modules.push('generic-k-tall-60');
+    (tall.kitchen as RawKitchen).to = [588, 31];
+    const t = parseRoomProgram(tall, input('B', 'Wohnküche'));
+    expect(kitchenStorage(t.value.kitchen!, input('B', 'Wohnküche').room)).toBeGreaterThan(kitchenStorage(b.value.kitchen!, input('B', 'Wohnküche').room) + 1.4);
   });
 
   it('far too many pieces and an empty answer', () => {
