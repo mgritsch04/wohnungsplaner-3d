@@ -240,6 +240,9 @@ test('Smart Home (#253): Router setzen, WLAN-Abdeckung im Plan, Wert je Raum, zw
   await expect(page.getByTestId('wifi-overlay')).toHaveCount(0);
   await panel.getByLabel('Abdeckung im Plan anzeigen').check();
   await expect(page.getByTestId('wifi-overlay')).toBeVisible();
+  // since #492 the default view is the data rate on the best band; this test checks the 2.4-GHz signal
+  await panel.getByLabel('Ansicht').selectOption('signal');
+  await panel.getByLabel('Band').selectOption('2.4');
   await expect(panel.getByTestId('wifi-hint')).toContainText('Messen mit dem Handy ersetzt das nicht');
   const rooms = (await getProject(page)).rooms.map((r) => r.name);
   await expect(panel.getByTestId('wifi-room')).toHaveCount(rooms.length);
@@ -268,6 +271,7 @@ test('Smart Home (#253): Router setzen, WLAN-Abdeckung im Plan, Wert je Raum, zw
   await left.getByRole('button', { name: 'Smart Home' }).click();
   expect((await getProject(page)).devices.filter((d) => d.kind === 'router')).toHaveLength(2);
   await panel.getByLabel('Abdeckung im Plan anzeigen').check();
+  await panel.getByLabel('Ansicht').selectOption('signal');
   await panel.getByLabel('Band').selectOption('2.4');
   expect(await dbm(weakest)).toBe(improved);
   await expect(page.getByTestId('wifi-overlay')).toBeVisible();
