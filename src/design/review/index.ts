@@ -8,7 +8,7 @@ import type { Finding, RoomMetrics, RoomReview, Review } from '../types';
 import { flatScore, passes, roomScore } from '../score';
 import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary } from './functionRules';
 import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
-import { checkBackGap, checkBeds, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
+import { checkBackGap, checkBeds, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs, checkWallArt } from './decorRules';
 import { checkBalance, checkFocus, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
 import { RoomCtx, type ReviewInput } from './context';
@@ -31,6 +31,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkBackGap(ctx);
   checkTv(ctx);
   checkDining(ctx);
+  checkCookAisle(ctx);
   checkDesk(ctx);
   checkTall(ctx);
   checkWallFit(ctx);

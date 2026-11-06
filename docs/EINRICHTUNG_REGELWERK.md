@@ -43,6 +43,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | E2 | H | Hinter Stühlen 90 cm bis zur Wand oder zum nächsten Möbel; wo jemand dahinter vorbeigeht, 110–120 cm. | Stuhl zurückschieben und aufstehen. | Room & Board, Ruggable | Prompt, Löser, Begehung |
 | E3 | W | Pendelleuchte mittig über der Tischmitte (nicht über der Raummitte), Unterkante 60–70 cm über der Tischplatte; Ø ⅓–½ der Tischbreite; ab 180 cm Tischlänge zwei Pendel oder eine Linearleuchte. | Licht auf den Tisch, ohne zu blenden oder die Sicht zu verstellen. | Louis Poulsen, Artika | Prompt, Löser, Begehung |
 | E4 | T | Teppich unter dem Esstisch je Seite 60 cm größer als der Tisch, damit die Stühle beim Zurückschieben darauf bleiben; sonst lieber keiner. | Stühle kippen sonst an der Kante. | Ruggable, Rug Love | Prompt |
+| WK3 | H | Esstisch und seine Stuhlzone (60 cm auf den Seiten mit Stühlen) schneiden den Arbeitsgang vor der Küchenzeile nicht (mindestens 100 cm frei); bei offener Wohnküche den Tisch seitlich versetzt oder um 90° gedreht stellen. | Wer den Stuhl zurückschiebt, steht sonst im Weg des Kochs, und Schubladen und Geschirrspüler lassen sich nicht öffnen. | Ableitung aus NKBA/K4 und E2 | Prompt, Begehung |
 
 ## Küche
 

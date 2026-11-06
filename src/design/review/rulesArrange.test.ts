@@ -158,6 +158,26 @@ describe('C4 Esstisch', () => {
     expect(has(kitchen(1.35), 'C4', /Arbeitsgang/)).toBe(true);
     expect(has(kitchen(2.5), 'C4', /Arbeitsgang/)).toBe(false);
   });
+  it('WK3: the chair zone of the table must not cut the aisle in front of the kitchen run', () => {
+    const kitchen = (tableY: number) =>
+      review({
+        room: rectRoom(4, 4, { doors: [{ wall: 'W', at: 2 }] }),
+        type: 'kitchen',
+        items: [
+          put('generic-k-base-60', { x: 1.0, y: 0.3, face: 'S' }),
+          put('generic-k-base-60', { x: 1.6, y: 0.3, face: 'S' }),
+          put('generic-dining-table-4', { x: 1.6, y: tableY, face: 'S' }),
+          put('generic-chair', { x: 1.2, y: tableY - 0.6, face: 'S' }),
+          put('generic-chair', { x: 2.0, y: tableY - 0.6, face: 'S' }),
+          put('generic-chair', { x: 1.2, y: tableY + 0.6, face: 'N' }),
+          put('generic-chair', { x: 2.0, y: tableY + 0.6, face: 'N' }),
+        ],
+      });
+    // table edge 1.45 m from the run: out of the aisle, but the chairs on the kitchen side reach into it
+    expect(has(kitchen(2.2), 'C4', /Arbeitsgang/)).toBe(true);
+    // far enough away: no finding
+    expect(has(kitchen(3.0), 'C4', /Arbeitsgang/)).toBe(false);
+  });
 });
 
 describe('C5 Schreibtisch', () => {
