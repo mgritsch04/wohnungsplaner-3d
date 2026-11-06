@@ -218,6 +218,50 @@ export function checkPalette(ctx: RoomCtx): void {
   }
 }
 
+/** Light reflectance value (0–100) of a #rrggbb colour: the relative luminance Y of sRGB times 100. */
+export function lrv(hex: string): number | null {
+  const c = rgb(hex);
+  if (!c) return null;
+  const lin = c.map((v) => {
+    const x = v / 255;
+    return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 100 * (0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]);
+}
+
+/** FM2: a big piece whose lightness differs from the floor by this many LRV points looks „almost the same“. */
+export const CONTRAST_NEAR: [number, number] = [5, 15];
+
+/** Big pieces that carry the picture: sofa, bed, wardrobe, rug of 2 m² and more. */
+function bigForColour(i: RItem): boolean {
+  if (i.role === 'rug') return i.width * i.depth >= 2;
+  if (!i.floor) return false;
+  if (i.role === 'sofa' || i.shape === 'bed') return true;
+  return (i.shape === 'wardrobe' || i.tags.includes('schrank')) && i.width >= 0.9 && i.height >= 1.4;
+}
+
+/**
+ * E8 (L, FM2): big pieces against the floor: an LRV difference of 5–15 points is „almost the same“
+ * (the piece vanishes in the floor or looks like a mistake); equal (below 5, tone on tone) or clearly
+ * different (20 and more) is fine. One finding per room: the colour scheme is one decision. Only when the
+ * floor colour of the room is known (`ReviewInput.floorColor`): a guessed floor would give false findings.
+ */
+export function checkFloorContrast(ctx: RoomCtx): void {
+  const floor = ctx.floorColor ? lrv(ctx.floorColor) : null;
+  if (floor === null) return;
+  const near: { it: RItem; d: number }[] = [];
+  for (const it of ctx.items) {
+    if (!bigForColour(it)) continue;
+    const c = lrv(ctx.program?.items.find((p) => p.id === it.id)?.color ?? it.color ?? '');
+    if (c === null) continue;
+    const d = Math.abs(c - floor);
+    if (d >= CONTRAST_NEAR[0] && d <= CONTRAST_NEAR[1]) near.push({ it, d });
+  }
+  if (!near.length) return;
+  const list = near.map(({ it, d }) => `${ctx.label(it)} (${Math.round(d)} Punkte)`).join(', ');
+  ctx.add('E8', 'L', `Beim Boden fast gleich hell, aber nicht gleich: ${list}. Große Möbel verschwinden so im Boden oder wirken zufällig; entweder ganz Ton in Ton oder mindestens 20 Helligkeitspunkte Unterschied (FM2).`, near.map((n) => n.it), near[0].it);
+}
+
 /** Wood words in a label, by tone (Nussbaum and Walnuss are one wood). */
 const WOODS: [RegExp, string][] = [
   [/eiche/i, 'Eiche'],

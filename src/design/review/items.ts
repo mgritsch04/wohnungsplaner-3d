@@ -17,6 +17,8 @@ export interface RItem extends PlacedItem {
   shape: string;
   category: string;
   tags: string[];
+  /** Catalogue colour (#rrggbb). */
+  color?: string;
   /** Kitchen module type (`sink`, `cooktop`, `fridge`, `base` …) for kitchen pieces. */
   kitchen?: string;
   poly: Vec2[];
@@ -45,6 +47,7 @@ export function toRItem(it: PlacedItem, existing: boolean, extra: CatalogItem[])
     shape,
     category,
     tags: cat?.tags ?? [],
+    color: cat?.color,
     kitchen: cat?.kitchen?.type ?? (shape.startsWith('k-') ? shape.slice(2) : undefined),
     poly: footprint({ x: it.x, y: it.y, rotation: it.rotation, width: it.width, depth: it.depth }),
     front: frontVec(it.rotation),
