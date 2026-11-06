@@ -130,6 +130,9 @@ describe('D7 Vorhang', () => {
       living([sofa, put('generic-curtain', { x: 1.6, y: 0.05, face: 'S', width: 0.49 }), put('generic-curtain', { x: 3.4, y: 0.05, face: 'S', width: 0.49 }), put('generic-shelf-80', { x: shelfX, y: 0.15, face: 'S' })]);
     expect(has(pair(3.6), 'D7', /Weg von/)).toBe(true);
     expect(has(pair(4.3), 'D7', /Weg von/)).toBe(false);
+    // a desk pushed into the curtain too (test flat B, bedroom)
+    const desk = living([sofa, put('generic-curtain', { x: 1.6, y: 0.05, face: 'S', width: 0.49 }), put('generic-curtain', { x: 3.4, y: 0.05, face: 'S', width: 0.49 }), put('generic-desk', { x: 3.9, y: 0.35, face: 'S' })]);
+    expect(has(desk, 'D7', /Weg von/)).toBe(true);
   });
   it('a bedroom without darkening when the user wants one', () => {
     const bedroom = (curtain: boolean) =>
