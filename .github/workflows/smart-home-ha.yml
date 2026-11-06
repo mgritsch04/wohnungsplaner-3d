@@ -29,6 +29,7 @@ jobs:
           cache: pip
           cache-dependency-path: scripts/ha/requirements.txt
       - run: pip install -r scripts/ha/requirements.txt
-      # the demo camera needs the TurboJPEG library, otherwise the whole `demo:` integration fails to set up
-      - run: sudo apt-get update && sudo apt-get install -y libturbojpeg
+      # the demo camera needs the TurboJPEG library, otherwise the whole `demo:` integration fails to set up;
+      # Ubuntu 26.04 (ubuntu-latest since Nov 2026) names the package libturbojpeg0, older images libturbojpeg
+      - run: sudo apt-get update && (sudo apt-get install -y libturbojpeg0 || sudo apt-get install -y libturbojpeg)
       - run: scripts/ha/run-local.sh
