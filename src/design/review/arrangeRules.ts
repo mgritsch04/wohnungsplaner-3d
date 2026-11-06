@@ -323,8 +323,11 @@ export function checkBackGap(ctx: RoomCtx): void {
   for (const i of ctx.placed) {
     if (!i.floor || !(i.role === 'sofa' || i.category === 'desk')) continue;
     const behind = ctx.freeDepth(i, 'back', 0.8);
-    if (behind.blocker === 'wall' && behind.depth >= 0.15 - 1e-6 && behind.depth <= 0.7 + 1e-6)
-      ctx.add('C8', 'L', `Hinter ${ctx.label(i)} bleiben ${cm(behind.depth)} cm bis zur Wand: zu schmal für einen Gang, zu breit für „an der Wand“.`, [i], i);
+    if (behind.blocker && behind.depth >= 0.15 - 1e-6 && behind.depth <= 0.7 + 1e-6) {
+      // W9: also a strip between the sofa and the next piece (plant bench, shelf) is neither passage nor wall
+      const what = behind.blocker === 'wall' ? 'bis zur Wand' : `bis zum nächsten Möbel (${ctx.label(behind.blocker)})`;
+      ctx.add('C8', 'L', `Hinter ${ctx.label(i)} bleiben ${cm(behind.depth)} cm ${what}: zu schmal für einen Gang, zu breit für „an der Wand“.`, [i], i);
+    }
   }
 }
 

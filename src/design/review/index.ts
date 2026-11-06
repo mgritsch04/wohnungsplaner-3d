@@ -11,6 +11,7 @@ import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
 import { checkBackGap, checkBeds, checkCallBackground, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs, checkWallArt } from './decorRules';
 import { checkBalance, checkFloorContrast, checkFocus, checkNav, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
+import { checkArmchairToTable, checkBedSides, checkCoffeeTableSize, checkRugInCookAisle, checkRugOverhang, checkTvGlare } from './groupRules';
 import { RoomCtx, type ReviewInput } from './context';
 
 export type { ReviewInput, ReviewOptions } from './context';
@@ -41,6 +42,12 @@ function run(ctx: RoomCtx): RoomReview {
   checkPlants(ctx);
   checkLight(ctx);
   checkRugs(ctx);
+  checkRugInCookAisle(ctx);
+  checkRugOverhang(ctx);
+  checkBedSides(ctx);
+  checkTvGlare(ctx);
+  checkArmchairToTable(ctx);
+  checkCoffeeTableSize(ctx);
   checkPictures(ctx);
   checkWallArt(ctx);
   checkCurtains(ctx);
