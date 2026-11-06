@@ -348,7 +348,9 @@ function deriveNode(m: Model, n: Node): void {
         const row = Math.floor(r.index / perRow);
         const c = at(-P.hw + (2 * P.hw * (col + 0.5)) / Math.min(perRow, r.count), -P.hd + Math.min(s.depth, 2 * P.hd) / 2);
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: Math.min(s.depth, 2 * P.hd) / 2, rotation: P.rotation };
-        n.elevation = p.elevation + 0.03 + row * 0.38;
+        // a still life goes on a board at eye level, boxes fill the shelf from the bottom (#436)
+        const decor = s.shape === 'decor' && s.category === 'decor';
+        n.elevation = p.elevation + 0.03 + (decor ? Math.max(0, Math.min(3, Math.floor((p.top - p.elevation - 0.4) / 0.38))) : row) * 0.38;
         return;
       }
       const row = onRow(m, n, P, parentNode);

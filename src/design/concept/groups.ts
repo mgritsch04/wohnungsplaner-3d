@@ -316,8 +316,14 @@ export function completeGroups(program: RoomProgram, type: RoomType, area: numbe
     // an armchair outside a seating group: a reading corner
     for (const a of anchors(['armchair']).filter((a) => !bound(c, a.id))) readingCorner(c, a, scope);
   }
-  // the room's main light (L1): a ceiling light that is not the pendant over a table
-  if ((BASIC_LIGHT.includes(type) || (MAIN_LIGHT.includes(type) && area >= 6)) && !c.items.some((i) => roleOfItem(c, i) === 'pendant' && !bound(c, i.id))) {
+  // the room's main light (L1): a ceiling light that is not the pendant over a table or desk; one
+  // Claude hung high over the seating group or the bed is that light already (two lamps in the
+  // image review of test flat A, 6.11.)
+  const overTask = (i: ProgramItem) => targetsOf(c, i.id).some((t) => {
+    const target = c.items.find((x) => x.id === t);
+    return !!target && (roleOfItem(c, target) === 'table' || lookup(c, target.catalogId)?.category === 'desk' || lookup(c, target.catalogId)?.kitchen !== undefined);
+  });
+  if ((BASIC_LIGHT.includes(type) || (MAIN_LIGHT.includes(type) && area >= 6)) && !c.items.some((i) => roleOfItem(c, i) === 'pendant' && (!bound(c, i.id) || !overTask(i)))) {
     const anchor = c.items.find((i) => i.required) ?? c.items[0];
     if (anchor) add(c, anchor, 'Grundlicht', 'generic-pendant', 'deckenlicht', 'Grundlicht des Raums an der Decke, warmweiß und dimmbar (L1, L3).');
   }

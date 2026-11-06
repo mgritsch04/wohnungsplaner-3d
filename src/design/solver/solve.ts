@@ -19,6 +19,8 @@ import { kitchenTops } from './kitchenTops';
 import { buildModel, detachUnit, runId, type Model, type Node, type Unit } from './model';
 import { Rng } from './rng';
 import { buildRoom, type FixedPiece } from './room';
+import { findCatalogItem } from '../../catalog/generic';
+import { roleOf } from '../../suggest/roomGeometry';
 import { candidates, hintPose, poseOf, randomMove, setPose, State, type Pose } from './search';
 
 export interface SolveOptions {
@@ -86,6 +88,43 @@ export function solveRoom(analysis: RoomAnalysis, program: RoomProgram, opts: So
   opts.trace?.(violations(st).map((v) => `${v.rule}: ${v.text} [${v.items.join(', ')}]`));
   const dropped = settle(st, seed);
   return toLayout(st, dropped, seed);
+}
+
+/** Seeds `solveBest` tries per programme (#436): the search lands in rather different places per seed. */
+export const BEST_OF = 3;
+
+/** Roles whose loss changes what the room can do (a TV, a table, a bed), not just how it looks. */
+const MAIN_ROLES = new Set(['bed', 'sofa', 'tv', 'tv-board', 'table', 'coffee-table', 'armchair', 'wall', 'corner']);
+
+/**
+ * Weight of the pieces a layout left out: a required piece weighs most, a TV, table or cabinet
+ * more than a picture, a plant or a lamp. Lower is better.
+ */
+export function droppedWeight(program: RoomProgram, layout: Layout, catalog: CatalogItem[] = []): number {
+  let w = 0;
+  for (const d of layout.dropped) {
+    const it = program.items.find((i) => i.id === d.id);
+    const item = catalog.find((c) => c.id === d.catalogId) ?? findCatalogItem(d.catalogId);
+    const role = item ? roleOf({ ...item, catalogId: item.id }) : null;
+    w += it?.required ? 5 : role && MAIN_ROLES.has(role) && item?.category !== 'decor' ? 2 : item && ['decor', 'lighting', 'textile', 'plant'].includes(item.category) ? 0.3 : 1;
+  }
+  return w;
+}
+
+/**
+ * The best of `BEST_OF` seeds (#436): fewest and least important pieces left out, then the lowest
+ * remaining cost. One seed alone turned Claude's sofa round and lost the TV in a real run (test flat
+ * A, 6.11.), the next seed kept Claude's seating group as planned. Deterministic for a seed.
+ */
+export function solveBest(analysis: RoomAnalysis, program: RoomProgram, opts: SolveOptions & { tries?: number } = {}): Layout {
+  const seed = opts.seed ?? 1;
+  let best: { layout: Layout; key: number } | null = null;
+  for (let k = 0; k < Math.max(1, opts.tries ?? BEST_OF); k++) {
+    const layout = solveRoom(analysis, program, { ...opts, seed: seed + k * 1000 });
+    const key = droppedWeight(program, layout, opts.catalog) * 10 + layout.unsolved.length * HARD + layout.cost;
+    if (!best || key < best.key - 1e-9) best = { layout, key };
+  }
+  return { ...best!.layout, seed };
 }
 
 // ---------------------------------------------------------------------------------------------

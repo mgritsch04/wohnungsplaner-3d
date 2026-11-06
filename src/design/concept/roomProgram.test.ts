@@ -191,6 +191,15 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(parseRoomProgram(bed, input('B', 'Schlafzimmer')).problems.some((p) => p.includes('nicht gekocht'))).toBe(true);
   });
 
+  it('leaves out Claude\'s own light strips where the app hangs wall cabinets with strips (K5, test flat A 6.11.)', () => {
+    const raw = recorded('B', 'Wohnküche');
+    raw.items.push({ id: 'kl1', catalogId: 'generic-k-light', zone: raw.zones[0].id, x: 100, y: 20, facing: 'S', label: 'LED-Leiste', why: '' });
+    const r = parseRoomProgram(raw, input('B', 'Wohnküche'));
+    expect(r.value.items.some((it) => it.id === 'kl1')).toBe(false);
+    expect(r.problems.some((p) => p.includes('kl1'))).toBe(false);
+    expect(r.notes.some((n) => n.startsWith('Lichtleisten'))).toBe(true);
+  });
+
   it('far too many pieces and an empty answer', () => {
     const raw = recorded('A', 'Gang');
     const base = raw.items[0];

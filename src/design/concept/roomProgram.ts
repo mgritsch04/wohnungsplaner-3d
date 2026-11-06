@@ -144,7 +144,7 @@ ${input.image ? 'Das Bild zeigt denselben Raum leer von oben, mit Wänden, Türe
 Raumfakten:
 ${roomFacts(room, project, concept)}
 ${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}
-${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
+${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke mit Lichtleisten, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
 Küchenmodule (nur in "kitchen"):
 ${summarizePlaceholders(KITCHEN_MODULES)}
 ` : all.some((f) => !!f.kitchen) ? 'Die Küchenzeile ist vorhanden (Bestand): keine neue planen, nur Essplatz und Rest.\n' : ''}
@@ -279,6 +279,13 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
       const same = f.existing.find((x) => x.label === id || x.f.id === id || shapeOf(x.f) === t.shape);
       if (same) duplicateOf.set(id, same.label);
       else leftOut.add(id);
+      continue;
+    }
+    // the app hangs a light strip under every wall cabinet it adds (K5); Claude's own strips came
+    // on top of them, twice the light on one worktop (test flat A, 6.11.)
+    if (c.id === 'generic-k-light' && plansKitchen(f.rc, f.all)) {
+      if (!notes.some((n) => n.startsWith('Lichtleisten'))) notes.push('Lichtleisten unter den Oberschränken setzt die App, Claudes eigene nicht übernommen.');
+      leftOut.add(id);
       continue;
     }
     if (isKitchenModule(c)) {

@@ -6,7 +6,7 @@ import type { FlatKey } from '../fixtures/flats';
 import { RECORDED } from '../fixtures/recorded';
 import type { Layout, RoomAnalysis } from '../types';
 import type { FixedPiece } from './room';
-import { existingPieces, solveRoom } from './solve';
+import { droppedWeight, existingPieces, solveBest, solveRoom } from './solve';
 import { independentCheck } from './verify';
 
 interface Case {
@@ -69,6 +69,21 @@ describe('solver on the recorded programmes of test flats A–F', () => {
     const b = c.run().layout;
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
   });
+
+  it('solveBest is never worse than its first seed and stays deterministic (#436)', () => {
+    const f = testFlatInput('A');
+    const concept = parseFlatConcept(RECORDED.A!.concept, f).value;
+    for (const [name, raw] of Object.entries(RECORDED.A!.programs)) {
+      const room = f.analysis.rooms.find((r) => r.name === name)!;
+      const existing = existingPieces(f.project, room);
+      const program = parseRoomProgram(raw, { project: f.project, concept, room, sketch: '', wishes: f.wishes }).value;
+      const one = solveRoom(room, program, { existing, seed: 7 });
+      const best = solveBest(room, program, { existing, seed: 7 });
+      const key = (l: Layout) => droppedWeight(program, l) * 10 + l.unsolved.length * 4 + l.cost;
+      expect(key(best), name).toBeLessThanOrEqual(key(one) + 1e-9);
+      expect(JSON.stringify(solveBest(room, program, { existing, seed: 7 }))).toBe(JSON.stringify(best));
+    }
+  }, 60_000);
 
   it('needs well under 300 ms per room on average', () => {
     for (const c of all) get(c);
