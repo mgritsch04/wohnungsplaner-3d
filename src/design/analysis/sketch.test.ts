@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { findCatalogItem } from '../../catalog/generic';
+import { createFurnitureFromCatalog } from '../../catalog/instantiate';
 import { FLAT_KEYS, TEST_FLATS } from '../fixtures/flats';
 import { analyzeFlat } from './flat';
 import { flatSketch, roomSketch } from './sketch';
@@ -55,5 +57,20 @@ describe('Raumskizze, Inhalt', () => {
     expect(text).toContain('8 Wände, teils schräg');
     expect(text.match(/schräge Wand/g)).toHaveLength(2);
     expect(text.match(/springt in den Raum vor/g)).toHaveLength(2);
+  });
+});
+
+describe('Raumskizze, Blickziel (#436)', () => {
+  it('an existing sofa says what it looks at, worked out by the code', () => {
+    const project = TEST_FLATS.B.build();
+    const home = analyzeFlat(project).rooms.find((r) => r.name === 'Wohnküche')!;
+    const south = home.walls.find((w) => w.side === 'S')!;
+    // sofa with its back to the south wall, looking north
+    const f = createFurnitureFromCatalog(findCatalogItem('generic-sofa-3')!, { x: south.a.x - 3.2, y: south.a.y - 0.45, rotation: Math.PI });
+    f.existing = true;
+    project.furniture.push(f);
+    const flat = analyzeFlat(project);
+    const text = roomSketch({ project, flat }, flat.rooms.find((r) => r.name === 'Wohnküche')!);
+    expect(text).toMatch(/Bestand \(bleibt stehen, nicht neu planen\): Sofa 3-Sitzer.*Front nach [NOSW], schaut auf: /);
   });
 });

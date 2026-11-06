@@ -10,6 +10,7 @@ import { dot, sub, type Vec2 } from '../../model/vec';
 import { frontOf } from '../../suggest/roomGeometry';
 import { sideOfVector, toRoomCm } from '../coords';
 import type { FlatAnalysis, RoomAnalysis, Side, WallInfo, WallOpening } from '../types';
+import { gazeOf, gazePieceOf, hasGaze, type GazePiece } from './gaze';
 
 const SIDE_WORD: Record<Side, string> = { N: 'Nord', O: 'Ost', S: 'Süd', W: 'West' };
 const SIDE_TO: Record<Side, string> = { N: 'Norden', O: 'Osten', S: 'Süden', W: 'Westen' };
@@ -108,12 +109,15 @@ function backWall(a: RoomAnalysis, f: Furniture): WallInfo | undefined {
 }
 
 /** Where a piece stands: centre, size, the wall its back is against and where its front faces. */
-function pieceText(a: RoomAnalysis, f: Furniture): string {
+function pieceText(a: RoomAnalysis, f: Furniture, others: readonly GazePiece[] = []): string {
   const p = toRoomCm(a.origin, f);
   const wall = backWall(a, f);
   const side = sideOfVector(frontOf(f), 30);
   const hung = f.elevation > 0.3 ? `, hängt ab ${cm(f.elevation)} cm Höhe` : '';
-  return `${f.name} (${cm(f.width)} × ${cm(f.depth)} cm) bei (${p.x},${p.y})${wall ? `, Rücken an ${wall.id}` : ''}${side ? `, Front nach ${side}` : ''}${hung}`;
+  const piece = gazePieceOf(f);
+  // what a seat, a bed or a desk looks at, worked out by the code (bed-north hallucination)
+  const gaze = hasGaze(piece) ? `, ${gazeOf(a, piece, others).text}` : '';
+  return `${f.name} (${cm(f.width)} × ${cm(f.depth)} cm) bei (${p.x},${p.y})${wall ? `, Rücken an ${wall.id}` : ''}${side ? `, Front nach ${side}` : ''}${gaze}${hung}`;
 }
 
 const FIXTURE_WORD: Record<string, string> = { radiator: 'Heizkörper', socket: 'Steckdose', switch: 'Lichtschalter', water: 'Wasseranschluss', drain: 'Abfluss' };
@@ -161,7 +165,8 @@ export function roomSketch(ctx: SketchContext, a: RoomAnalysis): string {
   const existing = ctx.project.furniture.filter((f) => a.existing.includes(f.id));
   const kitchen = existing.filter(isKitchen);
   const loose = existing.filter((f) => !isKitchen(f));
-  if (loose.length) lines.push(`Bestand (bleibt stehen, nicht neu planen): ${loose.map((f) => pieceText(a, f)).join('; ')}.`);
+  const seen = existing.map(gazePieceOf);
+  if (loose.length) lines.push(`Bestand (bleibt stehen, nicht neu planen): ${loose.map((f) => pieceText(a, f, seen)).join('; ')}.`);
   if (kitchen.length) {
     // the run along each wall: stretch and depth of the floor units standing with their back to it
     const floor = kitchen.filter((f) => f.elevation < 0.5 && f.kitchen?.type !== 'countertop');
