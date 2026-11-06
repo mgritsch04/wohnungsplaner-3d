@@ -29,6 +29,8 @@ export interface ReviewInput {
   program?: RoomProgram;
   /** Colours of the style plan (#rrggbb) for E4. */
   palette?: string[];
+  /** Colour of the floor (#rrggbb) for E8 (FM2); without it the rule is not checked. */
+  floorColor?: string;
   /** Products of the user, besides the generic catalogue. */
   catalog?: CatalogItem[];
   options?: ReviewOptions;
@@ -72,6 +74,7 @@ export class RoomCtx {
   readonly program?: RoomProgram;
   readonly options: ReviewOptions;
   readonly palette: string[];
+  readonly floorColor?: string;
   readonly layout: Layout;
   /** Products of the user, besides the generic catalogue. */
   readonly catalog: CatalogItem[];
@@ -91,6 +94,7 @@ export class RoomCtx {
     this.program = input.program;
     this.options = input.options ?? {};
     this.palette = input.palette ?? [];
+    this.floorColor = input.floorColor;
     this.layout = input.layout;
     const extra = input.catalog ?? [];
     this.catalog = extra;

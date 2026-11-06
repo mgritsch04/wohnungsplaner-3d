@@ -177,6 +177,7 @@ export interface Scenario {
   existing?: PlacedItem[];
   program?: RoomProgram;
   palette?: string[];
+  floorColor?: string;
   options?: ReviewOptions;
   dropped?: Layout['dropped'];
 }
@@ -184,7 +185,7 @@ export interface Scenario {
 export function review(s: Scenario) {
   const layout = layoutOf(s.room.roomId, s.items);
   layout.dropped = s.dropped ?? [];
-  const input: ReviewInput = { analysis: s.room, type: s.type, layout, existing: s.existing, program: s.program, palette: s.palette, options: s.options };
+  const input: ReviewInput = { analysis: s.room, type: s.type, layout, existing: s.existing, program: s.program, palette: s.palette, floorColor: s.floorColor, options: s.options };
   return reviewRoom(input);
 }
 
