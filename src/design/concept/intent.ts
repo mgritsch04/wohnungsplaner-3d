@@ -7,7 +7,8 @@
  * names what already breaks a rule there: the television not opposite the sofa or far off it (W5), the sofa
  * looking at the kitchen run (W10), dining chairs without room to the wall (E2), a half of the room or a
  * wide patch of floor left empty (E6; in all six benchmark rooms with E6 the plan itself left it empty,
- * 6.11.), a rug under the bed too short across it or off its middle (S5). These go back to Claude with the other problems of the answer (one repair round); a finding
+ * 6.11.), a rug under the bed too short across it or off its middle (S5), a piece in the way between
+ * two doors (B2). These go back to Claude with the other problems of the answer (one repair round); a finding
  * the solver causes later is not Claude's to fix.
  */
 import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
@@ -16,7 +17,9 @@ import type { Furniture } from '../../model/schema';
 import { dist, sub, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
+import { checkWalkways } from '../analysis';
 import { reviewRoom } from '../review';
+import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
 import { tvRange } from '../tvDistance';
 import type { PlacedItem, ProgramItem, RoomAnalysis, RoomProgram } from '../types';
@@ -160,6 +163,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
     }
   problems.push(...rugUnderBed(pieces, products));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
+  if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
   return problems;
 }
 
@@ -182,21 +186,24 @@ function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]
       const half = halfAlong(rug, across);
       // under the bed: spans it across and lies under its lower part, not a runner beside it
       if (Math.abs(u) > bed.width / 2 || half < bed.width * 0.4 || Math.abs(v) > bed.depth / 2 + halfAlong(rug, bed.front) - 0.15) continue;
+      const cm = (m: number) => Math.round(Math.max(0, m) * 100);
+      // the solver turns the rug with its long side across the bed, so its long side counts
+      const long = Math.max(rug.width, rug.depth);
+      const longAcross = 2 * half >= long - 0.01;
       const left = half - u - bed.width / 2;
       const right = half + u - bed.width / 2;
-      if (Math.min(left, right) >= 0.39) continue;
-      const cm = (m: number) => Math.round(Math.max(0, m) * 100);
-      if (2 * half - bed.width >= 0.79) {
+      if (long - bed.width < 0.79) {
+        const need = bed.width + 0.8;
+        const fits = [...products, ...GENERIC_CATALOG]
+          .filter((c) => shapeOf(c) === 'rug' && Math.max(c.width, c.depth) >= need - 0.01 && Math.min(c.width, c.depth) >= 1.2)
+          .sort((a, b) => a.width * a.depth - b.width * b.depth)[0];
+        out.push(
+          `„${rug.id}“ unter „${bed.id}“ ist nach deinen Startplätzen zu klein (Bett ${cm(bed.width)} cm breit): selbst quer ragt er nur ${cm((long - bed.width) / 2)} cm heraus, schön sind 40 bis 60 cm auf beiden Seiten (S5). Einen Teppich mit mindestens ${cm(need)} cm Länge nehmen${fits ? ` (z. B. ${fits.id}, ${fits.name})` : ''}, mit der langen Seite quer unter das untere Bettdrittel, oder statt dessen zwei Bettvorleger links und rechts.`,
+        );
+      } else if (!longAcross)
+        out.push(`„${rug.id}“ liegt nach deinen Startplätzen längs unter „${bed.id}“, so ragt er seitlich nur ${cm(Math.min(left, right))} cm heraus (S5). Mit der langen Seite quer unter das untere Bettdrittel legen, dann sind es je ${cm((long - bed.width) / 2)} cm.`);
+      else if (Math.min(left, right) < 0.39)
         out.push(`„${rug.id}“ liegt nach deinen Startplätzen nicht mittig unter „${bed.id}“: er ragt auf einer Seite ${cm(Math.min(left, right))} cm, auf der anderen ${cm(Math.max(left, right))} cm heraus, schön sind 40 bis 60 cm auf beiden Seiten (S5). Mittig unter das untere Bettdrittel legen.`);
-        continue;
-      }
-      const need = bed.width + 0.8;
-      const fits = [...products, ...GENERIC_CATALOG]
-        .filter((c) => shapeOf(c) === 'rug' && Math.max(c.width, c.depth) >= need - 0.01 && Math.min(c.width, c.depth) >= 1.2)
-        .sort((a, b) => a.width * a.depth - b.width * b.depth)[0];
-      out.push(
-        `„${rug.id}“ ist für „${bed.id}“ (${cm(bed.width)} cm breit) zu klein: quer unter dem Bett ragt er nach deinen Startplätzen nur ${cm(Math.min(left, right))} cm heraus, schön sind 40 bis 60 cm auf beiden Seiten (S5). Einen Teppich mit mindestens ${cm(need)} cm quer zum Bett nehmen${fits ? ` (z. B. ${fits.id}, ${fits.name})` : ''}, mit der langen Seite quer unter das untere Bettdrittel, oder statt dessen zwei Bettvorleger links und rechts.`,
-      );
     }
   }
   return out;
@@ -211,16 +218,13 @@ const FILL: Partial<Record<RoomType, string>> = {
   dining: 'ein Sideboard oder eine Anrichte an der leeren Wand',
 };
 
-/** E6 on the start places: the walkthrough's own check on the plan as Claude drew it. */
-function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
-  const fill = FILL[type];
-  if (!fill) return [];
+/** The plan as the walkthrough sees it: the start places, the kitchen run as one block, the pieces already there. */
+function hintLayout(program: RoomProgram, room: RoomAnalysis, existing: readonly Furniture[], products: readonly CatalogItem[]): { items: PlacedItem[]; fixed: PlacedItem[] } {
   const items: PlacedItem[] = program.items.flatMap((it) => {
     const c = findCatalogItem(it.catalogId, [...products]);
     if (!c || !it.hint) return [];
     return [{ id: it.id, catalogId: it.catalogId, zone: it.zone, x: it.hint.x, y: it.hint.y, rotation: it.hint.rotation, elevation: c.elevation ?? 0, width: c.width, depth: c.depth, height: c.height }];
   });
-  // the kitchen run as one block along its wall
   for (const [k, run] of (program.kitchen ?? []).entries()) {
     const wall = room.walls.find((w) => w.id === run.wall);
     if (!wall) continue;
@@ -228,9 +232,48 @@ function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
     items.push({ id: `kitchen-${k}`, catalogId: 'generic-k-base-60', zone: '', x: (run.from.x + run.to.x) / 2 + wall.inward.x * 0.3, y: (run.from.y + run.to.y) / 2 + wall.inward.y * 0.3, rotation: rotationFacing(wall.inward), elevation: 0, width: len, depth: 0.6, height: 0.9 });
   }
   const fixed: PlacedItem[] = existing.map((f) => ({ id: f.id, catalogId: f.catalogId ?? '', zone: 'bestand', x: f.x, y: f.y, rotation: f.rotation, elevation: f.elevation ?? 0, width: f.width, depth: f.depth, height: f.height }));
+  return { items, fixed };
+}
+
+/** E6 on the start places: the walkthrough's own check on the plan as Claude drew it. */
+function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  const fill = FILL[type];
+  if (!fill) return [];
+  const { items, fixed } = hintLayout(program, room, existing, products);
   const review = reviewRoom({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program });
   return review.findings
     .filter((f) => f.rule === 'E6')
     .slice(0, 1)
     .map((f) => `Im Plan gilt nach deinen Startplätzen schon: ${f.text} Dort plant ein Profi ${fill}; Wege bleiben frei.`);
+}
+
+/**
+ * B1/B2 on the start places: a piece of the plan in the way between two doors. In the benchmark (6.11.) both
+ * rooms of F with three doors had it in the plan already; the solver then shrank the 180 bed to 140 to get
+ * the way free (research RF4: in a room one walks through, the bed or sofa goes to the longest wall without doors).
+ */
+function blockedWays(program: RoomProgram, room: RoomAnalysis, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  if (!room.walkways.length) return [];
+  const { items, fixed } = hintLayout(program, room, existing, products);
+  const extra = [...products];
+  const block = (list: readonly PlacedItem[], isExisting: boolean) => list.map((i) => toRItem(i, isExisting, extra)).filter((i) => i.obstacle);
+  const mine = block(items, false);
+  const theirs = block(fixed, true).map((i) => i.poly);
+  const base = checkWalkways(room, theirs);
+  const all = checkWalkways(room, [...theirs, ...mine.map((i) => i.poly)]);
+  const out: string[] = [];
+  for (const [k, w] of all.entries()) {
+    // the pieces already in the room are not Claude's to move
+    if (w.fits >= w.width - 0.05 || w.fits >= base[k].fits - 0.05) continue;
+    const without = mine.filter((m) => {
+      const rest = checkWalkways(room, [...theirs, ...mine.filter((o) => o !== m).map((o) => o.poly)])[k];
+      return rest.fits >= Math.min(w.width, base[k].fits) - 0.05 || rest.fits >= w.fits + 0.15;
+    });
+    const who = without.length ? without.map((m) => `„${m.id}“`).join(', ') : 'deine Möbel';
+    const free = w.fits === 0 ? 'man kommt nicht mehr durch' : `nur ${Math.round(w.fits * 100)} cm frei`;
+    out.push(
+      `Nach deinen Startplätzen steht ${who} im Weg zwischen den Türen ${w.from} und ${w.to}: ${free}, gebraucht werden ${Math.round(w.width * 100)} cm (B2). Den Durchgang frei lassen: große Möbel an die türfreien Wandstücke, Bett oder Sofa an die längste Wand ohne Tür (RF4).`,
+    );
+  }
+  return out;
 }

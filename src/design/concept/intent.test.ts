@@ -45,13 +45,21 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     // 160×230 across a 160 bed (165 cm with its frame): 32 cm each side
     const small = check(program([bed, item('rug', 'generic-rug-160', 2, 1.6, 'O')]));
     expect(small).toHaveLength(1);
-    expect(small[0]).toMatch(/zu klein.*32 cm.*\(S5\).*mindestens 245 cm.*generic-rug-200/);
+    expect(small[0]).toMatch(/zu klein.*selbst quer.*32 cm.*\(S5\).*mindestens 245 cm.*generic-rug-200/);
+    // 200×300 lengthwise under the bed: turn it
+    expect(check(program([bed, item('rug', 'generic-rug-200', 2, 1.6, 'S')]))[0]).toMatch(/längs.*18 cm.*quer.*je 68 cm/);
     // 200×300 across: 67 cm each side
     expect(check(program([bed, item('rug', 'generic-rug-200', 2, 1.6, 'O')]))).toEqual([]);
     // long enough but pushed to one side
     expect(check(program([bed, item('rug', 'generic-rug-200', 2.5, 1.6, 'O')]))[0]).toMatch(/nicht mittig.*18 cm.*118 cm/);
     // a runner beside the bed is not under it
     expect(check(program([bed, item('mat', 'generic-runner', 3.3, 1.1, 'S')]))).toEqual([]);
+  });
+  it('a piece of the plan in the way between two doors is named (B2)', () => {
+    const room = rectRoom(4, 3.2, { doors: [{ wall: 'W', at: 1.6 }, { wall: 'O', at: 1.6 }], passThrough: true });
+    const across = intentProblems(program([item('bed', 'generic-bed-160', 2, 1.6, 'S')]), room);
+    expect(across.some((x) => /„bed“ im Weg zwischen den Türen T1 und T2.*\(B2\)/.test(x))).toBe(true);
+    expect(intentProblems(program([item('bed', 'generic-bed-160', 2, 1.05, 'N')]), room).some((x) => /\(B2\)/.test(x))).toBe(false);
   });
   it('a living room whose plan leaves a wide patch of floor empty is named with what a designer adds (E6)', () => {
     const room = rectRoom(7, 6, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] });
