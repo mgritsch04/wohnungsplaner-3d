@@ -441,7 +441,7 @@ async function roomShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
 }
 
 /**
- * Dritter Blick je Raum: auf Augenhöhe (1,60 m) von der Haupttür aus, ungeschnitten, auf die
+ * Dritter und vierter Blick je Raum: auf Augenhöhe (1,60 m) von der Haupttür aus (`-auge`) und aus der fernsten Ecke zurück (`-auge2`), ungeschnitten, auf die
  * gegenüberliegende Wand – so sieht man Bilder, Vorhänge und Deko an den Wänden, die von oben
  * und im Schnitt fehlen (Wunsch von G, 31.10.).
  */
@@ -465,6 +465,16 @@ async function eyeShots(page: Page, dir: string, rooms: RoomAnalysis[]) {
     );
     await page.waitForTimeout(1500);
     await canvas.screenshot({ path: `${dir}/3d-${fileOf(room.name)}-auge.png` });
+    // second look from the corner farthest from the door back across the room: sofa fronts, beds and tables seen from the side they are used from
+    const far = room.polygon.reduce((best, p) => (Math.hypot(p.x - view.at.x, p.y - view.at.y) > Math.hypot(best.x - view.at.x, best.y - view.at.y) ? p : best));
+    const inward = { x: c.x - far.x, y: c.y - far.y };
+    const len = Math.hypot(inward.x, inward.y) || 1;
+    await page.evaluate(
+      ([p, t]) => (window as unknown as { __wp: Wp }).__wp.useCameraRig.getState().orbit?.set(p, t),
+      [{ x: far.x + (inward.x / len) * 0.25, y: 1.6, z: far.y + (inward.y / len) * 0.25 }, { x: view.at.x, y: 0.9, z: view.at.y }] as const,
+    );
+    await page.waitForTimeout(1500);
+    await canvas.screenshot({ path: `${dir}/3d-${fileOf(room.name)}-auge2.png` });
   }
 }
 
