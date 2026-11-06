@@ -6,6 +6,7 @@
  * never moves (a window, an existing washbasin, the ceiling) form fixed units.
  */
 import type { Vec2 } from '../../model/vec';
+import { SOFT_SHAPES } from '../../suggest/roomGeometry';
 import type { ProgramItem, ProgramZone, Relation, RoomProgram } from '../types';
 import type { Box } from './geom';
 import { specOf, type Spec, type WallBound } from './items';
@@ -297,6 +298,16 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     if (n.spec.base === 'curtain') {
       const w = nearestWindow(ctx, hint ?? centroid(ctx.poly));
       if (w) setRule(n.id, w, { kind: 'curtain', window: w, index: 0, count: 1 });
+    } else if (n.spec.base === 'stack' && SOFT_SHAPES.has(n.spec.shape)) {
+      // cushions and throws a programme names without saying where: onto the nearest sofa, armchair or bed
+      const seat = [...nodes.values()]
+        .filter((m) => m !== n && (m.spec.role === 'sofa' || m.spec.role === 'armchair' || m.spec.role === 'bed') && (n.spec.shape !== 'bed-throw' || m.spec.role === 'bed') && (m.spec.role !== 'bed' || n.spec.shape !== 'throw'))
+        .sort((a, b) => hintDistance(a, hint) - hintDistance(b, hint))[0];
+      if (seat) setRule(n.id, seat.id, { kind: 'on', index: 0, count: 1 });
+    } else if (n.spec.base === 'stack' && n.spec.shape === 'herbs' && nearestWindow(ctx, hint ?? centroid(ctx.poly), true)) {
+      // kitchen herbs stand on the window sill, where they get light
+      const w = nearestWindow(ctx, hint ?? centroid(ctx.poly), true)!;
+      setRule(n.id, w, { kind: 'sill', window: w, index: 0, count: 1 });
     } else if (n.spec.base === 'stack') {
       const surface = nearestSurface(nodes, n);
       if (surface) setRule(n.id, surface, { kind: 'on', index: 0, count: 1 });
@@ -546,6 +557,9 @@ export function nearestWindow(ctx: RoomCtx, p: Vec2, sill = false): string | nul
   }
   return best;
 }
+
+/** Distance of a node's start place from a hint (large when either is missing). */
+const hintDistance = (n: Node, hint: Vec2 | undefined): number => (hint && n.prog?.hint ? Math.hypot(n.prog.hint.x - hint.x, n.prog.hint.y - hint.y) : 3);
 
 /** A surface piece for a small piece without a parent: same zone first, nearest to its hint. */
 function nearestSurface(nodes: Map<string, Node>, n: Node): string | null {

@@ -34,6 +34,12 @@ export type Role =
   | 'wall-art';
 
 export const shapeOf = (f: Pick<Furniture, 'model'>) => (f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape);
+/** Small decoration that stands or lies on another piece (cushions on the sofa, a vase on the table). */
+export const STACK_DECOR_SHAPES = new Set(['decor', 'cushions', 'throw', 'bed-throw', 'vase', 'tray', 'herbs', 'fruit-bowl', 'desk-set']);
+/** Soft furnishings: they lie on a seat or a bed, not on a surface. */
+export const SOFT_SHAPES = new Set(['cushions', 'throw', 'bed-throw']);
+/** Decoration that hangs on a wall without being a picture (towel rail, clock). */
+export const HANGING_DECOR_SHAPES = new Set(['towels', 'wall-clock']);
 export const CORNER_SHAPES = new Set(['wardrobe', 'shelf', 'shower', 'bathtub', 'washer', 'plant', 'k-fridge', 'vacuum']);
 
 export type RoleInput = Pick<CatalogItem, 'name' | 'category' | 'model'> & { tags?: string[]; catalogId?: string; elevation?: number; height?: number };
@@ -48,9 +54,9 @@ export function roleOf(f: RoleInput): Role {
   if (item.category === 'chair') return 'seat';
   if (shape === 'rug') return 'rug';
   if (shape === 'curtain') return 'curtain';
-  if (shape === 'picture' || shape === 'picture-set' || shape === 'wall-shelf') return 'wall-art';
-  // a still life (vase, books, bowl) stands on a piece like a box
-  if (shape === 'decor') return 'box';
+  if (shape === 'picture' || shape === 'picture-set' || shape === 'wall-shelf' || HANGING_DECOR_SHAPES.has(shape)) return 'wall-art';
+  // a still life (vase, books, bowl), cushions, a throw: small pieces that stand or lie on another piece like a box
+  if (STACK_DECOR_SHAPES.has(shape)) return 'box';
   if (shape === 'coat-rack') return 'coat-rack';
   // a small mirror hangs (bath: above the washbasin); a tall one stands on the floor against a wall
   if (shape === 'panel' && (item.elevation ?? 0) >= 0.8) return 'mirror';
