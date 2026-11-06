@@ -259,8 +259,10 @@ function blockedWays(program: RoomProgram, room: RoomAnalysis, existing: readonl
   const block = (list: readonly PlacedItem[], isExisting: boolean) => list.map((i) => toRItem(i, isExisting, extra)).filter((i) => i.obstacle);
   const mine = block(items, false);
   const theirs = block(fixed, true).map((i) => i.poly);
-  const base = checkWalkways(room, theirs);
   const all = checkWalkways(room, [...theirs, ...mine.map((i) => i.poly)]);
+  // the walking grid is not cheap: the room without Claude's pieces only where a way is too narrow
+  if (all.every((w) => w.fits >= w.width - 0.05)) return [];
+  const base = checkWalkways(room, theirs);
   const out: string[] = [];
   for (const [k, w] of all.entries()) {
     // the pieces already in the room are not Claude's to move
