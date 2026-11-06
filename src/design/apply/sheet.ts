@@ -11,13 +11,13 @@ import { paletteText, roomConceptOf } from '../concept/flatConcept';
 import { schemeOf, schemeText } from '../concept/scheme';
 import { sideOfRotation, toRoomCm } from '../coords';
 import type { FurnishRunResult } from '../run';
-import type { PlacedItem, RoomAnalysis, RoomType, WallInfo } from '../types';
+import { isLightStrip, LIGHT_SCENES, placedLampPlan } from '../lightPlan';
+import type { PlacedItem, RoomAnalysis, WallInfo } from '../types';
 
 const cm = (m: number) => Math.round(m * 100);
 const SIDE_NAME = { N: 'Norden', O: 'Osten', S: 'Süden', W: 'Westen' } as const;
 const LIGHTS: Role[] = ['pendant', 'floor-lamp', 'table-lamp'];
-/** Recommended colour temperature (L3): warm where one lives and sleeps, neutral where one works. */
-const KELVIN: Partial<Record<RoomType, number>> = { living: 2700, bedroom: 2700, kids: 2700, dining: 2700, kitchen: 3000, bath: 3000, office: 3000, hall: 3000 };
+const USE_NAME = { grund: 'Grundlicht', arbeit: 'Arbeitslicht', zone: 'Zonenlicht', stimmung: 'Stimmungslicht' } as const;
 
 /** Wall a floor piece stands against with its back (within 10 cm), and how far its middle is from the corner where the wall starts. */
 function wallPlace(room: RoomAnalysis, it: PlacedItem): string {
@@ -97,17 +97,22 @@ export function furnishingSheet(result: FurnishRunResult, names: Record<string, 
     if (curtains.length) out.push('', `**Vorhänge:** ${counted(curtains)}, Stange 10–15 cm über dem Fenster und 10–25 cm seitlich darüber hinaus (R8).`);
     const kitchen = r.layout.items.filter((p) => p.kitchenRun !== undefined);
     if (kitchen.length) out.push('', `**Küche:** ${kitchen.length} Module, ${[...new Set(kitchen.map((k) => item(k.catalogId)?.name ?? k.catalogId))].join(', ')}.`);
+    const strip = (p: PlacedItem) => isLightStrip(p.catalogId, item(p.catalogId)?.tags);
     const lights = r.layout.items.filter((p) => LIGHTS.includes(roleOfPlaced(p) ?? 'wall'));
-    if (lights.length) {
-      const k = KELVIN[type] ?? 2700;
+    const strips = r.layout.items.filter(strip);
+    if (lights.length || strips.length) {
       out.push('', '**Licht:**');
       for (const l of lights) {
         const role = roleOfPlaced(l);
         const parent = l.parent ? r.layout.items.find((x) => x.id === l.parent) : undefined;
         const where = role === 'pendant' ? `Unterkante ${cm(l.elevation)} cm über dem Boden${parent ? `, über ${label(parent)}` : ''}` : role === 'table-lamp' ? `auf ${parent ? label(parent) : 'einem Möbel'}` : `${cm(l.height)} cm hoch${parent ? `, neben ${label(parent)}` : ''}`;
-        const kelvin = role === 'table-lamp' && parent && item(parent.catalogId)?.category === 'desk' ? 4000 : k;
-        out.push(`- ${label(l)}${real(l)}: ${where}; ${kelvin} K, dimmbar. ${why.get(l.id)?.why ?? ''}`.trimEnd());
+        const plan = placedLampPlan(type, l, r.layout.items, catalog);
+        const colour = plan ? `${USE_NAME[plan.use]}, ${plan.kelvin} K, Ra ≥ ${plan.ra}, dimmbar` : 'dimmbar';
+        out.push(`- ${label(l)}${real(l)}: ${where}; ${colour}. ${why.get(l.id)?.why ?? ''}`.trimEnd());
       }
+      const sp = strips.length ? placedLampPlan(type, strips[0], r.layout.items, catalog) : null;
+      if (sp) out.push(`- ${strips.length} × Lichtleiste unter den Oberschränken, vorn: Arbeitslicht, ${sp.kelvin} K, Ra ≥ ${sp.ra}, etwa 500 lx auf der Arbeitsplatte (K5).`);
+      if (LIGHT_SCENES[type]) out.push(`- Szenen (L9, L10): ${LIGHT_SCENES[type]}`);
     }
     if (r.layout.dropped.length) out.push('', '**Nicht untergebracht:**', ...r.layout.dropped.map((d) => `- ${item(d.catalogId)?.name ?? d.catalogId}: ${d.reason}`));
   }

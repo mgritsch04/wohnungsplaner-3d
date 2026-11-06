@@ -146,7 +146,7 @@ describe('Einrichtungsblatt (#436)', () => {
     expect(sheet).toMatch(/\| Schlafsofa[^|]*\| 210 × 90 × 82 \| (an W\d \([A-Za-zü]+\), Mitte \d+ cm von der Ecke mit W\d|frei im Raum[^|]*); Blick nach [A-Za-zü]+ \| .+\|/);
     // the chairs of the dining table counted once
     expect(sheet).toMatch(/Dazu: 4 × Stuhl/);
-    expect(sheet).toMatch(/Pendelleuchte[^\n]*Unterkante \d+ cm über dem Boden[^\n]*2700 K, dimmbar/);
+    expect(sheet).toMatch(/Pendelleuchte[^\n]*Unterkante \d+ cm über dem Boden[^\n]*2700 K, Ra ≥ \d+, dimmbar/);
     expect(furnishingSheet(result, names, [], [result.rooms[0].roomId], 'Ideal')).not.toContain(`## ${names[result.rooms[1].roomId]}`);
   });
 });

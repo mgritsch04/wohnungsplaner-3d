@@ -11,6 +11,7 @@ import type { CatalogItem } from '../../catalog/types';
 import { generateCountertops } from '../../kitchen/kitchen';
 import type { Furniture, Project } from '../../model/schema';
 import { suggestedIn, type FurnishingSuggestion, type RoomSuggestion, type RoomType } from '../../suggest/furnishing';
+import { placedLampPlan } from '../lightPlan';
 import type { Layout, ProgramItem, RoomAnalysis, RoomProgram } from '../types';
 
 /** One room of the new proposal as placed by the solver. */
@@ -62,6 +63,9 @@ export function layoutFurniture(project: Project, room: PlacedRoom, catalog: Cat
     f.height = tidy(p.height);
     f.elevation = tidy(p.elevation);
     if (prog?.color && isPlaceholderId(item.id)) f.color = prog.color;
+    // light colour for its use (L9): warm where one lives, neutral at the desk and the worktop
+    const lamp = placedLampPlan(room.type, p, room.layout.items, catalog);
+    if (lamp && f.kelvin === undefined) f.kelvin = lamp.kelvin;
     f.suggested = true;
     furniture.push(f);
   }
