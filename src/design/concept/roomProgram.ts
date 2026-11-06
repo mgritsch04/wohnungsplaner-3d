@@ -19,6 +19,7 @@ import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, s
 import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
 import { rulebookPrompt } from '../rulebook';
+import { completeLight } from './light';
 import { completeDecor } from './decor';
 import { fitToScheme, schemeOf, schemeText } from './scheme';
 import { completeGroups, groupLines } from './groups';
@@ -433,9 +434,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y) })));
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);
   notes.push(...groups.notes);
+  // a third light layer: mood light in the other half of a larger living room (L1, L8)
+  const light = completeLight(groups.program, f.rc.type, room.area, input.products);
+  notes.push(...light.notes);
   // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
   const scheme = schemeOf(f.rc, input.concept.style);
-  const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
+  const decor = completeDecor(light.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
   notes.push(...decor.notes);
   return { value: withoutKitchenCurtains(decor.program, room, notes), problems, notes };
 }

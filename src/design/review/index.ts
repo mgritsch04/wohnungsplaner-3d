@@ -10,7 +10,8 @@ import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary 
 import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
 import { checkBackGap, checkBeds, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs, checkWallArt } from './decorRules';
-import { checkBalance, checkFocus, checkNav, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
+import { checkLightPlan } from './lightRules';
+import { checkBalance, checkFloorContrast, checkFocus, checkNav, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
 import { RoomCtx, type ReviewInput } from './context';
 
 export type { ReviewInput, ReviewOptions } from './context';
@@ -39,6 +40,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkZonesApart(ctx);
   checkPlants(ctx);
   checkLight(ctx);
+  checkLightPlan(ctx);
   checkRugs(ctx);
   checkPictures(ctx);
   checkWallArt(ctx);
@@ -51,6 +53,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkZones(ctx);
   checkTogether(ctx);
   checkPalette(ctx);
+  checkFloorContrast(ctx);
   checkStyle(ctx);
   checkFocus(ctx);
   const findings = [...ctx.findings].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);

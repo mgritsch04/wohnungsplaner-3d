@@ -215,6 +215,16 @@ describe('E Gesamteindruck', () => {
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 4.85, 2, 'W')]), 'E3', /verschiedenen Wänden/)).toBe(true);
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 2, 0.15, 'S')]), 'E3', /verschiedenen Wänden/)).toBe(false);
   });
+  it('E8 / FM2 a big piece 5–15 LRV points from the floor is light, tone on tone or clearly different is fine', () => {
+    const run = (color: string, floorColor?: string) => living([sofa], { floorColor, program: prog({ items: [{ id: 'sofa', catalogId: 'generic-sofa-3', zone: 'z', why: '', color }] }) });
+    // floor #c49a6c has LRV 36; #a58056 ≈ 24 (12 points), #c9a273 ≈ 39 (tone on tone), #3a3a3a ≈ 4 (clearly darker), #f4f0e8 ≈ 87
+    expect(has(run('#a58056', '#c49a6c'), 'E8', /FM2/)).toBe(true);
+    expect(has(run('#c9a273', '#c49a6c'), 'E8')).toBe(false);
+    expect(has(run('#3a3a3a', '#c49a6c'), 'E8')).toBe(false);
+    expect(has(run('#f4f0e8', '#c49a6c'), 'E8')).toBe(false);
+    // floor colour unknown: not checked
+    expect(has(run('#a58056'), 'E8')).toBe(false);
+  });
   it('E4 a colour outside the palette is light, neutrals and palette colours fit', () => {
     const palette = ['#7d8a96', '#c8b59a'];
     const run = (color: string) => living([sofa], { palette, program: prog({ items: [{ id: 'sofa', catalogId: 'generic-sofa-3', zone: 'z', why: '', color }] }) });
