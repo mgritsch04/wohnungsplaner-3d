@@ -22,6 +22,22 @@ describe('furniture groups (#436)', () => {
     expect(notes.join(' ')).toContain('Sitzgruppe „sofa“ ergänzt');
   });
 
+  it('a pendant Claude hung over the coffee table is the main light: no second ceiling light in the same spot', () => {
+    const { program: p } = completeGroups(
+      program(
+        [item('sofa', 'generic-sofa-3', 'z', { required: true }), item('coffee', 'generic-coffee-table'), item('pend', 'generic-pendant')],
+        [
+          { kind: 'front-of', item: 'coffee', target: 'sofa', gap: COFFEE_GAP },
+          { kind: 'above', item: 'pend', target: 'coffee' },
+        ],
+      ),
+      'living',
+      22,
+      2,
+    );
+    expect(ids(p, 'generic-pendant')).toEqual(['pend']);
+  });
+
   it('puts only as many pieces at the sofa arms as its zone holds (flat B, #436)', () => {
     // zone 2.8 m along the sofa (rotation 90°: its width runs along y), a plant of Claude's already at one arm
     const narrow: RoomProgram = { ...program([item('sofa', 'generic-sofa-3', 'z', { hint: { x: 1, y: 2, rotation: Math.PI / 2 } }), item('plant', 'generic-plant')], [{ kind: 'right-of', item: 'plant', target: 'sofa' }]), zones: [{ id: 'z', function: 'Sitzen', rect: { x0: 0, y0: 0.6, x1: 5, y1: 3.4 }, why: '' }] };
