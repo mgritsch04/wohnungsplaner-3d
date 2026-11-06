@@ -148,13 +148,17 @@ interface RoomWork {
 export const PLACE_TRIES = 3;
 export const PLACE_TRIES_FAILING = 5;
 
-/** The better placement of one programme: passing, then points, then the lighter loss, then the solver's cost. */
+/**
+ * The better placement of one programme: passing, then the lighter loss (the planned pieces all in
+ * the room count before a few points: a picture left out is missing in the plan), then points,
+ * then the solver's cost.
+ */
 export function betterPlacement(a: RoomResult, b: RoomResult, catalog?: CatalogItem[]): RoomResult {
   if (a.review.passed !== b.review.passed) return a.review.passed ? a : b;
-  if (a.review.score !== b.review.score) return a.review.score > b.review.score ? a : b;
   const wa = droppedWeight(a.program, a.layout, catalog);
   const wb = droppedWeight(b.program, b.layout, catalog);
   if (Math.abs(wa - wb) > 1e-9) return wa < wb ? a : b;
+  if (a.review.score !== b.review.score) return a.review.score > b.review.score ? a : b;
   return a.layout.cost <= b.layout.cost ? a : b;
 }
 

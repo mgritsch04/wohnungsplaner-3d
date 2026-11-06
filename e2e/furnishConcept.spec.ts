@@ -98,10 +98,14 @@ function expectStages(made: Call[], planned: string[]) {
   expect(made.filter((c) => c.kind === 'programm' || c.kind === 'variante').every((c) => c.images === 1)).toBe(true);
   // der Bildvergleich zweier Fassungen sieht je Fassung zwei 3D-Bilder
   expect(made.filter((c) => c.kind === 'vergleich').every((c) => c.images === 4)).toBe(true);
-  // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443); höchstens zwei je Raum
+  // jede Kritikrunde geht mit genau einem Raumbild hinaus, der Blick vor der Abgabe dazu mit zwei 3D-Bildern (#443);
+  // höchstens zwei Kritikrunden je Raum und ein Blick, wenn er danach besteht
   const critique = made.filter((c) => c.kind === 'kritik');
   expect(critique.every((c) => c.images === (c.look ? 3 : 1) && c.picture)).toBe(true);
-  for (const room of new Set(critique.map((c) => c.room))) expect(critique.filter((c) => c.room === room).length).toBeLessThanOrEqual(2);
+  for (const room of new Set(critique.map((c) => c.room))) {
+    expect(critique.filter((c) => c.room === room && !c.look).length).toBeLessThanOrEqual(2);
+    expect(critique.filter((c) => c.room === room && c.look).length).toBeLessThanOrEqual(1);
+  }
   return critique;
 }
 
