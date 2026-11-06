@@ -402,6 +402,20 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
       );
   }
 
+  // a couple keeps its clothes in the bedroom (ST1): two persons need at least about 2 m of
+  // wardrobe (ideal 2.5 m); test flat A had one 150 cm wardrobe for a 140 bed (image review, 6.11.)
+  // two sleep here: the concept says a couple or family lives here, or (unless it names one person) a bed of 160 and more
+  const living = input.concept.living ?? '';
+  const couple = /\bpaar\b|partner|familie|eltern|zwei personen|(wohnen|leben) zu zweit/i.test(living);
+  const single = /eine person|\ballein\b|\bjemand\b|\bsingle\b/i.test(living);
+  const doubleBed = pieces.some((p) => p.t.shape === 'bed' && p.t.width >= 1.35 && (couple || (!single && p.t.width >= 1.55)));
+  const clothesElsewhere = input.concept.functions.some((a) => a.roomId !== room.roomId && /kleid|ankleide|schrankraum/i.test(a.function));
+  const wardrobe = pieces.filter((p) => p.t.shape === 'wardrobe').reduce((sum, p) => sum + p.t.width, 0);
+  if (doubleBed && !clothesElsewhere && wardrobe < WARDROBE_COUPLE_MIN - 0.01)
+    problems.push(
+      `Zu wenig Kleiderschrank für zwei (ST1): nur ${cm(wardrobe)} cm. Für ein Paar mindestens ${cm(WARDROBE_COUPLE_MIN)} cm, besser 250 cm, als ein durchgehender Schrank an einer Wand (davor 90 cm frei). Passt das nicht, ein kleineres Bett oder ein Teil der Kleidung in einen anderen Raum.`,
+    );
+
   const parsed: RoomProgram = {
     roomId: room.roomId,
     reading: str(o.reading, 1200),
@@ -496,6 +510,9 @@ function parseKitchen(raw: unknown, f: ProgramFacts, problems: string[], notes: 
 }
 
 /** Storage a planned kitchen offers (K7), as metres of base-cabinet front: a tall unit holds about 2.5 base units, a wall cabinet 0.6, the sink cabinet half. */
+/** Wardrobe (m) a bedroom with a double bed needs at least (ST1: a couple 250 cm, 2 m the floor). */
+export const WARDROBE_COUPLE_MIN = 2.0;
+
 export function kitchenStorage(kitchen: readonly KitchenRun[], room: RoomAnalysis): number {
   let total = 0;
   let hood = false;
