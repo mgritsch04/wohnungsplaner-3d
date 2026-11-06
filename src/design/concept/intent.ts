@@ -5,17 +5,21 @@
  *
  * The check reads the start places and directions of the programme, before anything is placed, and
  * names what already breaks a rule there: the television not opposite the sofa or far off it (W5), the sofa
- * looking at the kitchen run (W10), dining chairs without room to the wall (E2). These go back to Claude with the other problems of the answer
- * (one repair round); a finding the solver causes later is not Claude's to fix.
+ * looking at the kitchen run (W10), dining chairs without room to the wall (E2), a half of the room or a
+ * wide patch of floor left empty (E6; in all six benchmark rooms with E6 the plan itself left it empty,
+ * 6.11.). These go back to Claude with the other problems of the answer (one repair round); a finding
+ * the solver causes later is not Claude's to fix.
  */
 import { findCatalogItem } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
 import type { Furniture } from '../../model/schema';
 import { dist, sub, type Vec2 } from '../../model/vec';
-import { roleOf, shapeOf } from '../../suggest/roomGeometry';
+import type { RoomType } from '../../suggest/furnishing';
+import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
+import { reviewRoom } from '../review';
 import { sideOfVector } from '../coords';
 import { tvRange } from '../tvDistance';
-import type { ProgramItem, RoomAnalysis, RoomProgram } from '../types';
+import type { PlacedItem, ProgramItem, RoomAnalysis, RoomProgram } from '../types';
 
 const deg = (d: number) => (d * Math.PI) / 180;
 /** Front of a piece with this rotation (local +y), as `Furniture.rotation`. */
@@ -91,7 +95,7 @@ const SIDE_WORD = { N: 'nördlichen', O: 'östlichen', S: 'südlichen', W: 'west
  * Problems in the programme's own start places, as lines for the repair prompt. `existing` are the
  * pieces already in the room (a fitted kitchen counts as kitchen run).
  */
-export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'polygon'> | undefined, existing: readonly Furniture[] = [], products: readonly CatalogItem[] = []): string[] {
+export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'polygon'> | undefined, existing: readonly Furniture[] = [], products: readonly CatalogItem[] = [], type?: RoomType): string[] {
   const problems: string[] = [];
   const pieces = placedOf(program.items, products);
   const sofas = pieces.filter((p) => p.role === 'sofa');
@@ -154,5 +158,39 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
         }
       }
     }
+  if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   return problems;
+}
+
+/** What a designer puts into an empty half or middle, per room type (research 6.11.: R-M3, S7, R4, W9, KI1). */
+const FILL: Partial<Record<RoomType, string>> = {
+  living: 'eine zweite kleine Gruppe (Leseecke mit Sessel, Beistelltisch und Stehleuchte am Fenster), die Sitzgruppe frei in den Raum mit Konsole oder Sideboard hinter dem Sofa, oder ein runder Tisch oder Pouf als Anker (R4, W9)',
+  bedroom: 'eine Kommode oder Bank (mit 90 cm bis zur Wand), eine Leseecke mit Sessel und Stehleuchte oder eine Ankleide-Ecke mit Spiegel (S7)',
+  kids: 'eine Spielfläche mit Teppich und niedrigem Regal oder Kisten (KI1)',
+  office: 'eine Leseecke mit Sessel und Stehleuchte oder ein Regal oder Sideboard an der leeren Seite',
+  dining: 'ein Sideboard oder eine Anrichte an der leeren Wand',
+};
+
+/** E6 on the start places: the walkthrough's own check on the plan as Claude drew it. */
+function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  const fill = FILL[type];
+  if (!fill) return [];
+  const items: PlacedItem[] = program.items.flatMap((it) => {
+    const c = findCatalogItem(it.catalogId, [...products]);
+    if (!c || !it.hint) return [];
+    return [{ id: it.id, catalogId: it.catalogId, zone: it.zone, x: it.hint.x, y: it.hint.y, rotation: it.hint.rotation, elevation: c.elevation ?? 0, width: c.width, depth: c.depth, height: c.height }];
+  });
+  // the kitchen run as one block along its wall
+  for (const [k, run] of (program.kitchen ?? []).entries()) {
+    const wall = room.walls.find((w) => w.id === run.wall);
+    if (!wall) continue;
+    const len = dist(run.from, run.to);
+    items.push({ id: `kitchen-${k}`, catalogId: 'generic-k-base-60', zone: '', x: (run.from.x + run.to.x) / 2 + wall.inward.x * 0.3, y: (run.from.y + run.to.y) / 2 + wall.inward.y * 0.3, rotation: rotationFacing(wall.inward), elevation: 0, width: len, depth: 0.6, height: 0.9 });
+  }
+  const fixed: PlacedItem[] = existing.map((f) => ({ id: f.id, catalogId: f.catalogId ?? '', zone: 'bestand', x: f.x, y: f.y, rotation: f.rotation, elevation: f.elevation ?? 0, width: f.width, depth: f.depth, height: f.height }));
+  const review = reviewRoom({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program });
+  return review.findings
+    .filter((f) => f.rule === 'E6')
+    .slice(0, 1)
+    .map((f) => `Im Plan gilt nach deinen Startplätzen schon: ${f.text} Dort plant ein Profi ${fill}; Wege bleiben frei.`);
 }
