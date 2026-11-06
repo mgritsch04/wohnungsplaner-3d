@@ -16,7 +16,7 @@ import { schemeOf } from '../concept/scheme';
 import { reviewFlat, reviewRoom } from '../review';
 import { BALANCED } from '../review/overallRules';
 import { asPlaced, reviewInputOf, type FurnishRunResult } from '../run';
-import { existingPieces, solveRoom } from '../solver/solve';
+import { existingPieces, solveBest } from '../solver/solve';
 import type { FlatResult, ProgramItem, RoomResult } from '../types';
 import { isPlaceholderId, type PlacedRoom } from './index';
 
@@ -137,7 +137,7 @@ export function withProduct(
   const program = { ...room.program, items: room.program.items.map((it) => (ids.has(it.id) ? { ...it, catalogId: swap.catalogId } : it)) };
   const existing = existingPieces(project, analysis);
   const type = (roomTypes[swap.roomId] ?? roomConceptOf(result.concept, analysis).type) as RoomType;
-  const layout = solveRoom(analysis, program, { existing, seed, catalog, spread: BALANCED.has(type) });
+  const layout = solveBest(analysis, program, { existing, seed, catalog, spread: BALANCED.has(type) });
   const palette = result.concept.style.palette.map((c) => c.hex);
   const review = reviewRoom(reviewInputOf({ analysis, type, layout, program, existing: asPlaced(existing), palette, catalog }));
   const severe = (r: typeof review) => r.findings.filter((f) => f.severity === 'S').length;

@@ -18,7 +18,9 @@ export const isRug = (f: Item) => f.category === 'textile' && f.height < 0.05;
 export const isTextile = (f: Item) => f.category === 'textile';
 const isSeat = (f: Item) => f.category === 'chair';
 const isTableLike = (f: Item) => f.category === 'table' || f.category === 'desk';
-const isBox = (f: Item) => shapeOf(f) === 'box' && f.category === 'storage' && f.height <= 0.45;
+const isBox = (f: Item) => (shapeOf(f) === 'box' && f.category === 'storage' && f.height <= 0.45) || isShelfDecor(f);
+/** Small decor (vase, books, bowl) that stands on a board of an open shelf like a box (#436). */
+const isShelfDecor = (f: Item) => shapeOf(f) === 'decor' && f.category === 'decor' && f.height <= 0.4;
 const KITCHEN_INSERTS = new Set(['countertop', 'cooktop', 'hood']);
 const isKitchenInsert = (f: Item) => !!f.kitchen && KITCHEN_INSERTS.has(f.kitchen.type);
 
@@ -62,8 +64,8 @@ export function pairRule(a: Item, b: Item): PairRule {
   // only the seat: the backrest must stay out of the table (`seatBackDepth`, checked in placement.ts)
   if (seatAndTable(a, b)) return { allowed: true, reason: 'Stuhl unter Tisch' };
   if ((a.kitchen || b.kitchen) && (isKitchenInsert(a) || isKitchenInsert(b))) return { allowed: true, reason: 'Kücheneinbau' };
-  // storage box standing on a board of an open shelf (#350)
-  if ((isBox(a) && shapeOf(b) === 'shelf') || (isBox(b) && shapeOf(a) === 'shelf')) return { allowed: true, reason: 'Box im Regal' };
+  // storage box or a still life standing on a board of an open shelf (#350, #436)
+  if ((isBox(a) && shapeOf(b) === 'shelf') || (isBox(b) && shapeOf(a) === 'shelf')) return { allowed: true, reason: 'Box oder Deko im Regal' };
   return { allowed: false };
 }
 

@@ -300,7 +300,8 @@ function deriveNode(m: Model, n: Node): void {
         const v0 = P.hd + r.gap + Math.min(s.width, s.depth) / 2 + (n.parent?.startsWith('kitchen') ? 0.08 : 0);
         const options: Box[] = [];
         for (let back = 0; back <= v0 + 0.01; back += 0.05) options.push(rugBox(at(0, v0 - back), P.rotation, s.width, s.depth, true));
-        n.box = options.find((b) => insideScore(m, b) === 0) ?? options[0];
+        // the first that lies inside the room, else the one that sticks out least
+      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
       } else {
         const c = at(0, P.hd + r.gap + s.depth / 2);
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
@@ -313,9 +314,10 @@ function deriveNode(m: Model, n: Node): void {
       const all = r.kind === 'under-all' || parentNode?.spec.role === 'table' || parentNode?.spec.role === 'coffee-table';
       const bed = parentNode?.spec.role === 'bed';
       const options: Box[] = [];
-      // under a bed a rug that is long enough lies across it, 40–60 cm out on both sides (#443)
-      const across = bed && Math.max(s.width, s.depth) >= 2 * P.hw + 0.6;
-      for (const longAlong of across ? [false, true] : [true, false]) {
+      // under a bed a rug lies across it, 40–60 cm out on both sides (#443); under a sofa its long side runs along the sofa
+      // (`longAlong`: the long side runs along the parent's width, i.e. across the bed; the order was
+      // the wrong way round and laid a 160×230 rug lengthwise under a 160 bed, hidden – test flat B, 6.11.)
+      for (const longAlong of [true, false]) {
         const probe = rugBox({ x: 0, y: 0 }, P.rotation, s.width, s.depth, longAlong);
         const { ey } = extents(probe, P.rotation);
         let v: number;
@@ -329,7 +331,8 @@ function deriveNode(m: Model, n: Node): void {
           if (all && !bed) break;
         }
       }
-      n.box = options.find((b) => insideScore(m, b) === 0) ?? options[0];
+      // the first that lies inside the room, else the one that sticks out least
+      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
       return;
     }
     case 'around': {
@@ -383,7 +386,9 @@ function deriveNode(m: Model, n: Node): void {
         const row = Math.floor(r.index / perRow);
         const c = at(-P.hw + (2 * P.hw * (col + 0.5)) / Math.min(perRow, r.count), -P.hd + Math.min(s.depth, 2 * P.hd) / 2);
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: Math.min(s.depth, 2 * P.hd) / 2, rotation: P.rotation };
-        n.elevation = p.elevation + 0.03 + row * 0.38;
+        // a still life goes on a board at eye level, boxes fill the shelf from the bottom (#436)
+        const decor = s.shape === 'decor' && s.category === 'decor';
+        n.elevation = p.elevation + 0.03 + (decor ? Math.max(0, Math.min(3, Math.floor((p.top - p.elevation - 0.4) / 0.38))) : row) * 0.38;
         return;
       }
       const row = onRow(m, n, P, parentNode);

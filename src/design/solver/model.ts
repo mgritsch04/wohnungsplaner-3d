@@ -5,6 +5,7 @@
  * kitchen run is one unit, a picture on its own wall is one, and pieces bound to something that
  * never moves (a window, an existing washbasin, the ceiling) form fixed units.
  */
+import { findCatalogItem } from '../../catalog/generic';
 import type { Vec2 } from '../../model/vec';
 import { SOFT_SHAPES } from '../../suggest/roomGeometry';
 import type { ProgramItem, ProgramZone, Relation, RoomProgram } from '../types';
@@ -168,6 +169,8 @@ function withChairGroups(relations: readonly Relation[], nodes: Map<string, Node
 const DERIVED_FRONT_ROLES = new Set(['coffee-table', 'seat', 'rug']);
 /** Largest gap between a runner or mat and the piece it lies in front of. */
 const RUG_GAP = 0.05;
+/** A runner the programme gives no place: in a kitchen it goes in front of the sink run. */
+const RUNNER = 'generic-runner';
 const SCREENS = new Set(['tv', 'tv-board']);
 const VIEWERS = new Set(['sofa', 'armchair', 'bed']);
 /** Weight of „the seat looks at the screen“: a sofa with its back to the TV is never meant (C3). */
@@ -298,6 +301,11 @@ export function buildModel(ctx: RoomCtx, program: RoomProgram): Model {
     if (n.spec.base === 'curtain') {
       const w = nearestWindow(ctx, hint ?? centroid(ctx.poly));
       if (w) setRule(n.id, w, { kind: 'curtain', window: w, index: 0, count: 1 });
+    } else if (n.catalogId === RUNNER && runs.length > 0) {
+      // a runner without a place in a kitchen lies in the work aisle in front of the sink run, not
+      // across the middle of the room (image review of test flat A, 6.11.)
+      const sinkRun = Math.max(0, runs.findIndex((r) => r.modules.some((id) => findCatalogItem(id, ctx.catalog)?.kitchen?.type === 'sink')));
+      setRule(n.id, runId(sinkRun), { kind: 'front', gap: 0 });
     } else if (n.spec.base === 'stack' && SOFT_SHAPES.has(n.spec.shape)) {
       // cushions and throws a programme names without saying where: onto the nearest sofa, armchair or bed
       const seat = [...nodes.values()]

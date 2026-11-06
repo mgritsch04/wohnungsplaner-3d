@@ -151,7 +151,7 @@ ${input.image ? 'Das Bild zeigt denselben Raum leer von oben, mit Wänden, Türe
 Raumfakten:
 ${roomFacts(room, project, concept)}
 ${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}
-${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
+${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke mit Lichtleisten, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
 Küchenmodule (nur in "kitchen"):
 ${summarizePlaceholders(KITCHEN_MODULES)}
 ` : all.some((f) => !!f.kitchen) ? 'Die Küchenzeile ist vorhanden (Bestand): keine neue planen, nur Essplatz und Rest.\n' : ''}
@@ -267,6 +267,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const duplicateOf = new Map<string, string>();
   const rawItems = Array.isArray(o.items) ? o.items : [];
   if (!rawItems.length) problems.push('"items" ist leer.');
+  // a bed of the catalogue comes with its mattress and pillows; a mattress on top of it covered the
+  // headboard and stood out 15 cm at the sides (image review of test flat A, 6.11.)
+  const bedFrame = rawItems.some((it) => {
+    const c = lookup(str((it as Record<string, unknown> | null)?.catalogId, 120));
+    return !!c && shapeOf(c) === 'bed';
+  });
   for (const it of rawItems.slice(0, 120)) {
     const e = (it ?? {}) as Record<string, unknown>;
     let id = str(e.id, 40);
@@ -286,6 +292,18 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
       const same = f.existing.find((x) => x.label === id || x.f.id === id || shapeOf(x.f) === t.shape);
       if (same) duplicateOf.set(id, same.label);
       else leftOut.add(id);
+      continue;
+    }
+    // the app hangs a light strip under every wall cabinet it adds (K5); Claude's own strips came
+    // on top of them, twice the light on one worktop (test flat A, 6.11.)
+    if (c.id === 'generic-k-light' && plansKitchen(f.rc, f.all)) {
+      if (!notes.some((n) => n.startsWith('Lichtleisten'))) notes.push('Lichtleisten unter den Oberschränken setzt die App, Claudes eigene nicht übernommen.');
+      leftOut.add(id);
+      continue;
+    }
+    if (bedFrame && shapeOf(c) === 'mattress') {
+      notes.push(`Teil „${id}“ (${c.name}) nicht übernommen: das Bett hat schon eine Matratze.`);
+      leftOut.add(id);
       continue;
     }
     if (isKitchenModule(c)) {
@@ -376,6 +394,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   if (kitchen?.length) {
     const mods = kitchen.flatMap((k) => k.modules.map((m) => lookup(m) ?? findCatalogItem(m)!));
     for (const [type, label] of [['sink', 'Spüle'], ['fridge', 'Kühlschrank']] as const) if (!mods.some((m) => m.kitchen?.type === type)) problems.push(`Die Küchenzeile hat keine ${label}.`);
+    // enough storage for everyday cooking (K7): the run under the window of test flat B had 80 cm of cupboards
+    const storage = kitchenStorage(kitchen, room);
+    if (room.area >= KITCHEN_STORAGE_FROM && storage < KITCHEN_STORAGE_MIN)
+      problems.push(
+        `Zu wenig Stauraum in der Küche (K7): nur etwa ${cm(storage)} cm Schrankfront (Unterschränke ohne Geräte, Spüle halb, Hochschrank 2,5-fach, Oberschränke 0,6-fach; unter einem Fenster hängt kein Oberschrank). Mindestens ${cm(KITCHEN_STORAGE_MIN)} cm: eine längere Zeile mit Schubladenschränken, ein Hochschrank (generic-k-tall-60) neben dem Kühlschrank oder eine L-Küche über die Ecke an eine Wand ohne Fenster.`,
+      );
   }
 
   const parsed: RoomProgram = {
@@ -396,8 +420,37 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const scheme = schemeOf(f.rc, input.concept.style);
   const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
   notes.push(...decor.notes);
-  return { value: decor.program, problems, notes };
+  return { value: withoutKitchenCurtains(decor.program, room, notes), problems, notes };
 }
+
+/**
+ * No floor-length curtains at a window above the new kitchen run: they would hang over the worktop
+ * and next to the cooktop (fire, grease; image review of test flat B, 6.11.). The window stays bare
+ * there, as a kitchen planner leaves it.
+ */
+export function withoutKitchenCurtains(program: RoomProgram, room: RoomAnalysis, notes: string[] = []): RoomProgram {
+  if (!program.kitchen?.length) return program;
+  const overRun = new Set<string>();
+  for (const run of program.kitchen) {
+    const wall = room.walls.find((w) => w.id === run.wall);
+    if (!wall) continue;
+    const t0 = Math.min(dot(sub(run.from, wall.a), wall.dir), dot(sub(run.to, wall.a), wall.dir));
+    const t1 = Math.max(dot(sub(run.from, wall.a), wall.dir), dot(sub(run.to, wall.a), wall.dir));
+    for (const o of wall.openings) if (o.kind === 'window' && o.t1 > t0 + 0.05 && o.t0 < t1 - 0.05) overRun.add(o.id);
+  }
+  if (!overRun.size) return program;
+  const isCurtain = (id: string) => {
+    const c = findCatalogItem(program.items.find((i) => i.id === id)?.catalogId ?? '');
+    return !!c && shapeOf(c) === 'curtain';
+  };
+  const gone = new Set(program.relations.flatMap((r) => (r.kind === 'window' && overRun.has(r.window) && isCurtain(r.item) ? [r.item] : [])));
+  if (!gone.size) return program;
+  notes.push(`Keine bodenlangen Vorhänge über der Küchenzeile (${[...overRun].join(', ')}): ${[...gone].join(', ')} weggelassen.`);
+  return { ...program, items: program.items.filter((i) => !gone.has(i.id)), relations: program.relations.filter((r) => !relationTouches(r, gone)) };
+}
+
+const relationTouches = (r: RoomProgram['relations'][number], ids: Set<string>): boolean =>
+  r.kind === 'around' ? r.items.some((i) => ids.has(i)) || ids.has(r.target) : r.kind === 'align' ? r.items.some((i) => ids.has(i)) : r.kind === 'pair' ? ids.has(r.item) || ids.has(r.item2) || ids.has(r.target) : ('item' in r && ids.has(r.item)) || ('target' in r && typeof r.target === 'string' && ids.has(r.target));
 
 const thingOfFurniture = (f: Furniture): Thing => ({ category: f.category, shape: shapeOf(f), height: f.height, width: f.width, depth: f.depth, name: f.name });
 
@@ -441,6 +494,40 @@ function parseKitchen(raw: unknown, f: ProgramFacts, problems: string[], notes: 
   }
   return out;
 }
+
+/** Storage a planned kitchen offers (K7), as metres of base-cabinet front: a tall unit holds about 2.5 base units, a wall cabinet 0.6, the sink cabinet half. */
+export function kitchenStorage(kitchen: readonly KitchenRun[], room: RoomAnalysis): number {
+  let total = 0;
+  let hood = false;
+  for (const run of kitchen) {
+    const wall = room.walls.find((w) => w.id === run.wall);
+    if (!wall) continue;
+    const dir = dot(sub(run.to, run.from), wall.dir) >= 0 ? 1 : -1;
+    let t = dot(sub(run.from, wall.a), wall.dir);
+    const windows = wall.openings.filter((o) => o.kind === 'window');
+    for (const id of run.modules) {
+      const m = findCatalogItem(id);
+      const w = m?.width ?? 0;
+      const lo = dir > 0 ? t : t - w;
+      const hi = dir > 0 ? t + w : t;
+      t += dir * w;
+      const type = m?.kitchen?.type;
+      if (type === 'base') total += w;
+      else if (type === 'sink') total += 0.5 * w;
+      else if (type === 'tall') total += 2.5 * w;
+      // the app hangs a wall cabinet over base, sink, dishwasher and oven where no window is (one hood instead over the cooktop)
+      if (type && ['base', 'sink', 'dishwasher', 'oven'].includes(type) && !windows.some((o) => o.t1 > lo + 0.05 && o.t0 < hi - 0.05)) {
+        if (!hood && (type === 'oven' || type === 'base')) hood = true;
+        else total += 0.6 * w;
+      }
+    }
+  }
+  return total;
+}
+
+/** Least kitchen storage (K7) in a room of at least `KITCHEN_STORAGE_FROM` m² where the kitchen is planned new. */
+export const KITCHEN_STORAGE_MIN = 2.0;
+const KITCHEN_STORAGE_FROM = 8;
 
 /** Room types asked with the strongest model when thorough: main rooms; small rooms go to Sonnet. */
 const MAIN_TYPES: RoomType[] = ['living', 'bedroom', 'kids', 'kitchen', 'dining', 'office'];

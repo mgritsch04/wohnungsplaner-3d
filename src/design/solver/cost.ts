@@ -342,7 +342,8 @@ function backGapCost(m: Model, n: Node): number {
   if (!backed(n)) return 0;
   const g = backGap(m, n);
   if (!(g > DEAD_GAP.lo && g < DEAD_GAP.hi)) return 0;
-  return 0.6 * Math.min(1, Math.min(g - DEAD_GAP.lo, DEAD_GAP.hi - g) / 0.15);
+  // a short ramp only: a sofa 67 cm in front of the window cost too little and stayed (image review of test flat A, 6.11.)
+  return 1.0 * Math.min(1, Math.min(g - DEAD_GAP.lo, DEAD_GAP.hi - g) / 0.05);
 }
 
 /** D1: a plant stands in a corner, at a window or at a wall, never free in the room. */
@@ -351,7 +352,7 @@ function plantPlaceCost(m: Model, n: Node): number {
   const p = { x: n.box.x, y: n.box.y };
   if (ctx.analysis.corners.some((c) => !c.reflex && Math.hypot(c.p.x - p.x, c.p.y - p.y) < 0.7)) return 0;
   const on = (wi: number, t: number) => add(ctx.walls[wi].a, scale(ctx.walls[wi].dir, t));
-  if (ctx.windows.some((w) => closestPointOnSegment(p, on(w.wall, w.t0), on(w.wall, w.t1)).distance < 1.0)) return 0;
+  if (ctx.windows.some((w) => closestPointOnSegment(p, on(w.wall, w.t0), on(w.wall, w.t1)).distance < 0.8)) return 0;
   const gap = Math.min(...ctx.walls.map((w, i) => closestPointOnSegment(p, w.a, on(i, w.length)).distance)) - Math.max(n.box.hw, n.box.hd);
   return gap < 0.35 ? 0 : 1.0;
 }

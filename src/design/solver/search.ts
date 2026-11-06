@@ -264,8 +264,9 @@ export function randomMove(m: Model, u: Unit, rng: Rng, start: Pose): Pose {
       const ww = m.ctx.walls[wi];
       return { ...p, wall: wi, t: n.spec.width / 2 + rng.next() * Math.max(0, ww.length - n.spec.width) };
     }
-    // step away from the wall
-    const off = 0.05 + rng.next() * 0.6;
+    // step away from the wall: a little, or past the dead strip to a passage behind (W9); only
+    // small steps left a sofa at the wall stuck behind the 10–75 cm the cost forbids
+    const off = rng.next() < 0.5 ? 0.05 + rng.next() * 0.6 : 0.8 + rng.next() * 1.2;
     return { mode: 'free', wall: u.wall, t: u.t, x: n.box.x + w.inward.x * off, y: n.box.y + w.inward.y * off, rot: snap90(n.box.rotation) };
   }
   if (r < 0.6) {

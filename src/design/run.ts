@@ -23,7 +23,7 @@ import { buildCritiquePrompt, LOOK_ENOUGH, parseCritique, type CritiqueInput } f
 import { roomPlanSvg, roomTextMap, type RoomPlan } from './render';
 import { reviewFlat, reviewRoom, type ReviewInput } from './review';
 import { BALANCED } from './review/overallRules';
-import { existingPieces, solveRoom } from './solver/solve';
+import { existingPieces, solveBest } from './solver/solve';
 import type { FlatAnalysis, FlatResult, Layout, PlacedItem, RoomAnalysis, RoomProgram, RoomResult } from './types';
 
 /** Rooms placed, walked through and criticised at the same time. */
@@ -141,7 +141,7 @@ interface RoomWork {
 
 /** Place and walk through one programme. */
 function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, rounds: number): RoomResult {
-  const layout = solveRoom(work.analysis, program, { existing: work.existing, seed, catalog: work.base.products, spread: BALANCED.has(work.type) });
+  const layout = solveBest(work.analysis, program, { existing: work.existing, seed, catalog: work.base.products, spread: BALANCED.has(work.type) });
   const review = reviewRoom(work.review(layout, program));
   return { roomId: work.analysis.roomId, program, layout, review, rounds };
 }

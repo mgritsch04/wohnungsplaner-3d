@@ -106,6 +106,16 @@ describe('furniture groups (#436)', () => {
     expect(rel(p, 'on', ids(p, 'generic-table-lamp')[0])).toMatchObject({ target: 'd' });
   });
 
+  it('takes Claude\'s pendant high over the seating group as the main light, not a second ceiling light (L1, test flat A 6.11.)', () => {
+    const { program: p } = completeGroups(
+      program([item('sofa', 'generic-sofa-3', 'z', { required: true }), item('coffee', 'generic-coffee-table'), item('lamp', 'generic-pendant')], [{ kind: 'front-of', item: 'coffee', target: 'sofa', gap: 0.45 }, { kind: 'above', item: 'lamp', target: 'coffee', height: 2.05 }]),
+      'living',
+      22,
+      2,
+    );
+    expect(ids(p, 'generic-pendant')).toEqual(['lamp']);
+  });
+
   it('hangs curtains as a pair at every window of a bedroom without them, in the zone by the window (R8)', () => {
     const plan: RoomProgram = { ...program([item('bed', 'generic-bed-160', 'z', { required: true }), item('c', 'generic-curtain', 'z')], [{ kind: 'window', item: 'c', window: 'F1', place: 'over' }]), zones: [{ id: 'z', function: 'Schlafen', rect: { x0: 0, y0: 0, x1: 3, y1: 4 }, why: '' }, { id: 'k', function: 'Kleidung', rect: { x0: 3.2, y0: 0, x1: 4, y1: 4 }, why: '' }] };
     const windows = [{ id: 'F1', x: 1, y: 0, rotation: 0 }, { id: 'F2', x: 4, y: 2, rotation: Math.PI / 2 }];

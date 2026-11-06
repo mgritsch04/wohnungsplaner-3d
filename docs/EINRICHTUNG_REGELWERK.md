@@ -51,6 +51,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | K4 | H | Arbeitsgang vor der Zeile 100–120 cm; zwischen zwei Zeilen oder zur Insel 120 cm. | Schubladen und Geschirrspüler öffnen, zu zweit arbeiten. | NKBA, Hornbach | Prompt, Löser, Begehung |
 | K5 | W | Arbeitslicht unter den Oberschränken (Lichtleiste vorn, 500 lx, Ra ≥ 90), nicht nur eine Deckenleuchte im Rücken. | Sonst steht man im eigenen Schatten beim Schneiden. | licht.de, DIN EN 12464-1 | Prompt, Begehung |
 | K6 | W | Oberschränke 50–60 cm über der Arbeitsplatte; Stauraum dort, wo er gebraucht wird (Geschirr bei Spüle und Geschirrspüler, Töpfe beim Kochfeld, Vorräte beim Kühlschrank). | Griffbereit ohne Laufen. | NKBA, Ratgeber | Prompt |
+| K7 | W | Genug Stauraum: in einer neuen Küche ab 8 m² mindestens etwa 2 m Schrankfront (Unterschränke ohne Geräte, Spülenschrank halb, Hochschrank 2,5-fach, Oberschränke 0,6-fach); liegt die Zeile unter dem Fenster, ersetzt ein Hochschrank neben dem Kühlschrank oder eine L-Küche die fehlenden Oberschränke. | Geschirr, Töpfe und Vorräte brauchen Platz hinter Fronten, sonst stehen sie auf der Arbeitsfläche. | Faustregel | Prompt |
 
 ## Arbeiten
 
@@ -83,6 +84,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | R7 | W | Bild: Bildmitte auf 145–155 cm, über einem Möbel Unterkante 15–25 cm über Lehne oder Platte und etwa ⅔ seiner Breite; nichts über Fenster oder Tür. | Auf Augenhöhe und im Maß des Möbels darunter. | Wohnglück, Montcarta | Prompt, Löser, Begehung |
 | R8 | W | Vorhänge als Paar, Stange 10–15 cm über dem Fenster und 10–25 cm seitlich darüber hinaus, offen neben dem Glas, bis knapp über den Boden. | Das Fenster wirkt größer, das Licht bleibt frei. | Homes & Gardens, Taskrabbit | Prompt, Löser |
 | R9 | T | Pflanzen in Ecken, neben Fenster oder Möbel, nie frei im Raum oder im Weg; kleine Pflanzen auf Fensterbank, Regal oder Sideboard. | Sie rahmen und beleben, ohne im Weg zu stehen. | Faustregel | Prompt, Löser |
+| R10 | W | Zonen klar getrennt: zwischen zwei Möbelgruppen (Essplatz und Sitzgruppe, Sitzgruppe und Leseecke) bleibt ein Durchgang von 60–90 cm; ein Sessel gehört zu genau einer Gruppe und steht nicht zwischen zweien. | Jede Zone wirkt für sich und man kommt hinein, ohne sich an Stühlen vorbeizudrücken. | Faustregel | Prompt |
 
 ## Stauraum
 
