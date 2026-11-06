@@ -88,10 +88,14 @@ describe('runFurnishing', { timeout: 150_000 }, () => {
 
   it('keeps the better round: a worse answer in the critique does not get used', async () => {
     // the critique answers with an empty room, which scores worse than anything placed
-    const empty = { reading: 'leer', zones: [], items: [], relations: [], walk: '-', check: [] };
-    const { sample } = fake((p, o) => (o.label?.startsWith('Kritik: ') ? empty : recorded(p, o)));
+    const empty = { reading: 'Leere Antwort der Kritik', zones: [], items: [], relations: [], walk: '-', check: [] };
+    const { sample, calls } = fake((p, o) => (o.label?.startsWith('Kritik: ') ? empty : recorded(p, o)));
     const r = await run(sample);
     for (const room of r.rooms) expect(room.layout.items.length).toBeGreaterThan(0);
+    // nor is it built on: the second round shows Claude the best programme so far again, not the empty one
+    const second = calls.filter((c) => c.label.endsWith('(Runde 2)'));
+    expect(second.length).toBeGreaterThan(0);
+    for (const c of second) expect(c.prompt).not.toContain('Leere Antwort der Kritik');
   });
 
   it('a failed critique round leaves the room as the first attempt placed it', async () => {

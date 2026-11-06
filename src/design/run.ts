@@ -23,7 +23,7 @@ import { buildCritiquePrompt, LOOK_ENOUGH, parseCritique, type CritiqueInput } f
 import { roomPlanSvg, roomTextMap, type RoomPlan } from './render';
 import { reviewFlat, reviewRoom, type ReviewInput } from './review';
 import { BALANCED } from './review/overallRules';
-import { droppedWeight, existingPieces, solveRoom } from './solver/solve';
+import { droppedWeight, existingPieces, solveRoom, type Judge } from './solver/solve';
 import type { FlatAnalysis, FlatResult, Layout, PlacedItem, RoomAnalysis, RoomProgram, RoomResult } from './types';
 
 /** Rooms placed, walked through and criticised at the same time. */
@@ -173,6 +173,16 @@ function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, roun
     const r: RoomResult = { roomId: work.analysis.roomId, program, layout, review, rounds };
     best = best ? betterPlacement(best, r, work.base.products) : r;
   }
+  // the walk-through moves what it still finds (#436): the chosen seed once more, with it as the judge
+  if (best!.review.findings.some((f) => f.severity !== 'L' && f.items.length)) {
+    const judge: Judge = (layout) => {
+      const rv = reviewRoom(work.review(layout, program));
+      return { passed: rv.passed, score: rv.score, items: [...new Set(rv.findings.filter((f) => f.severity !== 'L').flatMap((f) => f.items))] };
+    };
+    const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: best!.layout.seed, catalog: work.base.products, spread: BALANCED.has(work.type), judge });
+    const review = reviewRoom(work.review(layout, program));
+    best = betterPlacement(best!, { roomId: work.analysis.roomId, program, layout, review, rounds }, work.base.products);
+  }
   return best!;
 }
 
@@ -228,12 +238,12 @@ async function critique(input: FurnishRunInput, work: RoomWork, first: RoomResul
       log.ms = Date.now() - t0;
     }
   };
-  let current = first;
   for (let round = 1; round <= MAX_ROUNDS && !goodEnough(best); round++) {
-    const got = await ask(current, round, false);
+    const got = await ask(best, round, false);
     if (!got) return { ...best, rounds };
-    current = got.result;
-    best = better(best, current);
+    // a round that is not better is not built on: the next one starts again from the best so far
+    // (Q7, Roomer acceptance rule – a repair that breaks something elsewhere is dropped, 6.11.)
+    best = better(best, got.result);
   }
   if (goodEnough(best) && LOOK_TYPES.has(work.type) && input.wishes.quality !== 'fast') {
     for (let round = 1; round <= LOOK_ROUNDS; round++) {
