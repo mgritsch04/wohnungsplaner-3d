@@ -233,6 +233,15 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(r.notes.some((n) => n.startsWith('Keine bodenlangen Vorhänge'))).toBe(true);
   });
 
+  it('asks a couple\'s bedroom for at least 2 m of wardrobe (ST1, image review of test flat A, 6.11.)', () => {
+    // B's bedroom: a 160 bed and one 150 cm wardrobe; fine for the one person of the concept
+    const one = input('B', 'Schlafzimmer');
+    expect(parseRoomProgram(recorded('B', 'Schlafzimmer'), one).problems.some((p) => p.includes('(ST1)'))).toBe(false);
+    // the same room for a couple: too little
+    const two = { ...one, concept: { ...one.concept, living: 'Hier wohnt ein Paar mit wenig Zeit, beide arbeiten.' } };
+    expect(parseRoomProgram(recorded('B', 'Schlafzimmer'), two).problems.find((p) => p.includes('(ST1)'))).toMatch(/nur 150 cm/);
+  });
+
   it('asks for more kitchen storage where a new run has too little (K7)', () => {
     // B: the run lies under the window, no wall cabinets there, two narrow base units
     const b = parseRoomProgram(recorded('B', 'Wohnküche'), input('B', 'Wohnküche'));

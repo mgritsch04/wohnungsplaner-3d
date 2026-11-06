@@ -94,13 +94,13 @@ describe('C3 Fernseher', () => {
 });
 
 describe('C4 Esstisch', () => {
-  const dining = (opts: { chairs?: [number, number, 'N' | 'S'][]; pendant?: [number, number]; h?: number } = {}) => {
+  const dining = (opts: { chairs?: [number, number, 'N' | 'S'][]; pendant?: [number, number]; h?: number; ty?: number; type?: 'dining' | 'balcony' } = {}) => {
     const h = opts.h ?? 3;
     const chairs: [number, number, 'N' | 'S'][] = opts.chairs ?? [[1.6, 0.915, 'S'], [2.4, 0.915, 'S'], [1.6, 2.085, 'N'], [2.4, 2.085, 'N']];
     return review({
       room: rectRoom(4, h, { doors: [{ wall: 'W', at: h / 2 }] }),
-      type: 'dining',
-      items: [put('generic-dining-table-4', { x: 2, y: h / 2, face: 'S' }), ...chairs.map(([x, y, f]) => put('generic-chair', { x, y, face: f })), put('generic-pendant', { x: opts.pendant?.[0] ?? 2, y: opts.pendant?.[1] ?? h / 2 })],
+      type: opts.type ?? 'dining',
+      items: [put('generic-dining-table-4', { x: 2, y: opts.ty ?? h / 2, face: 'S' }), ...chairs.map(([x, y, f]) => put('generic-chair', { x, y, face: f })), put('generic-pendant', { x: opts.pendant?.[0] ?? 2, y: opts.pendant?.[1] ?? h / 2 })],
     });
   };
   it('chairs at the table, pendant above it, room behind the chairs', () => {
@@ -110,8 +110,15 @@ describe('C4 Esstisch', () => {
     expect(has(dining({ chairs: [[1.6, 0.915, 'S'], [2.4, 0.915, 'S'], [1.6, 2.085, 'N'], [3.6, 2.7, 'N']] }), 'C4', /nicht am Tisch/)).toBe(true);
   });
   it('less than 75 cm behind the chairs on two sides is light', () => {
-    const r = dining({ h: 2.0, chairs: [[1.6, 0.415, 'S'], [2.4, 0.415, 'S'], [1.6, 1.585, 'N'], [2.4, 1.585, 'N']] });
+    const r = dining({ h: 2.2, chairs: [[1.6, 0.515, 'S'], [2.4, 0.515, 'S'], [1.6, 1.685, 'N'], [2.4, 1.685, 'N']] });
     expect(r.findings.find((f) => f.rule === 'C4' && /75 cm/.test(f.text))?.severity).toBe('L');
+  });
+  it('a chair that cannot be pulled out is medium, even on one side (image review of test flats A and B, 6.11.)', () => {
+    // table edge 47 cm from the north wall, the south side free
+    const chairs: [number, number, 'N' | 'S'][] = [[1.6, 0.3, 'S'], [2.4, 0.3, 'S'], [1.6, 1.5, 'N'], [2.4, 1.5, 'N']];
+    expect(dining({ h: 3.0, ty: 0.9, chairs }).findings.find((f) => f.rule === 'C4' && /zurückschieben/.test(f.text))?.severity).toBe('M');
+    // on a balcony the bistro table stands at the railing on purpose
+    expect(has(dining({ h: 3.0, ty: 0.9, chairs, type: 'balcony' }), 'C4', /zurückschieben/)).toBe(false);
   });
   it('pendant not over the table is light', () => {
     expect(has(dining({ pendant: [0.5, 0.5] }), 'C4', /Pendel/)).toBe(true);

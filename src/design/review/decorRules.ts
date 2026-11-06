@@ -137,9 +137,9 @@ export function checkCurtains(ctx: RoomCtx): void {
     if (total < w.width - 0.05) ctx.add('D7', 'L', `Der Vorhang am Fenster ${w.label} ist mit ${cm(total)} cm schmaler als das Fenster (${cm(w.width)} cm).`, mine, mine[0]);
     else if (mine.length === 1 && w.width >= 0.8) ctx.add('D7', 'L', `Am Fenster ${w.label} hängt nur ein Vorhangschal auf einer Seite, ein Paar links und rechts rahmt das Fenster.`, mine, mine[0]);
   }
-  // a shelf or cabinet in the curtain drawn open traps the fabric (image review of test flat B, 6.11.)
+  // a shelf, cabinet or desk in the curtain drawn open traps the fabric (image review of test flat B, 6.11.)
   for (const c of curtains) {
-    const hit = ctx.items.find((i) => i.floor && i.category === 'storage' && overlaps(c.poly, i.poly, 0.02));
+    const hit = ctx.items.find((i) => i.floor && (i.category === 'storage' || i.category === 'desk') && overlaps(c.poly, i.poly, 0.02));
     if (hit) ctx.add('D7', 'L', `Der Vorhang ${ctx.label(c)} hängt im Weg von ${ctx.label(hit)}, er lässt sich dort nicht auf- und zuziehen.`, [c, hit], c);
   }
   if (ctx.options.darkening && ctx.type === 'bedroom' && ctx.windows.length && !curtains.length) ctx.add('D7', 'L', 'Das Schlafzimmer hat keine Verdunkelung, gewünscht ist ein dunkler Raum.', [], ctx.windows[0].mid);
