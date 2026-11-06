@@ -143,7 +143,8 @@ interface RoomWork {
  * Seeds placed per programme (#436). The search lands in very different places per seed: the same
  * programme of test flat B's living kitchen walked through at 0 to 88 points over twelve seeds
  * (6.11.), and the seed with the lowest solver cost was not the one with the best walk-through.
- * So the walk-through picks; after `PLACE_TRIES` seeds the rest are tried only while none passes.
+ * So the walk-through picks; after `PLACE_TRIES` seeds the rest are tried only while none passes
+ * with every piece in the room.
  */
 export const PLACE_TRIES = 3;
 export const PLACE_TRIES_FAILING = 5;
@@ -166,7 +167,7 @@ export function betterPlacement(a: RoomResult, b: RoomResult, catalog?: CatalogI
 function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, rounds: number): RoomResult {
   let best: RoomResult | null = null;
   for (let k = 0; k < PLACE_TRIES_FAILING; k++) {
-    if (best && k >= PLACE_TRIES && best.review.passed) break;
+    if (best && k >= PLACE_TRIES && best.review.passed && !best.layout.dropped.length) break;
     const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: seed + k * 1000, catalog: work.base.products, spread: BALANCED.has(work.type) });
     const review = reviewRoom(work.review(layout, program));
     const r: RoomResult = { roomId: work.analysis.roomId, program, layout, review, rounds };
