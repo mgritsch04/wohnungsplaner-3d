@@ -41,6 +41,7 @@ import { WalkPathHint, WalkPathOverlay } from './WalkPathOverlay';
 import { DevicesOverlay2D } from '../smarthome/DevicesOverlay2D';
 import { Fixtures2D } from '../installation/Fixtures2D';
 import { WifiOverlay2D } from '../smarthome/WifiOverlay2D';
+import { WifiMarkers2D } from '../smarthome/WifiMarkers2D';
 import { LuxOverlay2D } from './LuxOverlay2D';
 import { walkPathClick } from './walkPathStore';
 import { markKindInfo } from '../model/marks';
@@ -1046,6 +1047,7 @@ export function Editor2D() {
           <LuxOverlay2D project={project} px={px} />
           {view.zoom >= ICON_MIN_ZOOM && <Fixtures2D project={project} px={px} />}
           {view.zoom >= ICON_MIN_ZOOM && <DevicesOverlay2D project={project} px={px} />}
+          <WifiMarkers2D project={project} px={px} />
           {view.zoom >= ICON_MIN_ZOOM && <NotePins2D project={project} derived={derived} px={px} />}
           <ZonesOverlay2D zones={project.zones} px={px} editingId={zoneEdit?.id} />
           {tool === 'zone' && <ZoneDraft points={zoneEdit && !zoneEdit.id ? zoneEdit.points.concat(zoneEdit.points[0]) : zonePoly} cursor={zonePoly.length ? preview.snap?.point : null} px={px} />}

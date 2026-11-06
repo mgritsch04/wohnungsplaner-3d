@@ -13,6 +13,7 @@
 import { kitchenWorkTriangles } from '../kitchen/workTriangle';
 import { roomCoverage, occludersOf } from '../smarthome/simulation';
 import { levelOf, LEVEL_LABEL, roomWifi, wifiGrid } from '../smarthome/wifi';
+import { buildNet, checkClients, fmtMbps } from '../smarthome/wifiPlan';
 import { checkCircuits, formatWatts } from './circuits';
 import { computeDaylight, DAYLIGHT_LABEL, isOutdoorRoom } from './daylight';
 import type { DerivedPlan } from './derived';
@@ -193,6 +194,12 @@ export function runPlanCheck(project: Project, derived: DerivedPlan): PlanCheckR
         at: centre(w.roomId),
         select: { type: 'room', id: w.roomId },
       });
+    }
+    // own WLAN devices that get less than they need (#492)
+    if (project.wifiClients.length) {
+      for (const c of checkClients(buildNet(project, derived)).filter((x) => x.own && !x.ok)) {
+        items.push({ id: `wifi-client:${c.id}`, category: 'wifi', severity: 'info', title: `„${c.name}“: WLAN reicht nicht (ca. ${fmtMbps(c.mbps)})`, detail: c.advice, at: { x: c.x, y: c.y } });
+      }
     }
   }
 
