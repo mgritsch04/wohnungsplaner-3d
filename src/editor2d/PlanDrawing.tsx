@@ -358,6 +358,17 @@ export const FurnitureSymbol = memo(function FurnitureSymbol({
       details.push(line(-w / 2, -d / 2, w / 2, d / 2, 'x1'));
       details.push(line(-w / 2, d / 2, w / 2, -d / 2, 'x2'));
       break;
+    case 'bike': {
+      // top view of a bike (#493): both tyres, the frame between them and the handlebar across the front
+      const dw = Math.min(f.height * 0.68, w * 0.4);
+      const tyre = Math.min(0.05, d * 0.2);
+      details.push(rect(-w / 2, -tyre / 2, dw, tyre, 'rear', tyre / 2));
+      details.push(rect(w / 2 - dw, -tyre / 2, dw, tyre, 'front', tyre / 2));
+      details.push(line(-w / 2 + dw / 2, 0, w / 2 - dw / 2, 0, 'frame'));
+      details.push(line(w / 2 - dw * 0.62, -d / 2 + 0.02, w / 2 - dw * 0.62, d / 2 - 0.02, 'bar'));
+      break;
+    }
+    case 'cylinder':
     case 'table-round':
       return (
         <g transform={`translate(${f.x} ${f.y}) rotate(${radToDeg(f.rotation)})`}>

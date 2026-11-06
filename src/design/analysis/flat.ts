@@ -3,6 +3,7 @@
  * rooms connect, where one comes in and which rooms one walks through to reach others.
  */
 import { derivePlan, type DerivedPlan } from '../../model/derived';
+import { isFixedPiece } from '../../model/fixed';
 import { furnitureFootprint, isPassageObstacle } from '../../model/passages';
 import type { Project } from '../../model/schema';
 import { add, dot, pointInPolygon, scale, sub, type Vec2 } from '../../model/vec';
@@ -102,7 +103,7 @@ export function analyzeFlat(project: Project, d: DerivedPlan = derivePlan(projec
 
     // ways between all passable openings in the empty room (existing pieces block)
     const width = typeFromName === 'hall' || passThrough ? WAY_WIDTH.main : WAY_WIDTH.other;
-    const existing = project.furniture.filter((f) => f.existing && pointInPolygon(f, outline));
+    const existing = project.furniture.filter((f) => isFixedPiece(f) && pointInPolygon(f, outline));
     const grid = walkGrid(outline, existing.filter(isPassageObstacle).map(furnitureFootprint));
     const ends = wayEnds(rw);
     // every pair of openings; with more than four (a hall), from the main door to each other one:

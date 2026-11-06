@@ -183,6 +183,8 @@ export const ModelRefSchema = z.discriminatedUnion('type', [
       .max(80_000)
       .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
       .optional(),
+    /** Print without a frame (#493), e.g. a metal poster: the `texture` fills the whole front. Only for `picture`. */
+    frameless: z.boolean().optional(),
   }),
   z.object({
     type: z.literal('gltf'),
@@ -311,6 +313,8 @@ export const FurnitureSchema = z.object({
   suggested: z.boolean().optional(),
   /** Packages or parts with their sizes (#487); absent = the piece is carried in one go. Optional: older files stay valid. */
   packages: z.array(FurniturePackageSchema).max(30).optional(),
+  /** Fixed given for the furnishing suggestion (#493): it plans around this piece and never moves it, like fitted pieces (`existing`). Optional: older files stay valid. */
+  fixed: z.boolean().optional(),
 });
 
 /**

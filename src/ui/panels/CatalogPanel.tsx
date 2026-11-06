@@ -1,26 +1,25 @@
 import { useMemo, useState } from 'react';
 import { GENERIC_CATALOG } from '../../catalog/generic';
-import { CATEGORIES, categoryLabel, type CatalogItem } from '../../catalog/types';
+import { CATEGORIES, categoryLabel } from '../../catalog/types';
 import { useCatalogStore } from '../../catalog/catalogStore';
-import { formatEuro } from '../../model/units';
-import { addCatalogItem } from '../actions';
-import { Badge } from '../fields';
 import { importCatalogFile } from '../../catalog/catalogImport';
 import { useDialogStore } from '../dialogStore';
-import { endCatalogDrag, startCatalogDrag } from '../../catalog/catalogDrag';
 import { useIkeaDrafts } from '../../catalog/ikeaDrafts';
 import { isMoebelixDraft } from '../../catalog/ikeaSelection';
 import { findDuplicateGroups } from '../../catalog/duplicates';
 import { useProjectStore } from '../../store/projectStore';
 import { DuplicatesSection } from './DuplicatesSection';
 import { IkeaSection, MoebelixSection } from './IkeaSection';
+import { OwnSection } from './OwnSection';
+import { CatalogRow } from './CatalogRow';
 import s from './IkeaSection.module.css';
 
 export function CatalogPanel() {
-  const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix' | 'duplicates'>('catalog');
+  const [view, setView] = useState<'catalog' | 'ikea' | 'moebelix' | 'own' | 'duplicates'>('catalog');
   const drafts = useIkeaDrafts((st) => st.drafts);
   const importedItems = useCatalogStore((st) => st.items);
   const furniture = useProjectStore((st) => st.project.furniture);
+  const ownCount = importedItems.filter((i) => i.source === 'own').length;
   const dupCount = useMemo(() => findDuplicateGroups(importedItems, { furniture }).length, [importedItems, furniture]);
   const waiting = { ikea: drafts.filter((d) => !isMoebelixDraft(d.draft)).length, moebelix: drafts.filter((d) => isMoebelixDraft(d.draft)).length };
   return (
@@ -35,6 +34,9 @@ export function CatalogPanel() {
         <button className={view === 'moebelix' ? 'active' : ''} aria-pressed={view === 'moebelix'} onClick={() => setView('moebelix')}>
           Möbelix{waiting.moebelix ? ` (${waiting.moebelix} ohne Maße)` : ''}
         </button>
+        <button className={view === 'own' ? 'active' : ''} aria-pressed={view === 'own'} onClick={() => setView('own')} data-testid="catalog-own-tab">
+          Eigene{ownCount ? ` (${ownCount})` : ''}
+        </button>
         {dupCount > 0 && (
           <button className={view === 'duplicates' ? 'active' : ''} aria-pressed={view === 'duplicates'} onClick={() => setView('duplicates')}>
             Doppelte ({dupCount})
@@ -48,7 +50,7 @@ export function CatalogPanel() {
           {waiting.moebelix > 0 && <button onClick={() => setView('moebelix')}>Möbelix › Maße fehlen</button>}
         </p>
       )}
-      {view === 'duplicates' ? <DuplicatesSection /> : view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : <CatalogList />}
+      {view === 'duplicates' ? <DuplicatesSection /> : view === 'ikea' ? <IkeaSection /> : view === 'moebelix' ? <MoebelixSection /> : view === 'own' ? <OwnSection /> : <CatalogList />}
     </div>
   );
 }
@@ -58,7 +60,7 @@ function CatalogList() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [maxWidth, setMaxWidth] = useState<number | null>(null);
-  const [source, setSource] = useState<'all' | 'generic' | 'imported'>('all');
+  const [source, setSource] = useState<'all' | 'generic' | 'imported' | 'own'>('all');
 
   const all = useMemo(() => [...imported, ...GENERIC_CATALOG], [imported]);
   const items = useMemo(() => {
@@ -106,7 +108,8 @@ function CatalogList() {
               <select value={source} onChange={(e) => setSource(e.target.value as typeof source)}>
                 <option value="all">Alle</option>
                 <option value="generic">Generisch</option>
-                <option value="imported">Importiert ({imported.length})</option>
+                <option value="imported">Importiert ({imported.filter((i) => i.source === 'imported').length})</option>
+                <option value="own">Eigene ({imported.filter((i) => i.source === 'own').length})</option>
               </select>
             </span>
           </label>
@@ -137,39 +140,5 @@ function CatalogList() {
         </p>
       </div>
     </>
-  );
-}
-
-function CatalogRow({ item }: { item: CatalogItem }) {
-  return (
-    <li>
-      <button
-        className="catalog-item"
-        onClick={() => addCatalogItem(item)}
-        draggable
-        onDragStart={(e) => startCatalogDrag(e.dataTransfer, item)}
-        onDragEnd={endCatalogDrag}
-        title="Klicken zum Hinzufügen oder in den Plan ziehen"
-      >
-        <span className="swatch" style={{ background: item.color }} />
-        <span className="catalog-main">
-          <span className="catalog-name">{item.name}</span>
-          <span className="catalog-meta">
-            {Math.round(item.width * 100)} × {Math.round(item.depth * 100)} × {Math.round(item.height * 100)} cm
-            {item.brand ? ` · ${item.brand}` : ''}
-          </span>
-        </span>
-        <span className="catalog-price">
-          {item.price ? (
-            <>
-              {formatEuro(item.price.amount)}
-              {item.price.status === 'estimate' && <Badge kind="muted">Schätzung</Badge>}
-            </>
-          ) : (
-            <Badge kind="muted">ohne Preis</Badge>
-          )}
-        </span>
-      </button>
-    </li>
   );
 }

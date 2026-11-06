@@ -41,6 +41,7 @@ export function createFurnitureFromCatalog(item: CatalogItem, at: { x: number; y
     solid: item.solid,
     kitchen: item.kitchen ? { ...item.kitchen } : undefined,
     locked: false,
-    existing: false,
+    existing: item.owned === true,
+    ...(item.fixed ? { fixed: true } : {}),
   };
 }

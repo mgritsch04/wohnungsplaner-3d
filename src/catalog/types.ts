@@ -13,6 +13,7 @@ export const CATEGORIES = [
   { id: 'appliance', label: 'Geräte' },
   { id: 'bathroom', label: 'Bad' },
   { id: 'decor', label: 'Deko & Pflanzen' },
+  { id: 'sport', label: 'Sport & Hobby' },
   { id: 'stairs', label: 'Treppen' },
 ] as const;
 
@@ -44,10 +45,14 @@ export interface CatalogItem {
   tags: string[];
   kitchen?: KitchenModule;
   /** Where this catalog entry comes from. */
-  source: 'generic' | 'imported';
+  source: 'generic' | 'imported' | 'own';
   /** Identifier of the imported catalog file, if any. */
   sourceName?: string;
   /** Name of the .glb file the product list referenced (to attach it later, e.g. when chosen separately). */
   modelFile?: string;
   description?: string;
+  /** Own object (#493): the furnishing suggestion plans around it and never moves it. */
+  fixed?: boolean;
+  /** Own object (#493): already owned, so it is not part of budget and shopping list. */
+  owned?: boolean;
 }
