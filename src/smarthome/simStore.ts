@@ -1,18 +1,23 @@
 import { create } from 'zustand';
 import { derivePlan } from '../model/derived';
-import type { Project, SmartDeviceKind } from '../model/schema';
+import type { Project, SmartDeviceKind, WifiAp, WifiClientType } from '../model/schema';
 import type { Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 import { useWalkPose } from '../store/walkPoseStore';
-import type { WifiBand } from './wifi';
+import type { HeatBand, HeatMode, NodeSuggestion } from './wifiPlan';
 import { doorMotionPoints, initialState, lightOverrides, occludersOf, step, withHour, type Occluder, type SimState } from './simulation';
 
 /** Device waiting to be placed by a click into the 2D plan (#233). */
 export interface Placing {
   kind: SmartDeviceKind;
   productId?: string;
+  /** kind `router` (#492): role etc. of the access point to place */
+  wifi?: WifiAp;
 }
+
+/** WLAN marker waiting for a click into the plan (#492): a neighbour network, an own device or a measuring point. */
+export type WifiPlacing = { type: 'neighbor'; id: string } | { type: 'client'; clientType: WifiClientType } | { type: 'measure'; id: string };
 
 export type PanelStep = 'devices' | 'rules' | 'test';
 
@@ -33,11 +38,19 @@ interface SimStore {
   setStep: (s: PanelStep) => void;
   /** WLAN coverage layer in the 2D plan (#253) and its band */
   wifiOn: boolean;
-  wifiBand: WifiBand;
+  wifiBand: HeatBand;
   wifiRec: boolean;
   setWifiRec: (on: boolean) => void;
   setWifi: (on: boolean) => void;
-  setWifiBand: (b: WifiBand) => void;
+  setWifiBand: (b: HeatBand) => void;
+  /** what the colour layer shows (#492) */
+  wifiMode: HeatMode;
+  setWifiMode: (m: HeatMode) => void;
+  wifiPlacing: WifiPlacing | null;
+  setWifiPlacing: (p: WifiPlacing | null) => void;
+  /** suggested repeater / mesh positions shown in the plan (#492) */
+  wifiSuggest: NodeSuggestion[] | null;
+  setWifiSuggest: (s: NodeSuggestion[] | null) => void;
   start: () => void;
   stop: () => void;
   setSpeed: (s: number) => void;
@@ -113,11 +126,17 @@ export const useSimStore = create<SimStore>((set, get) => ({
   step: 'devices',
   setStep: (step) => set({ step }),
   wifiOn: false,
-  wifiBand: '2.4',
+  wifiBand: 'best',
   wifiRec: false,
   setWifiRec: (wifiRec) => set({ wifiRec }),
   setWifi: (wifiOn) => set({ wifiOn }),
   setWifiBand: (wifiBand) => set({ wifiBand }),
+  wifiMode: 'rate',
+  setWifiMode: (wifiMode) => set({ wifiMode }),
+  wifiPlacing: null,
+  setWifiPlacing: (wifiPlacing) => set({ wifiPlacing }),
+  wifiSuggest: null,
+  setWifiSuggest: (wifiSuggest) => set({ wifiSuggest }),
   start: () => {
     if (get().running) return;
     const project = useProjectStore.getState().project;

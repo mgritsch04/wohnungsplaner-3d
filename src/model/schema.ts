@@ -183,6 +183,8 @@ export const ModelRefSchema = z.discriminatedUnion('type', [
       .max(80_000)
       .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
       .optional(),
+    /** Print without a frame (#493), e.g. a metal poster: the `texture` fills the whole front. Only for `picture`. */
+    frameless: z.boolean().optional(),
   }),
   z.object({
     type: z.literal('gltf'),
@@ -311,6 +313,8 @@ export const FurnitureSchema = z.object({
   suggested: z.boolean().optional(),
   /** Packages or parts with their sizes (#487); absent = the piece is carried in one go. Optional: older files stay valid. */
   packages: z.array(FurniturePackageSchema).max(30).optional(),
+  /** Fixed given for the furnishing suggestion (#493): it plans around this piece and never moves it, like fitted pieces (`existing`). Optional: older files stay valid. */
+  fixed: z.boolean().optional(),
 });
 
 /**
@@ -342,6 +346,64 @@ export const LightSchema = z.object({
  * behaviour in the simulation, `productId` points into the device catalog
  * (smarthome/catalog.ts) whose datasheet values are used unless overridden here.
  */
+/**
+ * WLAN settings of a router / access point (#492). All optional: a router without them is the main
+ * router (WLAN 6, 2,4 + 5 GHz, power at the EU limit). `model` is the user's own name of the device –
+ * no product data is invented; `txDbm` only when the user takes it from a datasheet.
+ */
+export const WifiStandardSchema = z.enum(['wifi4', 'wifi5', 'wifi6', 'wifi6e', 'wifi7']);
+export const WifiApSchema = z.object({
+  /** router = main router (internet); ap = access point on a LAN cable; mesh = mesh node; repeater = plug-in repeater */
+  role: z.enum(['router', 'ap', 'mesh', 'repeater']).optional(),
+  standard: WifiStandardSchema.optional(),
+  model: z.string().max(100).optional(),
+  txDbm: z.number().min(0).max(36).optional(),
+  /** spatial streams (antennas) of the device; unset = 2 */
+  streams: z.number().int().min(1).max(4).optional(),
+  ch24: z.number().int().min(1).max(13).optional(),
+  ch5: z.number().int().min(36).max(165).optional(),
+  width5: z.union([z.literal(20), z.literal(40), z.literal(80), z.literal(160)]).optional(),
+  ch6: z.number().int().min(1).max(233).optional(),
+  /** mesh/repeater/ap: the access point it connects to (unset = the strongest one in reach) */
+  uplinkId: z.string().optional(),
+  /** how it connects: LAN cable, own radio band (tri-band mesh) or the same radio as the clients (repeater) */
+  backhaul: z.enum(['wired', 'wireless-dedicated', 'wireless-shared']).optional(),
+});
+
+/** A neighbour's WLAN (#492), entered from a WLAN app (name, band, channel, optional measured strength). */
+export const WifiNeighborSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(100),
+  /** assumed position of the neighbour's router (usually just behind a wall of the flat) */
+  x: finite(),
+  y: finite(),
+  band: z.enum(['2.4', '5', '6']),
+  channel: z.number().int().min(1).max(233),
+  width: z.union([z.literal(20), z.literal(40), z.literal(80), z.literal(160)]).default(20),
+  /** same storey, the flat above or below (adds the loss of a ceiling) */
+  floor: z.enum(['same', 'above', 'below']).default('same'),
+  /** how busy the network is (share of air time it takes) */
+  load: z.enum(['low', 'medium', 'high']).default('medium'),
+  /** strength the user measured (dBm) and where; calibrates the estimate */
+  measuredDbm: z.number().min(-100).max(-10).optional(),
+  measuredAt: Vec2Schema.optional(),
+});
+
+export const WifiClientTypeSchema = z.enum(['phone', 'laptop', 'tablet', 'pc', 'tv', 'console', 'smart', 'other']);
+/** An own device that uses the WLAN (#492): laptop, TV, PC … placed where it is mostly used. */
+export const WifiClientSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().max(100),
+  type: WifiClientTypeSchema,
+  x: finite(),
+  y: finite(),
+  /** data rate it needs (Mbit/s); unset = typical value of the type */
+  needMbps: z.number().min(0.1).max(10000).optional(),
+  /** bands the device can use; unset = typical value of the type */
+  bands: z.enum(['2.4', '2.4+5', '2.4+5+6']).optional(),
+  streams: z.number().int().min(1).max(4).optional(),
+});
+
 export const SmartDeviceKindSchema = z.enum(['motion', 'presence', 'contact', 'light', 'plug', 'router', 'strip', 'speaker', 'blind']);
 export const SmartDeviceSchema = z.object({
   id: z.string().min(1),
@@ -382,6 +444,8 @@ export const SmartDeviceSchema = z.object({
   audioDefId: z.string().optional(),
   /** Purchase phase (#363); absent = by the smart-home concept phase of the device kind. */
   buyPhase: BuyPhaseSchema.optional(),
+  /** kind `router` (#492): role, WLAN standard, channels, uplink. */
+  wifi: WifiApSchema.optional(),
 });
 
 /**
@@ -677,6 +741,9 @@ export const LevelPlanSchema = z.object({
   marks: z.array(MarkSchema).default([]),
   /** Marked areas with a purpose (#416) of this storey. */
   zones: z.array(ZoneSchema).default([]),
+  /** Neighbour WLANs and own WLAN devices (#492) of this storey. */
+  wifiNeighbors: z.array(WifiNeighborSchema).max(100).default([]),
+  wifiClients: z.array(WifiClientSchema).max(200).default([]),
   underlay: UnderlaySchema.nullable().default(null),
 });
 
@@ -721,6 +788,11 @@ export const ProjectSchema = z.object({
   marks: z.array(MarkSchema).default([]),
   /** Marked areas with a purpose for the furnishing proposal (#416); projects saved before lack the field. */
   zones: z.array(ZoneSchema).default([]),
+  /** Neighbour WLANs and own WLAN devices (#492); projects saved before lack the fields. */
+  wifiNeighbors: z.array(WifiNeighborSchema).max(100).default([]),
+  wifiClients: z.array(WifiClientSchema).max(200).default([]),
+  /** Speed of the internet line (Mbit/s, #492); caps the WLAN estimate. */
+  wifiInternetMbps: z.number().min(1).max(100000).optional(),
   /** Installation plan (#64, #81): sockets, switches, radiators, water/waste-water connections; projects saved before lack the field. */
   fixtures: z.array(FixtureSchema).default([]),
   /** Circuits and consumers for the power check (#135); projects saved before lack the fields. */
@@ -767,6 +839,11 @@ export type Light = z.infer<typeof LightSchema>;
 export type Shading = z.infer<typeof ShadingSchema>;
 export type SmartDeviceKind = z.infer<typeof SmartDeviceKindSchema>;
 export type SmartDevice = z.infer<typeof SmartDeviceSchema>;
+export type WifiAp = z.infer<typeof WifiApSchema>;
+export type WifiStandard = z.infer<typeof WifiStandardSchema>;
+export type WifiNeighbor = z.infer<typeof WifiNeighborSchema>;
+export type WifiClient = z.infer<typeof WifiClientSchema>;
+export type WifiClientType = z.infer<typeof WifiClientTypeSchema>;
 export type AudioDeviceDef = z.infer<typeof AudioDeviceDefSchema>;
 export type Automation = z.infer<typeof AutomationSchema>;
 export type MarkKind = z.infer<typeof MarkKindSchema>;

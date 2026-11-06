@@ -57,6 +57,13 @@ export function existingLabels(project: Project, room: RoomAnalysis): { label: s
     .map((f, i) => ({ label: `B${i + 1}`, f }));
 }
 
+/**
+ * The user's own fixed desk or bed (#493) is the room's desk or bed: Claude listing another one
+ * (not in a children's room, which may have two beds) would plan a double.
+ */
+export const ownGivenAlready = (pieces: readonly Furniture[], shape: string, roomType: string): boolean =>
+  (shape === 'desk' || (shape === 'bed' && roomType !== 'kids')) && pieces.some((e) => e.fixed === true && !e.existing && shapeOf(e) === shape);
+
 const hasKitchen = (pieces: readonly Furniture[]) => pieces.some((f) => !!f.kitchen || shapeOf(f).startsWith('k-'));
 
 /** Does the room get a kitchen run from Claude: cooking is here and no kitchen is there yet. */
@@ -130,7 +137,7 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
 4. Lichtplan: Grundlicht, Licht für jede Zone, Stimmungslicht (L1, L2).
 5. Stauraum: wohin kommen Kleidung, Bücher, Vorräte, Alltagskram (ST1–ST3)?
 6. Stil: jedes Teil mit Farbe aus dem Farbschema des Raums (60/30/10, SL2; große Möbel in der Möbelfarbe, Teppich, Vorhänge und Kissen in der Textilfarbe, Deko in der Akzentfarbe, nichts gegen die Wandfarbe), Material und Form im "label" (z. B. „Sofa 3-Sitzer, Leinen hellgrau, schmale Eichenfüße“), dazu "features" mit den Funktionen, die es haben muss (z. B. „Schlaffunktion“, „Stauraum“, „Schubladen“, „dimmbar“). Wiederkehrende Materialien, höchstens 2–3 Holztöne (SL3), Formen und Texturen gemischt (SL4).
-7. Textilien und Deko: Teppiche, Vorhänge, Bilder, Pflanzen, jedes Teil mit Platz und Grund; lieber wenige gute Stücke (SL6).
+7. Textilien und Deko: Teppiche, Vorhänge, Bilder, Pflanzen, jedes Teil mit Platz und Grund; lieber wenige gute Stücke (SL6). Zierkissen („generic-cushions“), Decken („generic-throw“, „generic-bed-throw“), Vase, Kerzentablett, Kräuter, Obstschale, Schreibtisch-Set, Handtücher und Wanduhr gibt es im Katalog; sie liegen oder stehen mit der Beziehung „on“ auf Sofa, Bett oder Tisch (SL8). Fehlt dir etwas davon, ergänzt der Planer es selbst.
 8. Begehung im Kopf und Selbstprüfung: Kommt man überall bequem durch? Öffnen alle Türen ganz? Ist jedes Möbel erreichbar? Gehe das Regelwerk unten Kennung für Kennung durch und schreibe in "check", was du geprüft hast („W2: Couchtisch 45 cm vor dem Sofa“). Würde eine Innenarchitektin das so abgeben?
 
 Wohnkonzept: ${concept.living}
@@ -274,7 +281,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     }
     const t = thingOf(c);
     // already there: the existing WC or basin listed again, a piece with the id or name of an existing one
-    if (f.existing.some((x) => x.label === id || x.f.id === id || key(x.f.name) === key(label)) || ((SANITARY.has(t.shape) || isKitchenModule(c)) && existingShapes.has(t.shape)) || /\(bestand\)|\bbestand\b|vorhanden/i.test(label)) {
+    if (f.existing.some((x) => x.label === id || x.f.id === id || key(x.f.name) === key(label)) || ((SANITARY.has(t.shape) || isKitchenModule(c)) && existingShapes.has(t.shape)) || /\(bestand\)|\bbestand\b|vorhanden/i.test(label) || ownGivenAlready(f.all, t.shape, f.rc.type)) {
       notes.push(`Teil „${id}“ (${c.name}) ist schon da (Bestand), nicht noch einmal aufgenommen.`);
       const same = f.existing.find((x) => x.label === id || x.f.id === id || shapeOf(x.f) === t.shape);
       if (same) duplicateOf.set(id, same.label);
@@ -399,7 +406,8 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);
   notes.push(...groups.notes);
   // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
-  const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, schemeOf(f.rc, input.concept.style).accent);
+  const scheme = schemeOf(f.rc, input.concept.style);
+  const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
   notes.push(...decor.notes);
   return { value: withoutKitchenCurtains(decor.program, room, notes), problems, notes };
 }

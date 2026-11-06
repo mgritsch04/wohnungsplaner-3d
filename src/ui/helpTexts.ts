@@ -28,6 +28,10 @@ export const HELP_TEXTS = {
     term: 'Grafikqualität',
     text: '„Hoch“ zeigt feinere Spiegelungen und Schatten, braucht aber eine starke Grafikkarte. „Automatisch“ wählt „Hoch“ nur am PC mit Grafikkarte.',
   },
+  ownObject: {
+    term: 'Eigenes Objekt, feste Vorgabe',
+    text: 'Eigene Objekte (Katalog › Eigene) sind Dinge ohne IKEA/Möbelix: Fahrrad, fremder Schreibtisch, Poster. „Feste Vorgabe“: Der Einrichtungsvorschlag plant darum herum.',
+  },
   levels: {
     term: 'Etagen',
     text: 'Für Häuser mit mehreren Geschossen. Jede Etage hat ihren eigenen Plan; du bearbeitest immer eine. Die anderen zeigt die 3D-Ansicht mit. Wechseln: Etagen-Knöpfe am Plan oder Bild auf / Bild ab.',

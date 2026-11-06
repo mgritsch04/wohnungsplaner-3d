@@ -63,6 +63,8 @@ export function isFloor(n: Node): boolean {
 }
 const isRug = (n: Node) => n.spec.base === 'rug';
 const isWallItem = (n: Node) => n.spec.base === 'wall' && !n.spec.item.kitchen;
+/** A piece stacked on another one (dryer on the washer): it hides what hangs on the wall behind it like floor furniture does. */
+const isStackedOn = (n: Node) => (n.spec.base === 'stack' || n.spec.base === 'floor') && n.rule?.kind === 'above' && n.elevation >= 0.05;
 /** Furniture one cannot squeeze past: not plants, lamps or chairs (C9). */
 const isFirm = (n: Node) => isFloor(n) && n.spec.shape !== 'plant' && n.spec.role !== 'floor-lamp' && n.spec.role !== 'seat' && n.spec.shape !== 'vacuum';
 /** Kitchen modules that end at worktop height; a tall unit or fridge is as tall as it is. */
@@ -413,7 +415,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       }
       continue;
     }
-    if (!fa && !wa) continue;
+    if (!fa && !wa && !isStackedOn(a)) continue;
     for (const b of v.nodes) {
       if (isRug(b) && fa && a.spec.wall === 'always') {
         const d = overlapDepth(a.poly, b.poly);
@@ -422,7 +424,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       }
       const fb = isFloor(b);
       const wb = isWallItem(b);
-      if (!fb && !wb) continue;
+      if (!fb && !wb && !isStackedOn(b)) continue;
       if (Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) > a.reach + b.reach) continue;
       if (fa && fb) {
         if (!tucked(a, b)) {

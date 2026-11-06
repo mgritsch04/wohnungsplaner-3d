@@ -23,6 +23,8 @@ export function createEmptyProject(name = 'Neue Wohnung'): Project {
     automations: [],
     marks: [],
     zones: [],
+    wifiNeighbors: [],
+    wifiClients: [],
     materials: DEFAULT_MATERIALS.map((m) => ({ ...m })),
     underlay: null,
     cameraBookmarks: [],

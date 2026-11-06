@@ -13,6 +13,7 @@ import { rulesOf, ruleSentence } from './rules';
 import { blindClosed, sensorParams } from './simulation';
 import { formatLength, STRIP_DIRECTIONS, stripColor, stripLengthM, stripPoints } from './strip';
 import { useSimStore } from './simStore';
+import { WifiApFields } from './WifiPanel';
 import css from './SmartHomePanel.module.css';
 
 const isSensor = (d: SmartDevice) => d.kind === 'motion' || d.kind === 'presence';
@@ -163,6 +164,7 @@ export function DeviceInfo({ id, project }: { id: string; project: Project }) {
               </button>
             )}
           </div>
+          {d.kind === 'router' && <WifiApFields project={project} device={d} />}
           {d.kind === 'speaker' && (
             <SelectField label="Art" value={d.speakerType ?? 'bookshelf'} options={Object.entries(SPEAKER_TYPES).map(([value, s]) => ({ value, label: s.label }))} onChange={(v) => updateDevice(d.id, { speakerType: v as SpeakerType, elevation: SPEAKER_TYPES[v as SpeakerType].elevation })} />
           )}

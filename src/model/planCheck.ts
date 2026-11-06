@@ -4,7 +4,7 @@
  * Runs all existing plan checks in one go and returns one sorted list plus a traffic light:
  * collisions and door swing (#4, #267), narrow passages (#68), walk routes between rooms (#67),
  * kitchen work triangle (#82), daylight (#69), Wi-Fi coverage (#253), circuit load (#135) and
- * sensor coverage (#236). Nothing is re-implemented here – every finding comes from the
+ * sensor coverage (#236) and glare on TV and monitor screens (#495) and room acoustics (#494). Nothing is re-implemented here – every finding comes from the
  * module that owns the rule. Each finding carries the place in the plan to jump to.
  *
  * Severity: `error` (red) must be fixed, `warn` (yellow) is worth a look, `info` is a hint that
@@ -13,6 +13,7 @@
 import { kitchenWorkTriangles } from '../kitchen/workTriangle';
 import { roomCoverage, occludersOf } from '../smarthome/simulation';
 import { levelOf, LEVEL_LABEL, roomWifi, wifiGrid } from '../smarthome/wifi';
+import { buildNet, checkClients, fmtMbps } from '../smarthome/wifiPlan';
 import { checkCircuits, formatWatts } from './circuits';
 import { computeDaylight, DAYLIGHT_LABEL, isOutdoorRoom } from './daylight';
 import type { DerivedPlan } from './derived';
@@ -20,10 +21,13 @@ import { buildPlacementObstacles, furnitureConflicts, issueLevel, type Placement
 import { findNarrowPassages, passageLabel } from './passages';
 import type { Project } from './schema';
 import { shortestWalkPath } from './walkPath';
+import { ACOUSTIC_LABEL, formatSeconds, roomAcoustics, suggestionText, USAGE_LABEL } from './roomAcoustics';
+import { formatClock } from './sunPath';
+import { findScreenGlare, findScreens, GLARE_SEASON_LABEL, glareSpansLabel, type ScreenGlare } from './screenGlare';
 import { dist, type Vec2 } from './vec';
 
 export type CheckSeverity = 'error' | 'warn' | 'info';
-export type CheckCategory = 'collision' | 'doorSwing' | 'passage' | 'walk' | 'kitchen' | 'daylight' | 'wifi' | 'circuit' | 'sensor';
+export type CheckCategory = 'collision' | 'doorSwing' | 'passage' | 'walk' | 'kitchen' | 'daylight' | 'wifi' | 'circuit' | 'sensor' | 'glare' | 'acoustics';
 
 export const CHECK_CATEGORY_LABEL: Record<CheckCategory, string> = {
   collision: 'Kollisionen',
@@ -35,6 +39,8 @@ export const CHECK_CATEGORY_LABEL: Record<CheckCategory, string> = {
   wifi: 'WLAN',
   circuit: 'Stromkreise',
   sensor: 'Melder-Abdeckung',
+  glare: 'Bildschirm-Blendung',
+  acoustics: 'Raumakustik',
 };
 
 const CATEGORY_ORDER = Object.keys(CHECK_CATEGORY_LABEL) as CheckCategory[];
@@ -75,6 +81,25 @@ const DAYLIGHT_ROOM = /(wohn|schlaf|kinder|arbeit|büro|buero|küche|kueche|zimm
 
 const roomName = (p: Project, id: string) => p.rooms.find((r) => r.id === id)?.name ?? 'Raum';
 const furnitureName = (p: Project, id: string) => p.furniture.find((f) => f.id === id)?.name ?? 'Möbel';
+
+const SCREEN_WORD = { tv: 'Fernseher', monitor: 'Monitor', desk: 'Bildschirm am Schreibtisch' } as const;
+
+/** Longest glare span for the headline: "Spiegelung 16:00–18:00 Uhr im Winter". */
+function glareTitle(g: ScreenGlare): string {
+  const name = `„${g.name}“`;
+  if (g.kind === 'backlight') return `${name}: Gegenlicht – ein Fenster liegt hinter dem Bildschirm`;
+  const worst = [...g.spans].sort((a, b) => b.to - b.from - (a.to - a.from))[0];
+  return `${name}: Spiegelung ${formatClock(worst.from)}–${formatClock(worst.to)} Uhr im ${GLARE_SEASON_LABEL[worst.season]}`;
+}
+
+function glareDetail(g: ScreenGlare): string {
+  const times = g.spans.length ? `${g.kind === 'backlight' ? 'Besonders stark bei direkter Sonne' : 'Sonne spiegelt sich'}: ${glareSpansLabel(g.spans)}. ` : '';
+  const fix =
+    g.screenKind === 'desk'
+      ? 'Schreibtisch seitlich zum Fenster drehen oder Vorhang/Rollo am Fenster nutzen.'
+      : `${SCREEN_WORD[g.screenKind]} so stellen, dass das Fenster seitlich liegt, oder Vorhang/Rollo am Fenster nutzen.`;
+  return `${times}${fix} Schätzung: ohne Nachbarhäuser, Balkone und Wetter.`;
+}
 
 export function runPlanCheck(project: Project, derived: DerivedPlan): PlanCheckResult {
   const items: CheckItem[] = [];
@@ -194,6 +219,12 @@ export function runPlanCheck(project: Project, derived: DerivedPlan): PlanCheckR
         select: { type: 'room', id: w.roomId },
       });
     }
+    // own WLAN devices that get less than they need (#492)
+    if (project.wifiClients.length) {
+      for (const c of checkClients(buildNet(project, derived)).filter((x) => x.own && !x.ok)) {
+        items.push({ id: `wifi-client:${c.id}`, category: 'wifi', severity: 'info', title: `„${c.name}“: WLAN reicht nicht (ca. ${fmtMbps(c.mbps)})`, detail: c.advice, at: { x: c.x, y: c.y } });
+      }
+    }
   }
 
   // circuits (only when circuits or consumers exist)
@@ -239,6 +270,43 @@ export function runPlanCheck(project: Project, derived: DerivedPlan): PlanCheckR
         title: share === 0 ? `„${room.name}“ hat keinen Bewegungs-/Präsenzmelder` : `„${room.name}“: Melder decken nur ${Math.round(share * 100)} % der Fläche ab`,
         at: centre(roomId),
         select: share > 0 && nearest ? { type: 'device', id: nearest.id } : { type: 'room', id: roomId },
+      });
+    }
+  }
+
+  // glare on screens (TV, monitor, desk) from sun and windows – an estimate (#495)
+  if (project.furniture.length && project.openings.some((o) => o.kind === 'window')) {
+    const glare = findScreenGlare(project, derived);
+    // the check counts as done once a screen exists (a flat without any screen has nothing to check)
+    if (glare.length || findScreens(project, derived).length) checked.add('glare');
+    for (const g of glare) {
+      items.push({
+        id: `glare:${g.kind}:${g.furnitureId}`,
+        category: 'glare',
+        severity: g.kind === 'backlight' || g.hours >= 1 ? 'warn' : 'info',
+        title: glareTitle(g),
+        detail: glareDetail(g),
+        at: g.at,
+        select: { type: 'furniture', id: g.furnitureId },
+      });
+    }
+  }
+
+  // room acoustics: estimated reverberation per living room (#494)
+  const acoustics = roomAcoustics(project, derived);
+  if (acoustics.length) {
+    checked.add('acoustics');
+    for (const r of acoustics) {
+      if (r.level === 'good') continue;
+      const tips = r.suggestions.slice(0, 3).map(suggestionText);
+      items.push({
+        id: `acoustics:${r.roomId}`,
+        category: 'acoustics',
+        severity: r.level === 'poor' ? 'warn' : 'info',
+        title: `„${r.name}“ ${ACOUSTIC_LABEL[r.level]}: Nachhallzeit ca. ${formatSeconds(r.reverb)} (angenehm bis ${formatSeconds(r.limit)}, ${USAGE_LABEL[r.usage]})`,
+        detail: `${tips.length ? `${tips.join('; ')}. ` : ''}Schätzung nach Sabine aus Raumvolumen und Oberflächen, mit typischen Richtwerten.`,
+        at: centre(r.roomId),
+        select: { type: 'room', id: r.roomId },
       });
     }
   }

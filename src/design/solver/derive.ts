@@ -4,9 +4,9 @@
  * rug, picture above, lamp on top, curtain at the window).
  */
 import { add, pointInPolygon, scale, type Vec2 } from '../../model/vec';
-import { rotationFacing } from '../../suggest/roomGeometry';
+import { rotationFacing, SOFT_SHAPES } from '../../suggest/roomGeometry';
 import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
-import { specOf } from './items';
+import { specOf, type Spec } from './items';
 import type { Model, Node, Rule, Unit } from './model';
 import { runId } from './model';
 import { boxOnWall, pointOnWall, sideStrip } from './room';
@@ -158,7 +158,7 @@ const ON_GAP = 0.05;
  */
 function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | null {
   // the pieces that take another branch of the `on` rule do not share the row
-  const inRow = (s: Node) => s.spec.role !== 'mattress' && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
+  const inRow = (s: Node) => s.spec.role !== 'mattress' && !SOFT_SHAPES.has(s.spec.shape) && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
   const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
   // a screen or a picture hanging over the piece takes its middle: what stands on it goes to the ends (#443, R7)
   const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && (s.spec.role === 'tv' || s.spec.shape === 'picture' || s.spec.shape === 'picture-set'));
@@ -174,6 +174,32 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
     u += s.spec.width + gap;
   }
   return null;
+}
+
+/** Seat height and bed top of the procedural models (ProceduralModel: sofa seat 0.45, bed 0.32 frame + 0.22 mattress). */
+const SEAT_TOP = 0.45;
+const BED_TOP = 0.56;
+
+/**
+ * Where cushions and throws lie on a seat or a bed: cushions at one end of the sofa against its back,
+ * the throw at the other end; on a bed the cushions in front of the pillows and the plaid across the foot.
+ * `null` when the parent offers no seat (they then go like any small piece on a surface).
+ */
+function softOn(parent: Spec, s: Spec, P: Box): { u: number; v: number; hw: number; elevation: number } | null {
+  const hw = s.width / 2;
+  if (parent.role === 'bed') {
+    if (s.shape === 'bed-throw') return { u: 0, v: P.hd - s.depth / 2 - 0.12, hw: Math.min(hw, P.hw), elevation: BED_TOP + 0.03 };
+    if (s.shape === 'cushions') return { u: 0, v: -P.hd + 0.62 + s.depth / 2, hw: Math.min(hw, P.hw - 0.05), elevation: BED_TOP + 0.03 };
+    return null;
+  }
+  if (parent.shape !== 'sofa' && parent.shape !== 'armchair' && parent.shape !== 'sofa-corner') return null;
+  const arm = Math.min(0.2, 2 * P.hw * 0.13);
+  const seatTop = Math.min(SEAT_TOP, parent.height * 0.55);
+  const reach = Math.max(0, P.hw - arm - hw - 0.03);
+  const back = -P.hd + Math.min(0.24, 2 * P.hd * 0.27) * 0.6 + 0.06 + s.depth / 2;
+  if (parent.shape === 'armchair') return { u: s.shape === 'throw' ? Math.min(reach, 0.1) : 0, v: s.shape === 'throw' ? back + 0.18 : back, hw, elevation: seatTop };
+  // sofa: cushions in the corner at the right arm, throw at the left one
+  return { u: s.shape === 'cushions' ? reach : -reach, v: s.shape === 'cushions' ? back : back + 0.1, hw, elevation: seatTop };
 }
 
 function deriveNode(m: Model, n: Node): void {
@@ -344,6 +370,15 @@ function deriveNode(m: Model, n: Node): void {
         n.box = { x: P.x, y: P.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
         n.elevation = Math.max(0, p.top - s.height);
         return;
+      }
+      if (SOFT_SHAPES.has(s.shape) && parentNode) {
+        const pose = softOn(parentNode.spec, s, P);
+        if (pose) {
+          const c = at(pose.u, pose.v);
+          n.box = { x: c.x, y: c.y, hw: pose.hw, hd: s.depth / 2, rotation: P.rotation };
+          n.elevation = pose.elevation;
+          return;
+        }
       }
       if (parentNode?.spec.shape === 'shelf' && s.role === 'box') {
         const perRow = Math.max(1, Math.floor((2 * P.hw) / (s.width + 0.02)));

@@ -147,7 +147,7 @@ export function DevicesOverlay2D({ project, px }: { project: Project; px: number
       return;
     }
     const p = st().project;
-    placeDevice(placing.kind, placing.productId, roomAt(p, derivePlan(p), w), w);
+    placeDevice(placing.kind, placing.productId, roomAt(p, derivePlan(p), w), w, placing.wifi);
     setPlacing(null);
     setHoverAt(null);
   };
