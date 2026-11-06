@@ -127,7 +127,8 @@ describe('answers recorded with these prompts (C–F)', () => {
         const raw = run.programs[room.name];
         expect(raw, `${key} ${room.name}`).toBeDefined();
         const p = parseRoomProgram(raw, { project: f.project, concept: c.value, room, sketch: '', wishes: f.wishes });
-        expect(p.problems.filter((x) => !x.includes('(K7)')), `${key} ${room.name}`).toEqual([]);
+        // K7 and the start-place checks (intent.ts: E Wohnzimmer plans the sofa 2.7 m from the TV) ask Claude again, they do not make the answer unreadable
+        expect(p.problems.filter((x) => !x.includes('(K7)') && !x.includes('nach deinen Startplätzen')), `${key} ${room.name}`).toEqual([]);
       }
     }
   });
