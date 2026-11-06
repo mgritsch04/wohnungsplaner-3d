@@ -63,7 +63,7 @@ export function planFacts(a: RoomAnalysis, room: Pick<RoomResult, 'layout' | 'pr
   return [`Raum ${cm(a.size.x)} × ${cm(a.size.y)} cm (x nach Osten, y nach Süden, ab der Nordwest-Ecke).`, ...openings, 'Möbel:', ...pieces].join('\n');
 }
 
-const PLACEHOLDER = 'Die Möbel sind einfache Platzhalter-Modelle ohne Kissen, Plaids, Bettwäsche, Deko und Stoffstruktur. Bewerte Anordnung, Auswahl, Größe, Menge und die Farben der Möbel, nicht was Platzhalter nicht zeigen können.';
+const PLACEHOLDER = 'Die Möbel sind einfache Platzhalter-Modelle ohne Bettwäsche und Stoffstruktur; Kissen, Decken, Vasen und andere Deko sind als kleine Teile dabei. Bewerte Anordnung, Auswahl, Größe, Menge und die Farben der Möbel, nicht was Platzhalter nicht zeigen können.';
 const VIEWS = 'Der erste Blick zeigt den Raum schräg von oben, so wie man ihn beim Hereinkommen sieht, waagrecht in 1,20 m Höhe aufgeschnitten: Alles darüber fehlt dort (Hängeleuchten, Oberschränke, Vorhänge, Bilder, obere Teile hoher Möbel). Der zweite zeigt denselben Raum ungeschnitten fast senkrecht von oben, mit allem, was hängt. Urteile über Licht, Oberschränke und hohe Möbel nach dem Blick von oben. Andere Räume am Bildrand gehören nicht dazu.';
 
 /** The pair comparison for one room: plan 1 in pictures 1–2, plan 2 in pictures 3–4. */

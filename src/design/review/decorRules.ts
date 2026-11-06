@@ -1,5 +1,6 @@
 /** D Deko, Licht, Textil (#441): plants, lamps, rugs, pictures, curtains. */
 import { findCatalogItem } from '../../catalog/generic';
+import { HANGING_DECOR_SHAPES } from '../../suggest/roomGeometry';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
@@ -90,10 +91,13 @@ export function checkRugs(ctx: RoomCtx): void {
   }
 }
 
+/** Towel rail and clock hang on the wall but are no pictures. */
+const HANGING = HANGING_DECOR_SHAPES;
+
 /** D6: pictures and mirrors. */
 export function checkPictures(ctx: RoomCtx): void {
   for (const p of ctx.items.filter((i) => i.role === 'wall-art' || i.role === 'mirror')) {
-    if (p.shape === 'wall-shelf') continue;
+    if (p.shape === 'wall-shelf' || HANGING.has(p.shape)) continue;
     for (const w of ctx.windows) if (overlaps(w.strip, p.poly, 1e-3) && p.elevation + p.height > w.sill) ctx.add('D6', 'L', `${ctx.label(p)} hängt über dem Fenster ${w.label}.`, [p], p);
     for (const d of ctx.doors) if (Math.abs(dot(sub(p, d.mid), d.wall.dir)) < d.width / 2 && dot(sub(p, d.mid), d.wall.inward) < 0.3) ctx.add('D6', 'L', `${ctx.label(p)} hängt über der Tür ${d.label}.`, [p], p);
     const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
@@ -118,7 +122,7 @@ export function checkPictures(ctx: RoomCtx): void {
 /** D6, SL6: a room one lives or sleeps in has at least one picture on its walls. */
 export function checkWallArt(ctx: RoomCtx): void {
   if (!['living', 'bedroom', 'kids', 'office', 'dining'].includes(ctx.type) || ctx.an.area < 8) return;
-  if (ctx.items.some((i) => i.role === 'wall-art' && i.shape !== 'wall-shelf')) return;
+  if (ctx.items.some((i) => i.role === 'wall-art' && i.shape !== 'wall-shelf' && !HANGING.has(i.shape))) return;
   ctx.add('D6', 'L', 'An den Wänden hängt kein Bild, der Raum wirkt unbewohnt (SL6).');
 }
 
