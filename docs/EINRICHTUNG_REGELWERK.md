@@ -64,6 +64,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | A1 | W | Schreibtisch seitlich zum Fenster (Blick parallel zur Fensterfront), nicht mit Blick ins Fenster und nicht mit dem Rücken dazu; Licht für Rechtshänder von links. | Keine Blendung, keine Spiegelung im Bildschirm, kein Schatten der Hand. | DGUV 215-442 | Prompt, Begehung |
 | A2 | H | Hinter dem Tisch mindestens 100 cm Bewegungsfläche für den Stuhl (1,5 m²). | Aufstehen und Zurückrollen ohne Anstoßen. | ASR A1.2 | Prompt, Löser, Begehung |
 | A3 | W | Arbeitsplatz mit Arbeitsleuchte (500 lx), Ablage oder Regal in Griffnähe; Tisch 160 × 80 cm ideal, mindestens 100 × 60. | Ordnung und gutes Licht für langes Arbeiten. | DIN EN 12464-1, DGUV 215-410 | Prompt, Begehung |
+| HO4 | T | Videokonferenz: hinter dem Schreibtischstuhl (im Bild, ±30°) kein Fenster (Gegenlicht) und kein Bett; besser ein Regal oder eine ruhige Wand. | Gegenlicht macht das Gesicht dunkel, ein Bett im Hintergrund wirkt unaufgeräumt. | Ratgeber Homeoffice (Faustregel) | Prompt, Begehung |
 
 ## Licht
 
