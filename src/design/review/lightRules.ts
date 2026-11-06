@@ -53,8 +53,11 @@ export function darkestPoint(poly: Vec2[], lamps: Vec2[]): { p: Vec2; d: number 
   const xs = poly.map((p) => p.x);
   const ys = poly.map((p) => p.y);
   let best: { p: Vec2; d: number } | null = null;
-  for (let x = Math.min(...xs) + CELL / 2; x < Math.max(...xs); x += CELL)
-    for (let y = Math.min(...ys) + CELL / 2; y < Math.max(...ys); y += CELL) {
+  // cell centres on a fixed lattice of the plan, not on the corner of this room: mirrored or turned,
+  // the same room gets the same points (Q5, as the walking grid)
+  const start = (v: number) => (Math.floor(v / CELL + 1e-9) + 0.5) * CELL;
+  for (let x = start(Math.min(...xs)); x < Math.max(...xs); x += CELL)
+    for (let y = start(Math.min(...ys)); y < Math.max(...ys); y += CELL) {
       const p = { x, y };
       if (!pointInPolygon(p, poly)) continue;
       const d = Math.min(...lamps.map((l) => Math.hypot(l.x - x, l.y - y)));
