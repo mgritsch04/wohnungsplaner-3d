@@ -267,6 +267,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const duplicateOf = new Map<string, string>();
   const rawItems = Array.isArray(o.items) ? o.items : [];
   if (!rawItems.length) problems.push('"items" ist leer.');
+  // a bed of the catalogue comes with its mattress and pillows; a mattress on top of it covered the
+  // headboard and stood out 15 cm at the sides (image review of test flat A, 6.11.)
+  const bedFrame = rawItems.some((it) => {
+    const c = lookup(str((it as Record<string, unknown> | null)?.catalogId, 120));
+    return !!c && shapeOf(c) === 'bed';
+  });
   for (const it of rawItems.slice(0, 120)) {
     const e = (it ?? {}) as Record<string, unknown>;
     let id = str(e.id, 40);
@@ -292,6 +298,11 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     // on top of them, twice the light on one worktop (test flat A, 6.11.)
     if (c.id === 'generic-k-light' && plansKitchen(f.rc, f.all)) {
       if (!notes.some((n) => n.startsWith('Lichtleisten'))) notes.push('Lichtleisten unter den Oberschränken setzt die App, Claudes eigene nicht übernommen.');
+      leftOut.add(id);
+      continue;
+    }
+    if (bedFrame && shapeOf(c) === 'mattress') {
+      notes.push(`Teil „${id}“ (${c.name}) nicht übernommen: das Bett hat schon eine Matratze.`);
       leftOut.add(id);
       continue;
     }

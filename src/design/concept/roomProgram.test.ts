@@ -201,6 +201,18 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(r.notes.some((n) => n.startsWith('Lichtleisten'))).toBe(true);
   });
 
+  it('leaves out a mattress on a catalogue bed, which has its own (test flat A, 6.11.)', () => {
+    const raw = recorded('B', 'Schlafzimmer');
+    const bed = raw.items.find((it) => /^generic-bed-\d/.test(it.catalogId));
+    expect(bed, 'the recorded bedroom has a bed').toBeDefined();
+    raw.items.push({ id: 'matr', catalogId: 'generic-mattress', zone: bed!.zone, x: 100, y: 100, facing: 'S', label: 'Matratze', why: '' });
+    raw.relations = [...(raw.relations ?? []), ['matr', 'on', bed!.id]];
+    const r = parseRoomProgram(raw, input('B', 'Schlafzimmer'));
+    expect(r.value.items.some((it) => it.id === 'matr')).toBe(false);
+    expect(r.problems.some((p) => p.includes('matr'))).toBe(false);
+    expect(r.notes.some((n) => n.includes('schon eine Matratze'))).toBe(true);
+  });
+
   it('hangs no floor-length curtains at a window above the new kitchen run (test flat B, 6.11.)', () => {
     const i = input('B', 'Wohnküche');
     const raw = recorded('B', 'Wohnküche');
