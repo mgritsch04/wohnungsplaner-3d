@@ -125,6 +125,12 @@ describe('D7 Vorhang', () => {
     expect(curtain(1.4).findings.some((f) => f.rule === 'D7' && /nur ein Vorhangschal/.test(f.text))).toBe(true);
     expect(has(curtain(0.8), 'D7')).toBe(true);
   });
+  it('a bookcase in the curtain drawn open traps it (image review of test flat B, 6.11.)', () => {
+    const pair = (shelfX: number) =>
+      living([sofa, put('generic-curtain', { x: 1.6, y: 0.05, face: 'S', width: 0.49 }), put('generic-curtain', { x: 3.4, y: 0.05, face: 'S', width: 0.49 }), put('generic-shelf-80', { x: shelfX, y: 0.15, face: 'S' })]);
+    expect(has(pair(3.6), 'D7', /Weg von/)).toBe(true);
+    expect(has(pair(4.3), 'D7', /Weg von/)).toBe(false);
+  });
   it('a bedroom without darkening when the user wants one', () => {
     const bedroom = (curtain: boolean) =>
       review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }], windows: [{ wall: 'N', at: 2 }] }), type: 'bedroom', options: { darkening: true }, items: [put('generic-bed-140', { x: 2.975, y: 1.6, face: 'W' }), ...(curtain ? [put('generic-curtain', { x: 2, y: 0.05, face: 'S' })] : [])] });

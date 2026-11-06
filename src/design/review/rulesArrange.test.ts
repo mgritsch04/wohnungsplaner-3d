@@ -58,8 +58,8 @@ describe('C2 Sitzgruppe', () => {
 });
 
 describe('C3 Fernseher', () => {
-  const tvRoom = (tv: ReturnType<typeof put>, board?: ReturnType<typeof put>) =>
-    review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows: [{ wall: 'N', at: 2.5 }] }), type: 'living', items: [put('generic-sofa-3', { x: 2.5, y: 3.5, face: 'N' }), ...(board ? [board] : []), tv] });
+  const tvRoom = (tv: ReturnType<typeof put>, board?: ReturnType<typeof put>, sofaY = 2.6) =>
+    review({ room: rectRoom(5, 4, { doors: [{ wall: 'S', at: 4 }], windows: [{ wall: 'N', at: 2.5 }] }), type: 'living', items: [put('generic-sofa-3', { x: 2.5, y: sofaY, face: 'N' }), ...(board ? [board] : []), tv] });
   it('opposite the sofa at a comfortable distance', () => {
     expect(has(tvRoom(put('generic-tv', { x: 4.95, y: 2.0, face: 'W', elevation: 0.45 })), 'C3', /gegenüber/)).toBe(true);
     expect(has(tvRoom(put('generic-tv', { x: 2.5, y: 0.21, face: 'S', elevation: 0.45, parent: 'b' }), put('generic-tv-sideboard', { id: 'b', x: 2.5, y: 0.21, face: 'S' })), 'C3', /gegenüber|angenehm/)).toBe(false);
@@ -68,6 +68,10 @@ describe('C3 Fernseher', () => {
     const behind = tvRoom(put('generic-tv', { x: 1.0, y: 3.95, face: 'N', elevation: 0.45 }));
     expect(behind.findings.find((f) => f.rule === 'C3')?.severity).toBe('S');
     expect(behind.passed).toBe(false);
+  });
+  it('too far is medium: a 55″ TV 2.8 m from the sofa\'s edge (image review of test flat A, 6.11.)', () => {
+    const far = tvRoom(put('generic-tv', { x: 2.5, y: 0.21, face: 'S', elevation: 0.45, parent: 'b' }), put('generic-tv-sideboard', { id: 'b', x: 2.5, y: 0.21, face: 'S' }), 3.5);
+    expect(has(far, 'C3', /angenehm/)).toBe(true);
   });
   it('too close is medium', () => {
     expect(has(tvRoom(put('generic-tv', { x: 2.5, y: 2.0, face: 'S', elevation: 0.5 })), 'C3', /angenehm/)).toBe(true);
