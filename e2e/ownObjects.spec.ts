@@ -68,7 +68,7 @@ test('Eigene Objekte (#493): Fahrrad, Schreibtisch und Poster anlegen, platziere
   await dlg.getByLabel('Name des Objekts').fill('Poster Gebirge');
   const png = encodeGrayPng(160, 220, (x, y) => Math.round(40 + (x / 160) * 120 + (y / 220) * 60));
   await dlg.getByLabel('Foto des Posters wählen').setInputFiles({ name: 'motiv.png', mimeType: 'image/png', buffer: png });
-  await expect(dlg.getByText(/zugeschnitten/)).toBeVisible();
+  await expect(dlg.getByText(/auf das Seitenverhältnis 32:45 zugeschnitten/)).toBeVisible();
   await expect(dlg.getByLabel('Ohne Rahmen (z. B. Metall-Poster)')).toBeChecked();
   await page.waitForTimeout(500);
   await shot(page, 'dialog-poster');
