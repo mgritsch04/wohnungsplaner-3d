@@ -2,7 +2,7 @@
 import { tvRange } from '../tvDistance';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
-import { angleBetween, boundaryDist, cm, overlaps, pointPolyDist, polyDist, toLocal } from './geom';
+import { angleBetween, boundaryDist, cm, localRect, overlaps, pointPolyDist, polyDist, toLocal } from './geom';
 import { isDiningTable, isKitchenModule, isLamp, isPlant, type RItem } from './items';
 
 const deg = (d: number) => (d * Math.PI) / 180;
@@ -115,6 +115,18 @@ export function checkTv(ctx: RoomCtx): void {
   }
 }
 
+type TableSide = 'front' | 'back' | 'left' | 'right';
+
+/** The chairs standing at one side of a table (local frame of the table, front = +v). */
+function chairsAtSide(t: RItem, chairs: RItem[], side: TableSide): RItem[] {
+  return chairs.filter((c) => {
+    const l = toLocal(t, c);
+    const along = side === 'front' ? l.v : side === 'back' ? -l.v : side === 'right' ? l.u : -l.u;
+    const half = side === 'front' || side === 'back' ? t.depth / 2 : t.width / 2;
+    return along > half - 0.1 && polyDist(c.poly, t.poly) < 0.4;
+  });
+}
+
 /** C4: dining table. */
 export function checkDining(ctx: RoomCtx): void {
   const tables = ctx.items.filter((i) => isDiningTable(i) && i.floor && !ctx.an.userZones.some((z) => z.keepFree));
@@ -129,13 +141,7 @@ export function checkDining(ctx: RoomCtx): void {
     let tight = 0;
     let cramped = 0;
     for (const side of ['front', 'back', 'left', 'right'] as const) {
-      const sideChairs = chairs.filter((c) => {
-        const l = toLocal(t, c);
-        const along = side === 'front' ? l.v : side === 'back' ? -l.v : side === 'right' ? l.u : -l.u;
-        const half = side === 'front' || side === 'back' ? t.depth / 2 : t.width / 2;
-        return along > half - 0.1 && polyDist(c.poly, t.poly) < 0.4;
-      });
-      if (!sideChairs.length) continue;
+      if (!chairsAtSide(t, chairs, side).length) continue;
       const depth = ctx.freeDepth(t, side, 0.75, { ignore: seat }).depth;
       if (depth < 0.75 - 1e-6) tight++;
       // a chair pushed in at the table already takes about 50 cm: with less than 65 cm to the wall
@@ -146,6 +152,34 @@ export function checkDining(ctx: RoomCtx): void {
     if (cramped && ctx.type !== 'balcony') ctx.add('C4', 'M', `Hinter ${cramped === 1 ? 'einem Stuhl' : `den Stühlen auf ${cramped} Seiten`} bleibt bis zur Wand oder zum nächsten Möbel kaum Platz, man kann ihn nicht zurückschieben (E2: 90 cm ab Tischkante).`, [t], t);
     else if (tight > 1) ctx.add('C4', 'L', `Hinter den Stühlen am Tisch ist auf ${tight} Seiten weniger als 75 cm Platz zum Aufstehen.`, [t], t);
     if (pendants.length && !pendants.some((p) => dist(p, t) < 0.5)) ctx.add('C4', 'L', 'Die Pendelleuchte hängt nicht über dem Esstisch.', [t, pendants[0]], pendants[0]);
+  }
+}
+
+/** Depth of the cook's aisle in front of the kitchen run (K4: 100–120 cm); WK3 keeps the chair zone out of it. */
+const COOK_AISLE = 1.0;
+/** A chair pushed back to sit down or get up takes this much beside the table (E2). */
+const CHAIR_ZONE = 0.6;
+
+/**
+ * C4 (WK3): the table plus 60 cm chair zone on the sides with chairs must not cut the aisle in
+ * front of the kitchen run (100 cm). The table itself in the aisle is reported by B6/C4 already;
+ * here it is the chairs: whoever pushes a chair back stands in the cook's way (test flat B).
+ */
+export function checkCookAisle(ctx: RoomCtx): void {
+  const mods = ctx.items.filter((i) => i.floor && isKitchenModule(i) && i.kitchen !== 'tall' && i.kitchen !== 'fridge');
+  if (!mods.length) return;
+  const chairs = ctx.items.filter((i) => i.role === 'seat' && i.category === 'chair' && i.shape === 'chair');
+  const aisles = mods.map((m) => ({ m, full: localRect(m, -m.width / 2, m.width / 2, m.depth / 2, m.depth / 2 + 1.2), aisle: localRect(m, -m.width / 2, m.width / 2, m.depth / 2, m.depth / 2 + COOK_AISLE) }));
+  for (const t of ctx.placed.filter((i) => isDiningTable(i) && i.floor)) {
+    const at = (s: TableSide) => (chairsAtSide(t, chairs, s).length ? CHAIR_ZONE : 0);
+    if (!(['front', 'back', 'left', 'right'] as const).some((s) => at(s))) continue;
+    const zone = localRect(t, -t.width / 2 - at('left'), t.width / 2 + at('right'), -t.depth / 2 - at('back'), t.depth / 2 + at('front'));
+    // the table itself in the aisle is reported with the working aisle (C4), once is enough
+    const hit = aisles.find((a) => overlaps(a.aisle, zone, 0.03) && !overlaps(a.full, t.poly, 0.03));
+    if (hit) {
+      ctx.add('C4', 'M', `Die Stühle an ${ctx.label(t)} brauchen beim Zurückschieben 60 cm und ragen in den Arbeitsgang vor der Küchenzeile, wer sitzt oder aufsteht, steht im Weg des Kochs (WK3).`, [t, hit.m], t);
+      return;
+    }
   }
 }
 
