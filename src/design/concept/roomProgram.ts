@@ -428,7 +428,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     check: strList(o.check, 300, 30),
   };
   // Claude's own start places already break a rule (W5, W10): fix it in the answer, not after the solver
-  problems.push(...intentProblems(parsed, f.all, input.products ?? []));
+  problems.push(...intentProblems(parsed, room, f.all, input.products ?? []));
   // every furniture group complete and bound as a designer plans it (Sitzgruppe, Schlafplatz …)
   const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y) })));
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);

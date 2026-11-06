@@ -5,7 +5,7 @@
  *
  * The check reads the start places and directions of the programme, before anything is placed, and
  * names what already breaks a rule there: the television not opposite the sofa or far off it (W5), the sofa
- * looking at the kitchen run (W10). These go back to Claude with the other problems of the answer
+ * looking at the kitchen run (W10), dining chairs without room to the wall (E2). These go back to Claude with the other problems of the answer
  * (one repair round); a finding the solver causes later is not Claude's to fix.
  */
 import { findCatalogItem } from '../../catalog/generic';
@@ -15,7 +15,7 @@ import { dist, sub, type Vec2 } from '../../model/vec';
 import { roleOf, shapeOf } from '../../suggest/roomGeometry';
 import { sideOfVector } from '../coords';
 import { tvRange } from '../tvDistance';
-import type { ProgramItem, RoomProgram } from '../types';
+import type { ProgramItem, RoomAnalysis, RoomProgram } from '../types';
 
 const deg = (d: number) => (d * Math.PI) / 180;
 /** Front of a piece with this rotation (local +y), as `Furniture.rotation`. */
@@ -38,6 +38,8 @@ const KITCHEN_RANGE = 5;
 
 interface Placed {
   id: string;
+  category: string;
+  height: number;
   at: Vec2;
   front: Vec2;
   role: string;
@@ -50,7 +52,7 @@ function placedOf(items: readonly ProgramItem[], products: readonly CatalogItem[
   return items.flatMap((it) => {
     const c = findCatalogItem(it.catalogId, [...products]);
     if (!c || !it.hint) return [];
-    return [{ id: it.id, at: { x: it.hint.x, y: it.hint.y }, front: frontOf(it.hint.rotation), role: roleOf(c), shape: shapeOf(c), width: c.width, depth: c.depth }];
+    return [{ id: it.id, at: { x: it.hint.x, y: it.hint.y }, front: frontOf(it.hint.rotation), role: roleOf(c), shape: shapeOf(c), category: c.category, height: c.height, width: c.width, depth: c.depth }];
   });
 }
 
@@ -63,11 +65,33 @@ function kitchenPoints(program: RoomProgram, existing: readonly Furniture[]): Ve
   return out;
 }
 
+
+/** Distance from `p` along `dir` to the room's outline (m), or Infinity. */
+function rayToOutline(p: Vec2, dir: Vec2, poly: readonly Vec2[]): number {
+  let best = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const e = sub(b, a);
+    const den = dir.x * e.y - dir.y * e.x;
+    if (Math.abs(den) < 1e-9) continue;
+    const ap = sub(a, p);
+    const t = (ap.x * e.y - ap.y * e.x) / den;
+    const u = (ap.x * dir.y - ap.y * dir.x) / den;
+    if (t > 1e-6 && u >= -1e-6 && u <= 1 + 1e-6) best = Math.min(best, t);
+  }
+  return best;
+}
+
+/** Room behind the chairs of a dining table, table edge to wall (E2; the walkthrough flags under 75 cm). */
+const CHAIR_ROOM = 0.75;
+const SIDE_WORD = { N: 'nördlichen', O: 'östlichen', S: 'südlichen', W: 'westlichen' } as const;
+
 /**
  * Problems in the programme's own start places, as lines for the repair prompt. `existing` are the
  * pieces already in the room (a fitted kitchen counts as kitchen run).
  */
-export function intentProblems(program: RoomProgram, existing: readonly Furniture[] = [], products: readonly CatalogItem[] = []): string[] {
+export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'polygon'> | undefined, existing: readonly Furniture[] = [], products: readonly CatalogItem[] = []): string[] {
   const problems: string[] = [];
   const pieces = placedOf(program.items, products);
   const sofas = pieces.filter((p) => p.role === 'sofa');
@@ -102,6 +126,33 @@ export function intentProblems(program: RoomProgram, existing: readonly Furnitur
         problems.push(
           `„${s.id}“ schaut nach deinen Startplätzen nach ${sideName(s.front)} direkt auf die Küchenzeile (W10). Das Sofa so drehen oder stellen, dass es auf Fenster, Fernseher oder die Sitzgruppe schaut; die Küche liegt seitlich oder im Rücken, dann mit Konsole oder Sideboard dahinter.`,
         );
+    }
+  // dining chairs need room behind them to the wall (E2): a table pushed to the wall with chairs on that side
+  if (room?.polygon.length)
+    for (const t of pieces.filter((p) => p.category === 'table' && p.shape === 'table' && p.width >= 0.55 && p.height >= 0.6)) {
+      const right = { x: t.front.y * -1, y: t.front.x };
+      const sides = [
+        { dir: t.front, half: t.depth / 2 },
+        { dir: { x: -t.front.x, y: -t.front.y }, half: t.depth / 2 },
+        { dir: right, half: t.width / 2 },
+        { dir: { x: -right.x, y: -right.y }, half: t.width / 2 },
+      ];
+      for (const side of sides) {
+        const chairs = pieces.filter((c) => c.category === 'chair' && c.shape === 'chair').filter((c) => {
+          const to = sub(c.at, t.at);
+          const along = to.x * side.dir.x + to.y * side.dir.y;
+          return along > side.half - 0.1 && along < side.half + 0.8 && angle(side.dir, to) < deg(60);
+        });
+        if (!chairs.length) continue;
+        const edge = { x: t.at.x + side.dir.x * side.half, y: t.at.y + side.dir.y * side.half };
+        const free = rayToOutline(edge, side.dir, room.polygon);
+        if (free < CHAIR_ROOM - 0.05) {
+          const s = sideOfVector(side.dir, 45);
+          problems.push(
+            `Hinter ${chairs.length === 1 ? 'dem Stuhl' : 'den Stühlen'} an der ${s ? SIDE_WORD[s] : 'einen'} Seite von „${t.id}“ bleiben nach deinen Startplätzen nur etwa ${Math.round(free * 100)} cm bis zur Wand, zum Zurückschieben und Aufstehen braucht es 90 cm (E2). Den Tisch weiter in den Raum stellen oder auf dieser Seite keinen Stuhl (dort eine Bank an der Wand).`,
+          );
+        }
+      }
     }
   return problems;
 }
