@@ -15,6 +15,7 @@ import { categoryLabel, CATEGORIES } from '../../catalog/types';
 import { packsNeeded } from '../../catalog/packSize';
 import { catalogColors } from '../../catalog/generic';
 import { useCatalogStore } from '../../catalog/catalogStore';
+import { ownItemFromFurniture } from '../../catalog/own';
 import { defaultLeafOpen, openingLabel, type Furniture, type FurniturePackage, type FurnitureFinish, type Light, type Material, type Opening, type Project, type Provenance, type Room } from '../../model/schema';
 import { FURNITURE_FINISH_PRESETS, FURNITURE_FINISHES } from '../../model/furnitureFinishes';
 import { WINDOW_TWO_SASH_WIDTH } from '../../model/geometry/leaves';
@@ -776,6 +777,23 @@ function FurnitureProps({ id, project }: { id: string; project: Project }) {
         <CheckField label="Hindernis beim Begehen" checked={f.solid} onChange={(v) => upd((x) => (x.solid = v))} />
         <CheckField label="Gesperrt (nicht verschiebbar)" checked={f.locked} onChange={(v) => upd((x) => (x.locked = v))} />
         <CheckField label="Bestand (schon in der Wohnung, nicht im Budget)" checked={f.existing} onChange={(v) => upd((x) => (x.existing = v))} />
+        <CheckField
+          label="Feste Vorgabe (Einrichtungsvorschlag plant darum herum)"
+          checked={f.fixed === true}
+          onChange={(v) => upd((x) => (x.fixed = v || undefined))}
+          title="Der Einrichtungsvorschlag verschiebt dieses Möbel nicht, hält Wege frei und plant Beziehungen (Lampe daneben, Bild darüber) um es herum. Bestand zählt ohnehin so."
+        />
+        <button
+          className="block"
+          data-testid="save-as-own"
+          title="Legt dieses Möbel (Maße, Farbe, Form, Preis) im Katalog unter „Eigene“ ab, damit du es wieder platzieren kannst"
+          onClick={() => {
+            void useCatalogStore.getState().addItems([ownItemFromFurniture(f)]);
+            useUiStore.getState().toast(`„${f.name}“ liegt jetzt im Katalog unter „Eigene“.`, 'success');
+          }}
+        >
+          Als eigenes Objekt merken
+        </button>
       </PanelGroup>
       <NotesSection project={project} type="furniture" targetId={id} />
       <div className="btn-row padded">

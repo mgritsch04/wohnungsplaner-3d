@@ -18,6 +18,7 @@ import { createFurnitureFromCatalog } from '../catalog/instantiate';
 import type { CatalogItem } from '../catalog/types';
 import { generateCountertops, layoutKitchenRun, type RunModule } from '../kitchen/kitchen';
 import { derivePlan, type DerivedPlan } from '../model/derived';
+import { isFixedPiece } from '../model/fixed';
 import type { Furniture, Project } from '../model/schema';
 import { add, closestPointOnSegment, dist, dot, normalize, perp, pointInPolygon, scale, sub, type Vec2 } from '../model/vec';
 import { guessRoomType, placeNear, roomIdAt, ROOM_TYPES, suggestFurnishing, type FurnishingSuggestion, type PlaceTarget, type RoomType } from '../suggest/furnishing';
@@ -115,7 +116,7 @@ function wallOf(f: Furniture, walls: EditWall[]): number {
 
 const ABOVE = new Set(['wall', 'hood', 'cooktop']);
 const isModule = (f: Furniture) => !!f.kitchen && f.kitchen.type !== 'countertop';
-const isFixed = (f: Furniture) => f.locked || f.existing;
+const isFixed = (f: Furniture) => f.locked || isFixedPiece(f);
 
 /** Kitchen modules of a room grouped into runs (same direction, same back line). */
 function kitchenRuns(project: Project, derived: DerivedPlan, roomId: string): Furniture[][] {

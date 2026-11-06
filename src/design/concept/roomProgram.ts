@@ -57,6 +57,13 @@ export function existingLabels(project: Project, room: RoomAnalysis): { label: s
     .map((f, i) => ({ label: `B${i + 1}`, f }));
 }
 
+/**
+ * The user's own fixed desk or bed (#493) is the room's desk or bed: Claude listing another one
+ * (not in a children's room, which may have two beds) would plan a double.
+ */
+export const ownGivenAlready = (pieces: readonly Furniture[], shape: string, roomType: string): boolean =>
+  (shape === 'desk' || (shape === 'bed' && roomType !== 'kids')) && pieces.some((e) => e.fixed === true && !e.existing && shapeOf(e) === shape);
+
 const hasKitchen = (pieces: readonly Furniture[]) => pieces.some((f) => !!f.kitchen || shapeOf(f).startsWith('k-'));
 
 /** Does the room get a kitchen run from Claude: cooking is here and no kitchen is there yet. */
@@ -274,7 +281,7 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     }
     const t = thingOf(c);
     // already there: the existing WC or basin listed again, a piece with the id or name of an existing one
-    if (f.existing.some((x) => x.label === id || x.f.id === id || key(x.f.name) === key(label)) || ((SANITARY.has(t.shape) || isKitchenModule(c)) && existingShapes.has(t.shape)) || /\(bestand\)|\bbestand\b|vorhanden/i.test(label)) {
+    if (f.existing.some((x) => x.label === id || x.f.id === id || key(x.f.name) === key(label)) || ((SANITARY.has(t.shape) || isKitchenModule(c)) && existingShapes.has(t.shape)) || /\(bestand\)|\bbestand\b|vorhanden/i.test(label) || ownGivenAlready(f.all, t.shape, f.rc.type)) {
       notes.push(`Teil „${id}“ (${c.name}) ist schon da (Bestand), nicht noch einmal aufgenommen.`);
       const same = f.existing.find((x) => x.label === id || x.f.id === id || shapeOf(x.f) === t.shape);
       if (same) duplicateOf.set(id, same.label);

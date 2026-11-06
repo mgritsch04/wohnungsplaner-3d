@@ -8,6 +8,7 @@ import { confirmDialog, useDialogStore } from './dialogStore';
 import { importPdfPage } from '../import/underlayImport';
 import { ProductImportModal } from './ProductImportModal';
 import { ModelImportModal } from './ModelImportModal';
+import { OwnItemModal } from './OwnItemModal';
 import { BugReportModal } from './BugReportModal';
 import { SHORTCUT_GROUPS } from './shortcutCatalog';
 import { HELP_TEXTS } from './helpTexts';
@@ -23,6 +24,7 @@ export function ModalHost() {
       {modal === 'pdfPage' && <PdfPageModal />}
       {modal === 'product' && <ProductImportModal />}
       {modal === 'model' && <ModelImportModal />}
+      {modal === 'own' && <OwnItemModal />}
       {modal === 'bugReport' && <BugReportModal />}
       {modal === 'versions' && <VersionsModal />}
       {confirm && (

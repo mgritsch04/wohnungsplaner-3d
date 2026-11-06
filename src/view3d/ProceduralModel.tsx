@@ -24,6 +24,8 @@ const TAPER = new THREE.CylinderGeometry(0.5, 0.36, 1, 16);
 const SPHERE = new THREE.SphereGeometry(0.5, 20, 14);
 const LEAF = new THREE.IcosahedronGeometry(0.5, 1);
 const CONE = new THREE.CylinderGeometry(0.25, 0.5, 1, 32, 1, true);
+/** Ring in the XY plane (bike tyres): outer diameter 1.08, so scale by wheel diameter / 1.08. */
+const TORUS = new THREE.TorusGeometry(0.5, 0.04, 10, 36);
 /** Cylinder whose axis is Z (for round fronts). */
 const CYL_Z = new THREE.CylinderGeometry(0.5, 0.5, 1, 24).rotateX(Math.PI / 2);
 
@@ -217,13 +219,17 @@ export interface ProceduralLook {
   seatHeight?: number;
   /** product photo crop (data URL) for the main surface, e.g. a table top */
   texture?: string;
+  /** a print without a frame (#493): the picture fills the whole front */
+  frameless?: boolean;
+  /** the item has a photo (`texture`): a picture shows it instead of a drawn motif (#493) */
+  photo?: boolean;
 }
 
 /** The look fields a procedural model reference carries (#273). */
 export function lookOf(model: ModelRef): ProceduralLook {
   if (model.type !== 'procedural') return {};
-  const { secondaryColor: secondary, base, topThickness, legSize, seatHeight, texture } = model;
-  return { secondary, base, topThickness, legSize, seatHeight, texture };
+  const { secondaryColor: secondary, base, topThickness, legSize, seatHeight, texture, frameless } = model;
+  return { secondary, base, topThickness, legSize, seatHeight, texture, frameless };
 }
 
 /** Base under a rectangular table top whose underside is at height `top` (half sizes W, D). */
@@ -636,7 +642,18 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
       return parts;
     }
     case 'picture': {
+      // a print with the user's own photo (#493): framed with a thin mat, or a bare sheet like a metal poster
+      if (look.photo && look.frameless) return [rbox(-W, 0, -D, W, h, D, Math.min(0.003, D), '#ffffff', { rough: 0.3, metal: 0.1, textured: true })];
+      if (look.photo) {
+        const f = Math.min(0.025, w / 14, h / 14);
+        const m = Math.min(0.03, w / 16, h / 16);
+        return [rbox(-W, 0, -D, W, h, D, 0.004, '#2f2a26', { rough: 0.6 }), box(-W + f, f, D - 0.004, W - f, h - f, D + 0.001, '#f4f1ea', { rough: 0.9 }), box(-W + f + m, f + m, D, W - f - m, h - f - m, D + 0.002, '#ffffff', { rough: 0.55, textured: true })];
+      }
       // framed print (#350): thin frame, light mat, a motif in the item colour (G 31.10.: paintings, not one stripe)
+      if (look.frameless) {
+        const m = Math.min(0.02, w / 14, h / 14);
+        return [rbox(-W, 0, -D, W, h, D, 0.003, shade(color, 0.7), { rough: 0.35, metal: 0.2 }), ...artwork(-W + m, m, W - m, h - m, D, color, accent, motifOf(color, w, h))];
+      }
       const f = Math.min(0.03, w / 12, h / 12);
       const m = Math.min(0.06, w / 8, h / 8);
       return [
@@ -703,6 +720,67 @@ function shapeParts(shape: string, w: number, d: number, h: number, color: strin
         parts.push(box(x - 0.008, 0.03, -D + 0.025, x + 0.008, 0.05, D, BLACK, { metal: 0.6 }));
       }
       return parts;
+    }
+    case 'cylinder':
+      // a plain round object (#493): bin, drum, stand, pot without a plant
+      return [{ geo: CYL, p: [0, h / 2, 0], s: [w, h, d], color, rough: 0.55 }];
+    case 'bike': {
+      // a standing bike (#493), length = width, handlebar = depth: wheels, frame, saddle, handlebar, pedals
+      const dw = Math.min(h * 0.68, w * 0.4);
+      const rw = dw / 2;
+      const xr = -W + rw;
+      const xf = W - rw;
+      const L = xf - xr;
+      const tyre = '#1d1e20';
+      const frameC = color;
+      const steel = look.secondary ?? METAL;
+      const rod = (ax: number, ay: number, bx: number, by: number, z: number, r: number, c: string, extra: Partial<Part> = {}): Part => {
+        const dx = bx - ax;
+        const dy = by - ay;
+        return { geo: CYL, p: [(ax + bx) / 2, (ay + by) / 2, z], s: [r * 2, Math.max(1e-3, Math.hypot(dx, dy)), r * 2], r: [0, 0, Math.atan2(-dx, dy)], color: c, rough: 0.35, ...extra };
+      };
+      const across = (x: number, y: number, len: number, r: number, c: string, extra: Partial<Part> = {}): Part => ({ geo: CYL_Z, p: [x, y, 0], s: [r * 2, r * 2, len], color: c, rough: 0.5, ...extra });
+      const wheel = (x: number): Part[] => [
+        { geo: TORUS, p: [x, rw, 0], s: [dw / 1.08, dw / 1.08, dw / 1.08], color: tyre, rough: 0.9 },
+        ...[0, 1, 2, 3, 4, 5].map((i) => ({ geo: BOX, p: [x, rw, 0] as V3, s: [dw * 0.94, 0.004, 0.004] as V3, r: [0, 0, (i * Math.PI) / 6] as V3, color: '#c9ccd0', metal: 0.8, rough: 0.3 })),
+        across(x, rw, 0.06, 0.02, steel, { metal: 0.8, rough: 0.3 }),
+      ];
+      const bb: [number, number] = [xr + L * 0.45, rw * 0.8];
+      const seatTop: [number, number] = [bb[0] - L * 0.08, h * 0.8];
+      const headTop: [number, number] = [xf - L * 0.1, rw * 2 + h * 0.12];
+      const headBottom: [number, number] = [headTop[0] + L * 0.015, headTop[1] - 0.12];
+      const barY = Math.min(h * 0.96, headTop[1] + 0.1);
+      const barX = headTop[0] - 0.04;
+      const barHalf = Math.max(0.1, D - 0.03);
+      const crank = 0.17;
+      return [
+        ...wheel(xr),
+        ...wheel(xf),
+        // frame: seat tube, top tube, down tube, seat stay, chain stay
+        rod(bb[0], bb[1], seatTop[0], seatTop[1], 0, 0.016, frameC),
+        rod(seatTop[0], seatTop[1] - 0.03, headTop[0], headTop[1], 0, 0.016, frameC),
+        rod(bb[0], bb[1], headBottom[0], headBottom[1], 0, 0.019, frameC),
+        rod(seatTop[0], seatTop[1] - 0.05, xr, rw, 0.035, 0.009, frameC),
+        rod(seatTop[0], seatTop[1] - 0.05, xr, rw, -0.035, 0.009, frameC),
+        rod(bb[0], bb[1], xr, rw, 0.035, 0.009, frameC),
+        rod(bb[0], bb[1], xr, rw, -0.035, 0.009, frameC),
+        // fork and stem
+        rod(headBottom[0], headBottom[1], xf, rw, 0.04, 0.011, steel, { metal: 0.7 }),
+        rod(headBottom[0], headBottom[1], xf, rw, -0.04, 0.011, steel, { metal: 0.7 }),
+        rod(headTop[0], headTop[1], barX, barY, 0, 0.012, steel, { metal: 0.7 }),
+        // handlebar, grips
+        across(barX, barY, barHalf * 2, 0.011, steel, { metal: 0.7 }),
+        across(barX, barY, barHalf * 2 + 0.01, 0.016, BLACK, { rough: 0.9 }),
+        // seat post and saddle
+        rod(seatTop[0], seatTop[1] - 0.03, seatTop[0] - 0.015, h * 0.88, 0, 0.011, steel, { metal: 0.7 }),
+        rbox(seatTop[0] - 0.16, h * 0.86, -0.07, seatTop[0] + 0.1, h * 0.9, 0.07, 0.02, BLACK, { rough: 0.8 }),
+        // chain ring, cranks, pedals
+        across(bb[0], bb[1], 0.02, 0.085, steel, { metal: 0.8, rough: 0.3 }),
+        rod(bb[0], bb[1], bb[0] + crank, bb[1] - 0.02, 0.08, 0.009, steel, { metal: 0.8 }),
+        rod(bb[0], bb[1], bb[0] - crank, bb[1] + 0.02, -0.08, 0.009, steel, { metal: 0.8 }),
+        box(bb[0] + crank - 0.055, bb[1] - 0.03, 0.08, bb[0] + crank + 0.055, bb[1] - 0.015, 0.16, BLACK),
+        box(bb[0] - crank - 0.055, bb[1] + 0.01, -0.16, bb[0] - crank + 0.055, bb[1] + 0.025, -0.08, BLACK),
+      ];
     }
     case 'mattress':
       return [
@@ -807,14 +885,15 @@ export const ProceduralModel = memo(function ProceduralModel({
   /** Lamps (#420): luminous flux, colour temperature and switch; absent = a typical warm 800 lm bulb, on. */
   lamp?: LampSpec;
 }) {
-  const { secondary, base, topThickness, legSize, seatHeight, texture } = look ?? {};
+  const { secondary, base, topThickness, legSize, seatHeight, texture, frameless } = look ?? {};
   const photo = usePhotoTexture(texture);
+  const hasPhoto = !!texture;
   const parts = useMemo(
     () =>
       interior
         ? openCabinetParts(width, depth, height, color, interior, accent)
-        : buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight }),
-    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight, interior],
+        : buildParts(shape, width, depth, height, color, accent, finish, { secondary, base, topThickness, legSize, seatHeight, frameless, photo: hasPhoto }),
+    [shape, width, depth, height, color, accent, finish, secondary, base, topThickness, legSize, seatHeight, frameless, hasPhoto, interior],
   );
   const light = lampLight(lamp ?? DEFAULT_LAMP);
   const lampY = shape === 'pendant' ? height * 0.15 : shape === 'table-lamp' ? height * 0.7 : height - 0.2;

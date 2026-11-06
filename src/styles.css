@@ -2676,3 +2676,61 @@ code {
 .tool-btn.active {
   border-color: var(--color-accent);
 }
+
+/* ---------- eigene Objekte (#493) ---------- */
+.own-item-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.own-item-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.own-item-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.own-item-preview {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.own-item-preview canvas {
+  width: 100% !important;
+  height: 300px !important;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--color-border);
+}
+.own-photo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.own-row {
+  display: flex;
+  flex-direction: column;
+}
+.own-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-2);
+  font-size: var(--font-size-sm);
+}
+@media (max-width: 760px) {
+  .own-item-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .own-item-preview {
+    position: static;
+    order: -1;
+  }
+}

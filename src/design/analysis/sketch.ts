@@ -112,7 +112,8 @@ function pieceText(a: RoomAnalysis, f: Furniture): string {
   const p = toRoomCm(a.origin, f);
   const wall = backWall(a, f);
   const side = sideOfVector(frontOf(f), 30);
-  return `${f.name} (${cm(f.width)} × ${cm(f.depth)} cm) bei (${p.x},${p.y})${wall ? `, Rücken an ${wall.id}` : ''}${side ? `, Front nach ${side}` : ''}`;
+  const hung = f.elevation > 0.3 ? `, hängt ab ${cm(f.elevation)} cm Höhe` : '';
+  return `${f.name} (${cm(f.width)} × ${cm(f.depth)} cm) bei (${p.x},${p.y})${wall ? `, Rücken an ${wall.id}` : ''}${side ? `, Front nach ${side}` : ''}${hung}`;
 }
 
 const FIXTURE_WORD: Record<string, string> = { radiator: 'Heizkörper', socket: 'Steckdose', switch: 'Lichtschalter', water: 'Wasseranschluss', drain: 'Abfluss' };
