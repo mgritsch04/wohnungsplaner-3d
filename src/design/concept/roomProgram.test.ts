@@ -200,6 +200,26 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(r.notes.some((n) => n.startsWith('Lichtleisten'))).toBe(true);
   });
 
+  it('hangs no floor-length curtains at a window above the new kitchen run (test flat B, 6.11.)', () => {
+    const i = input('B', 'Wohnküche');
+    const raw = recorded('B', 'Wohnküche');
+    const run = raw.kitchen as RawKitchen;
+    const wall = i.room.walls.find((w) => w.id === run.wall)!;
+    const win = wall.openings.find((o) => o.kind === 'window');
+    expect(win, 'the recorded run of B lies on a wall with a window').toBeDefined();
+    // Claude's curtains at that window
+    raw.items.push({ id: 'vk1', catalogId: 'generic-curtain', zone: raw.zones[0].id, x: 100, y: 10, facing: 'S', label: 'Vorhang', why: '' });
+    raw.relations = [...(raw.relations ?? []), ['vk1', 'window', win!.id, 'over']];
+    const r = parseRoomProgram(raw, i);
+    // the run covers the window: no curtain belongs to it any more
+    const t = (p: { x: number; y: number }) => (p.x - wall.a.x) * wall.dir.x + (p.y - wall.a.y) * wall.dir.y;
+    const k = r.value.kitchen!.find((x) => x.wall === wall.id)!;
+    expect(Math.max(t(k.from), t(k.to)) > win!.t0 && Math.min(t(k.from), t(k.to)) < win!.t1).toBe(true);
+    expect(r.value.items.some((it) => it.id === 'vk1')).toBe(false);
+    expect(r.value.relations.some((x) => x.kind === 'window' && x.window === win!.id && r.value.items.find((it) => it.id === x.item)?.catalogId === 'generic-curtain')).toBe(false);
+    expect(r.notes.some((n) => n.startsWith('Keine bodenlangen Vorhänge'))).toBe(true);
+  });
+
   it('far too many pieces and an empty answer', () => {
     const raw = recorded('A', 'Gang');
     const base = raw.items[0];

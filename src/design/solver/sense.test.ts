@@ -394,19 +394,23 @@ describe('kitchen', () => {
 });
 
 describe('bedroom and ceiling light as a designer lays them (#443)', () => {
-  it('a 160×230 rug lies across a double bed, from just below the nightstands, out on both sides', () => {
+  it.each(['generic-bed-140', 'generic-bed-160'])('a 160×230 rug lies across a double bed (%s), from just below the nightstands, out on both sides', (bedId) => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }] });
-    const p = program(room, [item('bed', 'generic-bed-140', [2, 1.05, S]), item('rug', 'generic-rug-160')], [{ kind: 'under-all', item: 'rug', target: 'bed' }]);
+    const p = program(room, [item('bed', bedId, [2, 1.05, S]), item('rug', 'generic-rug-160')], [{ kind: 'under-all', item: 'rug', target: 'bed' }]);
     const layout = solveRoom(room, p, { seed: 1 });
     const bed = byId(layout, 'bed');
     const rug = byId(layout, 'rug');
-    const across = Math.abs(Math.sin(rug.rotation - bed.rotation)) < 0.1 ? Math.max(rug.width, rug.depth) : Math.min(rug.width, rug.depth);
+    // extent of the rug along the bed's width and along its length (the item's width runs along its own x axis)
+    const turned = Math.abs(Math.sin(rug.rotation - bed.rotation)) > 0.5;
+    const across = turned ? rug.depth : rug.width;
+    const along = turned ? rug.width : rug.depth;
     expect(across).toBeGreaterThan(2.2);
+    expect(across - bed.width).toBeGreaterThan(0.6);
     // head at the north wall: the rug starts 30–70 cm below it and ends past the foot
-    const top = rug.y - Math.min(rug.width, rug.depth) / 2;
+    const top = rug.y - along / 2;
     expect(top - (bed.y - bed.depth / 2)).toBeGreaterThanOrEqual(0.29);
     expect(top - (bed.y - bed.depth / 2)).toBeLessThanOrEqual(0.71);
-    expect(rug.y + Math.min(rug.width, rug.depth) / 2).toBeGreaterThan(bed.y + bed.depth / 2);
+    expect(rug.y + along / 2).toBeGreaterThan(bed.y + bed.depth / 2);
   });
 
   it('the only ceiling light hangs in the middle of the room, a pendant over the table stays there', () => {

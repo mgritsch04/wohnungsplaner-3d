@@ -395,8 +395,37 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
   const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, schemeOf(f.rc, input.concept.style).accent);
   notes.push(...decor.notes);
-  return { value: decor.program, problems, notes };
+  return { value: withoutKitchenCurtains(decor.program, room, notes), problems, notes };
 }
+
+/**
+ * No floor-length curtains at a window above the new kitchen run: they would hang over the worktop
+ * and next to the cooktop (fire, grease; image review of test flat B, 6.11.). The window stays bare
+ * there, as a kitchen planner leaves it.
+ */
+export function withoutKitchenCurtains(program: RoomProgram, room: RoomAnalysis, notes: string[] = []): RoomProgram {
+  if (!program.kitchen?.length) return program;
+  const overRun = new Set<string>();
+  for (const run of program.kitchen) {
+    const wall = room.walls.find((w) => w.id === run.wall);
+    if (!wall) continue;
+    const t0 = Math.min(dot(sub(run.from, wall.a), wall.dir), dot(sub(run.to, wall.a), wall.dir));
+    const t1 = Math.max(dot(sub(run.from, wall.a), wall.dir), dot(sub(run.to, wall.a), wall.dir));
+    for (const o of wall.openings) if (o.kind === 'window' && o.t1 > t0 + 0.05 && o.t0 < t1 - 0.05) overRun.add(o.id);
+  }
+  if (!overRun.size) return program;
+  const isCurtain = (id: string) => {
+    const c = findCatalogItem(program.items.find((i) => i.id === id)?.catalogId ?? '');
+    return !!c && shapeOf(c) === 'curtain';
+  };
+  const gone = new Set(program.relations.flatMap((r) => (r.kind === 'window' && overRun.has(r.window) && isCurtain(r.item) ? [r.item] : [])));
+  if (!gone.size) return program;
+  notes.push(`Keine bodenlangen Vorhänge über der Küchenzeile (${[...overRun].join(', ')}): ${[...gone].join(', ')} weggelassen.`);
+  return { ...program, items: program.items.filter((i) => !gone.has(i.id)), relations: program.relations.filter((r) => !relationTouches(r, gone)) };
+}
+
+const relationTouches = (r: RoomProgram['relations'][number], ids: Set<string>): boolean =>
+  r.kind === 'around' ? r.items.some((i) => ids.has(i)) || ids.has(r.target) : r.kind === 'align' ? r.items.some((i) => ids.has(i)) : r.kind === 'pair' ? ids.has(r.item) || ids.has(r.item2) || ids.has(r.target) : ('item' in r && ids.has(r.item)) || ('target' in r && typeof r.target === 'string' && ids.has(r.target));
 
 const thingOfFurniture = (f: Furniture): Thing => ({ category: f.category, shape: shapeOf(f), height: f.height, width: f.width, depth: f.depth, name: f.name });
 
