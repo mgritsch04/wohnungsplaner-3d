@@ -4,7 +4,7 @@
  * Runs all existing plan checks in one go and returns one sorted list plus a traffic light:
  * collisions and door swing (#4, #267), narrow passages (#68), walk routes between rooms (#67),
  * kitchen work triangle (#82), daylight (#69), Wi-Fi coverage (#253), circuit load (#135) and
- * sensor coverage (#236) and glare on TV and monitor screens (#495). Nothing is re-implemented here – every finding comes from the
+ * sensor coverage (#236) and glare on TV and monitor screens (#495) and room acoustics (#494). Nothing is re-implemented here – every finding comes from the
  * module that owns the rule. Each finding carries the place in the plan to jump to.
  *
  * Severity: `error` (red) must be fixed, `warn` (yellow) is worth a look, `info` is a hint that
@@ -20,12 +20,13 @@ import { buildPlacementObstacles, furnitureConflicts, issueLevel, type Placement
 import { findNarrowPassages, passageLabel } from './passages';
 import type { Project } from './schema';
 import { shortestWalkPath } from './walkPath';
+import { ACOUSTIC_LABEL, formatSeconds, roomAcoustics, suggestionText, USAGE_LABEL } from './roomAcoustics';
 import { formatClock } from './sunPath';
 import { findScreenGlare, findScreens, GLARE_SEASON_LABEL, glareSpansLabel, type ScreenGlare } from './screenGlare';
 import { dist, type Vec2 } from './vec';
 
 export type CheckSeverity = 'error' | 'warn' | 'info';
-export type CheckCategory = 'collision' | 'doorSwing' | 'passage' | 'walk' | 'kitchen' | 'daylight' | 'wifi' | 'circuit' | 'sensor' | 'glare';
+export type CheckCategory = 'collision' | 'doorSwing' | 'passage' | 'walk' | 'kitchen' | 'daylight' | 'wifi' | 'circuit' | 'sensor' | 'glare' | 'acoustics';
 
 export const CHECK_CATEGORY_LABEL: Record<CheckCategory, string> = {
   collision: 'Kollisionen',
@@ -38,6 +39,7 @@ export const CHECK_CATEGORY_LABEL: Record<CheckCategory, string> = {
   circuit: 'Stromkreise',
   sensor: 'Melder-Abdeckung',
   glare: 'Bildschirm-Blendung',
+  acoustics: 'Raumakustik',
 };
 
 const CATEGORY_ORDER = Object.keys(CHECK_CATEGORY_LABEL) as CheckCategory[];
@@ -279,6 +281,25 @@ export function runPlanCheck(project: Project, derived: DerivedPlan): PlanCheckR
         detail: glareDetail(g),
         at: g.at,
         select: { type: 'furniture', id: g.furnitureId },
+      });
+    }
+  }
+
+  // room acoustics: estimated reverberation per living room (#494)
+  const acoustics = roomAcoustics(project, derived);
+  if (acoustics.length) {
+    checked.add('acoustics');
+    for (const r of acoustics) {
+      if (r.level === 'good') continue;
+      const tips = r.suggestions.slice(0, 3).map(suggestionText);
+      items.push({
+        id: `acoustics:${r.roomId}`,
+        category: 'acoustics',
+        severity: r.level === 'poor' ? 'warn' : 'info',
+        title: `„${r.name}“ ${ACOUSTIC_LABEL[r.level]}: Nachhallzeit ca. ${formatSeconds(r.reverb)} (angenehm bis ${formatSeconds(r.limit)}, ${USAGE_LABEL[r.usage]})`,
+        detail: `${tips.length ? `${tips.join('; ')}. ` : ''}Schätzung nach Sabine aus Raumvolumen und Oberflächen, mit typischen Richtwerten.`,
+        at: centre(r.roomId),
+        select: { type: 'room', id: r.roomId },
       });
     }
   }

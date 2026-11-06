@@ -29,6 +29,12 @@ describe('feature search (#461)', () => {
     expect(titles('übergabe')[0]).toMatch(/Übergabeprotokoll/);
   });
 
+  it('finds the Wohnungs-Check by acoustics and glare (#494, #495)', () => {
+    expect(titles('akustik')).toContain('Wohnungs-Check');
+    expect(titles('nachhall')).toContain('Wohnungs-Check');
+    expect(titles('blendung')).toContain('Wohnungs-Check');
+  });
+
   it('needs every word of the query', () => {
     expect(titles('plan drucken')).toContain('Plan drucken / PDF / PNG');
     expect(titles('plan xyzzy')).toEqual([]);

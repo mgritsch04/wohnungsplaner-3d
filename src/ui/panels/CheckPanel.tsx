@@ -20,7 +20,7 @@ export function CheckPanel() {
   return (
     <div className="panel-scroll">
       <Section title="Wohnungs-Check">
-        <p className="muted small">Prüft den ganzen Plan auf einmal: Kollisionen, Türaufschlag, Engstellen, Laufwege, Küchendreieck, Tageslicht, WLAN, Stromkreise, Melder-Abdeckung und Blendung am Bildschirm (Schätzung nach Sonnenbahn).</p>
+        <p className="muted small">Prüft den ganzen Plan auf einmal: Kollisionen, Türaufschlag, Engstellen, Laufwege, Küchendreieck, Tageslicht, WLAN, Stromkreise, Melder-Abdeckung und Blendung am Bildschirm (Schätzung nach Sonnenbahn) und Raumakustik (geschätzter Nachhall).</p>
         <button className="primary" data-testid="check-run" onClick={startPlanCheck}>
           {result ? 'Wohnungs-Check erneut starten' : 'Wohnungs-Check starten'}
         </button>

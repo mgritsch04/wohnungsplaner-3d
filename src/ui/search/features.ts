@@ -110,7 +110,7 @@ export const SECTIONS: { tab: LeftTab | RightTab; title: string; keywords?: stri
   { tab: 'smarthome', title: 'Simulation', keywords: 'testen ablauf' },
   { tab: 'smarthome', title: 'Audio-Setup vorschlagen', keywords: 'lautsprecher musik sonos' },
   { tab: 'smarthome', title: 'Tagesablauf prüfen', keywords: 'routine morgen abend' },
-  { tab: 'check', title: 'Wohnungs-Check', keywords: 'prüfen probleme fehler blendung spiegelung fernseher monitor bildschirm gegenlicht sonne' },
+  { tab: 'check', title: 'Wohnungs-Check', keywords: 'prüfen probleme fehler blendung spiegelung fernseher monitor bildschirm gegenlicht sonne akustik nachhall hall raumakustik teppich' },
   { tab: 'check', title: 'Raumkritik mit Claude', keywords: 'ki bewertung feedback' },
   { tab: 'import', title: 'Grundriss importieren', keywords: 'pdf bild plan einlesen' },
   { tab: 'budget', title: 'Budget', keywords: 'kosten summe preis' },
