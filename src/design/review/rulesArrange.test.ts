@@ -93,6 +93,31 @@ describe('C3 Fernseher', () => {
   });
 });
 
+describe('C3 Sofa und Küchenzeile (W10)', () => {
+  const room = () => rectRoom(6, 4, { doors: [{ wall: 'S', at: 5 }], windows: [{ wall: 'O', at: 2 }] });
+  const kitchen = [put('generic-k-sink-80', { x: 2.5, y: 0.3, face: 'S' }), put('generic-k-base-60', { x: 3.2, y: 0.3, face: 'S' })];
+  const sees = (r: ReturnType<typeof review>) => has(r, 'C3', /Küchenzeile/);
+  it('a sofa looking at the sink is medium', () => {
+    const r = review({ room: room(), type: 'living', items: [put('generic-sofa-3', { x: 2.8, y: 3.5, face: 'N' }), ...kitchen] });
+    expect(r.findings.find((f) => /Küchenzeile/.test(f.text))?.severity).toBe('M');
+  });
+  it('with the kitchen beside or behind it, or a tall shelf in between, it is fine', () => {
+    expect(sees(review({ room: room(), type: 'living', items: [put('generic-sofa-3', { x: 2.8, y: 2.0, face: 'S' }), ...kitchen] }))).toBe(false);
+    expect(sees(review({ room: room(), type: 'living', items: [put('generic-sofa-3', { x: 1.0, y: 2.5, face: 'O' }), ...kitchen] }))).toBe(false);
+    expect(sees(review({ room: room(), type: 'living', items: [put('generic-sofa-3', { x: 2.8, y: 3.5, face: 'N' }), put('generic-shelf-cube', { x: 2.8, y: 2.0, face: 'S' }), ...kitchen] }))).toBe(false);
+  });
+});
+
+describe('C2 Gesprächsabstand (W11)', () => {
+  const room = rectRoom(7, 5, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3 }] });
+  const group = (chairX: number) => review({ room, type: 'living', items: [put('generic-sofa-3', { x: 1.0, y: 2.5, face: 'O' }), put('generic-coffee-table', { x: 2.2, y: 2.5, face: 'W' }), put('generic-armchair', { x: chairX, y: 2.5, face: 'W' })] });
+  const far = (r: ReturnType<typeof review>) => r.findings.find((f) => f.rule === 'C2' && /Gespräch/.test(f.text));
+  it('an armchair opposite the sofa within 2.5 m is fine, further away light', () => {
+    expect(far(group(3.3))).toBeUndefined();
+    expect(far(group(5.5))?.severity).toBe('L');
+  });
+});
+
 describe('C4 Esstisch', () => {
   const dining = (opts: { chairs?: [number, number, 'N' | 'S'][]; pendant?: [number, number]; h?: number; ty?: number; type?: 'dining' | 'balcony' } = {}) => {
     const h = opts.h ?? 3;

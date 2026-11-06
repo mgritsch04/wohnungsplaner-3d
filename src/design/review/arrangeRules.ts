@@ -2,7 +2,7 @@
 import { tvRange } from '../tvDistance';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
-import { angleBetween, boundaryDist, cm, overlaps, pointPolyDist, polyDist, toLocal } from './geom';
+import { angleBetween, boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentHitsConvex, toLocal } from './geom';
 import { isDiningTable, isKitchenModule, isLamp, isPlant, type RItem } from './items';
 
 const deg = (d: number) => (d * Math.PI) / 180;
@@ -59,6 +59,13 @@ export function checkSeating(ctx: RoomCtx): void {
     for (const a of ctx.items.filter((i) => i.role === 'armchair' && i.floor)) {
       const to = sub(centre, a);
       if (Math.hypot(to.x, to.y) > 0.4 && angleBetween(a.front, to) > deg(70)) ctx.add('C2', 'M', `${ctx.label(a)} schaut nicht zur Sitzgruppe, man sitzt mit dem Rücken zu den anderen.`, [a], a);
+      else {
+        // W11: an armchair of the group within talking distance of the sofa
+        const sofa = sofas.slice().sort((p, q) => dist(p, a) - dist(q, a))[0];
+        const gap = sofa ? Math.max(0, dist(sofa, a) - sofa.depth / 2 - a.depth / 2) : 0;
+        if (sofa && gap > CONVERSATION_GAP + 0.01)
+          ctx.add('C2', 'L', `${ctx.label(a)} steht ${gap.toFixed(1)} m von ${ctx.label(sofa)} entfernt, für ein Gespräch sind höchstens ${CONVERSATION_GAP.toFixed(1).replace('.', ',')} m angenehm (W11).`, [a, sofa], a);
+      }
     }
   // nobody sits looking at the back of a sofa or armchair (W7, R2; #436: a reading chair behind the sofa)
   const seats = ctx.items.filter((i) => (i.role === 'armchair' || i.role === 'sofa') && i.floor);
@@ -73,6 +80,33 @@ export function checkSeating(ctx: RoomCtx): void {
         break;
       }
     }
+}
+
+/** W11: seats of one group at most this far apart, front edge to front edge (m). */
+const CONVERSATION_GAP = 2.5;
+
+/** Kitchen pieces a sofa should not look at (W10): the working line, not the wall cupboards above it. */
+const KITCHEN_VIEW: ReadonlySet<string> = new Set(['sink', 'cooktop', 'oven', 'dishwasher', 'base', 'tall', 'fridge']);
+const KITCHEN_RANGE = 5;
+const KITCHEN_CONE = deg(35);
+
+/**
+ * W10: in a living kitchen the sofa does not look at the kitchen line (sink, hob, cupboards); a TV or
+ * a tall piece in between (shelf as divider) hides it.
+ */
+function kitchenAhead(ctx: RoomCtx, s: RItem): RItem | undefined {
+  const ahead = ctx.items
+    .filter((k) => k.kitchen !== undefined && KITCHEN_VIEW.has(k.kitchen) && k.floor)
+    .filter((k) => {
+      const to = sub(k, s);
+      return Math.hypot(to.x, to.y) <= KITCHEN_RANGE && angleBetween(s.front, to) <= KITCHEN_CONE;
+    })
+    .sort((p, q) => dist(p, s) - dist(q, s));
+  const k = ahead[0];
+  if (!k) return undefined;
+  const hidden = ctx.items.some((o) => o !== s && !o.kitchen && o.floor && (o.height >= 1.2 || o.role === 'tv' || ctx.items.some((t) => t.role === 'tv' && ctx.supportOf(t) === o)) && segmentHitsConvex(s, k, o.poly));
+  const tvFirst = ctx.items.some((t) => t.role === 'tv' && dist(t, s) < dist(k, s) && angleBetween(s.front, sub(t, s)) <= KITCHEN_CONE);
+  return hidden || tvFirst ? undefined : k;
 }
 
 /** How far a sofa looks for its focal point (m), and how wide its view is. */
@@ -98,6 +132,10 @@ export function checkTv(ctx: RoomCtx): void {
   if (!ctx.items.some((i) => i.role === 'tv'))
     for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor))
       if (!sofaFocus(ctx, s)) ctx.add('C3', 'M', `${ctx.label(s)} schaut auf nichts: kein Fernseher, kein Fenster, kein Bild und keine Sessel gegenüber.`, [s], s);
+  for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor)) {
+    const k = kitchenAhead(ctx, s);
+    if (k) ctx.add('C3', 'M', `${ctx.label(s)} schaut auf die Küchenzeile (${ctx.label(k)}); besser schaut das Sofa auf Fenster, Fernseher oder Sitzgruppe und die Küche liegt seitlich oder im Rücken (W10).`, [s, k], s);
+  }
   for (const tv of ctx.items.filter((i) => i.role === 'tv')) {
     const range = tvRange(tv.width);
     const sofa = ctx.items.filter((i) => i.role === 'sofa' && i.floor).sort((a, b) => dist(a, tv) - dist(b, tv))[0];
