@@ -64,8 +64,8 @@ describe('runConcept', () => {
     expect(bath.problems).toEqual([]);
     expect(r.calls.filter((c) => c.label === 'Bad').map((c) => c.round)).toEqual([1, 2]);
     // concept, five rooms, the bath repaired, the Wohnküche asked once more for kitchen storage (K7),
-    // and the balcony twice: the trial has no answer for it
-    expect(calls).toHaveLength(9);
+    // the bedroom once more for a larger rug under the bed (S5), and the balcony twice: the trial has no answer for it
+    expect(calls).toHaveLength(10);
   });
 
   it('asks again after a timeout and reports a room that never answers', async () => {

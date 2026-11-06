@@ -67,8 +67,9 @@ describe('parseRoomProgram on the recorded answers', () => {
         const r = parseRoomProgram(recorded(key, name), i);
         // B's bath has a kitchen wall cabinet over the dryer: the one thing to repair
         if (key === 'B' && name === 'Bad') expect(r.problems).toEqual(['Teil „wallcab“: Küchenmodule (generic-k-wall-60) gehören in "kitchen", nicht in "items".']);
-        // the recorded answers predate the storage check K7: the Wohnküche of B has too little (see below)
-        else expect(r.problems.filter((x) => !x.includes('(K7)')), `${key} ${name}`).toEqual([]);
+        // the recorded answers predate the storage check K7 (the Wohnküche of B has too little, see below) and
+        // the start-place checks (intent.ts: B Schlafzimmer plans a 160×230 rug across a 160 bed); both ask again
+        else expect(r.problems.filter((x) => !x.includes('(K7)') && !x.includes('nach deinen Startplätzen')), `${key} ${name}`).toEqual([]);
         expect(r.value.roomId).toBe(i.room.roomId);
         expect(r.value.items.length, `${key} ${name}`).toBeGreaterThan(3);
         for (const rel of r.value.relations) expect(VOCABULARY).toContain(rel.kind);

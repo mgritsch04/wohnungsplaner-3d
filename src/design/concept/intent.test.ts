@@ -40,6 +40,19 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(tight).toHaveLength(1);
     expect(tight[0]).toMatch(/nördlichen Seite.*38 cm.*\(E2\)/);
   });
+  it('the rug under the bed shows 40 cm on both sides, else a larger rug is named (S5)', () => {
+    const bed = item('bed', 'generic-bed-160', 2, 1.1, 'S');
+    // 160×230 across a 160 bed (165 cm with its frame): 32 cm each side
+    const small = check(program([bed, item('rug', 'generic-rug-160', 2, 1.6, 'O')]));
+    expect(small).toHaveLength(1);
+    expect(small[0]).toMatch(/zu klein.*32 cm.*\(S5\).*mindestens 245 cm.*generic-rug-200/);
+    // 200×300 across: 67 cm each side
+    expect(check(program([bed, item('rug', 'generic-rug-200', 2, 1.6, 'O')]))).toEqual([]);
+    // long enough but pushed to one side
+    expect(check(program([bed, item('rug', 'generic-rug-200', 2.5, 1.6, 'O')]))[0]).toMatch(/nicht mittig.*18 cm.*118 cm/);
+    // a runner beside the bed is not under it
+    expect(check(program([bed, item('mat', 'generic-runner', 3.3, 1.1, 'S')]))).toEqual([]);
+  });
   it('a living room whose plan leaves a wide patch of floor empty is named with what a designer adds (E6)', () => {
     const room = rectRoom(7, 6, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] });
     const corner = program([item('sofa', 'generic-sofa-3', 1.2, 0.5, 'S'), item('table', 'generic-coffee-table', 1.2, 1.4, 'S')]);

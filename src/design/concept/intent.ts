@@ -7,10 +7,10 @@
  * names what already breaks a rule there: the television not opposite the sofa or far off it (W5), the sofa
  * looking at the kitchen run (W10), dining chairs without room to the wall (E2), a half of the room or a
  * wide patch of floor left empty (E6; in all six benchmark rooms with E6 the plan itself left it empty,
- * 6.11.). These go back to Claude with the other problems of the answer (one repair round); a finding
+ * 6.11.), a rug under the bed too short across it or off its middle (S5). These go back to Claude with the other problems of the answer (one repair round); a finding
  * the solver causes later is not Claude's to fix.
  */
-import { findCatalogItem } from '../../catalog/generic';
+import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
 import type { Furniture } from '../../model/schema';
 import { dist, sub, type Vec2 } from '../../model/vec';
@@ -158,8 +158,48 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
         }
       }
     }
+  problems.push(...rugUnderBed(pieces, products));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   return problems;
+}
+
+/** Half the extent of a piece along `axis` (unit vector). */
+function halfAlong(p: Placed, axis: Vec2): number {
+  const across = { x: p.front.y, y: -p.front.x };
+  return (Math.abs(axis.x * across.x + axis.y * across.y) * p.width + Math.abs(axis.x * p.front.x + axis.y * p.front.y) * p.depth) / 2;
+}
+
+/** The rug under the bed shows 40 to 60 cm on both sides (S5); in four of four benchmark bedrooms
+ * with this finding (6.11.) the rug Claude chose was already too short across the bed. */
+function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]): string[] {
+  const out: string[] = [];
+  for (const bed of pieces.filter((p) => p.shape === 'bed')) {
+    const across = { x: bed.front.y, y: -bed.front.x };
+    for (const rug of pieces.filter((p) => p.shape === 'rug')) {
+      const to = sub(rug.at, bed.at);
+      const u = to.x * across.x + to.y * across.y;
+      const v = to.x * bed.front.x + to.y * bed.front.y;
+      const half = halfAlong(rug, across);
+      // under the bed: spans it across and lies under its lower part, not a runner beside it
+      if (Math.abs(u) > bed.width / 2 || half < bed.width * 0.4 || Math.abs(v) > bed.depth / 2 + halfAlong(rug, bed.front) - 0.15) continue;
+      const left = half - u - bed.width / 2;
+      const right = half + u - bed.width / 2;
+      if (Math.min(left, right) >= 0.39) continue;
+      const cm = (m: number) => Math.round(Math.max(0, m) * 100);
+      if (2 * half - bed.width >= 0.79) {
+        out.push(`„${rug.id}“ liegt nach deinen Startplätzen nicht mittig unter „${bed.id}“: er ragt auf einer Seite ${cm(Math.min(left, right))} cm, auf der anderen ${cm(Math.max(left, right))} cm heraus, schön sind 40 bis 60 cm auf beiden Seiten (S5). Mittig unter das untere Bettdrittel legen.`);
+        continue;
+      }
+      const need = bed.width + 0.8;
+      const fits = [...products, ...GENERIC_CATALOG]
+        .filter((c) => shapeOf(c) === 'rug' && Math.max(c.width, c.depth) >= need - 0.01 && Math.min(c.width, c.depth) >= 1.2)
+        .sort((a, b) => a.width * a.depth - b.width * b.depth)[0];
+      out.push(
+        `„${rug.id}“ ist für „${bed.id}“ (${cm(bed.width)} cm breit) zu klein: quer unter dem Bett ragt er nach deinen Startplätzen nur ${cm(Math.min(left, right))} cm heraus, schön sind 40 bis 60 cm auf beiden Seiten (S5). Einen Teppich mit mindestens ${cm(need)} cm quer zum Bett nehmen${fits ? ` (z. B. ${fits.id}, ${fits.name})` : ''}, mit der langen Seite quer unter das untere Bettdrittel, oder statt dessen zwei Bettvorleger links und rechts.`,
+      );
+    }
+  }
+  return out;
 }
 
 /** What a designer puts into an empty half or middle, per room type (research 6.11.: R-M3, S7, R4, W9, KI1). */
