@@ -207,7 +207,12 @@ function softDecor(c: Ctx, type: RoomType, area: number, colour: { color?: strin
   }
   if (type === 'bath') {
     // the washbasin is often the flat's own and not in the programme: any piece of the room will do as anchor
-    const basin = c.items.find((i) => shapeOfProgramItem(c, i) === 'washbasin') ?? anchor;
+    // else a low piece (bath mat, hamper), not the washer: its wall is often taken by a dryer stacked on it
+    const low = c.items.find((i) => {
+      const it = lookup(c, i.catalogId);
+      return !!it && !!i.hint && it.height <= 0.5 && (it.elevation ?? 0) < 0.05 && !['washer', 'towels'].includes(shapeOfProgramItem(c, i));
+    });
+    const basin = c.items.find((i) => shapeOfProgramItem(c, i) === 'washbasin') ?? low ?? anchor;
     if (basin && area >= 3 && !c.items.some((i) => shapeOfProgramItem(c, i) === 'towels')) add(c, basin, 'Textilien', 'generic-towels', 'handtuecher', 'Textilien: Handtuchstange mit zwei Handtüchern in Griffweite des Waschtischs (SL8).', { fallbacks: [], ...textile });
   }
 }

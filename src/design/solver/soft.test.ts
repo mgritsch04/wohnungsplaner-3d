@@ -150,3 +150,22 @@ describe('table decoration', () => {
     expect(Math.hypot(tray.x - coffee.x, tray.y - coffee.y)).toBeLessThan(0.4);
   });
 });
+
+describe('wall decoration and a stacked dryer', () => {
+  it('a towel rail never hangs behind the dryer stacked on the washer', () => {
+    const room = rectRoom(2.2, 2.6, { doors: [{ wall: 'S', at: 0.7 }] });
+    const p = program(
+      room,
+      [item('washer', 'generic-washer', [1.8, 1.0, Math.PI / 2]), item('dryer', 'generic-washer', [1.8, 1.0, Math.PI / 2]), item('towels', 'generic-towels', [1.8, 1.0, Math.PI / 2])],
+      [{ kind: 'above', item: 'dryer', target: 'washer' }],
+    );
+    for (const seed of [1, 2, 3]) {
+      const layout = solveRoom(room, p, { seed });
+      const dryer = byId(layout, 'dryer');
+      const towels = layout.items.find((i) => i.id === 'towels');
+      if (!towels) continue; // left out is fine; hidden behind the dryer is not
+      const apart = Math.abs(towels.x - dryer.x) - (dryer.width + towels.width) / 2 >= -0.01 || Math.abs(towels.y - dryer.y) - (dryer.depth + towels.depth) / 2 >= -0.01;
+      expect(apart || Math.hypot(towels.x - dryer.x, towels.y - dryer.y) > 0.5, `seed ${seed}`).toBe(true);
+    }
+  });
+});
