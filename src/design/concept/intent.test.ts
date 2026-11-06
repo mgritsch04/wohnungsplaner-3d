@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rotationForSide } from '../coords';
 import type { ProgramItem, RoomProgram, Side } from '../types';
+import { rectRoom } from '../review/testkit';
 import { intentProblems } from './intent';
 
 const item = (id: string, catalogId: string, x: number, y: number, face: Side): ProgramItem => ({ id, catalogId, zone: 'z', hint: { x, y, rotation: rotationForSide(face) }, why: '' });
@@ -38,5 +39,13 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     const tight = check(set(0.8), [], room);
     expect(tight).toHaveLength(1);
     expect(tight[0]).toMatch(/nördlichen Seite.*38 cm.*\(E2\)/);
+  });
+  it('a living room whose plan leaves a wide patch of floor empty is named with what a designer adds (E6)', () => {
+    const room = rectRoom(7, 6, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] });
+    const corner = program([item('sofa', 'generic-sofa-3', 1.2, 0.5, 'S'), item('table', 'generic-coffee-table', 1.2, 1.4, 'S')]);
+    const p = intentProblems(corner, room, [], [], 'living');
+    expect(p.some((x) => /nach deinen Startplätzen schon.*Leseecke/.test(x))).toBe(true);
+    // without a room type (or in a bath) nothing is asked
+    expect(intentProblems(corner, room, [], [], 'bath').some((x) => /Startplätzen schon/.test(x))).toBe(false);
   });
 });
