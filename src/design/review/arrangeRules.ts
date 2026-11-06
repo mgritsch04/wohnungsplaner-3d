@@ -1,4 +1,5 @@
 /** C Anordnung (#441): do the pieces stand the way people set them up? */
+import { tvRange } from '../tvDistance';
 import { dist, dot, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { angleBetween, boundaryDist, cm, overlaps, pointPolyDist, polyDist, toLocal } from './geom';
@@ -98,7 +99,7 @@ export function checkTv(ctx: RoomCtx): void {
     for (const s of ctx.items.filter((i) => i.role === 'sofa' && i.floor))
       if (!sofaFocus(ctx, s)) ctx.add('C3', 'M', `${ctx.label(s)} schaut auf nichts: kein Fernseher, kein Fenster, kein Bild und keine Sessel gegenüber.`, [s], s);
   for (const tv of ctx.items.filter((i) => i.role === 'tv')) {
-    const diag = tv.width / 0.872;
+    const range = tvRange(tv.width);
     const sofa = ctx.items.filter((i) => i.role === 'sofa' && i.floor).sort((a, b) => dist(a, tv) - dist(b, tv))[0];
     if (sofa) {
       const to = sub(tv, sofa);
@@ -106,8 +107,8 @@ export function checkTv(ctx: RoomCtx): void {
       const angle = angleBetween(sofa.front, to);
       if (angle > deg(80)) ctx.add('C3', 'S', `${ctx.label(tv)} hängt seitlich oder hinter ${ctx.label(sofa)}, vom Sofa aus sieht man nicht hin.`, [tv, sofa], tv);
       else if (angle > deg(30)) ctx.add('C3', 'M', `${ctx.label(tv)} hängt nicht gegenüber von ${ctx.label(sofa)}, man müsste den Kopf drehen.`, [tv, sofa], tv);
-      else if (d < 1.5 * diag - 0.01 || d > 2.5 * diag + 0.01)
-        ctx.add('C3', 'M', `Zwischen Sofa und Fernseher liegen ${d.toFixed(1)} m, bei diesem Gerät sind ${(1.5 * diag).toFixed(1)} bis ${(2.5 * diag).toFixed(1)} m angenehm.`, [tv, sofa], tv);
+      else if (d < range.lo - 0.05 || d > range.hi + 0.05)
+        ctx.add('C3', 'M', `Zwischen Sofavorderkante und Fernseher liegen ${d.toFixed(1)} m, bei diesem Gerät sind ${range.lo.toFixed(1)} bis ${range.hi.toFixed(1)} m angenehm (W5).`, [tv, sofa], tv);
     }
     const board = ctx.supportOf(tv);
     for (const w of ctx.windows) if (overlaps(w.strip, (board ?? tv).poly)) ctx.add('C3', 'M', `${ctx.label(tv)} steht vor dem Fenster ${w.label}, bei Tageslicht spiegelt es.`, [tv], tv);
