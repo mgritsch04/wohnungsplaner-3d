@@ -23,7 +23,7 @@ import { buildCritiquePrompt, LOOK_ENOUGH, parseCritique, type CritiqueInput } f
 import { roomPlanSvg, roomTextMap, type RoomPlan } from './render';
 import { reviewFlat, reviewRoom, type ReviewInput } from './review';
 import { BALANCED } from './review/overallRules';
-import { existingPieces, solveBest } from './solver/solve';
+import { droppedWeight, existingPieces, solveRoom } from './solver/solve';
 import type { FlatAnalysis, FlatResult, Layout, PlacedItem, RoomAnalysis, RoomProgram, RoomResult } from './types';
 
 /** Rooms placed, walked through and criticised at the same time. */
@@ -139,11 +139,36 @@ interface RoomWork {
   review: (layout: Layout, program: RoomProgram) => ReviewInput;
 }
 
-/** Place and walk through one programme. */
+/**
+ * Seeds placed per programme (#436). The search lands in very different places per seed: the same
+ * programme of test flat B's living kitchen walked through at 0 to 88 points over twelve seeds
+ * (6.11.), and the seed with the lowest solver cost was not the one with the best walk-through.
+ * So the walk-through picks; after `PLACE_TRIES` seeds the rest are tried only while none passes.
+ */
+export const PLACE_TRIES = 3;
+export const PLACE_TRIES_FAILING = 5;
+
+/** The better placement of one programme: passing, then points, then the lighter loss, then the solver's cost. */
+export function betterPlacement(a: RoomResult, b: RoomResult, catalog?: CatalogItem[]): RoomResult {
+  if (a.review.passed !== b.review.passed) return a.review.passed ? a : b;
+  if (a.review.score !== b.review.score) return a.review.score > b.review.score ? a : b;
+  const wa = droppedWeight(a.program, a.layout, catalog);
+  const wb = droppedWeight(b.program, b.layout, catalog);
+  if (Math.abs(wa - wb) > 1e-9) return wa < wb ? a : b;
+  return a.layout.cost <= b.layout.cost ? a : b;
+}
+
+/** Place and walk through one programme, several seeds, the walk-through decides. */
 function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, rounds: number): RoomResult {
-  const layout = solveBest(work.analysis, program, { existing: work.existing, seed, catalog: work.base.products, spread: BALANCED.has(work.type) });
-  const review = reviewRoom(work.review(layout, program));
-  return { roomId: work.analysis.roomId, program, layout, review, rounds };
+  let best: RoomResult | null = null;
+  for (let k = 0; k < PLACE_TRIES_FAILING; k++) {
+    if (best && k >= PLACE_TRIES && best.review.passed) break;
+    const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: seed + k * 1000, catalog: work.base.products, spread: BALANCED.has(work.type) });
+    const review = reviewRoom(work.review(layout, program));
+    const r: RoomResult = { roomId: work.analysis.roomId, program, layout, review, rounds };
+    best = best ? betterPlacement(best, r, work.base.products) : r;
+  }
+  return best!;
 }
 
 /**

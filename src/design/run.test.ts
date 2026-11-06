@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sample, SampleOptions } from '../assistant/claude';
 import { TEST_FLATS } from './fixtures/flats';
 import { RECORDED } from './fixtures/recorded';
-import { lookKeeps, runFurnishing, type DesignRunProgress } from './run';
+import { betterPlacement, lookKeeps, runFurnishing, type DesignRunProgress } from './run';
 import type { RoomResult } from './types';
 
 const flat = TEST_FLATS.B;
@@ -47,8 +47,8 @@ const run = (sample: Pick<Sample, 'json' | 'images'>, extra: Partial<Parameters<
   return runFurnishing({ sample, project, roomIds, wishes: flat.wishes, seed: 7, timeouts: { opus: 2000, sonnet: 2000 }, ...extra });
 };
 
-// jeder Test stellt eine ganze Wohnung auf: das dauert auf den Rechnern der CI länger als die 5 s Voreinstellung
-describe('runFurnishing', { timeout: 60_000 }, () => {
+// jeder Test stellt eine ganze Wohnung auf, ein Raum, der die Begehung nicht besteht, mit bis zu fünf Startwerten (PLACE_TRIES_FAILING): das dauert auf den Rechnern der CI lange
+describe('runFurnishing', { timeout: 150_000 }, () => {
   it('reads, asks, places, walks through and criticises – every room ends with a layout and a score', async () => {
     const { sample, calls } = fake(recorded);
     const stages: DesignRunProgress[] = [];
@@ -174,6 +174,21 @@ describe('runFurnishing', { timeout: 60_000 }, () => {
     expect(lookKeeps(room(95, true), room(97, false))).toBe(false);
     expect(lookKeeps(room(95, true), room(96, true, 6, 1))).toBe(false);
     expect(lookKeeps(room(95, true), room(96, true, 2))).toBe(false);
+  });
+
+  it('of several placements of one programme the walk-through picks: passing, points, then the lighter loss and the solver cost (#436)', () => {
+    const placed = (score: number, passed: boolean, cost = 1, dropped: { id: string; catalogId: string }[] = []) =>
+      ({ program: { items: [{ id: 'sofa', required: true }] }, review: { score, passed }, layout: { items: [], dropped, cost } }) as unknown as RoomResult;
+    const lamp = { id: 'lamp', catalogId: 'generic-floor-lamp' };
+    const sofa = { id: 'sofa', catalogId: 'generic-sofa-3' };
+    const a = placed(86, true);
+    const b = placed(84, false, 0.2);
+    expect(betterPlacement(a, b)).toBe(a);
+    expect(betterPlacement(b, placed(90, false, 9))).not.toBe(b);
+    const light = placed(90, true, 5, [lamp]);
+    expect(betterPlacement(placed(90, true, 1, [sofa]), light)).toBe(light);
+    const cheap = placed(90, true, 1);
+    expect(betterPlacement(placed(90, true, 3), cheap)).toBe(cheap);
   });
 
   it('a main room gets a second design, and the pictures choose between them (both orders must agree)', async () => {
