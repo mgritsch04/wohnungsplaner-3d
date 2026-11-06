@@ -287,6 +287,18 @@ describe('kitchen', () => {
     expect(byId(layout, 'kitchen1-hood').parent).toBe(cook.id);
   });
 
+  it('a runner without a relation lies along the kitchen run in the work aisle, not across the room', () => {
+    const room = runRoom(1.6);
+    const p = { ...withRun(room, ['generic-k-fridge', 'generic-k-base-60', 'generic-k-sink-80', 'generic-k-drawer-60', 'generic-k-base-60', 'generic-k-base-40']), items: [item('laeufer', 'generic-runner', [2.0, 2.2, Math.PI / 2])] };
+    for (const seed of [1, 2]) {
+      const runner = byId(solveRoom(room, p, { seed }), 'laeufer');
+      // long side along the run (x), right in front of the 60 cm deep modules
+      const ex = Math.abs(Math.cos(runner.rotation)) * runner.width + Math.abs(Math.sin(runner.rotation)) * runner.depth;
+      expect(ex, `seed ${seed} ${JSON.stringify(runner)}`).toBeGreaterThan(1.9);
+      expect(runner.y, `seed ${seed}`).toBeLessThan(0.6 + 0.4 + 0.15);
+    }
+  });
+
   it('a cooktop under a window gets no hood', () => {
     const room = runRoom(2.5);
     const layout = solveRoom(room, withRun(room, ['generic-k-fridge', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-oven']), { seed: 1 });
