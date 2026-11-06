@@ -1,6 +1,6 @@
 import { derivePlan, type DerivedPlan } from '../model/derived';
 import { newId } from '../model/ids';
-import type { AudioDeviceDef, Automation, Project, SmartDevice, SmartDeviceKind } from '../model/schema';
+import type { AudioDeviceDef, Automation, Project, SmartDevice, SmartDeviceKind, WifiAp } from '../model/schema';
 import { dist, pointInPolygon, polygonCentroid, type Vec2 } from '../model/vec';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
@@ -70,8 +70,12 @@ export function placementFor(
   return { x: r3(c.x), y: r3(c.y), rotation: 0 };
 }
 
-const nameFor = (project: Project, kind: SmartDeviceKind, roomName: string | undefined) => {
-  const base = `${KIND_LABEL[kind]}${roomName ? ` ${roomName}` : ''}`;
+/** Short names of WLAN access points by role (#492). */
+const AP_NAME: Record<string, string> = { ap: 'Access Point', mesh: 'Mesh-Knoten', repeater: 'Repeater' };
+
+const nameFor = (project: Project, kind: SmartDeviceKind, roomName: string | undefined, wifi?: WifiAp) => {
+  const label = kind === 'router' && wifi?.role && AP_NAME[wifi.role] ? AP_NAME[wifi.role] : KIND_LABEL[kind];
+  const base = `${label}${roomName ? ` ${roomName}` : ''}`;
   const n = project.devices.filter((d) => d.name === base || d.name.startsWith(`${base} `)).length;
   return n ? `${base} ${n + 1}` : base;
 };
@@ -80,7 +84,7 @@ const nameFor = (project: Project, kind: SmartDeviceKind, roomName: string | und
  * Add a device (optionally of a catalog product) to a room – at `at` if given (click into
  * the plan), else at a typical spot. A smart lamp also gets a placed light.
  */
-export function addDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2): string {
+export function addDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2, wifi?: WifiAp): string {
   const id = newId('dev');
   const st = useProjectStore.getState();
   const derived = derivePlan(st.project);
@@ -88,7 +92,8 @@ export function addDevice(kind: SmartDeviceKind, productId: string | undefined, 
     const pos = placementFor(d, derived, kind, roomId, at);
     const room = d.rooms.find((r) => r.id === roomId);
     const product = productById(productId);
-    const dev: SmartDevice = { id, name: nameFor(d, kind, room?.name), kind, productId: product?.id, ...pos, elevation: DEFAULT_ELEVATION[kind] };
+    const dev: SmartDevice = { id, name: nameFor(d, kind, room?.name, wifi), kind, productId: product?.id, ...pos, elevation: DEFAULT_ELEVATION[kind] };
+    if (kind === 'router' && wifi) dev.wifi = { ...wifi };
     if (kind === 'light') {
       const lightId = newId('light');
       const k = product?.kelvin ? Math.min(Math.max(2700, product.kelvin[0]), product.kelvin[1]) : 2700;
@@ -186,15 +191,15 @@ export function makeLightSmartWithFeedback(lightId: string, productId?: string):
 }
 
 /** Add a device and give visible feedback (#233): select it, flash it, short message. */
-export function placeDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2): string {
-  const id = addDevice(kind, productId, roomId, at);
+export function placeDevice(kind: SmartDeviceKind, productId: string | undefined, roomId: string | null, at?: Vec2, wifi?: WifiAp): string {
+  const id = addDevice(kind, productId, roomId, at, wifi);
   const p = useProjectStore.getState().project;
   const dev = p.devices.find((x) => x.id === id);
   const room = dev && p.rooms.find((r) => r.id === roomAt(p, derivePlan(p), dev));
   const ui = useUiStore.getState();
   ui.setSelection({ type: 'device', id });
   useSimStore.getState().setFlash(id);
-  ui.toast(`${KIND_LABEL[kind]} ${room ? `in „${room.name}“ ` : ''}platziert – Strg+Z macht es rückgängig.`, 'success');
+  ui.toast(`${kind === 'router' && wifi?.role && AP_NAME[wifi.role] ? AP_NAME[wifi.role] : KIND_LABEL[kind]} ${room ? `in „${room.name}“ ` : ''}platziert – Strg+Z macht es rückgängig.`, 'success');
   return id;
 }
 
