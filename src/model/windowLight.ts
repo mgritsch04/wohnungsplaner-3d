@@ -37,6 +37,12 @@ export interface WindowLight {
   bearing: number;
   /** Share of the daylight that gets through blind and curtains (0..1). */
   transmission: number;
+  /** Ends of the glass on the inside face of the wall (plan metres) – for sight lines and sun rays. */
+  a: Vec2;
+  b: Vec2;
+  /** Sill and head height above the floor (m). */
+  bottom: number;
+  top: number;
 }
 
 const shapeOf = (f: Furniture): string => (f.model.type === 'procedural' ? f.model.shape : f.model.fallbackShape);
@@ -103,6 +109,10 @@ export function windowLights(project: Project, plan: DerivedPlan, overrides?: Co
           glass: (r.s1 - r.s0) * (r.top - r.bottom),
           bearing: planBearing(scale(inward, -1), project.settings.northDirection),
           transmission: transmission(shading) * (1 - cover * (1 - CURTAIN_TRANSMISSION)),
+          a: add(add(fp.a, scale(fp.dir, r.s0)), scale(inward, fp.thickness / 2)),
+          b: add(add(fp.a, scale(fp.dir, r.s1)), scale(inward, fp.thickness / 2)),
+          bottom: r.bottom,
+          top: r.top,
         });
       }
     }
