@@ -367,11 +367,25 @@ function backGapCost(m: Model, n: Node): number {
 }
 
 /** D1: a plant stands in a corner, at a window or at a wall, never free in the room. */
+/** A tall plant in the middle in front of a window. */
+const PLANT_BEFORE_WINDOW = 0.6;
+
 function plantPlaceCost(m: Model, n: Node): number {
   const ctx = m.ctx;
   const p = { x: n.box.x, y: n.box.y };
   if (ctx.analysis.corners.some((c) => !c.reflex && Math.hypot(c.p.x - p.x, c.p.y - p.y) < 0.7)) return 0;
   const on = (wi: number, t: number) => add(ctx.walls[wi].a, scale(ctx.walls[wi].dir, t));
+  // a tall plant goes beside the window, not in the middle in front of it: it takes the light and
+  // the view (image review r14 A: the bird of paradise in the middle in front of F2)
+  const blocks = ctx.windows.some((w) => {
+    if (top(n) <= w.sill - 0.15) return false;
+    const wall = ctx.walls[w.wall];
+    const t = alongWall(wall, n.box);
+    const off = (p.x - wall.a.x) * wall.inward.x + (p.y - wall.a.y) * wall.inward.y;
+    const r = Math.max(n.box.hw, n.box.hd);
+    return off < 1.5 && t - r < (w.t0 + w.t1) / 2 + 0.15 && t + r > (w.t0 + w.t1) / 2 - 0.15 && t > w.t0 && t < w.t1;
+  });
+  if (blocks) return PLANT_BEFORE_WINDOW;
   if (ctx.windows.some((w) => closestPointOnSegment(p, on(w.wall, w.t0), on(w.wall, w.t1)).distance < 0.8)) return 0;
   const gap = Math.min(...ctx.walls.map((w, i) => closestPointOnSegment(p, w.a, on(i, w.length)).distance)) - Math.max(n.box.hw, n.box.hd);
   return gap < 0.35 ? 0 : 1.0;
