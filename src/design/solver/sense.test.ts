@@ -13,6 +13,7 @@ import { rectRoom } from '../review/testkit';
 import type { Layout, PlacedItem, ProgramItem, Relation, RoomAnalysis, RoomProgram } from '../types';
 import { programFromRecorded } from './recordedProgram';
 import { boxCorners, overlapDepth } from './geom';
+import { sideStrip } from './room';
 import { existingPieces, solveRoom } from './solve';
 
 const front = (i: PlacedItem): Vec2 => ({ x: -Math.sin(i.rotation), y: Math.cos(i.rotation) });
@@ -178,6 +179,16 @@ describe('lamps where they light (image review r7/r9)', () => {
       const wy = (win.t0 + win.t1) / 2;
       const u = (wx - desk.x) * Math.cos(desk.rotation) + (wy - desk.y) * Math.sin(desk.rotation);
       expect(u, `seed ${seed}`).toBeLessThan(0);
+    }
+  });
+
+  it('the sofa does not look at the back of whoever sits at the desk (paired image review r10–r12)', () => {
+    const r = rectRoom(3.2, 3.4, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'N', at: 1.6, width: 1.2 }] });
+    for (const seed of [1, 2, 3]) {
+      const p = program(r, [item('desk', 'generic-desk', [0.36, 1.7, -Math.PI / 2]), item('chair', 'generic-office-chair'), item('sofa', 'generic-sofa-2', [2.75, 1.9, Math.PI / 2])], [{ kind: 'around', items: ['chair'], target: 'desk' }]);
+      const layout = solveRoom(r, p, { seed });
+      const box = (i: PlacedItem) => ({ x: i.x, y: i.y, hw: i.width / 2, hd: i.depth / 2, rotation: i.rotation });
+      expect(overlapDepth(sideStrip(box(byId(layout, 'sofa')), 'front', 3), sideStrip(box(byId(layout, 'desk')), 'front', 0.9)), `seed ${seed}`).toBeLessThanOrEqual(0.1);
     }
   });
 

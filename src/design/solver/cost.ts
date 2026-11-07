@@ -496,8 +496,27 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
   }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
   c.soft += armchairCost(u, v) + armchairCost(v, u);
+  c.soft += seatViewCost(u, v) + seatViewCost(v, u);
   c.soft += cornerGapCost(u, v);
   return c;
+}
+
+/**
+ * A sofa looks at the back of whoever sits at the desk: the work place is the view from the
+ * seat, and on a video call the sofa (often a sofa bed) is in the picture (paired image review
+ * r10–r12, A Zimmer 2 every time).
+ */
+function seatViewCost(u: Unit, v: Unit): number {
+  let s = 0;
+  for (const a of u.nodes) {
+    if (a.spec.role !== 'sofa' || !isFloor(a)) continue;
+    const view = sideStrip(a.box, 'front', 3.0);
+    for (const b of v.nodes) {
+      if (b.spec.category !== 'desk' || !isFloor(b)) continue;
+      if (overlapDepth(view, sideStrip(b.box, 'front', 0.9)) > 0.1) s += 1.2;
+    }
+  }
+  return s;
 }
 
 /** Up to this gap (m) two kitchen runs at right angles count as one L that should close. */
