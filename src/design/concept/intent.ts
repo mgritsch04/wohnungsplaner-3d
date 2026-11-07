@@ -23,6 +23,7 @@ import { RoomCtx } from '../review/context';
 import { checkDesk } from '../review/arrangeRules';
 import { checkCurtains } from '../review/decorRules';
 import { checkTvGlare } from '../review/groupRules';
+import { boundaryDist } from '../review/geom';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
@@ -167,7 +168,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
         }
       }
     }
-  problems.push(...rugUnderBed(pieces, products));
+  problems.push(...rugUnderBed(pieces, products, room?.polygon));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
   if (room && 'walkways' in room) problems.push(...areaBudget(program, room as RoomAnalysis, existing, products));
@@ -183,10 +184,14 @@ function halfAlong(p: Placed, axis: Vec2): number {
 
 /** The rug under the bed shows 40 to 60 cm on both sides (S5); in four of four benchmark bedrooms
  * with this finding (6.11.) the rug Claude chose was already too short across the bed. */
-function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]): string[] {
+function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[], outline?: readonly Vec2[]): string[] {
   const out: string[] = [];
   for (const bed of pieces.filter((p) => p.shape === 'bed')) {
     const across = { x: bed.front.y, y: -bed.front.x };
+    // a bed with one long side at the wall (day bed, single bed): the rug only has to show on the free side
+    const atWall = (s: -1 | 1) => !!outline && boundaryDist({ x: bed.at.x + across.x * s * (bed.width / 2 + 0.05), y: bed.at.y + across.y * s * (bed.width / 2 + 0.05) }, outline) < 0.15;
+    const wallLeft = atWall(-1);
+    const wallRight = atWall(1);
     for (const rug of pieces.filter((p) => p.shape === 'rug')) {
       const to = sub(rug.at, bed.at);
       const u = to.x * across.x + to.y * across.y;
@@ -200,6 +205,12 @@ function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]
       const longAcross = 2 * half >= long - 0.01;
       const left = half - u - bed.width / 2;
       const right = half + u - bed.width / 2;
+      if (wallLeft !== wallRight) {
+        const free = wallLeft ? right : left;
+        if (free < 0.39)
+          out.push(`„${rug.id}“ ragt nach deinen Startplätzen auf der freien Seite von „${bed.id}“ nur ${cm(free)} cm heraus (S5). Das Bett steht mit einer Seite an der Wand, dort braucht es nichts; auf der freien Seite sind 40 bis 60 cm schön. Den Teppich zur freien Seite rücken oder einen größeren nehmen.`);
+        continue;
+      }
       if (long - bed.width < 0.79) {
         const need = bed.width + 0.8;
         const fits = [...products, ...GENERIC_CATALOG]

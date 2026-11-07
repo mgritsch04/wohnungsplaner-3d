@@ -82,7 +82,13 @@ export function checkRugs(ctx: RoomCtx): void {
       const corners = r.poly.map((c) => toLocal(bed, c).u);
       const left = -Math.min(...corners) - bed.width / 2;
       const right = Math.max(...corners) - bed.width / 2;
-      if (Math.min(left, right) < 0.4 - 0.01) ctx.add('D5', 'L', `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, Math.min(left, right)))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
+      // a bed with one long side at the wall: the rug only shows on the free side (benchmark 7.11.: E, day bed in the study)
+      const atWall = (s: -1 | 1) => boundaryDist({ x: bed.x + bed.right.x * s * (bed.width / 2 + 0.05), y: bed.y + bed.right.y * s * (bed.width / 2 + 0.05) }, ctx.an.polygon) < 0.15;
+      const wallLeft = atWall(-1);
+      const wallRight = atWall(1);
+      const free = wallLeft && !wallRight ? right : wallRight && !wallLeft ? left : Math.min(left, right);
+      if (free < 0.4 - 0.01)
+        ctx.add('D5', 'L', wallLeft !== wallRight ? `${ctx.label(r)} ragt auf der freien Seite des Bettes nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm.` : `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
     }
     if (ctx.type === 'hall' && r.width < 1.0 && r.depth >= 1.5) {
       // the middle of the free walking strip: a shoe cabinet or shelf along one wall narrows the hall
