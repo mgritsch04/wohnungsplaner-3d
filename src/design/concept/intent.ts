@@ -20,7 +20,7 @@ import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
-import { checkBackGap, checkDesk, checkTv } from '../review/arrangeRules';
+import { checkBackGap, checkCallBackground, checkDesk, checkTv } from '../review/arrangeRules';
 import { checkCurtains, checkPlants } from '../review/decorRules';
 import { checkClearances } from '../review/wayRules';
 import { checkTvGlare } from '../review/groupRules';
@@ -336,9 +336,9 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
 }
 
 /**
- * C3, C4, C8 and D1 on the start places: a sofa that looks at nothing, a dining table in the work aisle of
- * the kitchen, a sofa or desk with a useless strip behind it (F Wohnküche: 60 cm to the dining table), a tall
- * plant in a room without a window. In the benchmark (7.11.) each came from the plan
+ * C3, C4, C8, C10 and D1 on the start places: a sofa that looks at nothing, a dining table in the work aisle
+ * of the kitchen, a sofa or desk with a useless strip behind it (F Wohnküche: 60 cm to the dining table), the
+ * bed or a window behind the desk chair in a video call (B and C bedrooms), a tall plant in a room without a window. In the benchmark (7.11.) each came from the plan
  * (F Zimmer 2, E Küche, A Gang) and the solver kept it; no plan had one that the solver then mended, so
  * asking adds no repair round the result would not need (the recorded first answer for F Vorraum has a
  * tall plant without daylight too). Designers give every sofa a focal point (picture,
@@ -355,6 +355,7 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
   const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program, catalog: [...products] });
   checkTv(ctx);
   checkBackGap(ctx);
+  checkCallBackground(ctx);
   checkPlants(ctx);
   checkClearances(ctx);
   const mine = new Set(program.items.map((i) => i.id));
@@ -370,6 +371,11 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
       const m = /bleiben (\d+) cm (bis zur Wand|bis zum nächsten Möbel)/.exec(f.text);
       out.push(
         `Hinter „${id}“ bleiben nach deinen Startplätzen ${m ? `${m[1]} cm ${m[2]}` : 'nur ein schmaler Streifen'} (C8): zu schmal für einen Gang, zu breit für „an der Wand“. Profis stellen es entweder an die Wand (höchstens 15 cm Abstand) oder lassen dahinter einen Gang von mindestens 75 cm, hinter Esstischstühlen 90 cm.`,
+      );
+    } else if (f.rule === 'C10') {
+      const what = /Videokonferenz (.+) \(Gegenlicht/.exec(f.text)?.[1];
+      out.push(
+        `Hinter dem Stuhl an „${id}“ liegt nach deinen Startplätzen im Bild einer Videokonferenz ${what ?? 'ein unruhiger Hintergrund'} (C10, HO4). Profis stellen den Schreibtisch so, dass hinter dem Stuhl ein Schrank, ein Regal oder eine ruhige Wand liegt; das Fenster gehört seitlich, das Bett aus dem Bild.`,
       );
     } else if (f.rule === 'C4' && f.text.includes('Arbeitsgang der Küche')) {
       const left = /bleiben (\d+) cm/.exec(f.text)?.[1];
