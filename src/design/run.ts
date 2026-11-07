@@ -11,6 +11,7 @@ import type { CatalogItem } from '../catalog/types';
 import type { DesignWishes } from '../assistant/design';
 import type { Sample, SampleError, SampleImage, SampleOptions } from '../assistant/claude';
 import { runPool } from '../assistant/pool';
+import { DEFAULT_MATERIALS } from '../model/materials';
 import type { Project } from '../model/schema';
 import type { RoomType } from '../suggest/furnishing';
 import { analyzeFlat, flatSketch, roomSketch } from './analysis';
@@ -126,9 +127,18 @@ export function lookNote(raw: unknown): number | null {
 export const asPlaced = (pieces: ReturnType<typeof existingPieces>): PlacedItem[] => pieces.map((f) => ({ ...f, elevation: f.elevation ?? 0, zone: 'bestand' }));
 
 /** The walk-through's input for one placed room: the same for the run and for the product step. */
-export function reviewInputOf(args: { analysis: RoomAnalysis; type: RoomType; layout: Layout; program: RoomProgram; existing: PlacedItem[]; palette: string[]; catalog?: CatalogItem[] }): ReviewInput {
+export function reviewInputOf(args: { analysis: RoomAnalysis; type: RoomType; layout: Layout; program: RoomProgram; existing: PlacedItem[]; palette: string[]; catalog?: CatalogItem[]; floorColor?: string }): ReviewInput {
   const { analysis, type, layout, program, existing, palette } = args;
-  return { analysis, type, layout, program, existing, palette, ...(args.catalog ? { catalog: args.catalog } : {}) };
+  return { analysis, type, layout, program, existing, palette, ...(args.catalog ? { catalog: args.catalog } : {}), ...(args.floorColor ? { floorColor: args.floorColor } : {}) };
+}
+
+/**
+ * Colour of a room's floor (E8 / FM2), only when the plan sets a floor material: the default floor
+ * is a guess, and a guessed floor would give false findings.
+ */
+export function floorColorOf(project: Project, roomId: string): string | undefined {
+  const id = project.rooms.find((r) => r.id === roomId)?.floorMaterialId;
+  return id ? (project.materials.find((m) => m.id === id) ?? DEFAULT_MATERIALS.find((m) => m.id === id))?.color : undefined;
 }
 
 interface RoomWork {
@@ -427,7 +437,7 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
           wishes,
           ...(input.products ? { products: input.products } : {}),
         },
-        review: (layout, prog) => reviewInputOf({ analysis: room, type, layout, program: prog, palette, existing: asPlaced(existing), ...(input.products ? { catalog: input.products } : {}) }),
+        review: (layout, prog) => reviewInputOf({ analysis: room, type, layout, program: prog, palette, existing: asPlaced(existing), floorColor: floorColorOf(project, room.roomId), ...(input.products ? { catalog: input.products } : {}) }),
       };
       const image = async (r: RoomResult): Promise<SampleImage | undefined> => {
         if (!input.toImage || !input.sample.images) return undefined;
@@ -460,7 +470,7 @@ export async function runFurnishing(input: FurnishRunInput): Promise<FurnishRunR
     results.map((r) => {
       const room = analysis.rooms.find((x) => x.roomId === r.roomId)!;
       const rc = roomConceptOf(concept.concept!, room);
-      return reviewInputOf({ analysis: room, type: (input.roomTypes?.[r.roomId] ?? rc.type) as RoomType, layout: r.layout, program: r.program, palette: concept.concept!.style.palette.map((c) => c.hex), existing: asPlaced(existingPieces(project, room)), ...(input.products ? { catalog: input.products } : {}) });
+      return reviewInputOf({ analysis: room, type: (input.roomTypes?.[r.roomId] ?? rc.type) as RoomType, layout: r.layout, program: r.program, palette: concept.concept!.style.palette.map((c) => c.hex), existing: asPlaced(existingPieces(project, room)), floorColor: floorColorOf(project, room.roomId), ...(input.products ? { catalog: input.products } : {}) });
     }),
   );
   report('done', total, total);

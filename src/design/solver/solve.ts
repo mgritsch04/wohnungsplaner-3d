@@ -100,8 +100,64 @@ export function solveRoom(analysis: RoomAnalysis, program: RoomProgram, opts: So
   st.rebuild();
   opts.trace?.(violations(st).map((v) => `${v.rule}: ${v.text} [${v.items.join(', ')}]`));
   const dropped = settle(st, seed);
+  growRugs(st);
   if (opts.judge) polish(st, dropped, seed, opts.judge, opts.polishSteps ?? POLISH_STEPS);
   return toLayout(st, dropped, seed);
+}
+
+/** Plain rugs of the catalogue, smallest first (#436: the image review keeps finding the rug too small). */
+const GROW_RUGS = ['generic-rug-120', 'generic-rug-160', 'generic-rug-200', 'generic-rug-240'];
+
+/**
+ * How far a rug should reach past its piece on each side (D5, Profi-Regeln): under a bed 40–70 cm
+ * out on both sides, under a sofa at least 15 cm past each end. `null`: not a rug that grows.
+ */
+function rugReach(parentRole: string): { min: number; max: number } | null {
+  if (parentRole === 'bed') return { min: 0.4, max: 0.7 };
+  if (parentRole === 'sofa') return { min: 0.15, max: 0.6 };
+  return null;
+}
+
+/**
+ * A plain rug under a bed or sofa that only just reaches past it gets the next bigger plain rug
+ * that does, if it fits: no rule of the plan may break that held before (#436, image review 6.11.:
+ * 160 cm under a 160 bed, 5 cm past a sofa). Only the catalogue's own placeholders, never a product.
+ */
+function growRugs(st: State): void {
+  const m = st.m;
+  for (const n of m.nodes.values()) {
+    if (n.spec.role !== 'rug' || !GROW_RUGS.includes(n.catalogId) || n.replaces) continue;
+    const parent = n.parent ? m.nodes.get(n.parent) : undefined;
+    const reach = parent ? rugReach(parent.spec.role) : null;
+    if (!parent || !reach) continue;
+    // how far the rug as laid reaches past the parent's ends (along the parent's width)
+    const past = () => {
+      const dr = n.box.rotation - parent.box.rotation;
+      return (Math.abs(Math.cos(dr)) * 2 * n.box.hw + Math.abs(Math.sin(dr)) * 2 * n.box.hd - parent.spec.width) / 2;
+    };
+    if (past() >= reach.min - 1e-9) continue;
+    const original = n.catalogId;
+    const before = st.hard();
+    let kept = false;
+    for (const id of GROW_RUGS.slice(GROW_RUGS.indexOf(original) + 1)) {
+      if (!resizeNode(m, n, id)) continue;
+      delete n.replaces;
+      refreshUnit(m, m.units[n.unit]);
+      st.rebuild();
+      const reachNow = past();
+      if (reachNow > reach.max + 1e-9) break;
+      if (st.hard() <= before + 1e-9 && reachNow >= reach.min - 1e-9) {
+        kept = true;
+        break;
+      }
+    }
+    if (!kept) {
+      resizeNode(m, n, original);
+      delete n.replaces;
+      refreshUnit(m, m.units[n.unit]);
+      st.rebuild();
+    }
+  }
 }
 
 const judged = (a: ReturnType<Judge>, b: ReturnType<Judge>) => (a.passed !== b.passed ? a.passed : a.score > b.score);
