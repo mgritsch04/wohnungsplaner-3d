@@ -137,6 +137,9 @@ function screenOn(m: Model, parent: string): boolean {
   return false;
 }
 
+/** Lowest middle (m) of a wall clock. */
+const CLOCK_MIDDLE_MIN = 1.6;
+
 /** Least room (m) between the desktop and a shelf or cabinet hung over it: screen and desk lamp stand under it. */
 const DESK_SHELF_CLEAR = 0.5;
 
@@ -164,6 +167,9 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   // a shelf over the desk leaves room for the screen and the desk lamp under it (image review r13:
   // 41 cm over the desktop, the monitor stood against the shelf)
   if (!art && s.role !== 'tv' && s.role !== 'mirror' && parentNode?.spec.category === 'desk') want = Math.max(want, parentTop + DESK_SHELF_CLEAR);
+  // a clock is read from across the room: its face at least at standing eye level, not down at the
+  // sideboard behind the jug standing on it (image review r16 A, Küche: middle at 1.15 m)
+  if (s.shape === 'wall-clock') want = Math.max(want, CLOCK_MIDDLE_MIN - s.height / 2);
   // a mirror over a chest: the lamp or vase standing on it must not hide it (image review r9: the
   // lamp covered half the round mirror). Its lower edge goes over them while its middle stays at
   // face height.

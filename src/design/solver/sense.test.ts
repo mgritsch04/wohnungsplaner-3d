@@ -292,6 +292,15 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(pic(true)).toBeCloseTo(1.1 - 0.45, 2);
   });
 
+  it('a wall clock over the sideboard hangs with its face at eye level even if the programme says 1.0 m (image review r16)', () => {
+    const p = program(room, [item('sb', 'generic-sideboard', [2.25, 0.25, 0]), item('clock', 'generic-wall-clock')], [
+      { kind: 'wall', item: 'sb', wall: 'W1' },
+      { kind: 'above', item: 'clock', target: 'sb', height: 1.0 },
+    ]);
+    const clock = byId(solveRoom(room, p, { seed: 2 }), 'clock');
+    expect(clock.elevation + clock.height / 2).toBeGreaterThanOrEqual(1.6 - 1e-6);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
