@@ -266,6 +266,15 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(Math.hypot(cush.x - chair.x, cush.y - chair.y)).toBeLessThan(chair.depth / 2);
   });
 
+  it('a shelf over the desk leaves 50 cm for screen and lamp even if the programme says 1.15 m (image review r13)', () => {
+    const p = program(room, [item('desk', 'generic-desk', [2.25, 0.4, 0]), item('shelf', 'generic-wall-shelf')], [
+      { kind: 'above', item: 'shelf', target: 'desk', height: 1.15 },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const desk = byId(layout, 'desk');
+    expect(byId(layout, 'shelf').elevation - (desk.elevation + desk.height)).toBeGreaterThanOrEqual(0.5 - 1e-6);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
@@ -593,7 +602,6 @@ describe('bedroom and ceiling light as a designer lays them (#443)', () => {
     const layout = solveRoom(room, p, { seed: 1 });
     const bed = byId(layout, 'bed');
     const rug = byId(layout, 'rug');
-    console.log('DBG', rug.catalogId, rug.x.toFixed(2), rug.y.toFixed(2), rug.width, rug.depth, layout.items.filter((i) => /curtain|sofa/.test(i.catalogId)).map((i) => i.id + ' ' + i.x.toFixed(2) + ',' + i.y.toFixed(2)).join(' / '));
     // extent of the rug along the bed's width and along its length (the item's width runs along its own x axis)
     const turned = Math.abs(Math.sin(rug.rotation - bed.rotation)) > 0.5;
     const across = turned ? rug.depth : rug.width;
@@ -691,7 +699,6 @@ describe('a rug that reaches past its piece (D5)', () => {
     const room = bedroom(4.6, 4);
     const layout = solveRoom(room, bedRug(room), { seed: 3 });
     const rug = byId(layout, 'rug');
-    console.log('DBG', rug.catalogId, rug.x.toFixed(2), rug.y.toFixed(2), rug.width, rug.depth, layout.items.filter((i) => /curtain|sofa/.test(i.catalogId)).map((i) => i.id + ' ' + i.x.toFixed(2) + ',' + i.y.toFixed(2)).join(' / '));
     expect(rug.catalogId).toBe('generic-rug-200');
     expect(rug.replaces).toBeUndefined();
   });
