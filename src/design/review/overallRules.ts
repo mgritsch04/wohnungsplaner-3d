@@ -189,7 +189,9 @@ export function checkTogether(ctx: RoomCtx): void {
   const chairs = ctx.items.filter((i) => i.role === 'seat' && i.shape === 'chair');
   if (chairs.length && !ctx.items.some((i) => i.role === 'table' || i.category === 'desk' || isKitchenModule(i)))
     ctx.add('E3', 'L', 'Es stehen Stühle im Raum, aber kein Tisch dazu.', chairs, chairs[0]);
-  const shelves = ctx.placed.filter((i) => i.floor && i.shape === 'shelf');
+  // in a storeroom or pantry shelves run along two or three walls on purpose (L- or U-shaped shelving,
+  // everything in reach from the middle); benchmark 7.11.: F pantry
+  const shelves = ctx.type === 'utility' ? [] : ctx.placed.filter((i) => i.floor && i.shape === 'shelf');
   const groups = new Map<string, typeof shelves>();
   for (const s of shelves) groups.set(`${s.catalogId}|${s.zone}`, [...(groups.get(`${s.catalogId}|${s.zone}`) ?? []), s]);
   for (const g of groups.values()) {
