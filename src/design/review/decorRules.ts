@@ -6,6 +6,12 @@ import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
 import { isDiningTable, isLamp, isPlant, type RItem } from './items';
 
+/**
+ * Plants that get by on little or only artificial light (Zamioculcas, Bogenhanf, Schusterpalme, Efeutute)
+ * and artificial plants: D1 recommends exactly these for a room without windows, so naming one is no finding.
+ */
+const SHADE_PLANT = /zamioculcas|glücksfeder|sansevier|bogenhanf|schusterpalme|aspidistra|efeutute|epipremnum|schattenpflanze|kunstpflanze|künstlich/i;
+
 /** D1, D2: plants and small things on the floor. */
 export function checkPlants(ctx: RoomCtx): void {
   const walkLines = ctx.an.walkways;
@@ -21,7 +27,7 @@ export function checkPlants(ctx: RoomCtx): void {
     if (!inCorner && !beside && !atWindow) ctx.add('D1', 'M', `${ctx.label(p)} steht frei im Raum, Pflanzen gehören in eine Ecke, neben ein Möbel oder ans Fenster.`, [p], p);
     const onWay = walkLines.find((w) => w.path.length > 1 && Math.min(...w.path.slice(1).map((q, k) => segmentDist(p, w.path[k], q))) < p.width / 2 + 0.25);
     if (onWay) ctx.add('D1', 'S', `${ctx.label(p)} steht im Weg zwischen den Türen ${onWay.from} und ${onWay.to}.`, [p], p);
-    if (!ctx.windows.length && p.height >= 1.0) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
+    if (!ctx.windows.length && p.height >= 1.0 && !SHADE_PLANT.test(`${ctx.label(p)} ${p.name}`)) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
   }
   for (const b of ctx.placed.filter((i) => i.role === 'box' && i.elevation < 0.05 && !i.parent))
     if (!ctx.items.some((o) => o !== b && o.floor && o.height > 0.45 && overlaps(b.poly, o.poly, -0.2)))
