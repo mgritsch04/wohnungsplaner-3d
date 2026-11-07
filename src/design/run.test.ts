@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sample, SampleOptions } from '../assistant/claude';
 import { TEST_FLATS } from './fixtures/flats';
 import { RECORDED } from './fixtures/recorded';
-import { betterPlacement, lookKeeps, runFurnishing, type DesignRunProgress } from './run';
+import { betterPlacement, floorColorOf, lookKeeps, runFurnishing, type DesignRunProgress } from './run';
 import type { RoomResult } from './types';
 
 const flat = TEST_FLATS.B;
@@ -253,6 +253,15 @@ describe('runFurnishing', { timeout: 150_000 }, () => {
     const flatOnly = fake(reply(() => '1'), true);
     await run(flatOnly.sample, { toImage });
     expect(flatOnly.calls.filter((c) => c.label.startsWith('Entwurf 2: '))).toEqual([]);
+  });
+
+  it('hands the walk-through the floor colour only where the plan sets a floor (FM2: a guessed floor gives false findings)', () => {
+    const project = flat.build();
+    const [a, b] = project.rooms;
+    a.floorMaterialId = 'mat_floor_walnut';
+    delete b.floorMaterialId;
+    expect(floorColorOf(project, a.id)).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(floorColorOf(project, b.id)).toBeUndefined();
   });
 
   it('stops when the user cancels', async () => {
