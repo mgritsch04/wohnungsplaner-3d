@@ -131,6 +131,9 @@ function ownWallElevation(s: Spec): number {
   return art ? Math.min(s.elevation, ART_MIDDLE - s.height / 2) : s.elevation;
 }
 
+/** Least room (m) between the desktop and a shelf or cabinet hung over it: screen and desk lamp stand under it. */
+const DESK_SHELF_CLEAR = 0.5;
+
 function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number): { box: Box; elevation: number } {
   const s = n.spec;
   const ctx = m.ctx;
@@ -149,6 +152,9 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   // the parent stands free in the room, the picture on a wall of its own: Claude's height meant
   // „over the sofa“, on the bare wall it hangs at eye height (image review r9: lower edge at 102 cm)
   if (art && distToBox(box.x, box.y, P) > 0.5) want = ART_MIDDLE - s.height / 2;
+  // a shelf over the desk leaves room for the screen and the desk lamp under it (image review r13:
+  // 41 cm over the desktop, the monitor stood against the shelf)
+  if (!art && s.role !== 'tv' && s.role !== 'mirror' && parentNode?.spec.category === 'desk') want = Math.max(want, parentTop + DESK_SHELF_CLEAR);
   // a mirror over a chest: the lamp or vase standing on it must not hide it (image review r9: the
   // lamp covered half the round mirror). Its lower edge goes over them while its middle stays at
   // face height.
