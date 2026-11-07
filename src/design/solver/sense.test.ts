@@ -784,6 +784,23 @@ describe('the desk lamp beside the desk chair (image review r16 A, Zimmer 2)', (
   });
 });
 
+describe('curtains at a window with a piece beside it (image reviews r16/r17 A, Wohnzimmer)', () => {
+  it('the panel whose place is taken hangs on the free side of the window instead of in the shelf', () => {
+    const room = rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.3 }], windows: [{ wall: 'N', at: 2, width: 1.2 }] });
+    const p = program(room, [{ ...item('shelf', 'generic-shelf-80', [0.95, 0.2, 0]), required: true }, item('c1', 'generic-curtain'), item('c2', 'generic-curtain')], [
+      { kind: 'wall', item: 'shelf', wall: 'W1' },
+      { kind: 'window', item: 'c1', window: 'F1', place: 'over' },
+      { kind: 'window', item: 'c2', window: 'F1', place: 'over' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 1 });
+    const shelf = byId(layout, 'shelf');
+    const poly = (i: PlacedItem) => boxCorners({ x: i.x, y: i.y, hw: i.width / 2, hd: i.depth / 2, rotation: i.rotation });
+    // only meaningful when the shelf really stands where a panel would hang
+    expect(shelf.x + shelf.width / 2).toBeGreaterThan(2 - 0.6 - 0.25);
+    for (const c of ['c1', 'c2']) expect(overlapDepth(poly(byId(layout, c)), poly(shelf)), c).toBeLessThan(0.01);
+  });
+});
+
 describe('a rug that reaches past its piece (D5)', () => {
   const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
   const bedRug = (room: RoomAnalysis) =>
