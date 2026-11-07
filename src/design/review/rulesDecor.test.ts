@@ -212,6 +212,8 @@ describe('E Gesamteindruck', () => {
     const zones = [{ id: 'sitzen', function: 'Sitzgruppe', rect: { x0: 0, y0: 2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2')).toBe(false);
     expect(has(living([put('generic-sofa-3', { x: 4.2, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(true);
+    // a curtain hangs at its window, not in a zone
+    expect(has(living([put('generic-curtain', { x: 4.2, y: 0.05, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
     const overlapping = [...zones, { id: 'lesen', function: 'Leseecke', rect: { x0: 0.2, y0: 2.2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([sofa], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
   });
