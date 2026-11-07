@@ -139,6 +139,30 @@ describe('curtains frame the window (image review r7)', () => {
   });
 });
 
+describe('lamps where they light (image review r7/r9)', () => {
+  const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
+  it('the desk lamp stands on the left of the writer, alone and beside the desk set', () => {
+    for (const extra of [false, true]) {
+      const items = [item('desk', 'generic-desk', [0.4, 2.0, -Math.PI / 2]), item('lamp', 'generic-table-lamp'), ...(extra ? [item('set', 'generic-desk-set')] : [])];
+      const rels = [{ kind: 'on' as const, item: 'lamp', target: 'desk' }, ...(extra ? [{ kind: 'on' as const, item: 'set', target: 'desk' }] : [])];
+      const layout = solveRoom(room, program(room, items, rels), { seed: 2 });
+      const desk = byId(layout, 'desk');
+      const lamp = byId(layout, 'lamp');
+      // the writer looks into the desk (against its front); their left is the desk's −x
+      const u = (lamp.x - desk.x) * Math.cos(desk.rotation) + (lamp.y - desk.y) * Math.sin(desk.rotation);
+      expect(u, extra ? 'with the desk set' : 'alone').toBeLessThan(-0.1);
+    }
+  });
+
+  it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
+    const p = program(room, [item('sofa', 'generic-sofa', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
+      { kind: 'front-of', item: 'coffee', target: 'sofa' },
+      { kind: 'above', item: 'pendant', target: 'coffee', height: 1.6 },
+    ]);
+    expect(byId(solveRoom(room, p, { seed: 2 }), 'pendant').elevation).toBeCloseTo(1.9, 2);
+  });
+});
+
 describe('a tight room keeps its double bed', () => {
   it('three doors round the bed: a nightstand or the shelf stays out, the 180 bed keeps its size', () => {
     const room = rectRoom(4.59, 4.08, {

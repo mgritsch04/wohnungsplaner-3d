@@ -178,6 +178,17 @@ function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number, u0 = -I
   return v;
 }
 
+/**
+ * A lamp on a desk. Someone sitting at a desk looks into it (−front), so the desk's +x is their
+ * right: the lamp goes to −x, on the left of a right-handed writer (image review r7, A and B).
+ */
+function deskLamp(parent: Node | undefined, s: Spec): boolean {
+  return parent?.spec.category === 'desk' && s.role === 'table-lamp';
+}
+
+/** Lowest edge of a pendant over a coffee table (m above the floor). */
+const COFFEE_PENDANT_MIN = 1.9;
+
 /** Gap between two pieces sharing a surface. */
 const ON_GAP = 0.05;
 
@@ -193,7 +204,9 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
   // a screen or a picture hanging over the piece takes its middle: what stands on it goes to the ends (#443, R7)
   const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && (s.spec.role === 'tv' || s.spec.shape === 'picture' || s.spec.shape === 'picture-set'));
   if (sibs.length < 2 && !screenAbove) return null;
-  sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
+  // the desk lamp first: on the sitter's left (−x), its light does not fall into the shadow of the writing hand
+  const lampFirst = (s: Node) => (deskLamp(parent, s.spec) ? 0 : 1);
+  sibs.sort((a, b) => lampFirst(a) - lampFirst(b) || (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
   const widths = sibs.reduce((v, s) => v + s.spec.width, 0);
   const total = widths + ON_GAP * (sibs.length - 1);
   if (total > 2 * P.hw) return null;
@@ -381,7 +394,10 @@ function deriveNode(m: Model, n: Node): void {
         n.box = { x: P.x, y: P.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
         const tableLike = parentNode && ['table', 'coffee-table'].includes(parentNode.spec.role);
         const want = r.height ?? (tableLike || parentNode?.spec.category === 'desk' ? p.top + 0.65 : s.elevation);
-        n.elevation = clamp(want, p.top + 0.3, ctx.height - s.height - 0.05);
+        // over the coffee table it hangs above the line of sight from the sofa and above the head of
+        // someone getting up (image review r9: „Deckenleuchte auf 160 cm“); 60–70 cm is for the dining table
+        const coffee = parentNode?.spec.role === 'coffee-table';
+        n.elevation = clamp(coffee ? Math.max(want, COFFEE_PENDANT_MIN) : want, p.top + 0.3, ctx.height - s.height - 0.05);
         return;
       }
       if (s.base === 'wall' || s.item.kitchen) {
@@ -427,7 +443,8 @@ function deriveNode(m: Model, n: Node): void {
       const lim = Math.max(0, P.hw - s.width / 2);
       // on a table the chairs tuck in at the edges: what stands on it goes in the middle
       const table = parentNode?.spec.category === 'table';
-      const side = clamp(r.count === 1 && !table && row === null ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim);
+      const alone = Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) * (deskLamp(parentNode, s) ? -1 : 1);
+      const side = clamp(r.count === 1 && !table && row === null ? alone : table && r.count === 1 ? 0 : u, -lim, lim);
       // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
       // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
       const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height, side - s.width / 2, side + s.width / 2) + 0.01) + s.depth / 2;
