@@ -690,6 +690,22 @@ describe('a tight living room keeps its seating group (#436)', () => {
   });
 });
 
+describe('the step behind the door stays free (image review r14 A, Zimmer 2)', () => {
+  it('a side table beside the sofa does not stand right in front of the door, 55 cm in', () => {
+    const E = -Math.PI / 2;
+    const room = rectRoom(3, 2.8, { doors: [{ wall: 'N', at: 0.64, width: 0.8 }], windows: [{ wall: 'S', at: 1.5 }] });
+    const p = program(room, [{ ...item('sofa', 'generic-sofa-2', [0.44, 1.6, E]), required: true }, item('side', 'generic-side-table', [0.23, 0.55, E])], [
+      { kind: 'wall', item: 'sofa', wall: 'W4' },
+      { kind: 'left-of', item: 'side', target: 'sofa', gap: 0.05 },
+    ]);
+    const side = byId(solveRoom(room, p, { seed: 2 }), 'side');
+    // the door is 0.24–1.04 m wide on the north wall; in front of it the first 90 cm stay free
+    const clearSide = side.x - side.width / 2 >= 1.04 - 0.03 || side.x + side.width / 2 <= 0.24 + 0.03;
+    const clearDepth = side.y - side.depth / 2 >= 0.9 - 0.03;
+    expect(clearSide || clearDepth).toBe(true);
+  });
+});
+
 describe('a rug that reaches past its piece (D5)', () => {
   const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
   const bedRug = (room: RoomAnalysis) =>

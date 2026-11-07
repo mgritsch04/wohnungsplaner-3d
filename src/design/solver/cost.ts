@@ -22,6 +22,8 @@ const KEEP_FREE_SLACK = 0.15;
 export const HARD = 4;
 /** Overlaps up to this depth count as touching: below the plan's own checks (3 mm, see `placementIssues`). */
 const EPS = 0.002;
+/** Soft cost of a piece in the step in front of a door, behind the strip that stays free. */
+const ARRIVAL_COST = 0.2;
 /** The plan checks door swings to 1 mm. */
 const SWING_EPS = 0.0005;
 /** Movement areas are guide values: a few centimetres of overlap do not count (a basin beside the WC in a 125 cm room). */
@@ -181,6 +183,12 @@ export function unitCost(m: Model, u: Unit, sink: Sink = null): Cost {
       for (const door of ctx.doors) {
         const d = overlapDepth(n.poly, door.entry);
         if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'entry', items: [n.id], text: `${name(n)} steht direkt hinter ${door.label}` }));
+        // one step further in the way still opens on to the room: a side table 55 cm in front of the
+        // door is what one walks into (image review r14 A, Zimmer 2)
+        if (!rug && n !== u.main && n.spec.item.solid !== false && d <= EPS) {
+          const a = overlapDepth(n.poly, door.arrival);
+          if (a > 0.03) c.soft += ARRIVAL_COST + 2 * a;
+        }
       }
       for (const w of ctx.windows) {
         if (top(n) <= w.sill + 0.02) continue;

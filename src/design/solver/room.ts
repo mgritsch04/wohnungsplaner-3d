@@ -52,10 +52,14 @@ export interface DoorInfo {
   mid: Vec2;
   /** Strip right behind the opening that stays free of solid pieces (B5). */
   entry: Vec2[];
+  /** The step after the entry strip, door wide and `ARRIVAL_DEPTH` deep, that should stay free. */
+  arrival: Vec2[];
 }
 
 /** Depth of the free strip behind every door and passage. */
 export const ENTRY_DEPTH = 0.5;
+/** Depth of the strip behind a door that should stay free where it can (soft). */
+export const ARRIVAL_DEPTH = 0.9;
 /** Depth of the strip in front of a window where nothing may be higher than the sill. */
 export const WINDOW_DEPTH = 0.5;
 /** Clear width a piece must be reachable with (B7): 50 cm. */
@@ -147,7 +151,7 @@ export function buildRoom(analysis: RoomAnalysis, existing: FixedPiece[], catalo
       if (o.passable) {
         gaps.push(o);
         const mid = pointOnWall(w, (o.t0 + o.t1) / 2);
-        doors.push({ label: o.id, wall: wi, opening: o, mid, entry: wallStrip(w, o.t0, o.t1, ENTRY_DEPTH) });
+        doors.push({ label: o.id, wall: wi, opening: o, mid, entry: wallStrip(w, o.t0, o.t1, ENTRY_DEPTH), arrival: wallStrip(w, o.t0, o.t1, ARRIVAL_DEPTH) });
       } else {
         if (o.kind === 'window') windows.push({ label: o.id, wall: wi, t0: o.t0, t1: o.t1, sill: o.sill ?? 0.9, zone: wallStrip(w, o.t0, o.t1, WINDOW_DEPTH) });
       }
