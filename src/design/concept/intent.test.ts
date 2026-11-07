@@ -78,4 +78,18 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     // without a room type (or in a bath) nothing is asked
     expect(intentProblems(corner, room, [], [], 'bath').some((x) => /Startplätzen schon/.test(x))).toBe(false);
   });
+  it('a piece where the curtain hangs and a desk facing the window are named (D7, C5)', () => {
+    const room = rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
+    const c1 = item('c1', 'generic-curtain', 0.7, 0.05, 'S');
+    const c2 = item('c2', 'generic-curtain', 3.3, 0.05, 'S');
+    const one = intentProblems(program([c1, c2, item('desk', 'generic-desk', 1.0, 0.35, 'S')]), room, [], [], 'office');
+    expect(one.filter((x) => /\(D7\)/.test(x))).toHaveLength(1);
+    expect(one.some((x) => /„desk“ steht nach deinen Startplätzen dort, wo „c1“ am Fenster hängt.*quer zum Fenster/.test(x))).toBe(true);
+    // a sideboard under the window reaching into both curtains: one message
+    const both = intentProblems(program([item('c1', 'generic-curtain', 0.85, 0.05, 'S'), item('c2', 'generic-curtain', 3.15, 0.05, 'S'), item('sb', 'generic-sideboard', 2, 0.25, 'S')]), room, [], [], 'living');
+    expect(both.filter((x) => /\(D7\)/.test(x))).toEqual([expect.stringMatching(/„sb“ reicht nach deinen Startplätzen unter dem Fenster in beide Vorhänge „c1“ und „c2“/)]);
+    // the desk looking straight at the window, and the desk across it
+    expect(intentProblems(program([item('desk', 'generic-desk', 2, 0.35, 'S')]), room, [], [], 'office').some((x) => /„desk“ schaut nach deinen Startplätzen direkt auf das Fenster F1.*\(C5\)/.test(x))).toBe(true);
+    expect(intentProblems(program([c1, c2, item('desk', 'generic-desk', 0.35, 1.9, 'O')]), room, [], [], 'office').filter((x) => /\((C5|D7)\)/.test(x))).toEqual([]);
+  });
 });

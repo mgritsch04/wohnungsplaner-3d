@@ -8,7 +8,8 @@
  * looking at the kitchen run (W10), dining chairs without room to the wall (E2), a half of the room or a
  * wide patch of floor left empty (E6; in all six benchmark rooms with E6 the plan itself left it empty,
  * 6.11.), a rug under the bed too short across it or off its middle (S5), a piece in the way between
- * two doors (B2). These go back to Claude with the other problems of the answer (one repair round); a finding
+ * two doors (B2), a programme that needs more floor than the room has (R5), a piece where the curtain
+ * hangs and a desk looking straight at the window (D7, C5). These go back to Claude with the other problems of the answer (one repair round); a finding
  * the solver causes later is not Claude's to fix.
  */
 import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
@@ -19,6 +20,8 @@ import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
+import { checkDesk } from '../review/arrangeRules';
+import { checkCurtains } from '../review/decorRules';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
@@ -167,6 +170,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
   if (room && 'walkways' in room) problems.push(...areaBudget(program, room as RoomAnalysis, existing, products));
+  if (type && room && 'walls' in room) problems.push(...windowSpots(program, room as RoomAnalysis, type, existing, products));
   return problems;
 }
 
@@ -251,6 +255,48 @@ function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
     .filter((f) => f.rule === 'E6')
     .slice(0, 1)
     .map((f) => `Im Plan gilt nach deinen Startplätzen schon: ${f.text} Dort plant ein Profi ${fill}; Wege bleiben frei.`);
+}
+
+/**
+ * D7 and C5 on the start places: a desk, chest or sideboard where the curtain hangs (it cannot be drawn; in
+ * four of seven benchmark rooms with this finding, 7.11., the plan had it already), and a desk facing the
+ * window (backlight on the screen; real run r7, image review). Workplace rule: the line of sight runs along
+ * the window, the daylight comes from the side (research 7.11.).
+ */
+function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  const asks = (i: ProgramItem) => {
+    const c = findCatalogItem(i.catalogId, [...products]);
+    return !!c && !!i.hint && (c.category === 'desk' || shapeOf(c) === 'curtain');
+  };
+  if (!room.walls.some((w) => w.openings.some((o) => o.kind === 'window')) || !program.items.some(asks)) return [];
+  const { items, fixed } = hintLayout(program, room, existing, products);
+  const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program, catalog: [...products] });
+  checkCurtains(ctx);
+  checkDesk(ctx);
+  const mine = new Set(items.map((i) => i.id));
+  const byId = new Map(ctx.items.map((i) => [i.id, i]));
+  const out: string[] = [];
+  // one message per piece in the way: a sideboard under the window often reaches into both curtains
+  const caught = new Map<string, string[]>();
+  for (const f of ctx.findings)
+    if (f.rule === 'D7' && f.items.length === 2 && f.items.every((id) => mine.has(id))) caught.set(f.items[1], [...new Set([...(caught.get(f.items[1]) ?? []), f.items[0]])]);
+  for (const [hit, cs] of caught) {
+    const desk = byId.get(hit)?.category === 'desk';
+    const names = cs.map((c) => `„${c}“`).join(' und ');
+    out.push(
+      cs.length > 1
+        ? `„${hit}“ reicht nach deinen Startplätzen unter dem Fenster in beide Vorhänge ${names}: sie lassen sich nicht auf- und zuziehen (D7). Unter dem Fenster nur, was schmaler als das Fenster und niedriger als die Fensterbank ist, sonst „${hit}“ an eine Wand ohne Fenster oder ein Rollo statt der Schals.`
+        : `„${hit}“ steht nach deinen Startplätzen dort, wo ${names} am Fenster hängt: der Vorhang lässt sich nicht auf- und zuziehen (D7). Den Vorhang auf die freie Seite des Fensters hängen oder „${hit}“ so rücken, dass neben dem Fensterrand etwa 40 cm für den zusammengeschobenen Stoff frei bleiben${desk ? '; den Schreibtisch am besten quer zum Fenster, das Licht kommt dann von der Seite (C5)' : '; unter dem Fenster nur, was schmaler als das Fenster und niedriger als die Fensterbank ist'}.`,
+    );
+  }
+  for (const f of ctx.findings)
+    if (f.rule === 'C5' && f.text.includes('hinter dem Bildschirm') && f.items.every((id) => mine.has(id))) {
+      const w = /Fenster (\S+) liegt/.exec(f.text)?.[1] ?? '';
+      out.push(
+        `„${f.items[0]}“ schaut nach deinen Startplätzen direkt auf das Fenster ${w}: man blickt beim Arbeiten ins Gegenlicht, der Bildschirm wirkt dunkel (C5). Profis stellen den Schreibtisch quer zum Fenster, das Tageslicht kommt von der Seite (für Rechtshänder von links), der Blick geht an der Fensterwand entlang.`,
+      );
+    }
+  return [...new Set(out)];
 }
 
 /**
