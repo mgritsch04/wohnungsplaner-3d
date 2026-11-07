@@ -246,6 +246,9 @@ describe('E Gesamteindruck', () => {
     const shelf = (id: string, x: number, y: number, face: 'S' | 'W') => put('generic-shelf-80', { id, x, y, face, zone: 'z' });
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 4.85, 2, 'W')]), 'E3', /verschiedenen Wänden/)).toBe(true);
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 2, 0.15, 'S')]), 'E3', /verschiedenen Wänden/)).toBe(false);
+    // a pantry or storeroom has its shelves along two or three walls on purpose
+    const pantry = review({ room: rectRoom(2, 2, { doors: [{ wall: 'S', at: 1 }] }), type: 'utility', items: [shelf('a', 1, 0.15, 'S'), shelf('b', 1.85, 1, 'W')] });
+    expect(has(pantry, 'E3')).toBe(false);
   });
   it('E8 / FM2 a big piece 5–15 LRV points from the floor is light, tone on tone or clearly different is fine', () => {
     const run = (color: string, floorColor?: string) => living([sofa], { floorColor, program: prog({ items: [{ id: 'sofa', catalogId: 'generic-sofa-3', zone: 'z', why: '', color }] }) });
