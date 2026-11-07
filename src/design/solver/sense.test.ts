@@ -154,6 +154,18 @@ describe('lamps where they light (image review r7/r9)', () => {
     }
   });
 
+  it('a mirror over the chest hangs above the lamp standing on it (image review r9)', () => {
+    const p = program(room, [item('chest', 'generic-dresser', [4.2, 2.0, Math.PI / 2]), item('lamp', 'generic-table-lamp'), item('mirror', 'generic-mirror-round')], [
+      { kind: 'on', item: 'lamp', target: 'chest' },
+      { kind: 'above', item: 'mirror', target: 'chest', height: 1.1 },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const lamp = byId(layout, 'lamp');
+    const mirror = byId(layout, 'mirror');
+    expect(mirror.elevation).toBeGreaterThan(lamp.elevation + lamp.height);
+    expect(mirror.elevation + mirror.height / 2).toBeLessThanOrEqual(1.75 + 1e-6);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },

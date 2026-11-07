@@ -104,6 +104,8 @@ function pickRug(m: Model, options: Box[]): Box {
  */
 /** Height of a picture's middle above the floor (R7: 145–155 cm). */
 const ART_MIDDLE = 1.5;
+/** Highest middle of a mirror lifted over what stands below it (m): face height. */
+const MIRROR_MIDDLE_MAX = 1.75;
 
 /**
  * Height of a wall piece that hangs on its own. A picture's middle at eye height (R7): the
@@ -128,7 +130,15 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   // a picture over a piece: middle at eye height, but 15–30 cm over the piece so it belongs to it (R7)
   const art = s.shape === 'picture' || s.shape === 'picture-set';
   const fallback = art ? clamp(ART_MIDDLE - s.height / 2, parentTop + 0.15, parentTop + 0.3) : Math.max(s.elevation, parentTop + gap);
-  const want = Math.max(height ?? fallback, parentTop + 0.02);
+  let want = Math.max(height ?? fallback, parentTop + 0.02);
+  // a mirror over a chest: the lamp or vase standing on it must not hide it (image review r9: the
+  // lamp covered half the round mirror). Its lower edge goes over them while its middle stays at
+  // face height.
+  if (s.role === 'mirror') {
+    const tallest = Math.max(0, ...[...m.nodes.values()].filter((o) => o.parent === n.parent && o.rule?.kind === 'on' && !SOFT_SHAPES.has(o.spec.shape)).map((o) => o.spec.height));
+    const clear = parentTop + tallest + 0.05;
+    if (tallest > 0.1 && clear > want && clear + s.height / 2 <= MIRROR_MIDDLE_MAX) want = clear;
+  }
   return { box: boxOnWall(w, t, s.width, s.depth, 0.002), elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
 }
 
