@@ -121,6 +121,24 @@ describe('pictures hang at eye height over their piece (R7)', () => {
   });
 });
 
+describe('curtains frame the window (image review r7)', () => {
+  it('an open panel reaches at most 25 cm past the frame', () => {
+    const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2, width: 1.2 }] });
+    const p = program(room, [item('c1', 'generic-curtain'), item('c2', 'generic-curtain')], [
+      { kind: 'window', item: 'c1', window: 'F1', place: 'over' },
+      { kind: 'window', item: 'c2', window: 'F1', place: 'over' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    for (const id of ['c1', 'c2']) {
+      const c = byId(layout, id);
+      // window on the north wall from 1.6 to 2.8 m: the panel's outer edge
+      const outer = Math.max(1.6 - (c.x - c.width / 2), c.x + c.width / 2 - 2.8);
+      expect(outer, id).toBeLessThanOrEqual(0.25 + 1e-6);
+      expect(outer, id).toBeGreaterThanOrEqual(0.1);
+    }
+  });
+});
+
 describe('a tight room keeps its double bed', () => {
   it('three doors round the bed: a nightstand or the shelf stays out, the 180 bed keeps its size', () => {
     const room = rectRoom(4.59, 4.08, {

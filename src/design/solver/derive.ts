@@ -42,6 +42,8 @@ function parentBox(m: Model, id: string): { box: Box; top: number; elevation: nu
 
 /** How far an open curtain panel covers the frame of its window (m). */
 const CURTAIN_OVERLAP = 0.08;
+/** How far an open panel reaches past the frame at most (m). */
+const CURTAIN_BEYOND = 0.25;
 /** Width of an open, gathered curtain panel: about a third of its fabric, 30 to 50 cm. */
 export const curtainOpenWidth = (fabric: number): number => clamp(fabric * 0.35, 0.3, 0.5);
 
@@ -269,7 +271,8 @@ function deriveNode(m: Model, n: Node): void {
     } else {
       // drawn open: each panel gathered beside the frame, overlapping it a little; a pair frames the
       // window, a single panel goes to the side with more wall; near a corner it slides along the wall
-      const g = curtainOpenWidth(s.width);
+      // the rod reaches 10–25 cm past the frame (image review r7: 40 cm looked too wide)
+      const g = Math.min(curtainOpenWidth(s.width), CURTAIN_BEYOND + CURTAIN_OVERLAP);
       const left = win.t0 - g / 2 + CURTAIN_OVERLAP;
       const right = win.t1 + g / 2 - CURTAIN_OVERLAP;
       const side = r.count === 1 ? (win.t0 >= w.length - win.t1 ? left : right) : r.index % 2 === 0 ? left : right;
