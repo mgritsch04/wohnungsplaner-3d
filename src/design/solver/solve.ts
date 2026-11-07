@@ -692,7 +692,8 @@ function toLayout(st: State, dropped: DroppedItem[], seed: number): Layout {
         elevation: n.elevation,
         width: 2 * n.box.hw,
         depth: 2 * n.box.hd,
-        height: n.spec.height,
+        // a ceiling light mounted close under the ceiling (`deriveNode`) is only as tall as the room leaves it
+        height: n.rule?.kind === 'ceiling' ? Math.min(n.spec.height, Math.max(0.05, m.ctx.height - n.elevation)) : n.spec.height,
         ...(n.replaces && n.replaces !== n.catalogId ? { replaces: n.replaces } : {}),
         ...(parent ? { parent } : {}),
         ...(n.run !== undefined ? { kitchenRun: n.run } : {}),

@@ -229,6 +229,13 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(overlapDepth(corners(rugs[0]), corners(rugs[1]))).toBeLessThan(0.02);
   });
 
+  it('the main light over no table sits close under the ceiling, not at head height (image review r13)', () => {
+    const layout = solveRoom(room, program(room, [item('light', 'generic-pendant')]), { seed: 2 });
+    const light = byId(layout, 'light');
+    expect(light.elevation).toBeGreaterThanOrEqual(room.height - 0.25 - 1e-9);
+    expect(light.elevation + light.height).toBeLessThanOrEqual(room.height + 1e-9);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },

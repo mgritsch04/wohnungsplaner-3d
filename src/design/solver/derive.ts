@@ -200,6 +200,9 @@ function deskLamp(parent: Node | undefined, s: Spec): boolean {
   return parent?.spec.category === 'desk' && s.role === 'table-lamp';
 }
 
+/** How far a light over no table reaches down from the ceiling (m); `toLayout` shortens it to that. */
+export const CEILING_DROP = 0.25;
+
 /** Lowest edge of a pendant over a coffee table (m above the floor). */
 const COFFEE_PENDANT_MIN = 1.9;
 
@@ -301,7 +304,10 @@ function deriveNode(m: Model, n: Node): void {
     const middle = centroidOf(ctx.poly);
     const c = only && pointInPolygon(middle, ctx.poly) ? middle : (hint ?? (z ? { x: (z.rect.x0 + z.rect.x1) / 2, y: (z.rect.y0 + z.rect.y1) / 2 } : middle));
     n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
-    n.elevation = Math.min(s.elevation, ctx.height - s.height - 0.05);
+    // a light that hangs over no table sits close under the ceiling: a pendant at 1.90 m in the
+    // middle of the room is at head height where people walk (paired image review r13, A Zimmer 2:
+    // „hängt mitten im Durchgang auf 190 cm, besser eine flache Deckenleuchte“)
+    n.elevation = overTable ? Math.min(s.elevation, ctx.height - s.height - 0.05) : ctx.height - Math.min(s.height, CEILING_DROP);
     // a hanging lamp gives way to tall furniture, its doors and an opened door leaf (#442)
     if (!hangFree(m, n, n.box)) {
       for (const d of [0.3, 0.6, 0.9, 1.2]) {
