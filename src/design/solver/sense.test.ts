@@ -388,6 +388,25 @@ describe('kitchen', () => {
     expect(byId(layout, 'kitchen1-hood').parent).toBe(cook.id);
   });
 
+  it('in an L kitchen the other run does not stand in front of the dishwasher (image review r10)', () => {
+    const room = rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 1.2 }], windows: [{ wall: 'W', at: 1.75, width: 1.0 }] });
+    const p: RoomProgram = {
+      ...program(room, []),
+      kitchen: [
+        { wall: 'W1', from: { x: 0, y: 0 }, to: { x: 4, y: 0 }, modules: ['generic-k-tall-60', 'generic-k-drawer-60', 'generic-k-base-60', 'generic-k-sink-80', 'generic-k-base-60', 'generic-k-dishwasher'] },
+        { wall: 'W2', from: { x: 4, y: 0 }, to: { x: 4, y: 3.5 }, modules: ['generic-k-drawer-60', 'generic-k-oven', 'generic-k-base-60'] },
+      ],
+    };
+    const layout = solveRoom(room, p, { seed: 1 });
+    const dw = layout.items.find((i) => i.catalogId === 'generic-k-dishwasher')!;
+    const other = layout.items.filter((i) => i.id.startsWith('kitchen2-') && /k-(drawer|oven|base)/.test(i.catalogId));
+    // its door folds down 60 cm into the room: no module of the other run in that strip
+    const front = { x0: dw.x - dw.width / 2, x1: dw.x + dw.width / 2, y0: dw.y + dw.depth / 2, y1: dw.y + dw.depth / 2 + 0.6 };
+    const into = other.map((o) => Math.min(front.x1, o.x + o.depth / 2) - Math.max(front.x0, o.x - o.depth / 2) > 0.05 && Math.min(front.y1, o.y + o.width / 2) - Math.max(front.y0, o.y - o.width / 2) > 0.05);
+    expect(Math.abs(Math.sin(dw.rotation)), 'dishwasher on the first run').toBeLessThan(0.01);
+    expect(into).not.toContain(true);
+  });
+
   it('a runner without a relation lies along the kitchen run in the work aisle, not across the room', () => {
     const room = runRoom(1.6);
     const p = { ...withRun(room, ['generic-k-fridge', 'generic-k-base-60', 'generic-k-sink-80', 'generic-k-drawer-60', 'generic-k-base-60', 'generic-k-base-40']), items: [item('laeufer', 'generic-runner', [2.0, 2.2, Math.PI / 2])] };

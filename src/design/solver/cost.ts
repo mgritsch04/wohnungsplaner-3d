@@ -76,6 +76,9 @@ const name = (n: Node) => n.spec.name;
 /** Floor clearance under an opened door leaf (`DOOR_LEAF_UNDERCUT`): a flat rug may lie below it. */
 const LEAF_UNDERCUT = 0.015;
 
+/** How far the other run of an L may reach in front of an appliance at the corner (m). */
+const CORNER_EPS = 0.05;
+
 /**
  * What `q` takes away from the movement areas of `p`. The strip the plan insists on (doors and
  * drawers have to open) counts to the millimetre and whatever hangs at that height takes it away –
@@ -85,15 +88,19 @@ function clearCost(p: Node, q: Node, hard: (amount: number, v: () => Violation) 
   if (p === q || isRug(q) || q.parent === p.id || p.parent === q.id || tucked(p, q)) return;
   const sameRun = p.run !== undefined && q.run !== undefined && p.unit === q.unit;
   // two runs of an L meet at a corner: the end module of one stands in front of the other's end,
-  // which becomes the blind corner cabinet every L-shaped kitchen has (#443)
-  const blindCorner = p.run !== undefined && q.run !== undefined && !sameRun && Math.abs(Math.cos(p.box.rotation - q.box.rotation)) < 0.1;
+  // which becomes the blind corner cabinet every L-shaped kitchen has (#443); a dishwasher, oven,
+  // sink or fridge there could not be opened (image review r10, the drawer unit blocking the
+  // dishwasher): the run turns round instead
+  const atCorner = p.run !== undefined && q.run !== undefined && !sameRun && Math.abs(Math.cos(p.box.rotation - q.box.rotation)) < 0.1;
+  const blindCorner = atCorner && p.spec.item.kitchen?.type === 'base';
   for (const cl of p.clear) {
     // a movement area is about standing and walking: only the plan's own strip minds what hangs in it
     if (cl.strict ? sameRun || blindCorner : inCorner(p, q) || !isFloor(q)) continue;
     // the same height band as the plan; with the real heights (a fridge is 1.85 m tall, not 0.9 m)
     if (q.elevation > cl.z1 || top(q) < cl.z0) continue;
     const d = overlapDepth(cl.poly, q.poly);
-    if (d <= (cl.strict ? EPS : CLEAR_EPS)) {
+    // the other run's end touching the appliance's front by a few centimetres still lets it open
+    if (d <= (cl.strict ? (atCorner ? CORNER_EPS : EPS) : CLEAR_EPS)) {
       if (cl.strict && d > 0) soft(0.2);
       continue;
     }
