@@ -236,6 +236,24 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(light.elevation + light.height).toBeLessThanOrEqual(room.height + 1e-9);
   });
 
+  it('in a small room the rug grows only while it keeps floor to the walls and stays clear of the curtains (image review r13)', () => {
+    const r = rectRoom(2.7, 3.0, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'N', at: 1.4, width: 1.0 }] });
+    const p = program(r, [item('sofa', 'generic-sofa-2', [2.25, 1.3, Math.PI / 2]), item('rug', 'generic-rug-120'), item('c1', 'generic-curtain'), item('c2', 'generic-curtain')], [
+      { kind: 'under-front', item: 'rug', target: 'sofa' },
+      { kind: 'window', item: 'c1', window: 'F1', place: 'over' },
+      { kind: 'window', item: 'c2', window: 'F1', place: 'over' },
+    ]);
+    const layout = solveRoom(r, p, { seed: 2 });
+    const rug = byId(layout, 'rug');
+    const corners = boxCorners({ x: rug.x, y: rug.y, hw: rug.width / 2, hd: rug.depth / 2, rotation: rug.rotation });
+    // a border of floor all round, under the planned 120×170 as under a bigger one
+    const border = Math.min(...corners.map((c) => Math.min(c.x, 2.7 - c.x, c.y, 3.0 - c.y)));
+    expect(border).toBeGreaterThanOrEqual(0.2 - 1e-6);
+    for (const c of layout.items.filter((i) => i.catalogId === 'generic-curtain')) {
+      expect(overlapDepth(corners, boxCorners({ x: c.x, y: c.y, hw: c.width / 2, hd: c.depth / 2, rotation: c.rotation })), c.id).toBeLessThan(0.001);
+    }
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
@@ -563,6 +581,7 @@ describe('bedroom and ceiling light as a designer lays them (#443)', () => {
     const layout = solveRoom(room, p, { seed: 1 });
     const bed = byId(layout, 'bed');
     const rug = byId(layout, 'rug');
+    console.log('DBG', rug.catalogId, rug.x.toFixed(2), rug.y.toFixed(2), rug.width, rug.depth, layout.items.filter((i) => /curtain|sofa/.test(i.catalogId)).map((i) => i.id + ' ' + i.x.toFixed(2) + ',' + i.y.toFixed(2)).join(' / '));
     // extent of the rug along the bed's width and along its length (the item's width runs along its own x axis)
     const turned = Math.abs(Math.sin(rug.rotation - bed.rotation)) > 0.5;
     const across = turned ? rug.depth : rug.width;
@@ -660,6 +679,7 @@ describe('a rug that reaches past its piece (D5)', () => {
     const room = bedroom(4.6, 4);
     const layout = solveRoom(room, bedRug(room), { seed: 3 });
     const rug = byId(layout, 'rug');
+    console.log('DBG', rug.catalogId, rug.x.toFixed(2), rug.y.toFixed(2), rug.width, rug.depth, layout.items.filter((i) => /curtain|sofa/.test(i.catalogId)).map((i) => i.id + ' ' + i.x.toFixed(2) + ',' + i.y.toFixed(2)).join(' / '));
     expect(rug.catalogId).toBe('generic-rug-200');
     expect(rug.replaces).toBeUndefined();
   });

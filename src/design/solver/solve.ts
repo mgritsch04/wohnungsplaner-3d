@@ -12,7 +12,7 @@ import type { CatalogItem } from '../../catalog/types';
 import type { Project } from '../../model/schema';
 import type { DroppedItem, Layout, PlacedItem, RoomAnalysis, RoomProgram } from '../types';
 import { gridCost, HARD, pairCost, resetRelations, unitCost, type Violation } from './cost';
-import { inSwing, refreshUnit, resizeNode } from './derive';
+import { inSwing, refreshUnit, resizeNode, rugBorder } from './derive';
 import { wrapAngle } from './geom';
 import { smallerOptions } from './items';
 import { kitchenTops } from './kitchenTops';
@@ -123,6 +123,9 @@ function rugReach(parentRole: string): { min: number; max: number } | null {
  * that does, if it fits: no rule of the plan may break that held before (#436, image review 6.11.:
  * 160 cm under a 160 bed, 5 cm past a sofa). Only the catalogue's own placeholders, never a product.
  */
+/** Floor a grown rug leaves to the walls (m). */
+const RUG_BORDER = 0.2;
+
 function growRugs(st: State): void {
   const m = st.m;
   for (const n of m.nodes.values()) {
@@ -139,6 +142,7 @@ function growRugs(st: State): void {
     const original = n.catalogId;
     const before = st.hard();
     const swungBefore = inSwing(m, n.box);
+    const borderBefore = rugBorder(m, n.box);
     let kept = false;
     for (const id of GROW_RUGS.slice(GROW_RUGS.indexOf(original) + 1)) {
       if (!resizeNode(m, n, id)) continue;
@@ -148,7 +152,9 @@ function growRugs(st: State): void {
       const reachNow = past();
       if (reachNow > reach.max + 1e-9) break;
       // a door must not catch on the bigger rug where it did not on the planned one (D5)
-      if (st.hard() <= before + 1e-9 && reachNow >= reach.min - 1e-9 && (swungBefore || !inSwing(m, n.box))) {
+      // nor must it reach closer to a wall or under a curtain than the planned one did
+      const bordered = rugBorder(m, n.box) >= Math.min(RUG_BORDER, borderBefore) - 1e-9;
+      if (st.hard() <= before + 1e-9 && reachNow >= reach.min - 1e-9 && (swungBefore || !inSwing(m, n.box)) && bordered) {
         kept = true;
         break;
       }

@@ -5,7 +5,7 @@
  */
 import { add, pointInPolygon, scale, type Vec2 } from '../../model/vec';
 import { rotationFacing, SOFT_SHAPES } from '../../suggest/roomGeometry';
-import { axisX, axisY, boxCorners, clamp, distToBox, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
+import { axisX, axisY, boxCorners, clamp, distToBox, distToSegment, outsideAmount, overlapDepth, WALL_TOL, type Box } from './geom';
 import { specOf, type Spec } from './items';
 import type { Model, Node, Rule, Unit } from './model';
 import { runId } from './model';
@@ -84,6 +84,20 @@ function insideScore(m: Model, b: Box): number {
 export function inSwing(m: Model, b: Box): boolean {
   const poly = boxCorners(b);
   return m.ctx.swings.some((s) => overlapDepth(poly, s.poly) > 1e-3);
+}
+
+/**
+ * Floor left free between a rug and the walls (m, smallest over its corners); a curtain standing
+ * on the rug counts as 0. A grown rug keeps a border of floor round it (image review r13: 13 cm to
+ * the window wall, the curtains standing on it).
+ */
+export function rugBorder(m: Model, b: Box): number {
+  const poly = boxCorners(b);
+  for (const n of m.nodes.values()) if (n.spec.base === 'curtain' && m.units[n.unit].active && overlapDepth(poly, n.poly) > 1e-3) return 0;
+  const room = m.ctx.poly;
+  let d = Infinity;
+  for (const p of poly) for (let i = 0; i < room.length; i++) d = Math.min(d, distToSegment(p, room[i], room[(i + 1) % room.length]));
+  return d;
 }
 
 /** The first rug option inside the room and out of every door swing, else the first inside, else the one that sticks out least. */
