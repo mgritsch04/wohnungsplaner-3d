@@ -253,8 +253,11 @@ describe('B Wege und Zugang', () => {
   });
   it('B6 floor in front of a wardrobe: 70 cm', () => {
     const r = (bedX: number) => review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [put('generic-wardrobe-150', { x: 0.3, y: 1.75, face: 'O' }), put('generic-sideboard', { x: bedX, y: 1.75, face: 'W' })] });
-    expect(rulesOf(r(1.6))).not.toContain('B6');
+    expect(rulesOf(r(2.0))).not.toContain('B6');
     expect(rulesOf(r(1.3), 'M')).toContain('B6');
+    // 70 to 90 cm: cramped for swing doors, only a light hint
+    expect(rulesOf(r(1.6), 'L')).toContain('B6');
+    expect(rulesOf(r(1.6), 'M')).not.toContain('B6');
   });
   it('B6 beside the bed: 50 cm on one side at least', () => {
     const r = (y: number) => review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'other', items: [put('generic-bed-90', { x: 1.5, y, face: 'S' }), put('generic-wardrobe-100', { x: 0.3, y: 1.0, face: 'O' }), put('generic-wardrobe-100', { x: 2.7, y: 1.0, face: 'W' })] });
