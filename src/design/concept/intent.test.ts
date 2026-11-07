@@ -127,6 +127,14 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(check(at(1.3)).filter((x) => x.includes('(A5)'))).toEqual([]);
     expect(check(at(0.6, false)).filter((x) => x.includes('(A5)'))).toEqual([]);
   });
+  it('a sofa with a strip behind it that is neither passage nor wall is named (C8)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
+    const c8 = (y: number) => intentProblems(program([item('sofa', 'generic-sofa-3', 2, y, 'N')]), room, [], [], 'living').filter((x) => x.includes('(C8)'));
+    // back 40 cm from the south wall; at the wall, or with a passage behind, it is fine
+    expect(c8(3.15)).toEqual([expect.stringMatching(/Hinter „sofa“ bleiben nach deinen Startplätzen 4\d cm bis zur Wand.*75 cm/)]);
+    expect(c8(3.53)).toEqual([]);
+    expect(c8(2.5)).toEqual([]);
+  });
   it('a television opposite the window is named, one on the side wall not (C3)', () => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
     const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];
