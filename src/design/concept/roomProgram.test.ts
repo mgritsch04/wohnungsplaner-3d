@@ -40,6 +40,17 @@ describe('room programme prompt', () => {
     expect(p).not.toContain('"userZone"');
   });
 
+  it('offers checked places for the anchor pieces (#436)', () => {
+    const p = buildRoomProgramPrompt(input('B', 'Wohnküche'));
+    expect(p).toContain('Geprüfte Plätze für die Ankermöbel');
+    expect(p).toMatch(/- SOFA-1: Rücken an W\d/);
+    expect(p).toContain('"slot":"SOFA-1"');
+    // nothing to place: the section stays out
+    const bath = buildRoomProgramPrompt(input('B', 'Bad'));
+    expect(bath).not.toContain('Geprüfte Plätze');
+    expect(bath).not.toContain('"slot"');
+  });
+
   it('names the existing pieces with labels and leaves the kitchen out where there is none to plan', () => {
     const i = input('B', 'Bad');
     const p = buildRoomProgramPrompt(i);
@@ -67,8 +78,9 @@ describe('parseRoomProgram on the recorded answers', () => {
         const r = parseRoomProgram(recorded(key, name), i);
         // B's bath has a kitchen wall cabinet over the dryer: the one thing to repair
         if (key === 'B' && name === 'Bad') expect(r.problems).toEqual(['Teil „wallcab“: Küchenmodule (generic-k-wall-60) gehören in "kitchen", nicht in "items".']);
-        // the recorded answers predate the storage check K7: the Wohnküche of B has too little (see below)
-        else expect(r.problems.filter((x) => !x.includes('(K7)')), `${key} ${name}`).toEqual([]);
+        // the recorded answers predate the storage check K7 (the Wohnküche of B has too little, see below) and
+        // the start-place checks (intent.ts: B Schlafzimmer plans a 160×230 rug across a 160 bed); both ask again
+        else expect(r.problems.filter((x) => !x.includes('(K7)') && !x.includes('nach deinen Startplätzen')), `${key} ${name}`).toEqual([]);
         expect(r.value.roomId).toBe(i.room.roomId);
         expect(r.value.items.length, `${key} ${name}`).toBeGreaterThan(3);
         for (const rel of r.value.relations) expect(VOCABULARY).toContain(rel.kind);
@@ -131,6 +143,40 @@ describe('answers recorded with these prompts (C–F)', () => {
         expect(p.problems.filter((x) => !x.includes('(K7)') && !x.includes('nach deinen Startplätzen')), `${key} ${room.name}`).toEqual([]);
       }
     }
+  });
+});
+
+describe('a checked place instead of own coordinates (#436)', () => {
+  it('takes centre, front and wall from the place and drops the missing-place problems', () => {
+    const i = input('B', 'Wohnküche');
+    const raw = recorded('B', 'Wohnküche');
+    const sofa = raw.items.find((it) => it.id === 'sofa') as Record<string, unknown>;
+    delete sofa.x;
+    delete sofa.y;
+    delete sofa.facing;
+    sofa.slot = 'sofa-1';
+    const r = parseRoomProgram(raw, i);
+    // the check of the plan before placing (W5, W10) may still speak: the recorded kitchen is on the wall the place looks at
+    expect(r.problems.filter((x) => x.includes('„sofa“') && /Startplatz x, y fehlt|außerhalb des Raums|keine Himmelsrichtung/.test(x))).toEqual([]);
+    const place = /- SOFA-1: Rücken an (W\d) /.exec(buildRoomProgramPrompt(i))!;
+    const item = r.value.items.find((it) => it.id === 'sofa')!;
+    expect(item.hint).toBeDefined();
+    const wall = r.value.relations.find((x) => x.kind === 'wall' && x.item === 'sofa');
+    expect(wall).toMatchObject({ kind: 'wall', wall: place[1] });
+    expect(wall && 'along' in wall && wall.along).toBeTruthy();
+  });
+
+  it('an unknown place or one for another kind of piece falls back to the own place', () => {
+    const i = input('B', 'Wohnküche');
+    const raw = recorded('B', 'Wohnküche');
+    (raw.items.find((it) => it.id === 'sofa') as Record<string, unknown>).slot = 'SOFA-99';
+    const unknown = parseRoomProgram(raw, i);
+    expect(unknown.notes.some((n) => n.includes('Platz „SOFA-99“ gibt es nicht'))).toBe(true);
+    const sofa = raw.items.find((it) => it.id === 'sofa')!;
+    const at = fromRoomCm(i.room.origin, sofa.x, sofa.y);
+    expect(unknown.value.items.find((it) => it.id === 'sofa')!.hint!.x).toBeCloseTo(at.x);
+    (raw.items.find((it) => it.id === 'sofa') as Record<string, unknown>).slot = 'ESSTISCH-1';
+    expect(parseRoomProgram(raw, i).notes.some((n) => n.includes('ist für einen Esstisch gedacht'))).toBe(true);
   });
 });
 

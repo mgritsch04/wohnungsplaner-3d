@@ -36,7 +36,20 @@ export interface SolveOptions {
   trace?: (broken: string[]) => void;
   /** Living or sleeping room: avoid large patches without furniture (E6, from 12 m²). */
   spread?: boolean;
+  /**
+   * The walk-through as the judge of the finished layout (#436): pieces it names are moved where
+   * the walk-through likes them better, as long as no rule of the plan breaks. See `polish`.
+   */
+  judge?: Judge;
+  /** Trial moves for `judge` (default `POLISH_STEPS`). */
+  polishSteps?: number;
 }
+
+/** What the walk-through says about a layout: passed, points and the pieces of its findings worth moving. */
+export type Judge = (layout: Layout) => { passed: boolean; score: number; items: string[] };
+
+/** Trial moves of `polish` per layout. */
+export const POLISH_STEPS = 24;
 
 /** Existing pieces of a room from the project (`RoomAnalysis.existing`). */
 export function existingPieces(project: Project, analysis: RoomAnalysis): FixedPiece[] {
@@ -87,7 +100,51 @@ export function solveRoom(analysis: RoomAnalysis, program: RoomProgram, opts: So
   st.rebuild();
   opts.trace?.(violations(st).map((v) => `${v.rule}: ${v.text} [${v.items.join(', ')}]`));
   const dropped = settle(st, seed);
+  if (opts.judge) polish(st, dropped, seed, opts.judge, opts.polishSteps ?? POLISH_STEPS);
   return toLayout(st, dropped, seed);
+}
+
+const judged = (a: ReturnType<Judge>, b: ReturnType<Judge>) => (a.passed !== b.passed ? a.passed : a.score > b.score);
+
+/**
+ * The walk-through fixes what it found (#436): the search optimises its own cost, which is not
+ * quite the walk-through (a nightstand the search reaches, the walk-through not; 16 cm between
+ * the WC and the washer). Each step moves the unit of a piece a finding names to a neighbouring
+ * or a fresh place; the move stays when no rule of the plan breaks that held before and the
+ * walk-through gives more points (or passes now).
+ */
+function polish(st: State, dropped: DroppedItem[], seed: number, judge: Judge, steps: number): void {
+  const m = st.m;
+  const rng = new Rng(seed * 53 + 11);
+  let cur = judge(toLayout(st, dropped, seed));
+  const hard0 = st.hard();
+  for (let i = 0; i < steps && cur.items.length; i++) {
+    const n = m.nodes.get(cur.items[i % cur.items.length]);
+    if (!n) continue;
+    const u = m.units[n.unit];
+    if (!movable(u) || u.kitchen) continue;
+    const old = poseOf(u);
+    // a few neighbours and fresh places, the cheapest by the search's own measure first
+    const tries = [...Array.from({ length: 8 }, () => randomMove(m, u, rng, old)), ...candidates(m, u, rng, 24)];
+    const scored: { pose: Pose; delta: number }[] = [];
+    for (const pose of tries) {
+      const res = st.propose([{ u, pose }]);
+      scored.push({ pose, delta: res.delta });
+      res.rollback();
+    }
+    scored.sort((a, b) => a.delta - b.delta);
+    for (const pose of scored.slice(0, 2).map((x) => x.pose)) {
+      st.propose([{ u, pose }]).commit();
+      if (st.hard() <= hard0 + 1e-9) {
+        const got = judge(toLayout(st, dropped, seed));
+        if (judged(got, cur)) {
+          cur = got;
+          break;
+        }
+      }
+      st.propose([{ u, pose: old }]).commit();
+    }
+  }
 }
 
 /** Seeds `solveBest` tries per programme (#436): the search lands in rather different places per seed. */

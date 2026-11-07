@@ -11,7 +11,10 @@ import type { SampleImage } from '../assistant/claude';
 import { sideOfRotation, toRoomCm } from './coords';
 import { buildRoomProgramPrompt, parseRoomProgram, type RoomProgramInput } from './concept/roomProgram';
 import type { Checked } from './concept/common';
-import type { Finding, Layout, RoomProgram, RoomReview } from './types';
+import type { Finding, Layout, RoomAnalysis, RoomProgram, RoomReview } from './types';
+import { findCatalogItem } from '../catalog/generic';
+import { roleOf } from '../suggest/roomGeometry';
+import { pointInPolygon } from '../model/vec';
 
 export interface CritiqueInput {
   /** The same input stage 2 had: concept, room, sketch, wishes, products. */
@@ -124,7 +127,71 @@ export function programAsAnswer(program: RoomProgram, origin: { x: number; y: nu
 }
 
 /** What the walk-through and the placement found, as Claude reads it. */
-export function critiqueReport(program: RoomProgram, layout: Layout, review: RoomReview): string {
+/** Pieces whose view matters: one sits or lies on them and looks ahead. */
+const LOOKERS = new Set(['sofa', 'armchair', 'bed', 'desk']);
+const SIDE_NAMES: Record<string, string> = { N: 'Norden', O: 'Osten', S: 'Süden', W: 'Westen' };
+
+/**
+ * What each sofa, armchair, bed and desk looks at, worked out by the app (#436): a ray from its
+ * front to the first piece or wall. Claude reads compass sides well but derives such view lines
+ * badly and falls back to habit (research of 6.11.: SpatialText); in test flat B the sofa looked at
+ * the kitchen run in Claude's own plan through two critique rounds.
+ */
+export function viewLines(room: RoomAnalysis, program: RoomProgram, layout: Layout): string[] {
+  const role = (catalogId: string) => {
+    const item = findCatalogItem(catalogId);
+    return item ? { role: roleOf({ ...item, catalogId: item.id }), item } : null;
+  };
+  const labelOf = (id: string, catalogId: string) => (program.items.find((p) => p.id === id)?.label ?? findCatalogItem(catalogId)?.name ?? id).split(',')[0];
+  const inside = (i: Layout['items'][number], p: { x: number; y: number }) => {
+    const dx = p.x - i.x;
+    const dy = p.y - i.y;
+    const c = Math.cos(i.rotation);
+    const s = Math.sin(i.rotation);
+    return Math.abs(dx * c + dy * s) <= i.width / 2 && Math.abs(-dx * s + dy * c) <= i.depth / 2;
+  };
+  const solid = layout.items.filter((i) => {
+    const r = role(i.catalogId);
+    // what a seated person sees past: a coffee table or a candle tray does not end the view, a kitchen run does
+    return r && r.item.category !== 'textile' && r.role !== 'rug' && !(i.elevation > 1.6) && (i.kitchenRun !== undefined || r.role === 'tv' || r.role === 'tv-board' || i.elevation + i.height > 0.75);
+  });
+  const out: string[] = [];
+  for (const it of layout.items) {
+    const r = role(it.catalogId);
+    if (!r || !LOOKERS.has(r.role) || it.elevation > 0.05) continue;
+    const f = { x: -Math.sin(it.rotation), y: Math.cos(it.rotation) };
+    const mine = new Set([it.id, ...layout.items.filter((x) => x.parent === it.id).map((x) => x.id)]);
+    let seen = '';
+    for (let d = it.depth / 2 + 0.05; d < 12 && !seen; d += 0.05) {
+      const p = { x: it.x + f.x * d, y: it.y + f.y * d };
+      const hit = solid.find((x) => !mine.has(x.id) && inside(x, p));
+      if (hit) {
+        seen = `${hit.kitchenRun !== undefined ? 'die Küchenzeile' : `${labelOf(hit.id, hit.catalogId)} (${hit.id})`}, ${(d - it.depth / 2).toFixed(1).replace('.', ',')} m entfernt`;
+        break;
+      }
+      if (!pointInPolygon(p, room.polygon)) {
+        let wall = room.walls[0];
+        let bd = Infinity;
+        for (const w of room.walls) {
+          const t = (p.x - w.a.x) * w.dir.x + (p.y - w.a.y) * w.dir.y;
+          const q = { x: w.a.x + w.dir.x * Math.max(0, Math.min(w.length, t)), y: w.a.y + w.dir.y * Math.max(0, Math.min(w.length, t)) };
+          const dd = Math.hypot(p.x - q.x, p.y - q.y);
+          if (dd < bd) {
+            bd = dd;
+            wall = w;
+          }
+        }
+        const t = (p.x - wall.a.x) * wall.dir.x + (p.y - wall.a.y) * wall.dir.y;
+        const o = wall.openings.find((x) => t >= x.t0 - 0.1 && t <= x.t1 + 0.1);
+        seen = `die Wand ${wall.id}${o ? ` mit ${o.kind === 'window' ? 'Fenster' : 'Tür'} ${o.id}` : ''}, ${(d - it.depth / 2).toFixed(1).replace('.', ',')} m entfernt`;
+      }
+    }
+    if (seen) out.push(`- ${labelOf(it.id, it.catalogId)} (${it.id}), Front nach ${SIDE_NAMES[sideOfRotation(it.rotation)] ?? sideOfRotation(it.rotation)}, schaut auf ${seen}`);
+  }
+  return out;
+}
+
+export function critiqueReport(program: RoomProgram, layout: Layout, review: RoomReview, room?: RoomAnalysis): string {
   const hintOf = (id: string) => program.items.find((p) => p.id === id)?.hint;
   const findings = review.findings.map((f) => `- ${SEVERITY[f.severity]}: ${f.text}${f.items.length ? ` (${f.items.join(', ')})` : ''}`);
   const dropped = layout.dropped.map((d) => `- ${d.id} (${d.catalogId}) kam nicht hinein: ${d.reason}`);
@@ -138,6 +205,7 @@ export function critiqueReport(program: RoomProgram, layout: Layout, review: Roo
     findings.length ? `Befunde:\n${findings.join('\n')}` : 'Keine Befunde.',
     dropped.length ? `Nicht aufgestellt:\n${dropped.join('\n')}` : '',
     moved.length ? `Weit von deinem Platz entfernt aufgestellt:\n${moved.join('\n')}` : '',
+    ...(room ? [((v) => (v.length ? `Blickrichtungen, so wie aufgestellt (von der App gemessen):\n${v.join('\n')}` : ''))(viewLines(room, program, layout))] : []),
     `Belegung ${Math.round(review.metrics.occupancy * 100)} % der Fläche.`,
   ]
     .filter(Boolean)
@@ -172,7 +240,7 @@ ${programAsAnswer(program, origin)}
 
 ${picture}
 
-${critiqueReport(program, layout, review)}
+${critiqueReport(program, layout, review, base.room)}
 
 ${task}
 Typische Mittel: eine Zone verschieben oder kleiner machen, eine Beziehung ändern (anderes Ziel, anderer Abstand), ein Teil gegen ein kleineres tauschen, Überflüssiges weglassen, Fehlendes ergänzen. Ein Teil, das nicht hineinkam, braucht einen anderen Platz oder eine kleinere Größe – oder es gehört nicht in diesen Raum.

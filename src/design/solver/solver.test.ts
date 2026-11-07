@@ -6,7 +6,7 @@ import type { FlatKey } from '../fixtures/flats';
 import { RECORDED } from '../fixtures/recorded';
 import type { Layout, RoomAnalysis } from '../types';
 import type { FixedPiece } from './room';
-import { droppedWeight, existingPieces, solveBest, solveRoom } from './solve';
+import { droppedWeight, existingPieces, solveBest, solveRoom, type Judge } from './solve';
 import { independentCheck } from './verify';
 
 interface Case {
@@ -84,6 +84,25 @@ describe('solver on the recorded programmes of test flats A–F', () => {
       expect(JSON.stringify(solveBest(room, program, { existing, seed: 7 }))).toBe(JSON.stringify(best));
     }
   }, 60_000);
+
+  it('the walk-through as judge moves the pieces it names, never past a hard rule, and only for more points (#436)', () => {
+    const f = testFlatInput('A');
+    const concept = parseFlatConcept(RECORDED.A!.concept, f).value;
+    const raw = RECORDED.A!.programs['Wohnzimmer'];
+    const room = f.analysis.rooms.find((r) => r.name === 'Wohnzimmer')!;
+    const existing = existingPieces(f.project, room);
+    const program = parseRoomProgram(raw, { project: f.project, concept, room, sketch: '', wishes: f.wishes }).value;
+    const plain = solveRoom(room, program, { existing, seed: 7 });
+    const sofa = plain.items.find((i) => i.catalogId.includes('sofa'))!;
+    // a judge that wants the sofa 1 m further east than the search put it
+    const want = sofa.x + 1;
+    const judge: Judge = (l) => ({ passed: false, score: -Math.round(100 * Math.abs((l.items.find((i) => i.id === sofa.id)?.x ?? 0) - want)), items: [sofa.id] });
+    const polished = solveRoom(room, program, { existing, seed: 7, judge });
+    expect(judge(polished).score).toBeGreaterThan(judge(plain).score);
+    expect(polished.unsolved).toEqual([]);
+    expect(independentCheck(room, polished, existing)).toEqual([]);
+    expect(JSON.stringify(solveRoom(room, program, { existing, seed: 7, judge }))).toBe(JSON.stringify(polished));
+  });
 
   it('needs well under 300 ms per room on average', () => {
     for (const c of all) get(c);
