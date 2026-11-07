@@ -103,6 +103,16 @@ function pickRug(m: Model, options: Box[]): Box {
 /** Height of a picture's middle above the floor (R7: 145–155 cm). */
 const ART_MIDDLE = 1.5;
 
+/**
+ * Height of a wall piece that hangs on its own. A picture's middle at eye height (R7): the
+ * catalogue heights put a 70 cm picture's middle at 1.70–1.75 m, which the image review of r7
+ * called much too high.
+ */
+function ownWallElevation(s: Spec): number {
+  const art = s.shape === 'picture' || s.shape === 'picture-set';
+  return art ? Math.min(s.elevation, ART_MIDDLE - s.height / 2) : s.elevation;
+}
+
 function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number): { box: Box; elevation: number } {
   const s = n.spec;
   const ctx = m.ctx;
@@ -516,7 +526,7 @@ export function refreshUnit(m: Model, u: Unit): void {
     if (n.rule && (n !== u.main || u.kind === 'fixed')) deriveNode(m, n);
     else {
       n.box = mainBox(m, u, n);
-      n.elevation = n.spec.base === 'wall' ? n.spec.elevation : 0;
+      n.elevation = n.spec.base === 'wall' ? ownWallElevation(n.spec) : 0;
     }
   }
   const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };

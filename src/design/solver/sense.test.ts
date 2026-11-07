@@ -112,6 +112,13 @@ describe('pictures hang at eye height over their piece (R7)', () => {
     expect(gap).toBeLessThanOrEqual(0.3 + 1e-6);
     expect(art.elevation + art.height / 2).toBeGreaterThan(1.35);
   });
+
+  it('a picture on its own wall: middle at 1.5 m, not at 1.75 m like the catalogue height (image review r7)', () => {
+    const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
+    const p = program(room, [item('art', 'generic-picture-large')], [{ kind: 'wall', item: 'art', wall: 'W2' }]);
+    const art = byId(solveRoom(room, p, { seed: 2 }), 'art');
+    expect(art.elevation + art.height / 2).toBeCloseTo(1.5, 2);
+  });
 });
 
 describe('a tight room keeps its double bed', () => {
