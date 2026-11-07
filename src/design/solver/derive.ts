@@ -279,6 +279,8 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
 
 /** Seat height and bed top of the procedural models (ProceduralModel: sofa seat 0.45, bed 0.32 frame + 0.22 mattress). */
 const SEAT_TOP = 0.45;
+/** Seat height of the procedural chair (ProceduralModel `chair`). */
+const CHAIR_SEAT = 0.47;
 const BED_TOP = 0.56;
 
 /**
@@ -292,6 +294,12 @@ function softOn(parent: Spec, s: Spec, P: Box): { u: number; v: number; hw: numb
     if (s.shape === 'bed-throw') return { u: 0, v: P.hd - s.depth / 2 - 0.12, hw: Math.min(hw, P.hw), elevation: BED_TOP + 0.03 };
     if (s.shape === 'cushions') return { u: 0, v: -P.hd + 0.62 + s.depth / 2, hw: Math.min(hw, P.hw - 0.05), elevation: BED_TOP + 0.03 };
     return null;
+  }
+  // a cushion on a dining or desk chair lies on its seat against the back, not on top of the back
+  // rest (image review r13, A Küche: „Sitzkissen auf Lehnenhöhe, 86 cm“)
+  if (parent.shape === 'chair') {
+    const seat = Math.min(CHAIR_SEAT, parent.height * 0.55);
+    return { u: 0, v: -P.hd + Math.min(s.depth, 2 * P.hd) / 2 + 0.03, hw: Math.min(hw, P.hw), elevation: seat };
   }
   if (parent.shape !== 'sofa' && parent.shape !== 'armchair' && parent.shape !== 'sofa-corner') return null;
   const arm = Math.min(0.2, 2 * P.hw * 0.13);
