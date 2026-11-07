@@ -12,6 +12,7 @@ import { generateCountertops } from '../../kitchen/kitchen';
 import type { Furniture, Project } from '../../model/schema';
 import { suggestedIn, type FurnishingSuggestion, type RoomSuggestion, type RoomType } from '../../suggest/furnishing';
 import { placedLampPlan } from '../lightPlan';
+import { withActualSize } from '../sizeLabel';
 import type { Layout, ProgramItem, RoomAnalysis, RoomProgram } from '../types';
 
 /** One room of the new proposal as placed by the solver. */
@@ -40,24 +41,9 @@ export const isPlaceholderId = (catalogId: string) => findCatalogItem(catalogId)
 /** Name a piece shows in the plan: Claude's description for a placeholder, else the product name. */
 export function pieceName(item: CatalogItem, prog: ProgramItem | undefined): string {
   const label = prog?.label?.trim();
-  return (label && isPlaceholderId(item.id) ? `${resized(label, item, prog)} (Platzhalter)` : item.name).slice(0, MAX_NAME);
+  return (label && isPlaceholderId(item.id) ? `${prog ? withActualSize(label, prog.catalogId, item.id, item.width, item.depth) : label} (Platzhalter)` : item.name).slice(0, MAX_NAME);
 }
 
-/**
- * The solver can lay a bigger rug or stand a smaller piece than planned: a size in Claude's
- * description („Teppich 120×170“) then follows the piece that stands there (image review r7:
- * the name said 120 × 170, the rug was 160 × 230).
- */
-function resized(label: string, item: CatalogItem, prog: ProgramItem | undefined): string {
-  if (!prog || prog.catalogId === item.id) return label;
-  const w = Math.round(item.width * 100);
-  const d = Math.round(item.depth * 100);
-  return label.replace(/\b(\d{2,3})\s*[×x]\s*(\d{2,3})\b/, (_, a: string, b: string) => {
-    const lo = Math.min(w, d);
-    const hi = Math.max(w, d);
-    return Number(a) <= Number(b) ? `${lo}×${hi}` : `${hi}×${lo}`;
-  });
-}
 
 /** Furniture of one placed room (suggested, not yet in the project), worktops included. */
 export function layoutFurniture(project: Project, room: PlacedRoom, catalog: CatalogItem[] = []): RoomFurniture {

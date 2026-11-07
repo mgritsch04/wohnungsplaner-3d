@@ -8,6 +8,7 @@ import { dot, pointInPolygon, sub } from '../../model/vec';
 import { checkWalkways } from '../analysis';
 import { backOf, gazeOf, hasGaze, type GazePiece } from '../analysis/gaze';
 import { sideOfVector, toRoomCm } from '../coords';
+import { withActualSize } from '../sizeLabel';
 import { toRItem, type RItem } from '../review/items';
 import type { RoomAnalysis, Severity, WallInfo } from '../types';
 import type { RoomPlanInput } from './roomPlan';
@@ -54,7 +55,11 @@ export function roomTextMap(input: RoomPlanInput): string {
     return `(${p.x},${p.y})`;
   };
   const programItem = (id: string) => input.program?.items.find((x) => x.id === id);
-  const nameOf = (i: RItem) => programItem(i.id)?.label ?? i.name;
+  const nameOf = (i: RItem) => {
+    const p = programItem(i.id);
+    const placedAs = input.layout?.items.find((x) => x.id === i.id);
+    return p?.label ? withActualSize(p.label, p.catalogId, placedAs?.catalogId ?? p.catalogId, i.width, i.depth) : i.name;
+  };
   const floor = items.filter((i) => i.floor);
   const gazeRef = (i: RItem) => (i.existing ? i.name : `${i.id} (${nameOf(i)})`);
   const seen: GazePiece[] = items.map((i) => ({ ...i, ref: gazeRef(i) }));
