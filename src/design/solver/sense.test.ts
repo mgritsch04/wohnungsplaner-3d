@@ -766,6 +766,24 @@ describe('room behind the dining chairs (E2, image review r15 A, Küche)', () =>
   });
 });
 
+describe('the desk lamp beside the desk chair (image review r16 A, Zimmer 2)', () => {
+  it('the one chair around the desk leaves the lamp on the sitter\'s left, not in front of the writing hand', () => {
+    const room = rectRoom(3.5, 3.2, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: 1.6 }] });
+    const p = program(room, [item('desk', 'generic-desk', [0.36, 1.6, -Math.PI / 2]), item('chair', 'generic-office-chair'), item('lamp', 'generic-table-lamp')], [
+      { kind: 'wall', item: 'desk', wall: 'W4' },
+      { kind: 'around', items: ['chair'], target: 'desk' },
+      { kind: 'on', item: 'lamp', target: 'desk' },
+    ]);
+    for (const seed of [1, 2]) {
+      const layout = solveRoom(room, p, { seed });
+      const desk = byId(layout, 'desk');
+      const along = (i: PlacedItem) => (i.x - desk.x) * Math.cos(desk.rotation) + (i.y - desk.y) * Math.sin(desk.rotation);
+      // the desk's +x is the sitter's right: the lamp stands further to the left than the chair
+      expect(along(byId(layout, 'lamp')), `seed ${seed}`).toBeLessThan(along(byId(layout, 'chair')) - 0.2);
+    }
+  });
+});
+
 describe('a rug that reaches past its piece (D5)', () => {
   const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
   const bedRug = (room: RoomAnalysis) =>
