@@ -127,6 +127,23 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(check(at(1.3)).filter((x) => x.includes('(A5)'))).toEqual([]);
     expect(check(at(0.6, false)).filter((x) => x.includes('(A5)'))).toEqual([]);
   });
+  it('a sofa with a strip behind it that is neither passage nor wall is named (C8)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
+    const c8 = (y: number) => intentProblems(program([item('sofa', 'generic-sofa-3', 2, y, 'N')]), room, [], [], 'living').filter((x) => x.includes('(C8)'));
+    // back 40 cm from the south wall; at the wall, or with a passage behind, it is fine
+    expect(c8(3.15)).toEqual([expect.stringMatching(/Hinter „sofa“ bleiben nach deinen Startplätzen 4\d cm bis zur Wand.*75 cm/)]);
+    expect(c8(3.53)).toEqual([]);
+    expect(c8(2.5)).toEqual([]);
+  });
+  it('the bed behind the desk chair in a video call is named (C10)', () => {
+    const room = rectRoom(4, 4.5, { doors: [{ wall: 'O', at: 4 }], windows: [{ wall: 'W', at: 2 }] });
+    const desk = item('desk', 'generic-desk', 2, 0.35, 'S');
+    const c10 = (items: ProgramItem[]) => intentProblems(program(items), room, [], [], 'bedroom').filter((x) => x.includes('(C10'));
+    expect(c10([desk, item('bed', 'generic-bed-160', 2, 3.45, 'N')])).toEqual([expect.stringMatching(/Hinter dem Stuhl an „desk“ liegt nach deinen Startplätzen im Bild einer Videokonferenz .*Bett aus dem Bild/)]);
+    // a wardrobe closes the picture before the bed; without a bed the wall behind is quiet
+    expect(c10([desk, item('ws', 'generic-wardrobe-150', 2, 1.6, 'N'), item('bed', 'generic-bed-160', 2, 3.45, 'N')])).toEqual([]);
+    expect(c10([desk])).toEqual([]);
+  });
   it('a television opposite the window is named, one on the side wall not (C3)', () => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
     const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];
