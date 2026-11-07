@@ -212,6 +212,15 @@ describe('parseRoomProgram finds what has to be repaired', () => {
     expect(p).toContain('Teil „daybed“ ist ein Gästeschlafplatz – der ist laut Wohnkonzept in „Zimmer 2“.');
   });
 
+  it('a box of guest bedding is no guest bed', () => {
+    const raw = recorded('A', 'Wohnzimmer');
+    raw.items.push({ id: 'box-gast', catalogId: 'generic-storage-box', zone: raw.zones[0].id, x: 100, y: 300, facing: 'O', label: 'Beschriftete Box „Gästebettzeug“', why: '' });
+    raw.items.push({ id: 'sofa2', catalogId: 'generic-sofa-3', zone: raw.zones[0].id, x: 250, y: 300, facing: 'N', label: 'Schlafsofa für Gäste', why: '' });
+    const p = parseRoomProgram(raw, input('A', 'Wohnzimmer')).problems;
+    expect(p.some((x) => x.startsWith('Teil „box-gast“'))).toBe(false);
+    expect(p).toContain('Teil „sofa2“ ist ein Gästeschlafplatz – der ist laut Wohnkonzept in „Zimmer 2“.');
+  });
+
   it('new sanitary objects', () => {
     const raw = recorded('A', 'Bad');
     raw.items.push({ id: 'wc2', catalogId: 'generic-toilet', zone: raw.zones[0].id, x: 50, y: 50, facing: 'S', label: 'Wand-WC', why: '' });
