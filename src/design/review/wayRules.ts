@@ -3,7 +3,7 @@ import type { Vec2 } from '../../model/vec';
 import { checkWalkways } from '../analysis';
 import type { RoomMetrics } from '../types';
 import type { Clear, RoomCtx, Win } from './context';
-import { cm, localRect, overlaps, pointPolyDist } from './geom';
+import { cm, localRect, overlaps, pointPolyDist, segmentHitsConvex } from './geom';
 import { isDiningTable, isKitchenModule, type RItem } from './items';
 
 /** B1 (S), B2 (M), B3 (L) between the doors (the ways of stage 0); returns the walk lengths for the metrics. */
@@ -150,14 +150,17 @@ function windowReachable(ctx: RoomCtx, w: Win): boolean {
     const base = { x: w.wall.a.x + w.wall.dir.x * t, y: w.wall.a.y + w.wall.dir.y * t };
     const at = (d: number) => ({ x: base.x + w.wall.inward.x * d, y: base.y + w.wall.inward.y * d });
     if (ctx.grid.touches(ctx.reach, at(0.3), 0.5)) return true;
-    const under = ctx.items.filter((i) => i.obstacle && pointPolyDist(at(0.3), i.poly) < 0.05);
+    // the pieces between the window and the room, also with a narrow pocket behind them (a reading chair
+    // in a bay stands up to 40 cm off the glass; benchmark 7.11.: E living room, bay of three windows)
+    const under = ctx.items.filter((i) => i.obstacle && (pointPolyDist(at(0.3), i.poly) < 0.05 || segmentHitsConvex(at(0.05), at(0.6), i.poly)));
     if (!under.length) return false;
-    const depth = Math.max(...under.map((i) => i.depth));
+    // how far into the room the pieces reach, measured from the window
+    const far = Math.max(...under.flatMap((i) => i.poly.map((v) => (v.x - base.x) * w.wall.inward.x + (v.y - base.y) * w.wall.inward.y)));
     // a chair is moved, then one stands where it was
-    if (under.every((i) => MOVABLE.has(i.role))) return ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
+    if (under.every((i) => MOVABLE.has(i.role))) return ctx.grid.touches(ctx.reach, at(far + 0.3), 0.5);
     if (under.some((i) => i.height > w.sill + 0.05)) return false;
     // over a bathtub (58 cm high) one leans further than over a worktop
     const lean = under.every((i) => i.height <= 0.65) ? 0.8 : 0.7;
-    return depth <= lean && ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
+    return far <= lean + 0.05 && ctx.grid.touches(ctx.reach, at(far + 0.3), 0.5);
   });
 }
