@@ -92,4 +92,10 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(intentProblems(program([item('desk', 'generic-desk', 2, 0.35, 'S')]), room, [], [], 'office').some((x) => /„desk“ schaut nach deinen Startplätzen direkt auf das Fenster F1.*\(C5\)/.test(x))).toBe(true);
     expect(intentProblems(program([c1, c2, item('desk', 'generic-desk', 0.35, 1.9, 'O')]), room, [], [], 'office').filter((x) => /\((C5|D7)\)/.test(x))).toEqual([]);
   });
+  it('a television opposite the window is named, one on the side wall not (C3)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
+    const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];
+    expect(intentProblems(program(tvAt(2, 3.79, 'N')), room, [], [], 'living').filter((x) => /\(C3\)/.test(x))).toEqual([expect.stringMatching(/„tv“ steht nach deinen Startplätzen dem Fenster F1 gegenüber.*quer zum Fenster/)]);
+    expect(intentProblems(program(tvAt(0.21, 2, 'O')), room, [], [], 'living').filter((x) => /\(C3\)/.test(x))).toEqual([]);
+  });
 });
