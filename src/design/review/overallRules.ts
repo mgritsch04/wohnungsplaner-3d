@@ -166,8 +166,12 @@ export function checkZones(ctx: RoomCtx): void {
     if (out > 1.0) ctx.add('E2', 'L', `${ctx.label(i)} steht ${out.toFixed(1)} m außerhalb von „${z.function}“.`, [i], i);
   }
   const area = (r: { x0: number; y0: number; x1: number; y1: number }) => Math.max(0, r.x1 - r.x0) * Math.max(0, r.y1 - r.y0);
+  // a zone with nothing on its floor (access, standing room in front of shelves, at most a ceiling light)
+  // cannot clash with another; benchmark 7.11.: both overlap findings were such access zones in a storeroom
+  const used = new Set(ctx.placed.filter((i) => i.floor).map((i) => i.zone));
   for (let a = 0; a < prog.zones.length; a++)
     for (let b = a + 1; b < prog.zones.length; b++) {
+      if (!used.has(prog.zones[a].id) || !used.has(prog.zones[b].id)) continue;
       const p = prog.zones[a].rect;
       const q = prog.zones[b].rect;
       const w = Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0);
