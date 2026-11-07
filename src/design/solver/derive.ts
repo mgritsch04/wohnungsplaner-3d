@@ -131,6 +131,10 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   const art = s.shape === 'picture' || s.shape === 'picture-set';
   const fallback = art ? clamp(ART_MIDDLE - s.height / 2, parentTop + 0.15, parentTop + 0.3) : Math.max(s.elevation, parentTop + gap);
   let want = Math.max(height ?? fallback, parentTop + 0.02);
+  const box = boxOnWall(w, t, s.width, s.depth, 0.002);
+  // the parent stands free in the room, the picture on a wall of its own: Claude's height meant
+  // „over the sofa“, on the bare wall it hangs at eye height (image review r9: lower edge at 102 cm)
+  if (art && distToBox(box.x, box.y, P) > 0.5) want = ART_MIDDLE - s.height / 2;
   // a mirror over a chest: the lamp or vase standing on it must not hide it (image review r9: the
   // lamp covered half the round mirror). Its lower edge goes over them while its middle stays at
   // face height.
@@ -139,7 +143,7 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
     const clear = parentTop + tallest + 0.05;
     if (tallest > 0.1 && clear > want && clear + s.height / 2 <= MIRROR_MIDDLE_MAX) want = clear;
   }
-  return { box: boxOnWall(w, t, s.width, s.depth, 0.002), elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
+  return { box, elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
 }
 
 /** Room for a hanging lamp at `b`: inside the room, clear of tall furniture, its doors and door leaves. */

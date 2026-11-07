@@ -113,6 +113,20 @@ describe('pictures hang at eye height over their piece (R7)', () => {
     expect(art.elevation + art.height / 2).toBeGreaterThan(1.35);
   });
 
+  it('over a sofa standing free in the room: the picture on the wall hangs at eye height, not at „over the sofa“', () => {
+    const room = rectRoom(5, 4.5, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.5, 2.3, S]), item('art', 'generic-picture-wide')], [
+      { kind: 'center', item: 'sofa' },
+      { kind: 'above', item: 'art', target: 'sofa', height: 1.0 },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const art = byId(layout, 'art');
+    const sofa = byId(layout, 'sofa');
+    const apart = Math.hypot(art.x - sofa.x, art.y - sofa.y) - sofa.depth / 2;
+    expect(apart, 'the sofa stands free').toBeGreaterThan(0.6);
+    expect(art.elevation + art.height / 2).toBeCloseTo(1.5, 2);
+  });
+
   it('a picture on its own wall: middle at 1.5 m, not at 1.75 m like the catalogue height (image review r7)', () => {
     const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
     const p = program(room, [item('art', 'generic-picture-large')], [{ kind: 'wall', item: 'art', wall: 'W2' }]);
@@ -167,7 +181,7 @@ describe('lamps where they light (image review r7/r9)', () => {
   });
 
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
-    const p = program(room, [item('sofa', 'generic-sofa', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
       { kind: 'above', item: 'pendant', target: 'coffee', height: 1.6 },
     ]);
