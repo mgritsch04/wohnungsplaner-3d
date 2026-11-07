@@ -131,6 +131,12 @@ function ownWallElevation(s: Spec): number {
   return art ? Math.min(s.elevation, ART_MIDDLE - s.height / 2) : s.elevation;
 }
 
+/** A television stands on the piece or hangs over it: a picture there keeps its own height. */
+function screenOn(m: Model, parent: string): boolean {
+  for (const o of m.nodes.values()) if (o.parent === parent && o.spec.role === 'tv') return true;
+  return false;
+}
+
 /** Least room (m) between the desktop and a shelf or cabinet hung over it: screen and desk lamp stand under it. */
 const DESK_SHELF_CLEAR = 0.5;
 
@@ -152,6 +158,9 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   // the parent stands free in the room, the picture on a wall of its own: Claude's height meant
   // „over the sofa“, on the bare wall it hangs at eye height (image review r9: lower edge at 102 cm)
   if (art && distToBox(box.x, box.y, P) > 0.5) want = ART_MIDDLE - s.height / 2;
+  // over the piece it belongs to it: 15–30 cm above, whatever height Claude named (image review
+  // r14: 65 cm over the lowboard, „wirkt losgelöst“), unless a screen stands or hangs there
+  else if (art && height !== undefined && !screenOn(m, n.parent!)) want = clamp(want, parentTop + 0.15, parentTop + 0.3);
   // a shelf over the desk leaves room for the screen and the desk lamp under it (image review r13:
   // 41 cm over the desktop, the monitor stood against the shelf)
   if (!art && s.role !== 'tv' && s.role !== 'mirror' && parentNode?.spec.category === 'desk') want = Math.max(want, parentTop + DESK_SHELF_CLEAR);
