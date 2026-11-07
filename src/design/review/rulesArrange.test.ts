@@ -180,6 +180,22 @@ describe('C4 Esstisch', () => {
   });
 });
 
+describe('C10 / HO4 Hintergrund der Videokonferenz', () => {
+  const desk = [put('generic-desk', { x: 2, y: 2.65, face: 'N' }), put('generic-office-chair', { x: 2, y: 1.9, face: 'S' })];
+  const room = (windows: { wall: 'N' | 'S' | 'O' | 'W'; at: number }[]) => rectRoom(4, 3.5, { doors: [{ wall: 'W', at: 2.9 }], windows });
+  it('a window behind the chair is reported, a window at the side or a quiet wall is not', () => {
+    expect(has(review({ room: room([{ wall: 'N', at: 2 }]), type: 'office', items: desk }), 'C10', /Fenster/)).toBe(true);
+    expect(has(review({ room: room([{ wall: 'O', at: 1.9 }]), type: 'office', items: desk }), 'C10')).toBe(false);
+    expect(has(review({ room: room([]), type: 'office', items: desk }), 'C10')).toBe(false);
+  });
+  it('a bed behind the chair is reported, a tall shelf closes the picture', () => {
+    const tall = rectRoom(4, 5.5, { doors: [{ wall: 'W', at: 4.5 }] });
+    const items = [put('generic-desk', { x: 2, y: 4.65, face: 'N' }), put('generic-office-chair', { x: 2, y: 3.9, face: 'S' }), put('generic-bed-140', { x: 2, y: 1.0, face: 'S' })];
+    expect(review({ room: tall, type: 'bedroom', items }).findings.find((f) => f.rule === 'C10')?.severity).toBe('L');
+    expect(has(review({ room: tall, type: 'bedroom', items: [...items, put('generic-wardrobe-200', { x: 2, y: 2.6, face: 'S' })] }), 'C10')).toBe(false);
+  });
+});
+
 describe('C5 Schreibtisch', () => {
   const office = (wall: 'N' | 'S' | 'O') =>
     review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'W', at: 1.75 }], windows: [{ wall, at: wall === 'O' ? 1.9 : 2 }] }), type: 'office', items: [put('generic-desk', { x: 2, y: 2.65, face: 'N' }), put('generic-office-chair', { x: 2, y: 1.9, face: 'S' })] });

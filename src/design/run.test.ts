@@ -207,7 +207,9 @@ describe('runFurnishing', { timeout: 150_000 }, () => {
     const second = (_p: string, o: SampleOptions) => {
       const room = (o.label ?? '').slice('Entwurf 2: '.length);
       const prog = structuredClone(answers.programs[room]) as { items: unknown[] };
-      prog.items = prog.items.slice(0, -1);
+      // leave out a piece that does not carry the room (a plant if there is one), so the second design stays comparable
+      const spare = prog.items.findIndex((i) => /pflanze/i.test(JSON.stringify(i)));
+      prog.items = prog.items.filter((_, k) => k !== (spare >= 0 ? spare : prog.items.length - 1));
       return prog;
     };
     const judge = (answer: '1' | '2' | 'gleich') => ({ besser: answer, abstand: 'deutlich', warum: '-' });
