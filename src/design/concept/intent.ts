@@ -14,7 +14,7 @@
 import { findCatalogItem, GENERIC_CATALOG } from '../../catalog/generic';
 import type { CatalogItem } from '../../catalog/types';
 import type { Furniture } from '../../model/schema';
-import { dist, sub, type Vec2 } from '../../model/vec';
+import { dist, pointInPolygon, sub, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
@@ -22,6 +22,7 @@ import { RoomCtx } from '../review/context';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
+import { specOf, type Clearance } from '../solver/items';
 import { tvRange } from '../tvDistance';
 import type { PlacedItem, ProgramItem, RoomAnalysis, RoomProgram } from '../types';
 
@@ -165,6 +166,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
   problems.push(...rugUnderBed(pieces, products));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
+  if (room && 'walkways' in room) problems.push(...areaBudget(program, room as RoomAnalysis, existing, products));
   return problems;
 }
 
@@ -282,4 +284,93 @@ function blockedWays(program: RoomProgram, room: RoomAnalysis, existing: readonl
     );
   }
   return out;
+}
+
+/** Floor a piece takes with its movement areas (the solver's minimum strips, solver/items.ts), m². */
+function footprintWithMoves(width: number, depth: number, clear: readonly Clearance[]): { stand: number; move: number } {
+  let move = 0;
+  let either = false;
+  for (const c of clear) {
+    if (c.either) {
+      if (either) continue;
+      either = true;
+    }
+    const part = (c.to ?? 1) - (c.from ?? 0);
+    move += (c.side === 'front' || c.side === 'back' ? width : depth) * part * c.min;
+  }
+  return { stand: width * depth, move };
+}
+
+/** Area (m²) of the ways between the doors, each as wide as it must stay, overlaps counted once. */
+function wayArea(room: RoomAnalysis): number {
+  const segs = room.walkways.flatMap((w) => w.path.slice(1).map((b, i) => ({ a: w.path[i], b, r: w.width / 2 })));
+  if (!segs.length) return 0;
+  const cell = 0.1;
+  // only the cells around each way, on a fixed lattice, each counted once
+  const seen = new Set<number>();
+  let n = 0;
+  for (const sg of segs) {
+    const i0 = Math.floor((Math.min(sg.a.x, sg.b.x) - sg.r) / cell);
+    const i1 = Math.ceil((Math.max(sg.a.x, sg.b.x) + sg.r) / cell);
+    const j0 = Math.floor((Math.min(sg.a.y, sg.b.y) - sg.r) / cell);
+    const j1 = Math.ceil((Math.max(sg.a.y, sg.b.y) + sg.r) / cell);
+    for (let i = i0; i <= i1; i++)
+      for (let j = j0; j <= j1; j++) {
+        const key = i * 100003 + j;
+        if (seen.has(key)) continue;
+        const p = { x: (i + 0.5) * cell, y: (j + 0.5) * cell };
+        if (segmentDist(p, sg.a, sg.b) > sg.r) continue;
+        seen.add(key);
+        if (pointInPolygon(p, room.polygon)) n++;
+      }
+  }
+  return n * cell * cell;
+}
+
+function segmentDist(p: Vec2, a: Vec2, b: Vec2): number {
+  const d = sub(b, a);
+  const l = d.x * d.x + d.y * d.y;
+  const t = l ? Math.max(0, Math.min(1, ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l)) : 0;
+  return Math.hypot(p.x - a.x - t * d.x, p.y - a.y - t * d.y);
+}
+
+/**
+ * Above this share of the room the programme does not fit: a real run of B Wohnküche needed 104 % and lost
+ * six pieces, its passing version 96 %; F Schrankraum (108 %) got a smaller wardrobe. C Küche (104 %) and
+ * E Abstellraum (105 %) of the benchmark still fitted, so up to 110 % the message says it gets tight.
+ */
+const BUDGET = 1.0;
+const TIGHT = 1.1;
+const SLACK = 0.3;
+
+/**
+ * Area budget before the solver (FlairGPT: area per zone first; suggestion of the improvement thread
+ * 7.11.): floor and movement area of every piece plus the ways between the doors against the room.
+ * Over it, the solver would have to leave pieces out or take smaller ones without asking; Claude is
+ * told with the numbers and the optional pieces that take the most floor.
+ */
+function areaBudget(program: RoomProgram, room: RoomAnalysis, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  if (room.area <= 0) return [];
+  const extra = [...products];
+  const own = program.items.flatMap((it) => {
+    const sp = specOf(it.catalogId, extra);
+    if (!sp || sp.base !== 'floor') return [];
+    const f = footprintWithMoves(sp.width, sp.depth, sp.clear);
+    return [{ id: it.id, required: !!it.required, need: f.stand + f.move }];
+  });
+  const kitchen = (program.kitchen ?? []).reduce((s, k) => s + dist(k.from, k.to) * (0.6 + 1.0), 0);
+  const fixed = existing.reduce((s, f) => {
+    const sp = f.catalogId ? specOf(f.catalogId, extra) : undefined;
+    const m = footprintWithMoves(f.width, f.depth, sp?.clear ?? []);
+    return s + ((f.elevation ?? 0) < 0.05 ? m.stand + m.move : 0);
+  }, 0);
+  const pieces = own.reduce((s, o) => s + o.need, 0);
+  const total = pieces + kitchen + fixed + wayArea(room);
+  // and by more than a few tiles: a store room of 2.2 m² with shelves on three walls fills exactly, as planned
+  if (total <= room.area * BUDGET + SLACK) return [];
+  const optional = own.filter((o) => !o.required).sort((a, b) => b.need - a.need).slice(0, 3);
+  const m2 = (v: number) => v.toFixed(1).replace('.', ',');
+  return [
+    `Dein Programm braucht mit Stell- und Bewegungsflächen und den Wegen zwischen den Türen etwa ${m2(total)} m², der Raum hat ${m2(room.area)} m² (R5). ${total / room.area <= TIGHT ? 'Das wird knapp, sonst lässt der Löser Teile weg oder nimmt sie kleiner.' : 'So muss der Löser Teile weglassen oder kleiner nehmen.'} Streiche oder verkleinere zuerst Optionales${optional.length ? ` (am meisten Boden brauchen ${optional.map((o) => `„${o.id}“ ${m2(o.need)} m²`).join(', ')})` : ''}; Pflichtmöbel bleiben.`,
+  ];
 }

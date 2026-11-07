@@ -61,6 +61,15 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(across.some((x) => /„bed“ im Weg zwischen den Türen T1 und T2.*\(B2\)/.test(x))).toBe(true);
     expect(intentProblems(program([item('bed', 'generic-bed-160', 2, 1.05, 'N')]), room).some((x) => /\(B2\)/.test(x))).toBe(false);
   });
+  it('a programme that needs more floor than the room has is named with the numbers (R5)', () => {
+    const room = rectRoom(2.2, 2.2, { doors: [{ wall: 'S', at: 1.1 }] });
+    const three = program([item('w1', 'generic-wardrobe-150', 1.1, 0.3, 'S'), item('w2', 'generic-wardrobe-150', 0.3, 1.1, 'O'), item('w3', 'generic-wardrobe-150', 1.9, 1.1, 'W')]);
+    const p = intentProblems(three, room).filter((x) => /\(R5\)/.test(x));
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatch(/etwa 5,8 m², der Raum hat 4,8 m².*„w1“ 1,9 m²/);
+    const one = program([item('w1', 'generic-wardrobe-150', 1.1, 0.3, 'S')]);
+    expect(intentProblems(one, room).some((x) => /\(R5\)/.test(x))).toBe(false);
+  });
   it('a living room whose plan leaves a wide patch of floor empty is named with what a designer adds (E6)', () => {
     const room = rectRoom(7, 6, { doors: [{ wall: 'S', at: 6.5 }], windows: [{ wall: 'N', at: 3.5 }] });
     const corner = program([item('sofa', 'generic-sofa-3', 1.2, 0.5, 'S'), item('table', 'generic-coffee-table', 1.2, 1.4, 'S')]);
