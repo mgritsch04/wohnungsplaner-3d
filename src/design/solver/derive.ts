@@ -86,9 +86,14 @@ export function inSwing(m: Model, b: Box): boolean {
 
 /** The first rug option inside the room and out of every door swing, else the first inside, else the one that sticks out least. */
 function pickRug(m: Model, options: Box[]): Box {
-  const inside = options.filter((b) => insideScore(m, b) === 0);
-  if (inside.length) return inside.find((b) => !inSwing(m, b)) ?? inside[0];
-  return options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+  // lazily, as before: the search derives rugs on every move
+  let firstInside: Box | null = null;
+  for (const b of options) {
+    if (insideScore(m, b) !== 0) continue;
+    if (!m.ctx.swings.length || !inSwing(m, b)) return b;
+    firstInside ??= b;
+  }
+  return firstInside ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
 }
 
 /**
