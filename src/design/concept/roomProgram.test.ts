@@ -40,14 +40,16 @@ describe('room programme prompt', () => {
     expect(p).not.toContain('"userZone"');
   });
 
-  it('offers checked places for the anchor pieces (#436)', () => {
+  it('offers checked places for the anchor pieces and the recipes of the cases that apply (#436)', () => {
     const p = buildRoomProgramPrompt(input('B', 'Wohnküche'));
     expect(p).toContain('Geprüfte Plätze für die Ankermöbel');
     expect(p).toMatch(/- SOFA-1: Rücken an W\d/);
     expect(p).toContain('"slot":"SOFA-1"');
-    // nothing to place: the section stays out
+    expect(p).toContain('Durchgangszimmer mit 3 Türen');
+    // nothing to place, nothing that applies: the sections stay out
     const bath = buildRoomProgramPrompt(input('B', 'Bad'));
     expect(bath).not.toContain('Geprüfte Plätze');
+    expect(bath).not.toContain('Muster für diesen Raum');
     expect(bath).not.toContain('"slot"');
   });
 

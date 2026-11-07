@@ -30,10 +30,12 @@ export class WalkGrid {
     const b = bounds(poly);
     const area = (b.x1 - b.x0) * (b.y1 - b.y0);
     this.cell = area > 45 ? 0.1 : 0.05;
-    this.x0 = b.x0;
-    this.y0 = b.y0;
-    this.nx = Math.ceil((b.x1 - b.x0) / this.cell) + 1;
-    this.ny = Math.ceil((b.y1 - b.y0) / this.cell) + 1;
+    // the cells lie on a fixed lattice of the plan (multiples of the cell size), not on the corner of this
+    // room: mirrored or turned, the same room then gets the same cells and the same points (Q5)
+    this.x0 = Math.floor(b.x0 / this.cell + 1e-9) * this.cell;
+    this.y0 = Math.floor(b.y0 / this.cell + 1e-9) * this.cell;
+    this.nx = Math.ceil((b.x1 - this.x0) / this.cell - 1e-9) + 1;
+    this.ny = Math.ceil((b.y1 - this.y0) / this.cell - 1e-9) + 1;
     const n = this.nx * this.ny;
     this.inside = new Uint8Array(n);
     this.obstacleDist = new Float32Array(n).fill(9);

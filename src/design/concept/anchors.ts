@@ -1,6 +1,8 @@
 /**
  * What the room programme prompt gets from the code besides the sketch (mgritsch04/wohnungsplaner-3d#436):
- * the checked places for the anchor pieces (sofa, bed, desk, dining table; `analysis/slots.ts`).
+ * the checked places for the anchor pieces (sofa, bed, desk, dining table; `analysis/slots.ts`),
+ * and the pattern recipes of a designer for the hard room shapes, shown only when the case
+ * applies (long tube room, passage room with three doors, large square, L-shaped room).
  */
 import type { Furniture, Project } from '../../model/schema';
 import { gazePieceOf } from '../analysis/gaze';
@@ -62,3 +64,27 @@ ${slots.anchors.map((a) => slotLines(a.size, a.slots)).join('\n')}
 
 /** Slot of a given id in this room, or undefined. */
 export const slotById = (slots: RoomSlots, id: string): Slot | undefined => slots.anchors.flatMap((a) => a.slots).find((s) => s.id.toLowerCase() === id.trim().toLowerCase());
+
+const cm = (m: number) => Math.round(m * 100);
+
+/** Pattern recipes for the cases that apply to this room; each is one to three sentences. */
+export function patternRecipes(room: RoomAnalysis, type: RoomType): string[] {
+  const out: string[] = [];
+  // the recipes are about furniture groups: not for a hall, a bath, a balcony or a storeroom
+  if (!['living', 'bedroom', 'kids', 'office', 'dining'].includes(type)) return out;
+  const ratio = Math.max(room.size.x, room.size.y) / Math.max(0.01, Math.min(room.size.x, room.size.y));
+  const rect = room.walls.length === 4 && room.corners.every((c) => !c.reflex);
+  const openings = room.walls.flatMap((w) => w.openings);
+  const doors = openings.filter((o) => o.passable && o.kind !== 'window');
+  if (ratio > 2) out.push(`Schlauchraum (${cm(room.size.x)} × ${cm(room.size.y)} cm, Seitenverhältnis ${ratio.toFixed(1).replace('.', ',')} : 1): Teile den Raum in zwei Zonen hintereinander. Halte an einer Längswand einen durchgehenden Gehstreifen von mindestens 80 cm frei; stelle nie an beide Längswände tiefe Möbel. Sofa quer als Teiler oder an die Längswand, je Zone ein Teppich.`);
+  if (doors.length >= 3) out.push(`Durchgangszimmer mit ${doors.length} Türen: Plane zuerst die Wege zwischen allen Türen (90 cm). Möbel nur in die Restflächen; das Sofa an das längste Wandstück ohne Tür, den Rücken zum Weg. Wird der Weg zum Slalom, lieber weniger oder kleinere Möbel.`);
+  if (rect && ratio <= 1.25 && room.area > 20) out.push('Großes, fast quadratisches Zimmer: Stelle die Sitzgruppe frei mit Gang ringsum; nutze eine freie Ecke von mindestens 80 × 80 cm als Leseecke (Sessel, Stehlampe, Beistelltisch) und lege je Zone einen Teppich.');
+  if (room.walls.length >= 6 && room.corners.some((c) => c.reflex)) out.push('L-förmiger Raum oder Erker: Teile den Umriss in zwei Rechtecke. Sitzen in den größeren Schenkel, Essen oder Arbeiten in den kleineren (ein Schenkel unter 200 cm Breite nimmt nur einen Tisch oder Schreibtisch auf, unter 250 cm einen Rundtisch); der Knick bleibt 90 cm frei, ein Erker unter 200 cm Tiefe bekommt einen Sitzplatz oder Tisch und wird nicht zugestellt.');
+  return out;
+}
+
+/** Recipes as a prompt section, empty when none applies. */
+export function recipeSection(room: RoomAnalysis, type: RoomType): string {
+  const r = patternRecipes(room, type);
+  return r.length ? `Muster für diesen Raum (nur was zutrifft, aus der Erfahrung von Innenarchitekten):\n${r.map((x) => `- ${x}`).join('\n')}\n` : '';
+}

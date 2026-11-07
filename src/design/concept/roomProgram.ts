@@ -19,13 +19,14 @@ import { type Checked, hex, isKitchenModule, key, num, SANITARY, shapeOf, str, s
 import { existingIn, paletteText, roomConceptOf, wantsHandBasin } from './flatConcept';
 import { diningTable, functionNeeds, isCooking, isDining, isGuestBed, isSleeping, looksLikeGuestBed, type Need, NEEDS } from './needs';
 import { rulebookPrompt } from '../rulebook';
+import { completeLight } from './light';
 import { completeDecor } from './decor';
 import { fitToScheme, schemeOf, schemeText } from './scheme';
 import { completeGroups, groupLines } from './groups';
 import { extraAreas, roomFacts } from './roomFacts';
 import { intentProblems } from './intent';
 import { parseRelations, type RelationItem } from './relations';
-import { type RoomSlots, roomSlots, slotById, slotSection } from './anchors';
+import { recipeSection, type RoomSlots, roomSlots, slotById, slotSection } from './anchors';
 
 export interface RoomProgramInput {
   project: Project;
@@ -153,7 +154,7 @@ ${sketch}
 ${input.image ? 'Das Bild zeigt denselben Raum leer von oben, mit Wänden, Türen, Fenstern, den Wegen zwischen den Türen und den Raumkoordinaten in cm; was bleibt, ist eingezeichnet. Lies Maße aus der Skizze, das Bild ist für den Überblick.\n' : ''}
 Raumfakten:
 ${roomFacts(room, project, concept)}
-${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}${slotSection(slots, kitchen) ? `\n${slotSection(slots, kitchen)}` : ''}
+${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}${slotSection(slots, kitchen) ? `\n${slotSection(slots, kitchen)}` : ''}${recipeSection(room, rc.type) ? `\n${recipeSection(room, rc.type)}` : ''}
 ${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke mit Lichtleisten, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
 Küchenmodule (nur in "kitchen"):
 ${summarizePlaceholders(KITCHEN_MODULES)}
@@ -465,9 +466,12 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const windows = room.walls.flatMap((w) => w.openings.filter((o) => o.kind === 'window').map((o) => ({ id: o.id, x: w.a.x + (w.dir.x * (o.t0 + o.t1)) / 2, y: w.a.y + (w.dir.y * (o.t0 + o.t1)) / 2, rotation: Math.atan2(-w.inward.x, w.inward.y) })));
   const groups = completeGroups(parsed, f.rc.type, room.area, f.rc.functions.length, input.products, windows);
   notes.push(...groups.notes);
+  // a third light layer: mood light in the other half of a larger living room (L1, L8)
+  const light = completeLight(groups.program, f.rc.type, room.area, input.products);
+  notes.push(...light.notes);
   // wall decoration and a plant, as a designer finishes the room (R7, R9, S6, S7)
   const scheme = schemeOf(f.rc, input.concept.style);
-  const decor = completeDecor(groups.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
+  const decor = completeDecor(light.program, f.rc.type, room.area, input.products, scheme.accent, { textile: scheme.textile, windows, level: input.wishes.tier === 'guenstig' ? 'basic' : 'full' });
   notes.push(...decor.notes);
   return { value: withoutKitchenCurtains(decor.program, room, notes), problems, notes };
 }
