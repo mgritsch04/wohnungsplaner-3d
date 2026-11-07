@@ -12,7 +12,7 @@ import type { CatalogItem } from '../../catalog/types';
 import type { Project } from '../../model/schema';
 import type { DroppedItem, Layout, PlacedItem, RoomAnalysis, RoomProgram } from '../types';
 import { gridCost, HARD, pairCost, resetRelations, unitCost, type Violation } from './cost';
-import { refreshUnit, resizeNode } from './derive';
+import { inSwing, refreshUnit, resizeNode } from './derive';
 import { wrapAngle } from './geom';
 import { smallerOptions } from './items';
 import { kitchenTops } from './kitchenTops';
@@ -138,6 +138,7 @@ function growRugs(st: State): void {
     if (past() >= reach.min - 1e-9) continue;
     const original = n.catalogId;
     const before = st.hard();
+    const swungBefore = inSwing(m, n.box);
     let kept = false;
     for (const id of GROW_RUGS.slice(GROW_RUGS.indexOf(original) + 1)) {
       if (!resizeNode(m, n, id)) continue;
@@ -146,7 +147,8 @@ function growRugs(st: State): void {
       st.rebuild();
       const reachNow = past();
       if (reachNow > reach.max + 1e-9) break;
-      if (st.hard() <= before + 1e-9 && reachNow >= reach.min - 1e-9) {
+      // a door must not catch on the bigger rug where it did not on the planned one (D5)
+      if (st.hard() <= before + 1e-9 && reachNow >= reach.min - 1e-9 && (swungBefore || !inSwing(m, n.box))) {
         kept = true;
         break;
       }

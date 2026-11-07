@@ -12,6 +12,7 @@ import { RECORDED } from '../fixtures/recorded';
 import { rectRoom } from '../review/testkit';
 import type { Layout, PlacedItem, ProgramItem, Relation, RoomAnalysis, RoomProgram } from '../types';
 import { programFromRecorded } from './recordedProgram';
+import { overlapDepth } from './geom';
 import { existingPieces, solveRoom } from './solve';
 
 const front = (i: PlacedItem): Vec2 => ({ x: -Math.sin(i.rotation), y: Math.cos(i.rotation) });
@@ -511,6 +512,17 @@ describe('a rug that reaches past its piece (D5)', () => {
     const rug = byId(layout, 'rug');
     expect(rug.catalogId).toBe('generic-rug-200');
     expect(rug.replaces).toBeUndefined();
+  });
+
+  it('the rug under the bed keeps out of the door swing where another of its places does (D5: the door catches on it; flat B)', () => {
+    const { room, layout } = recorded('B', 'Schlafzimmer');
+    const rug = layout.items.find((i) => i.catalogId.includes('rug'))!;
+    const c = Math.cos(rug.rotation);
+    const s = Math.sin(rug.rotation);
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => ({ x: rug.x + (a * rug.width * c) / 2 - (b * rug.depth * s) / 2, y: rug.y + (a * rug.width * s) / 2 + (b * rug.depth * c) / 2 }));
+    const swings = room.walls.flatMap((w) => w.openings).flatMap((o) => (o.swing ? [o.swing] : []));
+    expect(swings.length).toBeGreaterThan(0);
+    for (const sw of swings) expect(overlapDepth(corners, sw)).toBeLessThan(2e-3);
   });
 
   it('in a room too narrow for the bigger rug the planned one stays', () => {

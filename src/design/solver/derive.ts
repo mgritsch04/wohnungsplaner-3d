@@ -78,6 +78,19 @@ function insideScore(m: Model, b: Box): number {
   return outsideAmount(boxCorners(b), m.ctx.poly, WALL_TOL);
 }
 
+/** Whether a rug reaches into the swing of a door: the door catches on it (D5). */
+export function inSwing(m: Model, b: Box): boolean {
+  const poly = boxCorners(b);
+  return m.ctx.swings.some((s) => overlapDepth(poly, s.poly) > 1e-3);
+}
+
+/** The first rug option inside the room and out of every door swing, else the first inside, else the one that sticks out least. */
+function pickRug(m: Model, options: Box[]): Box {
+  const inside = options.filter((b) => insideScore(m, b) === 0);
+  if (inside.length) return inside.find((b) => !inSwing(m, b)) ?? inside[0];
+  return options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+}
+
 /**
  * Where a wall piece hangs above its parent: on the wall behind it (a free-standing parent: the
  * nearest wall to its place), never lower than the parent's top (Claude's height can be too low).
@@ -300,8 +313,8 @@ function deriveNode(m: Model, n: Node): void {
         const v0 = P.hd + r.gap + Math.min(s.width, s.depth) / 2 + (n.parent?.startsWith('kitchen') ? 0.08 : 0);
         const options: Box[] = [];
         for (let back = 0; back <= v0 + 0.01; back += 0.05) options.push(rugBox(at(0, v0 - back), P.rotation, s.width, s.depth, true));
-        // the first that lies inside the room, else the one that sticks out least
-      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+        // the first that lies inside the room and out of the door swings, else as close as it gets
+      n.box = pickRug(m, options);
       } else {
         const c = at(0, P.hd + r.gap + s.depth / 2);
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
@@ -331,8 +344,8 @@ function deriveNode(m: Model, n: Node): void {
           if (all && !bed) break;
         }
       }
-      // the first that lies inside the room, else the one that sticks out least
-      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+      // the first that lies inside the room and out of the door swings (D5), else as close as it gets
+      n.box = pickRug(m, options);
       return;
     }
     case 'around': {
