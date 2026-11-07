@@ -1,7 +1,7 @@
 /** D Deko, Licht, Textil (#441): plants, lamps, rugs, pictures, curtains. */
 import { findCatalogItem } from '../../catalog/generic';
 import { HANGING_DECOR_SHAPES } from '../../suggest/roomGeometry';
-import { dist, dot, sub, type Vec2 } from '../../model/vec';
+import { dist, dot, pointInPolygon, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
 import { isDiningTable, isLamp, isPlant, type RItem } from './items';
@@ -79,14 +79,25 @@ export function checkRugs(ctx: RoomCtx): void {
       if (Math.min(left, right) < 0.4 - 0.01) ctx.add('D5', 'L', `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, Math.min(left, right)))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
     }
     if (ctx.type === 'hall' && r.width < 1.0 && r.depth >= 1.5) {
-      const reach = (dir: Vec2) => {
+      // the middle of the free walking strip: a shoe cabinet or shelf along one wall narrows the hall
+      // (benchmark 7.11.: Claude laid the runner in the middle beside the shelves, the old wall-to-wall
+      // measure called it off-centre)
+      const sides = ctx.items.filter((o) => o.obstacle && o !== r);
+      const free = (p: Vec2) => ctx.inRoom(p) && !sides.some((o) => pointInPolygon(p, o.poly));
+      const reach = (from: Vec2, dir: Vec2) => {
         let t = 0;
-        while (t < 3 && ctx.inRoom({ x: r.x + dir.x * t, y: r.y + dir.y * t })) t += 0.02;
+        while (t < 3 && free({ x: from.x + dir.x * t, y: from.y + dir.y * t })) t += 0.02;
         return t;
       };
-      const left = reach({ x: -r.right.x, y: -r.right.y });
-      const right = reach(r.right);
-      if (Math.abs(left - right) > 0.2) ctx.add('D5', 'L', `${ctx.label(r)} liegt nicht in der Mitte des Gangs.`, [r], r);
+      // along the whole runner: in an L-shaped hall its middle may lie in the corner, its ends in the leg;
+      // only where the hall is a corridor (at most 2.2 m free across), a wide entrance has no middle line
+      const offs = [-0.4, -0.2, 0, 0.2, 0.4].flatMap((k) => {
+        const at = { x: r.x + r.front.x * k * r.depth, y: r.y + r.front.y * k * r.depth };
+        const left = reach(at, { x: -r.right.x, y: -r.right.y });
+        const right = reach(at, r.right);
+        return left + right <= 2.2 ? [Math.abs(left - right)] : [];
+      });
+      if (offs.length && Math.min(...offs) > 0.2) ctx.add('D5', 'L', `${ctx.label(r)} liegt nicht in der Mitte des Gangs.`, [r], r);
     }
   }
 }

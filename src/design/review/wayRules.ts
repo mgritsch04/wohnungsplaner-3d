@@ -64,14 +64,19 @@ export function checkDoors(ctx: RoomCtx): void {
  */
 const fixed = (i: RItem, ...cs: Clear[]): boolean => i.existing && cs.every((c) => c.blocker === 'wall' || (c.blocker !== undefined && c.blocker.existing));
 
+/** A wardrobe for clothes with swing doors: not a broom or kitchen cupboard, not sliding doors (they need no swing). */
+const isClothesWardrobe = (i: RItem, label: string): boolean => i.shape === 'wardrobe' && /kleider|garderobe|ankleide|wardrobe/i.test(label) && !/schiebe|sliding/i.test(label);
+
 /** The kinds of pieces that need free floor in front or beside them, and how much. */
 function clearances(ctx: RoomCtx): void {
   const skipSeats = (x: RItem) => x.role === 'seat';
   for (const i of ctx.items) {
     if (!i.floor) continue;
     if (i.shape === 'wardrobe' || (i.category === 'storage' && i.height >= 1.2 && i.role !== 'box' && !isKitchenModule(i) && i.shape !== 'shelf' && i.tags.includes('schrank'))) {
-      const c = ctx.freeDepth(i, 'front', 0.7, { ignore: skipSeats });
+      const c = ctx.freeDepth(i, 'front', 0.9, { ignore: skipSeats });
       if (c.depth < 0.7 - 1e-6 && !fixed(i, c)) ctx.add('B6', 'M', `Vor ${ctx.label(i)} sind nur ${cm(c.depth)} cm frei, zum Öffnen und Ausräumen braucht man 70 cm.`, [i], i);
+      // 70 to 90 cm: the doors open, but cramped; planners count 90 cm in front of a wardrobe with swing doors (DIN 18011, ST1); sliding doors need no swing
+      else if (c.depth < 0.9 - 1e-6 && isClothesWardrobe(i, ctx.label(i)) && !fixed(i, c)) ctx.add('B6', 'L', `Vor ${ctx.label(i)} sind ${cm(c.depth)} cm frei, eng zum Öffnen der Drehtüren: Profis planen 90 cm (DIN 18011).`, [i], i);
     } else if (i.shape === 'bed') {
       const left = ctx.freeDepth(i, 'left', 0.5, { ignore: skipSeats, skip: 0.5 });
       const right = ctx.freeDepth(i, 'right', 0.5, { ignore: skipSeats, skip: 0.5 });

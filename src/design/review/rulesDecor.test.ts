@@ -88,6 +88,13 @@ describe('D5 Teppich', () => {
     const hall = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.7 }, { wall: 'N', at: 0.7 }] }), type: 'hall', items: [put('generic-runner', { x, y: 2 })] });
     expect(has(hall(0.7), 'D5', /Mitte/)).toBe(false);
     expect(has(hall(0.5), 'D5', /Mitte/)).toBe(true);
+    // the middle of the free strip counts: shelves along the east wall narrow the hall to 1.1 m
+    const shelves = [1.2, 2, 2.8].map((y) => put('generic-shelf-80', { x: 1.25, y, face: 'W' }));
+    const beside = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.5 }, { wall: 'N', at: 0.5 }] }), type: 'hall', items: [...shelves, put('generic-runner', { x, y: 2 })] });
+    expect(has(beside(0.55), 'D5', /Mitte/)).toBe(false);
+    expect(has(beside(0.7), 'D5', /Mitte/)).toBe(true);
+    // a wide entrance hall has no middle line
+    expect(has(review({ room: rectRoom(3, 3.5, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'hall', items: [put('generic-runner', { x: 0.6, y: 1.7 })] }), 'D5', /Mitte/)).toBe(false);
   });
 });
 
@@ -205,6 +212,8 @@ describe('E Gesamteindruck', () => {
     const zones = [{ id: 'sitzen', function: 'Sitzgruppe', rect: { x0: 0, y0: 2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2')).toBe(false);
     expect(has(living([put('generic-sofa-3', { x: 4.2, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(true);
+    // a curtain hangs at its window, not in a zone
+    expect(has(living([put('generic-curtain', { x: 4.2, y: 0.05, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
     const overlapping = [...zones, { id: 'lesen', function: 'Leseecke', rect: { x0: 0.2, y0: 2.2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([sofa], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
   });
