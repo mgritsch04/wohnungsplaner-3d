@@ -55,6 +55,15 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     // a runner beside the bed is not under it
     expect(check(program([bed, item('mat', 'generic-runner', 3.3, 1.1, 'S')]))).toEqual([]);
   });
+  it('a bed with one long side at the wall needs the rug only on the free side (S5)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }] });
+    const day = item('bed', 'generic-bed-90', 0.48, 2.9, 'N');
+    const s5 = (rug: ProgramItem) => check(program([day, rug]), [], room).filter((x) => /\(S5\)/.test(x));
+    // 160×230 lengthwise beside the wall: 65 cm on the free side, fine
+    expect(s5(item('rug', 'generic-rug-160', 0.8, 2.9, 'N'))).toEqual([]);
+    // 120×170 shows only 25 cm on the free side
+    expect(s5(item('rug', 'generic-rug-120', 0.6, 2.9, 'N'))).toEqual([expect.stringMatching(/freien Seite von „bed“ nur 2[45] cm/)]);
+  });
   it('a piece of the plan in the way between two doors is named (B2)', () => {
     const room = rectRoom(4, 3.2, { doors: [{ wall: 'W', at: 1.6 }, { wall: 'O', at: 1.6 }], passThrough: true });
     const across = intentProblems(program([item('bed', 'generic-bed-160', 2, 1.6, 'S')]), room);

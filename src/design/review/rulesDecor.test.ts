@@ -86,6 +86,11 @@ describe('D5 Teppich', () => {
     expect(has(bed(1.6), 'D5', /Bett/)).toBe(true);
     expect(has(bed(2.4), 'D5', /Bett/)).toBe(false);
   });
+  it('a bed rug beside a bed at the wall only shows on the free side', () => {
+    const day = (rug: string, x: number) => review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [put('generic-bed-90', { x: 0.48, y: 1.5, face: 'N' }), put(rug, { x, y: 1.5, face: 'N' })] });
+    expect(has(day('generic-rug-160', 0.8), 'D5', /Bett/)).toBe(false);
+    expect(has(day('generic-rug-120', 0.6), 'D5', /freien Seite/)).toBe(true);
+  });
   it('a rug in a door swing is light', () => {
     const r = review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [put('generic-rug-160', { x: 0.8, y: 3.0 })] });
     expect(has(r, 'D5', /Tür/)).toBe(true);
