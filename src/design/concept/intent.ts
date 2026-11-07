@@ -334,16 +334,20 @@ function segmentDist(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - a.x - t * d.x, p.y - a.y - t * d.y);
 }
 
-/** Above this share of the room the programme does not fit (F Schrankraum 108 %: a wardrobe came in smaller). */
-const BUDGET = 1.05;
+/**
+ * Above this share of the room the programme does not fit: a real run of B Wohnküche needed 104 % and lost
+ * six pieces, its passing version 96 %; F Schrankraum (108 %) got a smaller wardrobe. C Küche (104 %) and
+ * E Abstellraum (105 %) of the benchmark still fitted, so up to 110 % the message says it gets tight.
+ */
+const BUDGET = 1.0;
+const TIGHT = 1.1;
+const SLACK = 0.3;
 
 /**
  * Area budget before the solver (FlairGPT: area per zone first; suggestion of the improvement thread
  * 7.11.): floor and movement area of every piece plus the ways between the doors against the room.
  * Over it, the solver would have to leave pieces out or take smaller ones without asking; Claude is
- * told with the numbers and the optional pieces that take the most floor. In the benchmark (6.11.)
- * the recorded rooms reach up to 100 % and fit; F Schrankraum (108 %) lost a wardrobe size, a real run
- * of B Wohnküche lost six pieces.
+ * told with the numbers and the optional pieces that take the most floor.
  */
 function areaBudget(program: RoomProgram, room: RoomAnalysis, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   if (room.area <= 0) return [];
@@ -362,10 +366,11 @@ function areaBudget(program: RoomProgram, room: RoomAnalysis, existing: readonly
   }, 0);
   const pieces = own.reduce((s, o) => s + o.need, 0);
   const total = pieces + kitchen + fixed + wayArea(room);
-  if (total / room.area <= BUDGET) return [];
+  // and by more than a few tiles: a store room of 2.2 m² with shelves on three walls fills exactly, as planned
+  if (total <= room.area * BUDGET + SLACK) return [];
   const optional = own.filter((o) => !o.required).sort((a, b) => b.need - a.need).slice(0, 3);
   const m2 = (v: number) => v.toFixed(1).replace('.', ',');
   return [
-    `Dein Programm braucht mit Stell- und Bewegungsflächen und den Wegen zwischen den Türen etwa ${m2(total)} m², der Raum hat ${m2(room.area)} m² (R5). So muss der Löser Teile weglassen oder kleiner nehmen. Streiche oder verkleinere zuerst Optionales${optional.length ? ` (am meisten Boden brauchen ${optional.map((o) => `„${o.id}“ ${m2(o.need)} m²`).join(', ')})` : ''}; Pflichtmöbel bleiben.`,
+    `Dein Programm braucht mit Stell- und Bewegungsflächen und den Wegen zwischen den Türen etwa ${m2(total)} m², der Raum hat ${m2(room.area)} m² (R5). ${total / room.area <= TIGHT ? 'Das wird knapp, sonst lässt der Löser Teile weg oder nimmt sie kleiner.' : 'So muss der Löser Teile weglassen oder kleiner nehmen.'} Streiche oder verkleinere zuerst Optionales${optional.length ? ` (am meisten Boden brauchen ${optional.map((o) => `„${o.id}“ ${m2(o.need)} m²`).join(', ')})` : ''}; Pflichtmöbel bleiben.`,
   ];
 }
