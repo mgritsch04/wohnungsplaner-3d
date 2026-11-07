@@ -215,7 +215,12 @@ describe('E Gesamteindruck', () => {
     // a curtain hangs at its window, not in a zone
     expect(has(living([put('generic-curtain', { x: 4.2, y: 0.05, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
     const overlapping = [...zones, { id: 'lesen', function: 'Leseecke', rect: { x0: 0.2, y0: 2.2, x1: 2, y1: 4 }, why: '' }];
-    expect(has(living([sofa], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
+    const reading = put('generic-armchair', { x: 0.6, y: 2.6, face: 'O', zone: 'lesen' });
+    const sitting = put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' });
+    expect(has(living([sitting, reading], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
+    // a zone with nothing on its floor (access, standing room, a ceiling light at most) does not clash
+    const light = put('generic-pendant', { x: 1, y: 3, zone: 'lesen', elevation: 2.2 });
+    expect(has(living([sitting, light], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(false);
   });
   it('E3 chairs without a table, equal shelves on different walls', () => {
     expect(has(living([sofa, put('generic-chair', { x: 4.5, y: 2 })]), 'E3', /Stühle/)).toBe(true);
