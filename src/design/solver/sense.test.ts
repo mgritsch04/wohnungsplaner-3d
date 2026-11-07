@@ -723,6 +723,17 @@ describe('the step behind the door stays free (image review r14 A, Zimmer 2)', (
   });
 });
 
+describe('a plant at the window (image review r14 A, Wohnzimmer)', () => {
+  it('a planter Claude puts in front of the window stands to one side of it, not in the middle', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.2 }], windows: [{ wall: 'W', at: 2, width: 1.2 }] });
+    const p = program(room, [item('planter', 'generic-planter', [0.5, 2, -Math.PI / 2])], [{ kind: 'window', item: 'planter', window: 'F1', place: 'front' }]);
+    for (const seed of [1, 2]) {
+      const plant = byId(solveRoom(room, p, { seed }), 'planter');
+      expect(Math.abs(plant.y - 2), `seed ${seed}`).toBeGreaterThan(0.15 + 0.225 - 1e-6);
+    }
+  });
+});
+
 describe('a rug that reaches past its piece (D5)', () => {
   const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
   const bedRug = (room: RoomAnalysis) =>
