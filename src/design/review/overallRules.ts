@@ -160,8 +160,8 @@ export function checkZones(ctx: RoomCtx): void {
     // a curtain belongs to its window, whatever zone the programme gave it (benchmark 7.11.: 3 of 11 E2 were curtains)
     if (i.role === 'curtain') continue;
     // plants, pictures and wall shelves are spread over the room on purpose (accents repeated in several places,
-    // the styling triangle); a planter in the corner beside the seats is no stray piece (benchmark 7.11.: 4 of 6 E2 "outside")
-    if (isPlant(i) || i.role === 'wall-art') continue;
+    // the styling triangle); a planter in the corner beside the seats is no stray piece (benchmark 7.11.: 5 of 6 E2 "outside", herbs on the sill included)
+    if (isPlant(i) || i.shape === 'herbs' || i.role === 'wall-art') continue;
     const z = prog.zones.find((q) => q.id === i.zone);
     if (!z) continue;
     const r = z.rect;
