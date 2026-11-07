@@ -26,6 +26,7 @@ import { completeGroups, groupLines } from './groups';
 import { extraAreas, roomFacts } from './roomFacts';
 import { intentProblems } from './intent';
 import { parseRelations, type RelationItem } from './relations';
+import { type RoomSlots, roomSlots, slotById, slotSection } from './anchors';
 
 export interface RoomProgramInput {
   project: Project;
@@ -111,9 +112,9 @@ const RELATIONS = `Beziehungen (nur diese Wörter; a, b, c sind ids aus "items",
 - [a,"align",b] a und b in einer Flucht (Regale nebeneinander, Schränke in einer Reihe)
 Andere Wörter (next-to, beside, against …) versteht der Aufsteller nicht. Türen sind kein Ziel. Bestand (B1 …) darf Ziel sein, z. B. [mirror,"above","B2"].`;
 
-const format = (userZone: string | null) => `{"reading":"2–4 Sätze: was diesen Raum prägt (Licht, Wege, ruhige Seite, Blick beim Hereinkommen)",
+const format = (userZone: string | null, slot: string | null) => `{"reading":"2–4 Sätze: was diesen Raum prägt (Licht, Wege, ruhige Seite, Blick beim Hereinkommen)",
  "zones":[{"id":"sitzen","function":"Sitzen/Fernsehen","rect":[x0,y0,x1,y1],"why":"…"${userZone ? `,"userZone":"${userZone}"` : ''}}],
- "items":[{"id":"sofa","catalogId":"generic-sofa-3","zone":"sitzen","x":215,"y":140,"facing":"S","label":"Art, Material, Farbe, Form","color":"#rrggbb","features":["Schlaffunktion"],"why":"…","anchor":true,"fallbacks":["generic-sofa-2"]}],
+ "items":[{"id":"sofa","catalogId":"generic-sofa-3","zone":"sitzen","x":215,"y":140,"facing":"S"${slot ? `,"slot":"${slot}"` : ''},"label":"Art, Material, Farbe, Form","color":"#rrggbb","features":["Schlaffunktion"],"why":"…","anchor":true,"fallbacks":["generic-sofa-2"]}],
  "relations":[["coffee","front-of","sofa",45],["rug","under-front","sofa"],["ns1","pair","ns2","bed"],["pendant","above","table",160],["plant1","corner","W1","W2"],["tv","facing","sofa",250],["curtain1","window","F1","over"]],
  "kitchen":[{"wall":"W2","from":[x,y],"to":[x,y],"modules":["generic-k-fridge","…"]}],
  "walk":"wie man durch den eingerichteten Raum geht (Wege, Breiten)",
@@ -132,10 +133,11 @@ export function buildRoomProgramPrompt(input: RoomProgramInput): string {
   const own = preselect(input.products ?? [], [rc.type], 0, MAX_ROOM_PRODUCTS);
   const zones = room.userZones.filter((z) => !z.keepFree).map((z) => z.id);
   const palette = concept.style.palette.map(paletteText).join(', ');
+  const slots = roomSlots(project, concept, room);
   return `Du bist eine erfahrene Innenarchitektin und richtest jetzt EINEN Raum ein, passend zum Wohnkonzept. Ziel: ein Plan, nach dem man den Raum wirklich so einrichten kann – funktional, mit kurzen Wegen, gutem Licht und genug Stauraum, stimmig im Stil der Wohnung und so, dass man sich zu Hause fühlt. Arbeite wie im Büro, in dieser Reihenfolge:
 1. Raum lesen: Wo sind Türen und Fenster, welche Wege laufen durch, welche Wände sind frei, woher kommt das Tageslicht (siehe Raumfakten), welche Wände sind laut, was sieht man beim Hereinkommen?
 2. Zonen festlegen: welche Bereiche, wo genau (Rechteck in Raumkoordinaten), warum dort. Die Wege zwischen den Türen gehören zu keiner Möbelzone. Die Zonen verteilen sich über den Raum; jede Zone hat ein Ziel (Blickpunkt, Fenster, Licht).
-3. Je Zone ein Baustein (siehe unten) mit seinem Ankermöbel ("anchor":true), Startplatz und Blickrichtung. Plane die Teile des Bausteins mit, in der Ausführung, die du willst; was du weglässt, ergänzt die App nach dem Regelwerk.
+3. Je Zone ein Baustein (siehe unten) mit seinem Ankermöbel ("anchor":true), Startplatz und Blickrichtung${slots.anchors.length ? ' (Sofa, Bett, Schreibtisch und Esstisch: einen der geprüften Plätze unten wählen, "slot")' : ''}. Plane die Teile des Bausteins mit, in der Ausführung, die du willst; was du weglässt, ergänzt die App nach dem Regelwerk.
 4. Lichtplan: Grundlicht, Licht für jede Zone, Stimmungslicht (L1, L2).
 5. Stauraum: wohin kommen Kleidung, Bücher, Vorräte, Alltagskram (ST1–ST3)?
 6. Stil: jedes Teil mit Farbe aus dem Farbschema des Raums (60/30/10, SL2; große Möbel in der Möbelfarbe, Teppich, Vorhänge und Kissen in der Textilfarbe, Deko in der Akzentfarbe, nichts gegen die Wandfarbe), Material und Form im "label" (z. B. „Sofa 3-Sitzer, Leinen hellgrau, schmale Eichenfüße“), dazu "features" mit den Funktionen, die es haben muss (z. B. „Schlaffunktion“, „Stauraum“, „Schubladen“, „dimmbar“). Wiederkehrende Materialien, höchstens 2–3 Holztöne (SL3), Formen und Texturen gemischt (SL4).
@@ -152,7 +154,7 @@ ${sketch}
 ${input.image ? 'Das Bild zeigt denselben Raum leer von oben, mit Wänden, Türen, Fenstern, den Wegen zwischen den Türen und den Raumkoordinaten in cm; was bleibt, ist eingezeichnet. Lies Maße aus der Skizze, das Bild ist für den Überblick.\n' : ''}
 Raumfakten:
 ${roomFacts(room, project, concept)}
-${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}
+${existing.length ? `\nBestand (steht schon, siehe Skizze; NICHT in "items" aufnehmen; als Ziel in Beziehungen mit diesem Kürzel): ${existing.map(({ label, f }) => `${label} = ${f.name} bei (${toRoomCm(room.origin, f).x},${toRoomCm(room.origin, f).y})`).join(', ')}.\n` : ''}${zones.length ? `\nVom Nutzer markierte Bereiche (siehe Skizze): Die Zone für ${zones.join(', ')} bekommt "userZone" mit diesem Kürzel und liegt in dem Bereich. Die Bereiche sind von Hand und nur ungefähr gezeichnet: Ein Möbel darf etwas über den Rand ragen, wenn es so besser passt.\n` : ''}${slotSection(slots, kitchen) ? `\n${slotSection(slots, kitchen)}` : ''}
 ${needs.length ? `Muss in den Raum (sonst fehlt etwas): ${needs.map((n) => n.label).join(', ')}.\n` : ''}${kitchen ? `Küche: Hier gibt es noch keine Küchenzeile. Plane sie in "kitchen" als gerade Zeile an einer Wand (eine L-Küche sind zwei Zeilen): "from" und "to" sind Punkte an dieser Wand in Raumkoordinaten, "modules" die Bodenmodule in Reihenfolge von "from" nach "to" (Spüle, Kühlschrank, Backofen, Unterschränke; Oberschränke mit Lichtleisten, Arbeitsplatte, Kochfeld und Haube setzt die App). Spüle gern unter dem Fenster; Arbeitsfläche zwischen Spüle und Kochstelle mindestens 60 cm; Kühlschrank, Spüle und Kochstelle in einer zusammenhängenden Zeile (bei einer L-Küche treffen sich beide Zeilen in der Ecke, keine Lücke); die Kochstelle nicht gleich neben die Tür; nichts vor eine Tür oder die Balkontür.
 Küchenmodule (nur in "kitchen"):
 ${summarizePlaceholders(KITCHEN_MODULES)}
@@ -172,7 +174,7 @@ ${own.length ? `\nEigene Produkte des Nutzers (bevorzugt verwenden, wo sie passe
 ${RELATIONS}
 
 Antworte nur mit JSON in dieser Form:
-${format(zones[0] ?? null)}
+${format(zones[0] ?? null, slots.anchors[0]?.slots[0]?.id ?? null)}
 x,y = Mittelpunkt des Möbels in cm (Raumkoordinaten). facing = Himmelsrichtung (N, O, S, W), in die die Vorderseite zeigt: Sofa und Sessel in Sitzrichtung, Bett vom Kopfteil zum Fußende, Schrank und Regal mit der Türseite, Schreibtisch zur Sitzseite. Wandteile (Bild, Spiegel, Wandregal, Garderobe, Vorhang) mit x,y direkt an der Wand und facing in den Raum. "fallbacks": kleinere Teile derselben Art, falls das Ankermöbel nicht passt. "kitchen" nur, wenn oben eine Küche verlangt ist.`;
 }
 
@@ -191,6 +193,11 @@ interface ProgramFacts {
 function inRoom(room: RoomAnalysis, x: number, y: number, tol: number): boolean {
   return x >= -tol && y >= -tol && x <= cm(room.size.x) + tol && y <= cm(room.size.y) + tol;
 }
+
+/** Anchor kind of a catalogue piece, for the checked places. */
+const slotKindOf = (t: Thing): 'sofa' | 'bed' | 'desk' | 'dining' | null =>
+  t.shape === 'sofa' || t.shape === 'sofa-corner' ? 'sofa' : t.shape === 'bed' ? 'bed' : t.shape === 'desk' ? 'desk' : t.category === 'table' && t.height >= 0.6 && Math.max(t.width, t.depth) >= 0.75 ? 'dining' : null;
+const SLOT_WORD = { sofa: 'ein Sofa', bed: 'ein Bett', desk: 'einen Schreibtisch', dining: 'einen Esstisch' } as const;
 
 const ALIASES: [RegExp, string][] = [
   [/wc|toilet|klo/i, 'toilet'],
@@ -268,6 +275,9 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   /** Pieces Claude listed again although they are there: relations to them go to the existing piece. */
   const duplicateOf = new Map<string, string>();
   const rawItems = Array.isArray(o.items) ? o.items : [];
+  // the checked places of the anchor pieces: Claude names one by its id, the app takes centre, wall and front from it
+  let places: RoomSlots | null = null;
+  const placed = new Map<string, NonNullable<ReturnType<typeof slotById>>>();
   if (!rawItems.length) problems.push('"items" ist leer.');
   // a bed of the catalogue comes with its mattress and pillows; a mattress on top of it covered the
   // headboard and stood out 15 cm at the sides (image review of test flat A, 6.11.)
@@ -335,6 +345,19 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
     else if (!inRoom(room, x, y, 20)) problems.push(`Teil „${id}“ bei (${x},${y}) liegt außerhalb des Raums (Innenmaß ${cm(room.size.x)} × ${cm(room.size.y)} cm).`);
     else if (!side) problems.push(`Teil „${id}“: Blickrichtung „${str(e.facing, 10)}“ ist keine Himmelsrichtung (N, O, S, W).`);
     else hint = { ...f.P(x, y), rotation: rotationForSide(side) };
+    const slotId = str(e.slot, 30);
+    if (slotId) {
+      places ??= roomSlots(input.project, input.concept, room);
+      const slot = slotById(places, slotId);
+      if (!slot) notes.push(`Teil „${id}“: Platz „${slotId}“ gibt es nicht, der eigene Startplatz gilt.`);
+      else if (slot.kind !== slotKindOf(t)) notes.push(`Teil „${id}“: Platz „${slot.id}“ ist für ${SLOT_WORD[slot.kind]} gedacht, der eigene Startplatz gilt.`);
+      else {
+        // the problems of an own place do not count when the checked place replaces it
+        for (let k = problems.length - 1; k >= 0; k--) if (problems[k].startsWith(`Teil „${id}“`) && /Startplatz x, y fehlt|außerhalb des Raums|keine Himmelsrichtung/.test(problems[k])) problems.splice(k, 1);
+        hint = { x: slot.x, y: slot.y, rotation: slot.rotation };
+        placed.set(id, slot);
+      }
+    }
     let color = hex(e.color);
     if (color) {
       const fit = fitToScheme(color, schemeOf(f.rc, input.concept.style));
@@ -389,6 +412,15 @@ export function parseRoomProgram(raw: unknown, input: RoomProgramInput): Checked
   const rel = parseRelations(rawRelations, { items: things, walls: room.walls, existing: existingPlaces, zones: new Set(zones.map((z) => z.id)), origin: room.origin, loose: new Set(['room', 'raum', 'kitchen', 'küche', 'küchenzeile', ...input.project.rooms.map((r) => key(r.name))]) });
   problems.push(...rel.problems);
   notes.push(...rel.notes);
+  // a piece on a checked place stands with its back to that wall, over the stretch of the place
+  for (const [id, slot] of placed) {
+    const wall = room.walls.find((w) => w.id === slot.wall);
+    if (!wall || !slot.span || rel.relations.some((r) => r.kind === 'wall' && r.item === id)) continue;
+    const half = Math.max((slot.span.t1 - slot.span.t0) / 2, (things.get(id)?.thing.width ?? 0) / 2);
+    const mid = (slot.span.t0 + slot.span.t1) / 2;
+    const at = (t: number) => add(wall.a, scale(wall.dir, Math.max(0, Math.min(wall.length, t))));
+    rel.relations.push({ kind: 'wall', item: id, wall: wall.id, along: { from: at(mid - half), to: at(mid + half) } });
+  }
 
   // kitchen
   const kitchen = parseKitchen(o.kitchen, f, problems, notes);
