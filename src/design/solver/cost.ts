@@ -313,6 +313,7 @@ function designCost(m: Model, u: Unit, n: Node): number {
       if (overlapDepth(writerRight, w.zone) > 0.05 && !(overlapDepth(writerLeft, w.zone) > 0.05)) s += 0.15;
     }
   }
+  s += diningRoomCost(m, u, n);
   if (n.spec.role === 'sofa' && u.mode === 'free') {
     const behind = sideStrip(n.box, 'back', 1.0);
     for (const d of ctx.doors) if (overlapDepth(behind, d.entry) > 0.02) s += 0.3;
@@ -367,6 +368,38 @@ function backGapCost(m: Model, n: Node): number {
 }
 
 /** D1: a plant stands in a corner, at a window or at a wall, never free in the room. */
+/** Room behind the chairs of a dining table, from the table edge (E2: 90 cm to get up). */
+const DINE_CLEAR = 0.9;
+
+/**
+ * E2: on every side of a dining table with chairs, 90 cm from the table edge stay free of walls and
+ * other furniture, so the chairs can be pushed back (image review r15 A, Küche: 79 and 82 cm).
+ */
+function diningRoomCost(m: Model, u: Unit, t: Node): number {
+  const chairs = u.nodes.filter((c) => c.parent === t.id && c.spec.role === 'seat' && (c.rule?.kind === 'around' || c.rule?.kind === 'front'));
+  if (chairs.length < 2 || !isFloor(t)) return 0;
+  const ax = axisX(t.box.rotation);
+  const fy = axisY(t.box.rotation);
+  const sides = new Set<'front' | 'back' | 'left' | 'right'>();
+  for (const c of chairs) {
+    const du = (c.box.x - t.box.x) * ax.x + (c.box.y - t.box.y) * ax.y;
+    const dv = (c.box.x - t.box.x) * fy.x + (c.box.y - t.box.y) * fy.y;
+    sides.add(Math.abs(dv) / Math.max(t.box.hd, 0.01) >= Math.abs(du) / Math.max(t.box.hw, 0.01) ? (dv > 0 ? 'front' : 'back') : du > 0 ? 'left' : 'right');
+  }
+  const others = m.units.filter((o) => o !== u && o.active).flatMap((o) => o.nodes.filter((x) => isFloor(x) && x.spec.item.solid !== false && top(x) > 0.3));
+  let s = 0;
+  for (const side of sides) {
+    const strip = sideStrip(t.box, side, DINE_CLEAR, 0.2, 0.8);
+    let short = outsideAmount(strip, m.ctx.poly) / 2;
+    for (const o of others) short = Math.max(short, overlapDepth(strip, o.poly));
+    for (const f of m.ctx.fixed) if (f.floor) short = Math.max(short, overlapDepth(strip, f.poly));
+    if (short > 0.01) s += DINE_COST * Math.min(short, 0.4);
+  }
+  return s;
+}
+/** Weight per metre missing behind the chairs. */
+const DINE_COST = 2.0;
+
 /** A tall plant in the middle in front of a window. */
 const PLANT_BEFORE_WINDOW = 0.6;
 

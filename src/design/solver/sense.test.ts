@@ -734,6 +734,29 @@ describe('a plant at the window (image review r14 A, Wohnzimmer)', () => {
   });
 });
 
+describe('room behind the dining chairs (E2, image review r15 A, Küche)', () => {
+  it('the table moves away from the walls so 90 cm stay behind the chairs', () => {
+    const room = rectRoom(3.3, 4.1, { doors: [{ wall: 'W', at: 0.6 }], windows: [{ wall: 'N', at: 1.65 }] });
+    const p = program(room, [item('table', 'generic-dining-table-4', [2.2, 3.15, 0]), item('c1', 'generic-chair'), item('c2', 'generic-chair'), item('c3', 'generic-chair'), item('c4', 'generic-chair')], [
+      { kind: 'around', items: ['c1', 'c2', 'c3', 'c4'], target: 'table' },
+    ]);
+    for (const seed of [1, 2]) {
+      const layout = solveRoom(room, p, { seed });
+      const t = byId(layout, 'table');
+      const c = Math.abs(Math.cos(t.rotation));
+      const hx = (c * t.width + (1 - c) * t.depth) / 2;
+      const hy = (c * t.depth + (1 - c) * t.width) / 2;
+      const chairs = layout.items.filter((i) => i.catalogId === 'generic-chair');
+      for (const ch of chairs) {
+        const dx = (ch.x - t.x) / hx;
+        const dy = (ch.y - t.y) / hy;
+        const free = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3.3 - (t.x + hx) : t.x - hx) : dy > 0 ? 4.1 - (t.y + hy) : t.y - hy;
+        expect(free, `seed ${seed} ${ch.id}`).toBeGreaterThanOrEqual(0.9 - 0.02);
+      }
+    }
+  });
+});
+
 describe('a rug that reaches past its piece (D5)', () => {
   const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
   const bedRug = (room: RoomAnalysis) =>
