@@ -157,6 +157,8 @@ export function checkZones(ctx: RoomCtx): void {
   if (!prog) return;
   for (const i of ctx.placed) {
     if (!i.floor && i.elevation > 0.05 && ctx.parentOf(i)) continue;
+    // a curtain belongs to its window, whatever zone the programme gave it (benchmark 7.11.: 3 of 11 E2 were curtains)
+    if (i.role === 'curtain') continue;
     const z = prog.zones.find((q) => q.id === i.zone);
     if (!z) continue;
     const r = z.rect;
