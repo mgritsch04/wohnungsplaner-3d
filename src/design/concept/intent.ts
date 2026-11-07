@@ -21,7 +21,7 @@ import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
 import { checkBackGap, checkCallBackground, checkDesk, checkTv } from '../review/arrangeRules';
-import { checkCurtains, checkPlants } from '../review/decorRules';
+import { checkCurtains, checkPlants, checkRugs } from '../review/decorRules';
 import { checkClearances } from '../review/wayRules';
 import { checkTvGlare } from '../review/groupRules';
 import { boundaryDist } from '../review/geom';
@@ -336,19 +336,21 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
 }
 
 /**
- * C3, C4, C8, C10 and D1 on the start places: a sofa that looks at nothing, a dining table in the work aisle
- * of the kitchen, a sofa or desk with a useless strip behind it (F Wohnküche: 60 cm to the dining table), the
- * bed or a window behind the desk chair in a video call (B and C bedrooms), a tall plant in a room without a window. In the benchmark (7.11.) each came from the plan
- * (F Zimmer 2, E Küche, A Gang) and the solver kept it; no plan had one that the solver then mended, so
- * asking adds no repair round the result would not need (the recorded first answer for F Vorraum has a
- * tall plant without daylight too). Designers give every sofa a focal point (picture,
- * armchairs, window or television opposite), keep 120 cm between kitchen run and table (NKBA: 42 in work
- * aisle plus room behind the chairs) and put shade or artificial plants where no daylight comes.
+ * C3, C4, C8, C10, D5 and D1 on the start places: a sofa that looks at nothing, a dining table in the work
+ * aisle of the kitchen, a sofa or desk with a useless strip behind it, the bed or a window behind the desk
+ * chair in a video call, a rug in the swing of a door (R13), a tall plant in a room without a window. In the
+ * benchmark (7.11.) each came from the plan and the solver kept it (F Zimmer 2, E Küche, F Wohnküche, B and C
+ * bedrooms, A Gang); only the rug in the door swing was once also in a plan the solver mended (E Wohnzimmer),
+ * all others never, so asking adds hardly a repair round the result would not need. Designers give every
+ * sofa a focal point (picture, armchairs, window or television opposite), keep 120 cm between kitchen run
+ * and table (NKBA: 42 in work aisle plus room behind the chairs), put a sofa at the wall or leave 75 cm
+ * behind it, keep the bed out of the video picture, end the rug before the door swing and put shade or
+ * artificial plants where no daylight comes.
  */
 function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   const wanted = program.items.some((i) => {
     const c = findCatalogItem(i.catalogId, [...products]);
-    return !!c && !!i.hint && (roleOf(c) === 'sofa' || shapeOf(c) === 'plant' || c.category === 'table' || c.category === 'desk');
+    return !!c && !!i.hint && (roleOf(c) === 'sofa' || shapeOf(c) === 'plant' || shapeOf(c) === 'rug' || c.category === 'table' || c.category === 'desk');
   });
   if (!wanted) return [];
   const { items, fixed } = hintLayout(program, room, existing, products);
@@ -357,6 +359,7 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
   checkBackGap(ctx);
   checkCallBackground(ctx);
   checkPlants(ctx);
+  checkRugs(ctx);
   checkClearances(ctx);
   const mine = new Set(program.items.map((i) => i.id));
   const out: string[] = [];
@@ -381,6 +384,11 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
       const left = /bleiben (\d+) cm/.exec(f.text)?.[1];
       out.push(
         `„${id}“ steht nach deinen Startplätzen im Arbeitsgang der Küche${left ? `, vor der Zeile bleiben nur ${left} cm` : ''} (C4). Zwischen Küchenzeile und Esstisch plant man mindestens 120 cm, damit man kochen kann, während jemand am Tisch sitzt; den Tisch weiter in den Raum rücken oder quer zur Zeile stellen.`,
+      );
+    } else if (f.rule === 'D5' && f.text.includes('Aufschwung der Tür')) {
+      const door = /Aufschwung der Tür (\S+)/.exec(f.text)?.[1] ?? '';
+      out.push(
+        `„${id}“ liegt nach deinen Startplätzen im Aufschwung der Tür ${door} (D5, R13): das Türblatt schleift darüber oder bleibt hängen. Einen kleineren Teppich nehmen oder ihn so legen, dass er vor dem Schwenkbereich der Tür endet.`,
       );
     } else if (f.rule === 'D1' && f.text.includes('kein Tageslicht'))
       out.push(
