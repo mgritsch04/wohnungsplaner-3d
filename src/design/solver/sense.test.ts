@@ -275,6 +275,23 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(byId(layout, 'shelf').elevation - (desk.elevation + desk.height)).toBeGreaterThanOrEqual(0.5 - 1e-6);
   });
 
+  it('a picture over the lowboard hangs 15–30 cm above it even if the programme says 1.1 m; over the TV it keeps its height (image review r14)', () => {
+    const pic = (withTv: boolean) => {
+      const p = program(room, [item('board', 'generic-tv-sideboard', [2.25, 0.25, 0]), item('pic', 'generic-picture-large'), ...(withTv ? [item('tv', 'generic-tv')] : [])], [
+        { kind: 'wall', item: 'board', wall: 'W1' },
+        { kind: 'above', item: 'pic', target: 'board', height: 1.1 },
+        ...(withTv ? [{ kind: 'on', item: 'tv', target: 'board' } as Relation] : []),
+      ]);
+      const layout = solveRoom(room, p, { seed: 2 });
+      const board = byId(layout, 'board');
+      return byId(layout, 'pic').elevation - (board.elevation + board.height);
+    };
+    const gap = pic(false);
+    expect(gap).toBeGreaterThanOrEqual(0.15 - 1e-6);
+    expect(gap).toBeLessThanOrEqual(0.3 + 1e-6);
+    expect(pic(true)).toBeCloseTo(1.1 - 0.45, 2);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
