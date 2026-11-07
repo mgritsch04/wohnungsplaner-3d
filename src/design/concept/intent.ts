@@ -22,6 +22,8 @@ import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
 import { checkDesk } from '../review/arrangeRules';
 import { checkCurtains } from '../review/decorRules';
+import { checkTvGlare } from '../review/groupRules';
+import { boundaryDist } from '../review/geom';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
@@ -166,7 +168,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
         }
       }
     }
-  problems.push(...rugUnderBed(pieces, products));
+  problems.push(...rugUnderBed(pieces, products, room?.polygon));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
   if (room && 'walkways' in room) problems.push(...areaBudget(program, room as RoomAnalysis, existing, products));
@@ -182,10 +184,14 @@ function halfAlong(p: Placed, axis: Vec2): number {
 
 /** The rug under the bed shows 40 to 60 cm on both sides (S5); in four of four benchmark bedrooms
  * with this finding (6.11.) the rug Claude chose was already too short across the bed. */
-function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]): string[] {
+function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[], outline?: readonly Vec2[]): string[] {
   const out: string[] = [];
   for (const bed of pieces.filter((p) => p.shape === 'bed')) {
     const across = { x: bed.front.y, y: -bed.front.x };
+    // a bed with one long side at the wall (day bed, single bed): the rug only has to show on the free side
+    const atWall = (s: -1 | 1) => !!outline && boundaryDist({ x: bed.at.x + across.x * s * (bed.width / 2 + 0.05), y: bed.at.y + across.y * s * (bed.width / 2 + 0.05) }, outline) < 0.15;
+    const wallLeft = atWall(-1);
+    const wallRight = atWall(1);
     for (const rug of pieces.filter((p) => p.shape === 'rug')) {
       const to = sub(rug.at, bed.at);
       const u = to.x * across.x + to.y * across.y;
@@ -199,6 +205,12 @@ function rugUnderBed(pieces: readonly Placed[], products: readonly CatalogItem[]
       const longAcross = 2 * half >= long - 0.01;
       const left = half - u - bed.width / 2;
       const right = half + u - bed.width / 2;
+      if (wallLeft !== wallRight) {
+        const free = wallLeft ? right : left;
+        if (free < 0.39)
+          out.push(`„${rug.id}“ ragt nach deinen Startplätzen auf der freien Seite von „${bed.id}“ nur ${cm(free)} cm heraus (S5). Das Bett steht mit einer Seite an der Wand, dort braucht es nichts; auf der freien Seite sind 40 bis 60 cm schön. Den Teppich zur freien Seite rücken oder einen größeren nehmen.`);
+        continue;
+      }
       if (long - bed.width < 0.79) {
         const need = bed.width + 0.8;
         const fits = [...products, ...GENERIC_CATALOG]
@@ -266,13 +278,14 @@ function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
 function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   const asks = (i: ProgramItem) => {
     const c = findCatalogItem(i.catalogId, [...products]);
-    return !!c && !!i.hint && (c.category === 'desk' || shapeOf(c) === 'curtain');
+    return !!c && !!i.hint && (c.category === 'desk' || shapeOf(c) === 'curtain' || shapeOf(c) === 'tv');
   };
   if (!room.walls.some((w) => w.openings.some((o) => o.kind === 'window')) || !program.items.some(asks)) return [];
   const { items, fixed } = hintLayout(program, room, existing, products);
   const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program, catalog: [...products] });
   checkCurtains(ctx);
   checkDesk(ctx);
+  checkTvGlare(ctx);
   const mine = new Set(items.map((i) => i.id));
   const byId = new Map(ctx.items.map((i) => [i.id, i]));
   const out: string[] = [];
@@ -294,6 +307,14 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
       const w = /Fenster (\S+) liegt/.exec(f.text)?.[1] ?? '';
       out.push(
         `„${f.items[0]}“ schaut nach deinen Startplätzen direkt auf das Fenster ${w}: man blickt beim Arbeiten ins Gegenlicht, der Bildschirm wirkt dunkel (C5). Profis stellen den Schreibtisch quer zum Fenster, das Tageslicht kommt von der Seite (für Rechtshänder von links), der Blick geht an der Fensterwand entlang.`,
+      );
+    }
+  // benchmark 7.11.: in A and C the plan put the television opposite a window already, the solver kept it
+  for (const f of ctx.findings)
+    if (f.rule === 'C3' && f.items.every((id) => mine.has(id))) {
+      const w = /dem Fenster (\S+) gegenüber/.exec(f.text)?.[1] ?? '';
+      out.push(
+        `„${f.items[0]}“ steht nach deinen Startplätzen dem Fenster ${w} gegenüber: bei Tageslicht spiegelt sich das Fenster im Bild (C3). Profis stellen den Fernseher an eine Wand quer zum Fenster, das Licht fällt dann von der Seite; reicht der Platz nicht, einen Vorhang oder ein Rollo am Fenster einplanen.`,
       );
     }
   return [...new Set(out)];

@@ -6,6 +6,12 @@ import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
 import { isDiningTable, isLamp, isPlant, type RItem } from './items';
 
+/**
+ * Plants that get by on little or only artificial light (Zamioculcas, Bogenhanf, Schusterpalme, Efeutute)
+ * and artificial plants: D1 recommends exactly these for a room without windows, so naming one is no finding.
+ */
+const SHADE_PLANT = /zamioculcas|glücksfeder|sansevier|bogenhanf|schusterpalme|aspidistra|efeutute|epipremnum|schattenpflanze|kunstpflanze|künstlich/i;
+
 /** D1, D2: plants and small things on the floor. */
 export function checkPlants(ctx: RoomCtx): void {
   const walkLines = ctx.an.walkways;
@@ -21,7 +27,7 @@ export function checkPlants(ctx: RoomCtx): void {
     if (!inCorner && !beside && !atWindow) ctx.add('D1', 'M', `${ctx.label(p)} steht frei im Raum, Pflanzen gehören in eine Ecke, neben ein Möbel oder ans Fenster.`, [p], p);
     const onWay = walkLines.find((w) => w.path.length > 1 && Math.min(...w.path.slice(1).map((q, k) => segmentDist(p, w.path[k], q))) < p.width / 2 + 0.25);
     if (onWay) ctx.add('D1', 'S', `${ctx.label(p)} steht im Weg zwischen den Türen ${onWay.from} und ${onWay.to}.`, [p], p);
-    if (!ctx.windows.length && p.height >= 1.0) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
+    if (!ctx.windows.length && p.height >= 1.0 && !SHADE_PLANT.test(`${ctx.label(p)} ${p.name}`)) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
   }
   for (const b of ctx.placed.filter((i) => i.role === 'box' && i.elevation < 0.05 && !i.parent))
     if (!ctx.items.some((o) => o !== b && o.floor && o.height > 0.45 && overlaps(b.poly, o.poly, -0.2)))
@@ -76,7 +82,13 @@ export function checkRugs(ctx: RoomCtx): void {
       const corners = r.poly.map((c) => toLocal(bed, c).u);
       const left = -Math.min(...corners) - bed.width / 2;
       const right = Math.max(...corners) - bed.width / 2;
-      if (Math.min(left, right) < 0.4 - 0.01) ctx.add('D5', 'L', `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, Math.min(left, right)))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
+      // a bed with one long side at the wall: the rug only shows on the free side (benchmark 7.11.: E, day bed in the study)
+      const atWall = (s: -1 | 1) => boundaryDist({ x: bed.x + bed.right.x * s * (bed.width / 2 + 0.05), y: bed.y + bed.right.y * s * (bed.width / 2 + 0.05) }, ctx.an.polygon) < 0.15;
+      const wallLeft = atWall(-1);
+      const wallRight = atWall(1);
+      const free = wallLeft && !wallRight ? right : wallRight && !wallLeft ? left : Math.min(left, right);
+      if (free < 0.4 - 0.01)
+        ctx.add('D5', 'L', wallLeft !== wallRight ? `${ctx.label(r)} ragt auf der freien Seite des Bettes nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm.` : `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
     }
     if (ctx.type === 'hall' && r.width < 1.0 && r.depth >= 1.5) {
       // the middle of the free walking strip: a shoe cabinet or shelf along one wall narrows the hall

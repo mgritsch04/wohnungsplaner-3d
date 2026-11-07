@@ -31,7 +31,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 | S2 | W | Vom Bett aus sieht man die Tür, das Bett steht aber nicht in der Türachse (Füße nicht zur Tür). | Sicherheitsgefühl, und man schaut beim Hereinkommen nicht aufs Bett. | Homes & Gardens, livingetc | Prompt |
 | S3 | H | Neben dem Bett 60 cm frei, besser 70–80 cm; ein Doppelbett von beiden Längsseiten zugänglich; am Fußende 60 cm, mit Durchgang 75–90 cm. | Bettmachen, Aufstehen, zu zweit aneinander vorbei. | Simba, Casa Padrino | Prompt, Löser, Begehung |
 | S4 | W | Nachttische als Paar links und rechts, Oberkante ±5 cm zur Matratze, je eine Leseleuchte mit gerichtetem Licht (Unterkante 40–50 cm über der Matratze), einzeln schaltbar. | Jeder Schläfer hat Ablage und eigenes Licht, ohne den anderen zu blenden. | Simba, licht.de | Prompt, Löser, Begehung |
-| S5 | T | Teppich unter dem Bett: das untere ⅔ des Bettes darauf, seitlich 45–60 cm sichtbar; Nachttische ganz darauf oder ganz daneben. | Morgens auf etwas Weiches treten; das Bett wirkt geerdet. | Amanda Katherine, Welsh Design Studio | Prompt, Löser |
+| S5 | T | Teppich unter dem Bett: das untere ⅔ des Bettes darauf, seitlich 45–60 cm sichtbar (steht das Bett mit einer Längsseite an der Wand, nur auf der freien Seite); Nachttische ganz darauf oder ganz daneben. | Morgens auf etwas Weiches treten; das Bett wirkt geerdet. | Amanda Katherine, Welsh Design Studio | Prompt, Löser |
 | S6 | W | Bild über dem Bett etwa ⅔ der Bettbreite, Unterkante 15–25 cm über dem Kopfteil. | Fasst das Bett als Blickpunkt. | Montcarta, Edward Martin | Prompt, Löser, Begehung |
 | S7 | W | Eine Ankleide-Ecke: Spiegel, Ablage (Kommode, Stuhl oder Bank) beim Schrank, wenn die Kleidung keinen eigenen Raum hat. | Anziehen braucht einen Platz für Kleidung und einen Blick in den Spiegel. | Faustregel | Prompt, Begehung |
 
@@ -121,7 +121,7 @@ Eine Quelle für Maße und Regeln des Einrichtungsvorschlags (`src/design/rulebo
 
 | Kennung | Stufe | Regel | Warum | Quelle | Genutzt in |
 |---|---|---|---|---|---|
-| B1 | H | Vor WC und Waschtisch 75 cm frei (mindestens 55), WC-Achse 45 cm zur Seitenwand; Spiegel über dem Waschtisch, Unterkante 15–25 cm über dem Becken. | Sitzen, Bücken, Abtrocknen ohne Anstoßen. | NKBA, Geberit/ÖNORM | Prompt, Löser, Begehung |
+| B1 | H | Vor WC und Waschtisch 75 cm frei (mindestens 55), WC-Achse 45 cm zur Seitenwand; seitlich zwischen WC, Waschtisch, Dusche und Schrank mindestens 20 cm oder bündig; Spiegel über dem Waschtisch, Unterkante 15–25 cm über dem Becken. | Sitzen, Bücken, Abtrocknen ohne Anstoßen; ein schmaler Spalt zwischen zwei Objekten lässt sich nicht putzen. | NKBA, Geberit/ÖNORM, Baunetz Wissen (Abstände von Sanitärobjekten) | Prompt, Löser, Begehung |
 | B2 | T | Geschlossener Stauraum am Waschtisch, Handtücher in Griffweite der Dusche oder Wanne. | Nass aus der Dusche, Handtuch ohne Schritt. | Faustregel | Prompt |
 
 ## Vorraum und Gang

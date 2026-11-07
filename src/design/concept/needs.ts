@@ -86,6 +86,10 @@ export function functionNeeds(functions: readonly string[], type: RoomType = 'ot
   return out;
 }
 
-/** A guest bed among the programme pieces: a bed outside bed- and kids' rooms, or a piece labelled like one. */
-export const looksLikeGuestBed = (t: Thing, label: string, type: RoomType) => (bed(t) && type !== 'bedroom' && type !== 'kids') || /schlafsofa|gästebett|gastbett|tagesbett|daybed|schlafcouch/i.test(label);
+/**
+ * A guest bed among the programme pieces: a bed outside bed- and kids' rooms, or a bed or sofa labelled like one.
+ * The label alone is not enough: „Box Gästebettzeug“ in the storeroom is bedding, not a place to sleep (benchmark 7.11., A).
+ */
+export const looksLikeGuestBed = (t: Thing, label: string, type: RoomType) =>
+  (bed(t) && type !== 'bedroom' && type !== 'kids') || ((bed(t) || sofa(t) || t.category === 'sofa') && /schlafsofa|gästebett|gastbett|tagesbett|daybed|schlafcouch/i.test(label));
 export { diningTable };
