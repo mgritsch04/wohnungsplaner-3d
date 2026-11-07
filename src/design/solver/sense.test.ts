@@ -12,6 +12,7 @@ import { RECORDED } from '../fixtures/recorded';
 import { rectRoom } from '../review/testkit';
 import type { Layout, PlacedItem, ProgramItem, Relation, RoomAnalysis, RoomProgram } from '../types';
 import { programFromRecorded } from './recordedProgram';
+import { overlapDepth } from './geom';
 import { existingPieces, solveRoom } from './solve';
 
 const front = (i: PlacedItem): Vec2 => ({ x: -Math.sin(i.rotation), y: Math.cos(i.rotation) });
@@ -110,6 +111,81 @@ describe('pictures hang at eye height over their piece (R7)', () => {
     expect(gap).toBeGreaterThanOrEqual(0.15 - 1e-6);
     expect(gap).toBeLessThanOrEqual(0.3 + 1e-6);
     expect(art.elevation + art.height / 2).toBeGreaterThan(1.35);
+  });
+
+  it('over a sofa standing free in the room: the picture on the wall hangs at eye height, not at „over the sofa“', () => {
+    const room = rectRoom(5, 4.5, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.5 }] });
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.5, 2.3, S]), item('art', 'generic-picture-wide')], [
+      { kind: 'center', item: 'sofa' },
+      { kind: 'above', item: 'art', target: 'sofa', height: 1.0 },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const art = byId(layout, 'art');
+    const sofa = byId(layout, 'sofa');
+    const apart = Math.hypot(art.x - sofa.x, art.y - sofa.y) - sofa.depth / 2;
+    expect(apart, 'the sofa stands free').toBeGreaterThan(0.6);
+    expect(art.elevation + art.height / 2).toBeCloseTo(1.5, 2);
+  });
+
+  it('a picture on its own wall: middle at 1.5 m, not at 1.75 m like the catalogue height (image review r7)', () => {
+    const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
+    const p = program(room, [item('art', 'generic-picture-large')], [{ kind: 'wall', item: 'art', wall: 'W2' }]);
+    const art = byId(solveRoom(room, p, { seed: 2 }), 'art');
+    expect(art.elevation + art.height / 2).toBeCloseTo(1.5, 2);
+  });
+});
+
+describe('curtains frame the window (image review r7)', () => {
+  it('an open panel reaches at most 25 cm past the frame', () => {
+    const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2, width: 1.2 }] });
+    const p = program(room, [item('c1', 'generic-curtain'), item('c2', 'generic-curtain')], [
+      { kind: 'window', item: 'c1', window: 'F1', place: 'over' },
+      { kind: 'window', item: 'c2', window: 'F1', place: 'over' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    for (const id of ['c1', 'c2']) {
+      const c = byId(layout, id);
+      // window on the north wall from 1.6 to 2.8 m: the panel's outer edge
+      const outer = Math.max(1.6 - (c.x - c.width / 2), c.x + c.width / 2 - 2.8);
+      expect(outer, id).toBeLessThanOrEqual(0.25 + 1e-6);
+      expect(outer, id).toBeGreaterThanOrEqual(0.1);
+    }
+  });
+});
+
+describe('lamps where they light (image review r7/r9)', () => {
+  const room = rectRoom(4.5, 4, { doors: [{ wall: 'S', at: 0.8 }], windows: [{ wall: 'N', at: 2.2 }] });
+  it('the desk lamp stands on the left of the writer, alone and beside the desk set', () => {
+    for (const extra of [false, true]) {
+      const items = [item('desk', 'generic-desk', [0.4, 2.0, -Math.PI / 2]), item('lamp', 'generic-table-lamp'), ...(extra ? [item('set', 'generic-desk-set')] : [])];
+      const rels = [{ kind: 'on' as const, item: 'lamp', target: 'desk' }, ...(extra ? [{ kind: 'on' as const, item: 'set', target: 'desk' }] : [])];
+      const layout = solveRoom(room, program(room, items, rels), { seed: 2 });
+      const desk = byId(layout, 'desk');
+      const lamp = byId(layout, 'lamp');
+      // the writer looks into the desk (against its front); their left is the desk's −x
+      const u = (lamp.x - desk.x) * Math.cos(desk.rotation) + (lamp.y - desk.y) * Math.sin(desk.rotation);
+      expect(u, extra ? 'with the desk set' : 'alone').toBeLessThan(-0.1);
+    }
+  });
+
+  it('a mirror over the chest hangs above the lamp standing on it (image review r9)', () => {
+    const p = program(room, [item('chest', 'generic-dresser', [4.2, 2.0, Math.PI / 2]), item('lamp', 'generic-table-lamp'), item('mirror', 'generic-mirror-round')], [
+      { kind: 'on', item: 'lamp', target: 'chest' },
+      { kind: 'above', item: 'mirror', target: 'chest', height: 1.1 },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const lamp = byId(layout, 'lamp');
+    const mirror = byId(layout, 'mirror');
+    expect(mirror.elevation).toBeGreaterThan(lamp.elevation + lamp.height);
+    expect(mirror.elevation + mirror.height / 2).toBeLessThanOrEqual(1.75 + 1e-6);
+  });
+
+  it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
+      { kind: 'front-of', item: 'coffee', target: 'sofa' },
+      { kind: 'above', item: 'pendant', target: 'coffee', height: 1.6 },
+    ]);
+    expect(byId(solveRoom(room, p, { seed: 2 }), 'pendant').elevation).toBeCloseTo(1.9, 2);
   });
 });
 
@@ -511,6 +587,17 @@ describe('a rug that reaches past its piece (D5)', () => {
     const rug = byId(layout, 'rug');
     expect(rug.catalogId).toBe('generic-rug-200');
     expect(rug.replaces).toBeUndefined();
+  });
+
+  it('the rug under the bed keeps out of the door swing where another of its places does (D5: the door catches on it; flat B)', () => {
+    const { room, layout } = recorded('B', 'Schlafzimmer');
+    const rug = layout.items.find((i) => i.catalogId.includes('rug'))!;
+    const c = Math.cos(rug.rotation);
+    const s = Math.sin(rug.rotation);
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => ({ x: rug.x + (a * rug.width * c) / 2 - (b * rug.depth * s) / 2, y: rug.y + (a * rug.width * s) / 2 + (b * rug.depth * c) / 2 }));
+    const swings = room.walls.flatMap((w) => w.openings).flatMap((o) => (o.swing ? [o.swing] : []));
+    expect(swings.length).toBeGreaterThan(0);
+    for (const sw of swings) expect(overlapDepth(corners, sw)).toBeLessThan(2e-3);
   });
 
   it('in a room too narrow for the bigger rug the planned one stays', () => {

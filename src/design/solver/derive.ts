@@ -42,6 +42,8 @@ function parentBox(m: Model, id: string): { box: Box; top: number; elevation: nu
 
 /** How far an open curtain panel covers the frame of its window (m). */
 const CURTAIN_OVERLAP = 0.08;
+/** How far an open panel reaches past the frame at most (m). */
+const CURTAIN_BEYOND = 0.25;
 /** Width of an open, gathered curtain panel: about a third of its fabric, 30 to 50 cm. */
 export const curtainOpenWidth = (fabric: number): number => clamp(fabric * 0.35, 0.3, 0.5);
 
@@ -78,12 +80,42 @@ function insideScore(m: Model, b: Box): number {
   return outsideAmount(boxCorners(b), m.ctx.poly, WALL_TOL);
 }
 
+/** Whether a rug reaches into the swing of a door: the door catches on it (D5). */
+export function inSwing(m: Model, b: Box): boolean {
+  const poly = boxCorners(b);
+  return m.ctx.swings.some((s) => overlapDepth(poly, s.poly) > 1e-3);
+}
+
+/** The first rug option inside the room and out of every door swing, else the first inside, else the one that sticks out least. */
+function pickRug(m: Model, options: Box[]): Box {
+  // lazily, as before: the search derives rugs on every move
+  let firstInside: Box | null = null;
+  for (const b of options) {
+    if (insideScore(m, b) !== 0) continue;
+    if (!m.ctx.swings.length || !inSwing(m, b)) return b;
+    firstInside ??= b;
+  }
+  return firstInside ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+}
+
 /**
  * Where a wall piece hangs above its parent: on the wall behind it (a free-standing parent: the
  * nearest wall to its place), never lower than the parent's top (Claude's height can be too low).
  */
 /** Height of a picture's middle above the floor (R7: 145–155 cm). */
 const ART_MIDDLE = 1.5;
+/** Highest middle of a mirror lifted over what stands below it (m): face height. */
+const MIRROR_MIDDLE_MAX = 1.75;
+
+/**
+ * Height of a wall piece that hangs on its own. A picture's middle at eye height (R7): the
+ * catalogue heights put a 70 cm picture's middle at 1.70–1.75 m, which the image review of r7
+ * called much too high.
+ */
+function ownWallElevation(s: Spec): number {
+  const art = s.shape === 'picture' || s.shape === 'picture-set';
+  return art ? Math.min(s.elevation, ART_MIDDLE - s.height / 2) : s.elevation;
+}
 
 function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number): { box: Box; elevation: number } {
   const s = n.spec;
@@ -98,8 +130,20 @@ function wallAbove(m: Model, n: Node, P: Box, parentTop: number, height?: number
   // a picture over a piece: middle at eye height, but 15–30 cm over the piece so it belongs to it (R7)
   const art = s.shape === 'picture' || s.shape === 'picture-set';
   const fallback = art ? clamp(ART_MIDDLE - s.height / 2, parentTop + 0.15, parentTop + 0.3) : Math.max(s.elevation, parentTop + gap);
-  const want = Math.max(height ?? fallback, parentTop + 0.02);
-  return { box: boxOnWall(w, t, s.width, s.depth, 0.002), elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
+  let want = Math.max(height ?? fallback, parentTop + 0.02);
+  const box = boxOnWall(w, t, s.width, s.depth, 0.002);
+  // the parent stands free in the room, the picture on a wall of its own: Claude's height meant
+  // „over the sofa“, on the bare wall it hangs at eye height (image review r9: lower edge at 102 cm)
+  if (art && distToBox(box.x, box.y, P) > 0.5) want = ART_MIDDLE - s.height / 2;
+  // a mirror over a chest: the lamp or vase standing on it must not hide it (image review r9: the
+  // lamp covered half the round mirror). Its lower edge goes over them while its middle stays at
+  // face height.
+  if (s.role === 'mirror') {
+    const tallest = Math.max(0, ...[...m.nodes.values()].filter((o) => o.parent === n.parent && o.rule?.kind === 'on' && !SOFT_SHAPES.has(o.spec.shape)).map((o) => o.spec.height));
+    const clear = parentTop + tallest + 0.05;
+    if (tallest > 0.1 && clear > want && clear + s.height / 2 <= MIRROR_MIDDLE_MAX) want = clear;
+  }
+  return { box, elevation: clamp(want, 0, ctx.height - s.height - 0.02) };
 }
 
 /** Room for a hanging lamp at `b`: inside the room, clear of tall furniture, its doors and door leaves. */
@@ -148,6 +192,17 @@ function hangingFront(m: Model, n: Node, P: Box, z0: number, z1: number, u0 = -I
   return v;
 }
 
+/**
+ * A lamp on a desk. Someone sitting at a desk looks into it (−front), so the desk's +x is their
+ * right: the lamp goes to −x, on the left of a right-handed writer (image review r7, A and B).
+ */
+function deskLamp(parent: Node | undefined, s: Spec): boolean {
+  return parent?.spec.category === 'desk' && s.role === 'table-lamp';
+}
+
+/** Lowest edge of a pendant over a coffee table (m above the floor). */
+const COFFEE_PENDANT_MIN = 1.9;
+
 /** Gap between two pieces sharing a surface. */
 const ON_GAP = 0.05;
 
@@ -163,7 +218,9 @@ function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | nu
   // a screen or a picture hanging over the piece takes its middle: what stands on it goes to the ends (#443, R7)
   const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && (s.spec.role === 'tv' || s.spec.shape === 'picture' || s.spec.shape === 'picture-set'));
   if (sibs.length < 2 && !screenAbove) return null;
-  sibs.sort((a, b) => (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
+  // the desk lamp first: on the sitter's left (−x), its light does not fall into the shadow of the writing hand
+  const lampFirst = (s: Node) => (deskLamp(parent, s.spec) ? 0 : 1);
+  sibs.sort((a, b) => lampFirst(a) - lampFirst(b) || (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
   const widths = sibs.reduce((v, s) => v + s.spec.width, 0);
   const total = widths + ON_GAP * (sibs.length - 1);
   if (total > 2 * P.hw) return null;
@@ -241,7 +298,8 @@ function deriveNode(m: Model, n: Node): void {
     } else {
       // drawn open: each panel gathered beside the frame, overlapping it a little; a pair frames the
       // window, a single panel goes to the side with more wall; near a corner it slides along the wall
-      const g = curtainOpenWidth(s.width);
+      // the rod reaches 10–25 cm past the frame (image review r7: 40 cm looked too wide)
+      const g = Math.min(curtainOpenWidth(s.width), CURTAIN_BEYOND + CURTAIN_OVERLAP);
       const left = win.t0 - g / 2 + CURTAIN_OVERLAP;
       const right = win.t1 + g / 2 - CURTAIN_OVERLAP;
       const side = r.count === 1 ? (win.t0 >= w.length - win.t1 ? left : right) : r.index % 2 === 0 ? left : right;
@@ -300,8 +358,8 @@ function deriveNode(m: Model, n: Node): void {
         const v0 = P.hd + r.gap + Math.min(s.width, s.depth) / 2 + (n.parent?.startsWith('kitchen') ? 0.08 : 0);
         const options: Box[] = [];
         for (let back = 0; back <= v0 + 0.01; back += 0.05) options.push(rugBox(at(0, v0 - back), P.rotation, s.width, s.depth, true));
-        // the first that lies inside the room, else the one that sticks out least
-      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+        // the first that lies inside the room and out of the door swings, else as close as it gets
+      n.box = pickRug(m, options);
       } else {
         const c = at(0, P.hd + r.gap + s.depth / 2);
         n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
@@ -331,8 +389,8 @@ function deriveNode(m: Model, n: Node): void {
           if (all && !bed) break;
         }
       }
-      // the first that lies inside the room, else the one that sticks out least
-      n.box = options.find((b) => insideScore(m, b) === 0) ?? options.reduce((a, b) => (insideScore(m, b) < insideScore(m, a) ? b : a));
+      // the first that lies inside the room and out of the door swings (D5), else as close as it gets
+      n.box = pickRug(m, options);
       return;
     }
     case 'around': {
@@ -350,7 +408,10 @@ function deriveNode(m: Model, n: Node): void {
         n.box = { x: P.x, y: P.y, hw: s.width / 2, hd: s.depth / 2, rotation: 0 };
         const tableLike = parentNode && ['table', 'coffee-table'].includes(parentNode.spec.role);
         const want = r.height ?? (tableLike || parentNode?.spec.category === 'desk' ? p.top + 0.65 : s.elevation);
-        n.elevation = clamp(want, p.top + 0.3, ctx.height - s.height - 0.05);
+        // over the coffee table it hangs above the line of sight from the sofa and above the head of
+        // someone getting up (image review r9: „Deckenleuchte auf 160 cm“); 60–70 cm is for the dining table
+        const coffee = parentNode?.spec.role === 'coffee-table';
+        n.elevation = clamp(coffee ? Math.max(want, COFFEE_PENDANT_MIN) : want, p.top + 0.3, ctx.height - s.height - 0.05);
         return;
       }
       if (s.base === 'wall' || s.item.kitchen) {
@@ -396,7 +457,8 @@ function deriveNode(m: Model, n: Node): void {
       const lim = Math.max(0, P.hw - s.width / 2);
       // on a table the chairs tuck in at the edges: what stands on it goes in the middle
       const table = parentNode?.spec.category === 'table';
-      const side = clamp(r.count === 1 && !table && row === null ? Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) : table && r.count === 1 ? 0 : u, -lim, lim);
+      const alone = Math.min(lim, P.hw * 0.45) * (P.hw > 0.4 ? 1 : 0) * (deskLamp(parentNode, s) ? -1 : 1);
+      const side = clamp(r.count === 1 && !table && row === null ? alone : table && r.count === 1 ? 0 : u, -lim, lim);
       // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
       // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
       const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height, side - s.width / 2, side + s.width / 2) + 0.01) + s.depth / 2;
@@ -498,7 +560,7 @@ export function refreshUnit(m: Model, u: Unit): void {
     if (n.rule && (n !== u.main || u.kind === 'fixed')) deriveNode(m, n);
     else {
       n.box = mainBox(m, u, n);
-      n.elevation = n.spec.base === 'wall' ? n.spec.elevation : 0;
+      n.elevation = n.spec.base === 'wall' ? ownWallElevation(n.spec) : 0;
     }
   }
   const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
