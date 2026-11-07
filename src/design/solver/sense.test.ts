@@ -254,6 +254,18 @@ describe('lamps where they light (image review r7/r9)', () => {
     }
   });
 
+  it('a cushion on a dining chair lies on the seat, not on the back rest (image review r13)', () => {
+    const p = program(room, [item('table', 'generic-dining-table-4', [2.25, 2.0, 0]), item('c1', 'generic-chair'), item('cush', 'generic-cushion')], [
+      { kind: 'around', items: ['c1'], target: 'table' },
+      { kind: 'on', item: 'cush', target: 'c1' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const chair = byId(layout, 'c1');
+    const cush = byId(layout, 'cush');
+    expect(cush.elevation).toBeLessThan(0.5);
+    expect(Math.hypot(cush.x - chair.x, cush.y - chair.y)).toBeLessThan(chair.depth / 2);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
