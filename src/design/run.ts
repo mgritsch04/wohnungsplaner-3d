@@ -158,6 +158,13 @@ interface RoomWork {
  */
 export const PLACE_TRIES = 3;
 export const PLACE_TRIES_FAILING = 5;
+/**
+ * A room that still fails after all seeds: the walk-through polishes its best `POLISH_TOP` seeds,
+ * not only the best (B living kitchen of the real run r7 over six start seeds: one passes now,
+ * 72 → 92, one goes 62 → 70, none worse; twice the moves per seed gave nothing more). A passing room
+ * keeps the polish of its best seed.
+ */
+export const POLISH_TOP = 2;
 
 /**
  * The better placement of one programme: passing, then the lighter loss (the planned pieces all in
@@ -176,20 +183,26 @@ export function betterPlacement(a: RoomResult, b: RoomResult, catalog?: CatalogI
 /** Place and walk through one programme, several seeds, the walk-through decides. */
 function placeAndReview(work: RoomWork, program: RoomProgram, seed: number, rounds: number): RoomResult {
   let best: RoomResult | null = null;
+  const tried: RoomResult[] = [];
   for (let k = 0; k < PLACE_TRIES_FAILING; k++) {
     if (best && k >= PLACE_TRIES && best.review.passed && !best.layout.dropped.length) break;
     const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: seed + k * 1000, catalog: work.base.products, spread: BALANCED.has(work.type) });
     const review = reviewRoom(work.review(layout, program));
     const r: RoomResult = { roomId: work.analysis.roomId, program, layout, review, rounds };
+    tried.push(r);
     best = best ? betterPlacement(best, r, work.base.products) : r;
   }
-  // the walk-through moves what it still finds (#436): the chosen seed once more, with it as the judge
-  if (best!.review.findings.some((f) => f.severity !== 'L' && f.items.length)) {
-    const judge: Judge = (layout) => {
-      const rv = reviewRoom(work.review(layout, program));
-      return { passed: rv.passed, score: rv.score, items: [...new Set(rv.findings.filter((f) => f.severity !== 'L').flatMap((f) => f.items))] };
-    };
-    const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: best!.layout.seed, catalog: work.base.products, spread: BALANCED.has(work.type), judge });
+  // the walk-through moves what it still finds (#436): the best seeds once more, with it as the judge.
+  const judge: Judge = (layout) => {
+    const rv = reviewRoom(work.review(layout, program));
+    return { passed: rv.passed, score: rv.score, items: [...new Set(rv.findings.filter((f) => f.severity !== 'L' && f.items.length).flatMap((f) => f.items))] };
+  };
+  // a room that passes: the polish of its best seed; one that fails: of its best two
+  const failing = !best!.review.passed;
+  const ranked = [...tried].sort((a, b) => (betterPlacement(a, b, work.base.products) === a ? -1 : 1));
+  for (const r of ranked.slice(0, failing ? POLISH_TOP : 1)) {
+    if (!r.review.findings.some((f) => f.severity !== 'L' && f.items.length)) continue;
+    const layout = solveRoom(work.analysis, program, { existing: work.existing, seed: r.layout.seed, catalog: work.base.products, spread: BALANCED.has(work.type), judge });
     const review = reviewRoom(work.review(layout, program));
     best = betterPlacement(best!, { roomId: work.analysis.roomId, program, layout, review, rounds }, work.base.products);
   }
