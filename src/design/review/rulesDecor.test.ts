@@ -26,6 +26,13 @@ describe('D1 / D2 Pflanzen', () => {
     const r = review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'other', items: [put('generic-plant', { x: 0.3, y: 0.3 })] });
     expect(r.findings.find((f) => f.rule === 'D1')?.severity).toBe('L');
   });
+  it('a shade plant or an artificial plant in a room without windows is what D1 recommends, so no finding', () => {
+    const dark = (label: string) =>
+      review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'other', items: [put('generic-plant', { x: 0.3, y: 0.3, id: 'pl' })], program: prog({ items: [{ id: 'pl', label } as RoomProgram['items'][number]] }) });
+    expect(has(dark('Große Zimmerpflanze (genügsam, z. B. Zamioculcas) im Terrakotta-Topf'), 'D1')).toBe(false);
+    expect(has(dark('Kunstpflanze Olivenbaum im Korb'), 'D1')).toBe(false);
+    expect(has(dark('Große Pflanze (Olive oder Feige) im Terrakotta-Kübel'), 'D1')).toBe(true);
+  });
   it('D2 a small plant or box on the floor is medium, on a sideboard it is fine', () => {
     expect(has(living([sofa, put('generic-plant-small', { x: 0.3, y: 0.3 })]), 'D2')).toBe(true);
     expect(has(living([sofa, put('generic-sideboard', { x: 3.3, y: 0.225, face: 'S', id: 'sb' }), put('generic-plant-small', { x: 3.3, y: 0.225, elevation: 0.8, parent: 'sb' })]), 'D2')).toBe(false);
