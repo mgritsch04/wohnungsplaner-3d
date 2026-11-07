@@ -168,6 +168,19 @@ describe('lamps where they light (image review r7/r9)', () => {
     }
   });
 
+  it('daylight falls on the desk from the left of the writer (paired image review r12)', () => {
+    const r = rectRoom(3.6, 3.4, { doors: [{ wall: 'O', at: 2.8 }], windows: [{ wall: 'W', at: 1.7, width: 1.2 }] });
+    for (const seed of [1, 2, 3]) {
+      const layout = solveRoom(r, program(r, [item('desk', 'generic-desk'), item('chair', 'generic-office-chair')], [{ kind: 'window', item: 'desk', window: 'F1', place: 'beside' }, { kind: 'front-of', item: 'chair', target: 'desk', gap: 0 }]), { seed });
+      const desk = byId(layout, 'desk');
+      const win = r.walls[3].openings.find((o) => o.kind === 'window')!;
+      const wx = 0;
+      const wy = (win.t0 + win.t1) / 2;
+      const u = (wx - desk.x) * Math.cos(desk.rotation) + (wy - desk.y) * Math.sin(desk.rotation);
+      expect(u, `seed ${seed}`).toBeLessThan(0);
+    }
+  });
+
   it('a mirror over the chest hangs above the lamp standing on it (image review r9)', () => {
     const p = program(room, [item('chest', 'generic-dresser', [4.2, 2.0, Math.PI / 2]), item('lamp', 'generic-table-lamp'), item('mirror', 'generic-mirror-round')], [
       { kind: 'on', item: 'lamp', target: 'chest' },

@@ -295,9 +295,14 @@ function designCost(m: Model, u: Unit, n: Node): number {
   if (n.spec.category === 'desk') {
     const behindScreen = sideStrip(n.box, 'back', 0.3);
     const behindUser = sideStrip(n.box, 'front', 1.6);
+    // the writer looks into the desk, so its +x is their right: daylight from the right falls into
+    // the shadow of the writing hand (paired image review r12 A, Zimmer 2)
+    const writerRight = sideStrip(n.box, 'left', 1.5);
+    const writerLeft = sideStrip(n.box, 'right', 1.5);
     for (const w of ctx.windows) {
       if (overlapDepth(behindScreen, w.zone) > 0.05) s += 0.3;
       if (overlapDepth(behindUser, w.zone) > 0.05) s += 0.2;
+      if (overlapDepth(writerRight, w.zone) > 0.05 && !(overlapDepth(writerLeft, w.zone) > 0.05)) s += 0.15;
     }
   }
   if (n.spec.role === 'sofa' && u.mode === 'free') {
