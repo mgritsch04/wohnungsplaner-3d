@@ -470,7 +470,10 @@ function deriveNode(m: Model, n: Node): void {
       return;
     }
     case 'around': {
-      const slots = chairSlots(P, s.depth);
+      // at a desk the chair takes the place on the sitter's right first: the desk lamp stands on the
+      // left end (−x), beside the chair and not in front of the writing hand (image review r16 A, Zimmer 2)
+      const atDesk = m.nodes.get(n.parent!)?.spec.category === 'desk';
+      const slots = atDesk ? chairSlots(P, s.depth).reverse() : chairSlots(P, s.depth);
       const open = slots.filter((sl) => insideScore(m, sl.box(s.width, s.depth)) === 0 && !m.ctx.fixed.some((fx) => fx.floor && distToBox(sl.c.x, sl.c.y, fx.box) < s.depth / 2));
       const pool = open.length >= r.count ? open : [...open, ...slots.filter((sl) => !open.includes(sl))];
       const chosen = pickSlots(pool, r.count, s.width, s.depth);
