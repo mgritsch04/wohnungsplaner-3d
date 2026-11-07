@@ -144,6 +144,13 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(c10([desk, item('ws', 'generic-wardrobe-150', 2, 1.6, 'N'), item('bed', 'generic-bed-160', 2, 3.45, 'N')])).toEqual([]);
     expect(c10([desk])).toEqual([]);
   });
+  it('a rug in the swing of a door is named (D5)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
+    const d5 = (x: number, y: number) => intentProblems(program([item('rug', 'generic-rug-160', x, y, 'N')]), room, [], [], 'living').filter((x) => x.includes('(D5'));
+    // 160×230 reaching to the south wall in front of the door, and the same rug in the middle of the room
+    expect(d5(0.9, 2.8)).toEqual([expect.stringMatching(/„rug“ liegt nach deinen Startplätzen im Aufschwung der Tür T1 \(D5, R13\).*kleineren Teppich/)]);
+    expect(d5(1.6, 1.6)).toEqual([]);
+  });
   it('a television opposite the window is named, one on the side wall not (C3)', () => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
     const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];
