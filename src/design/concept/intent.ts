@@ -22,6 +22,7 @@ import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
 import { checkDesk } from '../review/arrangeRules';
 import { checkCurtains } from '../review/decorRules';
+import { checkTvGlare } from '../review/groupRules';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
@@ -266,13 +267,14 @@ function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
 function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   const asks = (i: ProgramItem) => {
     const c = findCatalogItem(i.catalogId, [...products]);
-    return !!c && !!i.hint && (c.category === 'desk' || shapeOf(c) === 'curtain');
+    return !!c && !!i.hint && (c.category === 'desk' || shapeOf(c) === 'curtain' || shapeOf(c) === 'tv');
   };
   if (!room.walls.some((w) => w.openings.some((o) => o.kind === 'window')) || !program.items.some(asks)) return [];
   const { items, fixed } = hintLayout(program, room, existing, products);
   const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program, catalog: [...products] });
   checkCurtains(ctx);
   checkDesk(ctx);
+  checkTvGlare(ctx);
   const mine = new Set(items.map((i) => i.id));
   const byId = new Map(ctx.items.map((i) => [i.id, i]));
   const out: string[] = [];
@@ -294,6 +296,14 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
       const w = /Fenster (\S+) liegt/.exec(f.text)?.[1] ?? '';
       out.push(
         `„${f.items[0]}“ schaut nach deinen Startplätzen direkt auf das Fenster ${w}: man blickt beim Arbeiten ins Gegenlicht, der Bildschirm wirkt dunkel (C5). Profis stellen den Schreibtisch quer zum Fenster, das Tageslicht kommt von der Seite (für Rechtshänder von links), der Blick geht an der Fensterwand entlang.`,
+      );
+    }
+  // benchmark 7.11.: in A and C the plan put the television opposite a window already, the solver kept it
+  for (const f of ctx.findings)
+    if (f.rule === 'C3' && f.items.every((id) => mine.has(id))) {
+      const w = /dem Fenster (\S+) gegenüber/.exec(f.text)?.[1] ?? '';
+      out.push(
+        `„${f.items[0]}“ steht nach deinen Startplätzen dem Fenster ${w} gegenüber: bei Tageslicht spiegelt sich das Fenster im Bild (C3). Profis stellen den Fernseher an eine Wand quer zum Fenster, das Licht fällt dann von der Seite; reicht der Platz nicht, einen Vorhang oder ein Rollo am Fenster einplanen.`,
       );
     }
   return [...new Set(out)];
