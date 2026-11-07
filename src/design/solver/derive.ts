@@ -206,24 +206,51 @@ const COFFEE_PENDANT_MIN = 1.9;
 /** Gap between two pieces sharing a surface. */
 const ON_GAP = 0.05;
 
+/** The pieces sharing a surface with `n` in a row, in row order (`n` among them). */
+function rowSiblings(m: Model, n: Node, parent: Node | undefined): Node[] {
+  // the pieces that take another branch of the `on` rule do not share the row
+  const inRow = (s: Node) => s.spec.role !== 'mattress' && !SOFT_SHAPES.has(s.spec.shape) && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
+  const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
+  // the desk lamp first: on the sitter's left (−x), its light does not fall into the shadow of the writing hand
+  const lampFirst = (s: Node) => (deskLamp(parent, s.spec) ? 0 : 1);
+  return sibs.sort((a, b) => lampFirst(a) - lampFirst(b) || (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
+}
+
+/**
+ * The pieces on a surface are wider together than it is (a lamp and a vase on a nightstand):
+ * they stand diagonally, the first at the back edge, the rest at the front one, so their round
+ * bodies pass each other. 0 when the row fits, −1 back, +1 front.
+ */
+function onStagger(m: Model, n: Node, P: Box, parent: Node | undefined): number {
+  if (parent?.spec.category === 'table') return 0;
+  const sibs = rowSiblings(m, n, parent);
+  if (sibs.length < 2 || !sibs.includes(n) || sibs.reduce((v, s) => v + s.spec.width, 0) <= 2 * P.hw + 0.005) return 0;
+  return sibs[0] === n ? -1 : 1;
+}
+
 /**
  * Where a piece standing on another sits along its width: the pieces share the surface in the
  * order the programme hints them, each taking as much room as it is wide, so the lamp lands beside
  * the TV and not in it. `null` when they do not all fit and the even spread has to do.
  */
 function onRow(m: Model, n: Node, P: Box, parent: Node | undefined): number | null {
-  // the pieces that take another branch of the `on` rule do not share the row
-  const inRow = (s: Node) => s.spec.role !== 'mattress' && !SOFT_SHAPES.has(s.spec.shape) && !(parent?.spec.shape === 'shelf' && s.spec.role === 'box');
-  const sibs = [...m.nodes.values()].filter((s) => s.parent === n.parent && s.rule?.kind === 'on' && inRow(s));
+  const sibs = rowSiblings(m, n, parent);
   // a screen or a picture hanging over the piece takes its middle: what stands on it goes to the ends (#443, R7)
   const screenAbove = [...m.nodes.values()].some((s) => s.parent === n.parent && s.rule?.kind === 'above' && (s.spec.role === 'tv' || s.spec.shape === 'picture' || s.spec.shape === 'picture-set'));
   if (sibs.length < 2 && !screenAbove) return null;
-  // the desk lamp first: on the sitter's left (−x), its light does not fall into the shadow of the writing hand
-  const lampFirst = (s: Node) => (deskLamp(parent, s.spec) ? 0 : 1);
-  sibs.sort((a, b) => lampFirst(a) - lampFirst(b) || (a.rule as Extract<Rule, { index: number }>).index - (b.rule as Extract<Rule, { index: number }>).index);
   const widths = sibs.reduce((v, s) => v + s.spec.width, 0);
   const total = widths + ON_GAP * (sibs.length - 1);
-  if (total > 2 * P.hw) return null;
+  if (total > 2 * P.hw) {
+    // too narrow for a row with gaps (a lamp and a vase on a nightstand): the first piece at the
+    // left end, the last at the right end, the rest spread between, so they touch rather than
+    // stand in each other (image review r10); `onFront` moves the rest forward when even that is short
+    if (sibs.length < 2) return null;
+    const k = sibs.indexOf(n);
+    if (k < 0) return null;
+    const first = -P.hw + sibs[0].spec.width / 2;
+    const last = P.hw - sibs[sibs.length - 1].spec.width / 2;
+    return first + ((last - first) * k) / (sibs.length - 1);
+  }
   const gap = screenAbove && sibs.length > 1 ? (2 * P.hw - widths) / (sibs.length - 1) : ON_GAP;
   let u = screenAbove ? -P.hw : -total / 2;
   for (const s of sibs) {
@@ -462,7 +489,9 @@ function deriveNode(m: Model, n: Node): void {
       // it stands on the piece, not behind it (a pot on a wall shelf would reach into the wall), and
       // in front of what hangs over the piece at the same height (the lamp beside, not behind, the TV)
       const back = Math.max(-P.hd, hangingFront(m, n, P, p.top, p.top + s.height, side - s.width / 2, side + s.width / 2) + 0.01) + s.depth / 2;
-      const v = table ? Math.max(0, back) : Math.max(back, -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
+      const v0 = table ? Math.max(0, back) : Math.max(back, -P.hd + Math.min(s.depth / 2 + 0.05, P.hd));
+      const stagger = row === null ? 0 : onStagger(m, n, P, parentNode);
+      const v = stagger > 0 ? Math.max(v0, P.hd - s.depth / 2 - 0.01) : stagger < 0 ? Math.max(back, Math.min(v0, -P.hd + s.depth / 2 + 0.01)) : v0;
       const c = at(side, Math.min(v, P.hd));
       n.box = { x: c.x, y: c.y, hw: s.width / 2, hd: s.depth / 2, rotation: P.rotation };
       n.elevation = p.top;

@@ -180,6 +180,19 @@ describe('lamps where they light (image review r7/r9)', () => {
     expect(mirror.elevation + mirror.height / 2).toBeLessThanOrEqual(1.75 + 1e-6);
   });
 
+  it('a lamp and a vase on a nightstand stand side by side, not in each other (image review r10)', () => {
+    const p = program(room, [item('bed', 'generic-bed-140', [2.25, 3.0, Math.PI]), item('ns', 'generic-nightstand'), item('lamp', 'generic-table-lamp'), item('vase', 'generic-vase')], [
+      { kind: 'near', item: 'ns', target: 'bed', max: 1.2 },
+      { kind: 'on', item: 'lamp', target: 'ns' },
+      { kind: 'on', item: 'vase', target: 'ns' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const lamp = byId(layout, 'lamp');
+    const vase = byId(layout, 'vase');
+    // together wider than the 42 cm top: they stand diagonally, the round shade passes the vase
+    expect(Math.hypot(lamp.x - vase.x, lamp.y - vase.y)).toBeGreaterThanOrEqual((lamp.width + vase.width) / 2);
+  });
+
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
     const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('coffee', 'generic-coffee-table'), item('pendant', 'generic-pendant')], [
       { kind: 'front-of', item: 'coffee', target: 'sofa' },
