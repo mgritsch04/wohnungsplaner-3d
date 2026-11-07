@@ -8,10 +8,11 @@ import type { Finding, RoomMetrics, RoomReview, Review } from '../types';
 import { flatScore, passes, roomScore } from '../score';
 import { checkAnchors, checkDoubles, checkKitchen, checkRequired, checkSanitary } from './functionRules';
 import { checkClearances, checkDoors, checkReach, checkWays } from './wayRules';
-import { checkBackGap, checkBeds, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
+import { checkBackGap, checkBeds, checkCallBackground, checkCookAisle, checkDesk, checkDining, checkSeating, checkTall, checkTv, checkWallFit, checkWedged, checkZonesApart } from './arrangeRules';
 import { checkCurtains, checkLight, checkPictures, checkPlants, checkRepeats, checkRugs, checkWallArt } from './decorRules';
 import { checkLightPlan } from './lightRules';
 import { checkBalance, checkFloorContrast, checkFocus, checkNav, checkOpenPatch, checkOccupancy, checkPalette, checkStyle, checkTogether, checkZones, occupancy } from './overallRules';
+import { checkArmchairToTable, checkBedSides, checkCoffeeTableSize, checkRugInCookAisle, checkRugOverhang, checkTvGlare } from './groupRules';
 import { RoomCtx, type ReviewInput } from './context';
 
 export type { ReviewInput, ReviewOptions } from './context';
@@ -34,6 +35,7 @@ function run(ctx: RoomCtx): RoomReview {
   checkDining(ctx);
   checkCookAisle(ctx);
   checkDesk(ctx);
+  checkCallBackground(ctx);
   checkTall(ctx);
   checkWallFit(ctx);
   checkWedged(ctx);
@@ -42,6 +44,12 @@ function run(ctx: RoomCtx): RoomReview {
   checkLight(ctx);
   checkLightPlan(ctx);
   checkRugs(ctx);
+  checkRugInCookAisle(ctx);
+  checkRugOverhang(ctx);
+  checkBedSides(ctx);
+  checkTvGlare(ctx);
+  checkArmchairToTable(ctx);
+  checkCoffeeTableSize(ctx);
   checkPictures(ctx);
   checkWallArt(ctx);
   checkCurtains(ctx);

@@ -237,6 +237,40 @@ export function checkDesk(ctx: RoomCtx): void {
   }
 }
 
+/** How far behind the chair the camera of a video call sees (m), and how wide (±30°). */
+const CALL_RANGE = 4;
+const CALL_CONE = deg(30);
+
+/**
+ * C10 (L, HO4): behind the desk chair, in the picture of a video call (±30°), there is no window
+ * (backlight) and no bed (untidy background); a shelf or a quiet wall is better. The first thing
+ * the ray meets counts; tall furniture closes the picture.
+ */
+export function checkCallBackground(ctx: RoomCtx): void {
+  if (ctx.type === 'kids' || ctx.type === 'bath' || ctx.type === 'kitchen' || ctx.type === 'hall') return;
+  for (const d of ctx.items.filter((i) => i.category === 'desk' && i.floor)) {
+    const eye: Vec2 = { x: d.x + d.front.x * (d.depth / 2 + 0.4), y: d.y + d.front.y * (d.depth / 2 + 0.4) };
+    const seen = new Set<string>();
+    for (const turn of [-CALL_CONE, 0, CALL_CONE]) {
+      const dir = { x: d.front.x * Math.cos(turn) - d.front.y * Math.sin(turn), y: d.front.x * Math.sin(turn) + d.front.y * Math.cos(turn) };
+      for (let t = 0.3; t <= CALL_RANGE; t += 0.05) {
+        const p = { x: eye.x + dir.x * t, y: eye.y + dir.y * t };
+        if (!ctx.inRoom(p)) {
+          const w = ctx.windows.find((x) => x.sill <= 1.5 && pointPolyDist(p, x.strip) < 0.1);
+          if (w) seen.add(`das Fenster ${w.label}`);
+          break;
+        }
+        const hit = ctx.items.find((i) => i !== d && i.floor && pointPolyDist(p, i.poly) === 0 && (i.shape === 'bed' || i.height > 1.2));
+        if (hit) {
+          if (hit.shape === 'bed') seen.add(ctx.label(hit));
+          break;
+        }
+      }
+    }
+    if (seen.size) ctx.add('C10', 'L', `Hinter dem Stuhl an ${ctx.label(d)} liegt im Bild einer Videokonferenz ${[...seen].join(' und ')} (Gegenlicht oder unruhiger Hintergrund), besser ein Regal oder eine ruhige Wand (HO4).`, [d], d);
+  }
+}
+
 /** C6, C7: tall pieces. */
 export function checkTall(ctx: RoomCtx): void {
   const dividers = new Set((ctx.program?.relations ?? []).flatMap((r) => (r.kind === 'center' ? [r.item] : [])));
@@ -289,8 +323,11 @@ export function checkBackGap(ctx: RoomCtx): void {
   for (const i of ctx.placed) {
     if (!i.floor || !(i.role === 'sofa' || i.category === 'desk')) continue;
     const behind = ctx.freeDepth(i, 'back', 0.8);
-    if (behind.blocker === 'wall' && behind.depth >= 0.15 - 1e-6 && behind.depth <= 0.7 + 1e-6)
-      ctx.add('C8', 'L', `Hinter ${ctx.label(i)} bleiben ${cm(behind.depth)} cm bis zur Wand: zu schmal für einen Gang, zu breit für „an der Wand“.`, [i], i);
+    if (behind.blocker && behind.depth >= 0.15 - 1e-6 && behind.depth <= 0.7 + 1e-6) {
+      // W9: also a strip between the sofa and the next piece (plant bench, shelf) is neither passage nor wall
+      const what = behind.blocker === 'wall' ? 'bis zur Wand' : `bis zum nächsten Möbel (${ctx.label(behind.blocker)})`;
+      ctx.add('C8', 'L', `Hinter ${ctx.label(i)} bleiben ${cm(behind.depth)} cm ${what}: zu schmal für einen Gang, zu breit für „an der Wand“.`, [i], i);
+    }
   }
 }
 
