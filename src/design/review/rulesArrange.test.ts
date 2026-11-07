@@ -134,9 +134,13 @@ describe('C4 Esstisch', () => {
   it('a chair away from the table is medium', () => {
     expect(has(dining({ chairs: [[1.6, 0.915, 'S'], [2.4, 0.915, 'S'], [1.6, 2.085, 'N'], [3.6, 2.7, 'N']] }), 'C4', /nicht am Tisch/)).toBe(true);
   });
-  it('less than 75 cm behind the chairs on two sides is light', () => {
-    const r = dining({ h: 2.2, chairs: [[1.6, 0.515, 'S'], [2.4, 0.515, 'S'], [1.6, 1.685, 'N'], [2.4, 1.685, 'N']] });
-    expect(r.findings.find((f) => f.rule === 'C4' && /75 cm/.test(f.text))?.severity).toBe('L');
+  it('less than 90 cm behind the chairs on two sides is light', () => {
+    const r = dining({ h: 2.45, chairs: [[1.6, 0.6, 'S'], [2.4, 0.6, 'S'], [1.6, 1.85, 'N'], [2.4, 1.85, 'N']] });
+    expect(r.findings.find((f) => f.rule === 'C4' && /90 cm/.test(f.text))?.severity).toBe('L');
+  });
+  it('less than 75 cm from the table edge to the wall behind a chair is medium (image reviews r7/r9)', () => {
+    const r = dining({ h: 2.3, chairs: [[1.6, 0.5, 'S'], [2.4, 0.5, 'S'], [1.6, 1.8, 'N'], [2.4, 1.8, 'N']] });
+    expect(r.findings.find((f) => f.rule === 'C4' && /zurückschieben/.test(f.text))?.severity).toBe('M');
   });
   it('a chair that cannot be pulled out is medium, even on one side (image review of test flats A and B, 6.11.)', () => {
     // table edge 47 cm from the north wall, the south side free
