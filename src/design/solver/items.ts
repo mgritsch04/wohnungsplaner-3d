@@ -58,7 +58,7 @@ function clearancesOf(shape: string, role: Role, it: CatalogItem): Clearance[] {
   if (it.kitchen) return KITCHEN_FLOOR.has(it.kitchen.type) ? [{ side: 'front', min: 1.0, comfort: 1.2 }] : [];
   if (role === 'bed') {
     const single = it.width < 1.2;
-    const side = (s: 'left' | 'right'): Clearance => ({ side: s, min: 0.5, comfort: 0.7, from: 0.22, to: 1, ...(single ? { either: true } : {}) });
+    const side = (s: 'left' | 'right'): Clearance => ({ side: s, min: 0.6, comfort: 0.75, from: 0.22, to: 1, ...(single ? { either: true } : {}) });
     return [side('left'), side('right')];
   }
   if (shape === 'wardrobe') return [{ side: 'front', min: 0.7, comfort: 0.9 }];
