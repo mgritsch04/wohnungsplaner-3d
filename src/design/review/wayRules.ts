@@ -134,15 +134,30 @@ export function checkReach(ctx: RoomCtx): void {
     ctx.add('B8', 'L', 'Kein Fenster des Raums ist erreichbar, man kann nicht lüften.', [], ctx.windows[0].mid);
 }
 
+/** Pieces one pushes aside with one hand to get to the window: a reading chair, side table or floor lamp. */
+const MOVABLE = new Set(['armchair', 'side-table', 'floor-lamp', 'seat']);
+
 /**
- * Standing at the window, or in front of a low piece under it (the worktop under the kitchen
- * window, a sideboard): one leans over it to open the window.
+ * Standing at the window anywhere along its width, or in front of a low piece under it (the worktop
+ * under the kitchen window, a sideboard, the bathtub): one leans over it to open the window. A reading
+ * chair at the window is pushed aside (the reading corner at the window is a designer's pattern, S7).
+ * Benchmark 7.11.: all four B8 findings were a bathtub 75 cm deep or an armchair at the window.
  */
 function windowReachable(ctx: RoomCtx, w: Win): boolean {
-  const at = (d: number) => ({ x: w.mid.x + w.wall.inward.x * d, y: w.mid.y + w.wall.inward.y * d });
-  if (ctx.grid.touches(ctx.reach, at(0.3), 0.5)) return true;
-  const under = ctx.items.filter((i) => i.obstacle && pointPolyDist(at(0.3), i.poly) < 0.05);
-  if (!under.length || under.some((i) => i.height > w.sill + 0.05)) return false;
-  const depth = Math.max(...under.map((i) => i.depth));
-  return depth <= 0.7 && ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
+  const n = Math.max(1, Math.floor((w.t1 - w.t0 - 0.4) / 0.3) + 1);
+  const along = Array.from({ length: n }, (_, k) => (n === 1 ? (w.t0 + w.t1) / 2 : w.t0 + 0.2 + (k * (w.t1 - w.t0 - 0.4)) / (n - 1)));
+  return along.some((t) => {
+    const base = { x: w.wall.a.x + w.wall.dir.x * t, y: w.wall.a.y + w.wall.dir.y * t };
+    const at = (d: number) => ({ x: base.x + w.wall.inward.x * d, y: base.y + w.wall.inward.y * d });
+    if (ctx.grid.touches(ctx.reach, at(0.3), 0.5)) return true;
+    const under = ctx.items.filter((i) => i.obstacle && pointPolyDist(at(0.3), i.poly) < 0.05);
+    if (!under.length) return false;
+    const depth = Math.max(...under.map((i) => i.depth));
+    // a chair is moved, then one stands where it was
+    if (under.every((i) => MOVABLE.has(i.role))) return ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
+    if (under.some((i) => i.height > w.sill + 0.05)) return false;
+    // over a bathtub (58 cm high) one leans further than over a worktop
+    const lean = under.every((i) => i.height <= 0.65) ? 0.8 : 0.7;
+    return depth <= lean && ctx.grid.touches(ctx.reach, at(depth + 0.3), 0.5);
+  });
 }
