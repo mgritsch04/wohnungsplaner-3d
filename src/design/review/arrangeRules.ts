@@ -180,15 +180,15 @@ export function checkDining(ctx: RoomCtx): void {
     let cramped = 0;
     for (const side of ['front', 'back', 'left', 'right'] as const) {
       if (!chairsAtSide(t, chairs, side).length) continue;
-      const depth = ctx.freeDepth(t, side, 0.75, { ignore: seat }).depth;
-      if (depth < 0.75 - 1e-6) tight++;
-      // a chair pushed in at the table already takes about 50 cm: with less than 65 cm to the wall
-      // nobody pulls it out to sit down (image review of test flats A and B, 6.11.: 25 cm behind the chair)
-      if (depth < 0.65 - 1e-6) cramped++;
+      const depth = ctx.freeDepth(t, side, 0.9, { ignore: seat }).depth;
+      if (depth < 0.9 - 1e-6) tight++;
+      // a chair pushed in at the table already takes about 50 cm: with less than 75 cm to the wall
+      // nobody pulls it out comfortably to sit down (image reviews r7/r9: 27 to 47 cm behind the chair)
+      if (depth < 0.75 - 1e-6) cramped++;
     }
     // on a balcony the bistro table stands at the railing on purpose
     if (cramped && ctx.type !== 'balcony') ctx.add('C4', 'M', `Hinter ${cramped === 1 ? 'einem Stuhl' : `den Stühlen auf ${cramped} Seiten`} bleibt bis zur Wand oder zum nächsten Möbel kaum Platz, man kann ihn nicht zurückschieben (E2: 90 cm ab Tischkante).`, [t], t);
-    else if (tight > 1) ctx.add('C4', 'L', `Hinter den Stühlen am Tisch ist auf ${tight} Seiten weniger als 75 cm Platz zum Aufstehen.`, [t], t);
+    else if (tight > 1 && ctx.type !== 'balcony') ctx.add('C4', 'L', `Hinter den Stühlen am Tisch ist auf ${tight === 1 ? 'einer Seite' : `${tight} Seiten`} weniger als 90 cm Platz zum Aufstehen (E2).`, [t], t);
     if (pendants.length && !pendants.some((p) => dist(p, t) < 0.5)) ctx.add('C4', 'L', 'Die Pendelleuchte hängt nicht über dem Esstisch.', [t, pendants[0]], pendants[0]);
   }
 }
