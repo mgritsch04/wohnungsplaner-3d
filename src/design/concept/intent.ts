@@ -22,6 +22,7 @@ import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
 import { checkBackGap, checkCallBackground, checkDesk, checkTv } from '../review/arrangeRules';
 import { checkCurtains, checkPlants, checkRugs } from '../review/decorRules';
+import { checkLightPlan } from '../review/lightRules';
 import { checkClearances } from '../review/wayRules';
 import { checkTvGlare } from '../review/groupRules';
 import { boundaryDist } from '../review/geom';
@@ -336,8 +337,8 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
 }
 
 /**
- * C3, C4, C8, C10, D5 and D1 on the start places: a sofa that looks at nothing, a dining table in the work
- * aisle of the kitchen, a sofa or desk with a useless strip behind it, the bed or a window behind the desk
+ * C3, C4, C8, C10, D5, L7 and D1 on the start places: a sofa that looks at nothing, a dining table in the work
+ * aisle of the kitchen, two lamps side by side (B Schlafzimmer; once also in a plan the solver mended, C), a sofa or desk with a useless strip behind it, the bed or a window behind the desk
  * chair in a video call, a rug in the swing of a door (R13), a tall plant in a room without a window. In the
  * benchmark (7.11.) each came from the plan and the solver kept it (F Zimmer 2, E Küche, F Wohnküche, B and C
  * bedrooms, A Gang); only the rug in the door swing was once also in a plan the solver mended (E Wohnzimmer),
@@ -350,7 +351,7 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
 function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   const wanted = program.items.some((i) => {
     const c = findCatalogItem(i.catalogId, [...products]);
-    return !!c && !!i.hint && (roleOf(c) === 'sofa' || shapeOf(c) === 'plant' || shapeOf(c) === 'rug' || c.category === 'table' || c.category === 'desk');
+    return !!c && !!i.hint && (roleOf(c) === 'sofa' || shapeOf(c) === 'plant' || shapeOf(c) === 'rug' || c.category === 'table' || c.category === 'desk' || c.category === 'lighting');
   });
   if (!wanted) return [];
   const { items, fixed } = hintLayout(program, room, existing, products);
@@ -360,6 +361,7 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
   checkCallBackground(ctx);
   checkPlants(ctx);
   checkRugs(ctx);
+  checkLightPlan(ctx);
   checkClearances(ctx);
   const mine = new Set(program.items.map((i) => i.id));
   const out: string[] = [];
@@ -389,6 +391,10 @@ function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, ex
       const door = /Aufschwung der Tür (\S+)/.exec(f.text)?.[1] ?? '';
       out.push(
         `„${id}“ liegt nach deinen Startplätzen im Aufschwung der Tür ${door} (D5, R13): das Türblatt schleift darüber oder bleibt hängen. Einen kleineren Teppich nehmen oder ihn so legen, dass er vor dem Schwenkbereich der Tür endet.`,
+      );
+    } else if (f.rule === 'L7' && f.text.includes('keinen Meter') && f.items.length === 2 && f.items.every((x) => mine.has(x))) {
+      out.push(
+        `„${f.items[0]}“ und „${f.items[1]}“ stehen nach deinen Startplätzen keinen Meter auseinander und beleuchten dieselbe Stelle (L7). Profis verteilen Steh- und Tischleuchten über den Raum: das zweite Licht ans andere Ende (Leseecke, Sideboard, gegenüberliegende Ecke), dann gibt es keine dunkle Raumhälfte.`,
       );
     } else if (f.rule === 'D1' && f.text.includes('kein Tageslicht'))
       out.push(
