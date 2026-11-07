@@ -3,7 +3,7 @@ import { dist, pointInPolygon, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import type { RoomCtx } from './context';
 import { polyDist, segmentHitsConvex } from './geom';
-import { isKitchenModule, type RItem } from './items';
+import { isKitchenModule, isPlant, type RItem } from './items';
 
 /** Share of the floor covered by pieces standing on it (chairs at a table do not count extra). */
 export function occupancy(ctx: RoomCtx): number {
@@ -159,6 +159,9 @@ export function checkZones(ctx: RoomCtx): void {
     if (!i.floor && i.elevation > 0.05 && ctx.parentOf(i)) continue;
     // a curtain belongs to its window, whatever zone the programme gave it (benchmark 7.11.: 3 of 11 E2 were curtains)
     if (i.role === 'curtain') continue;
+    // plants, pictures and wall shelves are spread over the room on purpose (accents repeated in several places,
+    // the styling triangle); a planter in the corner beside the seats is no stray piece (benchmark 7.11.: 5 of 6 E2)
+    if (isPlant(i) || i.role === 'wall-art') continue;
     const z = prog.zones.find((q) => q.id === i.zone);
     if (!z) continue;
     const r = z.rect;

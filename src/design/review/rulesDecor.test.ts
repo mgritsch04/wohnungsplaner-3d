@@ -216,6 +216,9 @@ describe('E Gesamteindruck', () => {
     expect(has(living([put('generic-sofa-3', { x: 4.2, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(true);
     // a curtain hangs at its window, not in a zone
     expect(has(living([put('generic-curtain', { x: 4.2, y: 0.05, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
+    // plants and pictures are accents spread over the room, not pieces of a zone
+    expect(has(living([put('generic-plant', { x: 4.7, y: 0.3, zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
+    expect(has(living([put('generic-picture', { x: 4.2, y: 0.03, elevation: 1.4, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
     const overlapping = [...zones, { id: 'lesen', function: 'Leseecke', rect: { x0: 0.2, y0: 2.2, x1: 2, y1: 4 }, why: '' }];
     const reading = put('generic-armchair', { x: 0.6, y: 2.6, face: 'O', zone: 'lesen' });
     const sitting = put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' });
