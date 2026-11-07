@@ -88,6 +88,13 @@ describe('D5 Teppich', () => {
     const hall = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.7 }, { wall: 'N', at: 0.7 }] }), type: 'hall', items: [put('generic-runner', { x, y: 2 })] });
     expect(has(hall(0.7), 'D5', /Mitte/)).toBe(false);
     expect(has(hall(0.5), 'D5', /Mitte/)).toBe(true);
+    // the middle of the free strip counts: shelves along the east wall narrow the hall to 1.1 m
+    const shelves = [1.2, 2, 2.8].map((y) => put('generic-shelf-80', { x: 1.25, y, face: 'W' }));
+    const beside = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.5 }, { wall: 'N', at: 0.5 }] }), type: 'hall', items: [...shelves, put('generic-runner', { x, y: 2 })] });
+    expect(has(beside(0.55), 'D5', /Mitte/)).toBe(false);
+    expect(has(beside(0.7), 'D5', /Mitte/)).toBe(true);
+    // a wide entrance hall has no middle line
+    expect(has(review({ room: rectRoom(3, 3.5, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'hall', items: [put('generic-runner', { x: 0.6, y: 1.7 })] }), 'D5', /Mitte/)).toBe(false);
   });
 });
 
