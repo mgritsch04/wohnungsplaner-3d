@@ -100,6 +100,8 @@ function rayToOutline(p: Vec2, dir: Vec2, poly: readonly Vec2[]): number {
 
 /** Room behind the chairs of a dining table, table edge to wall (E2; the walkthrough flags under 75 cm). */
 const CHAIR_ROOM = 0.75;
+/** An anchor may stand this far (m) outside its zone before the walkthrough calls it misplaced (A5). */
+const ZONE_SLACK = 0.3;
 const SIDE_WORD = { N: 'nördlichen', O: 'östlichen', S: 'südlichen', W: 'westlichen' } as const;
 
 /**
@@ -169,6 +171,17 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
         }
       }
     }
+  // A5: an anchor whose start place lies outside its own zone (benchmark 7.11.: F Bad 2, the solver kept it there)
+  for (const it of program.items) {
+    const zone = it.required && it.hint ? program.zones.find((z) => z.id === it.zone) : undefined;
+    if (!zone || !it.hint) continue;
+    const r = zone.rect;
+    const out = Math.max(r.x0 - it.hint.x, it.hint.x - r.x1, r.y0 - it.hint.y, it.hint.y - r.y1, 0);
+    if (out > ZONE_SLACK)
+      problems.push(
+        `„${it.id}“ steht nach deinen Startplätzen etwa ${Math.round(out * 100)} cm außerhalb seiner Zone „${zone.id}“ (${zone.function}) (A5). Den Startplatz in die Zone legen oder die Zone so ziehen, dass sie das Möbel einschließt; die Begehung prüft das Ankermöbel in seiner Zone.`,
+      );
+  }
   problems.push(...rugUnderBed(pieces, products, room?.polygon));
   if (type && room && 'walls' in room) problems.push(...emptyFloor(program, room as RoomAnalysis, type, existing, products));
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));

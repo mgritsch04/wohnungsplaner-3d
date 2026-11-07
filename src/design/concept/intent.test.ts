@@ -118,6 +118,15 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(of('D1', [{ ...plant, label: 'Zamioculcas im Übertopf' }])).toEqual([]);
     expect(of('D1', [plant], undefined, rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] }))).toEqual([]);
   });
+  it('an anchor whose start place lies outside its own zone is named (A5)', () => {
+    const zones = [{ id: 'baden', function: 'Baden und Handtücher', rect: { x0: 1.5, y0: 0, x1: 3.2, y1: 1.8 }, why: '' }];
+    const at = (x: number, required = true) => ({ ...program([{ ...item('regal', 'generic-shelf-80', x, 0.4, 'W'), zone: 'baden', required }]), zones });
+    expect(check(at(0.6)).filter((x) => x.includes('(A5)'))).toEqual([expect.stringMatching(/„regal“ steht nach deinen Startplätzen etwa 90 cm außerhalb seiner Zone „baden“/)]);
+    // inside, a little over the edge, or not an anchor: nothing
+    expect(check(at(3.0)).filter((x) => x.includes('(A5)'))).toEqual([]);
+    expect(check(at(1.3)).filter((x) => x.includes('(A5)'))).toEqual([]);
+    expect(check(at(0.6, false)).filter((x) => x.includes('(A5)'))).toEqual([]);
+  });
   it('a television opposite the window is named, one on the side wall not (C3)', () => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
     const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];
