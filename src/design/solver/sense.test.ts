@@ -499,3 +499,23 @@ describe('a tight living room keeps its seating group (#436)', () => {
     expect(layout.items.some((i) => i.id === 'ct')).toBe(true);
   });
 });
+
+describe('a rug that reaches past its piece (D5)', () => {
+  const bedroom = (w: number, d: number) => rectRoom(w, d, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'O', at: d / 2 }] });
+  const bedRug = (room: RoomAnalysis) =>
+    program(room, [item('bed', 'generic-bed-160', [room.size.x / 2, 1.1, 0]), item('rug', 'generic-rug-160')], [{ kind: 'under-all', item: 'rug', target: 'bed' }]);
+
+  it('a plain 160×230 under a 160 bed (32 cm out each side) becomes the 200×300 where it fits, without counting as a smaller variant', () => {
+    const room = bedroom(4.6, 4);
+    const layout = solveRoom(room, bedRug(room), { seed: 3 });
+    const rug = byId(layout, 'rug');
+    expect(rug.catalogId).toBe('generic-rug-200');
+    expect(rug.replaces).toBeUndefined();
+  });
+
+  it('in a room too narrow for the bigger rug the planned one stays', () => {
+    const room = bedroom(2.9, 3.6);
+    const layout = solveRoom(room, bedRug(room), { seed: 3 });
+    expect(byId(layout, 'rug').catalogId).toBe('generic-rug-160');
+  });
+});
