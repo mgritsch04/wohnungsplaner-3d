@@ -111,7 +111,10 @@ export function checkPictures(ctx: RoomCtx): void {
     if (p.shape === 'wall-shelf' || HANGING.has(p.shape)) continue;
     for (const w of ctx.windows) if (overlaps(w.strip, p.poly, 1e-3) && p.elevation + p.height > w.sill) ctx.add('D6', 'L', `${ctx.label(p)} hängt über dem Fenster ${w.label}.`, [p], p);
     for (const d of ctx.doors) if (Math.abs(dot(sub(p, d.mid), d.wall.dir)) < d.width / 2 && dot(sub(p, d.mid), d.wall.inward) < 0.3) ctx.add('D6', 'L', `${ctx.label(p)} hängt über der Tür ${d.label}.`, [p], p);
-    const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
+    // the piece Claude hung it over counts only where it really hangs over it: over a sofa standing free in
+    // the room the solver hangs the picture on another wall (benchmark 7.11.: E and F, 2.0 and 2.4 m away)
+    const parent = ctx.parentOf(p);
+    const under = (parent && pointPolyDist(p, parent.poly) < 0.5 ? parent : undefined) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
     // R7: a picture belongs to the piece under it, 15–30 cm above it; from half a metre it floats
     if (under && p.role === 'wall-art' && under.floor) {
       const gap = p.elevation - (under.elevation + under.height);
