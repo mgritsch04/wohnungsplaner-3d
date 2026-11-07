@@ -101,6 +101,23 @@ describe('the programme keeps its own rules before anything is placed (#436)', (
     expect(intentProblems(program([item('desk', 'generic-desk', 2, 0.35, 'S')]), room, [], [], 'office').some((x) => /„desk“ schaut nach deinen Startplätzen direkt auf das Fenster F1.*\(C5\)/.test(x))).toBe(true);
     expect(intentProblems(program([c1, c2, item('desk', 'generic-desk', 0.35, 1.9, 'O')]), room, [], [], 'office').filter((x) => /\((C5|D7)\)/.test(x))).toEqual([]);
   });
+  it('a sofa looking at nothing, a table in the cook aisle and a tall plant without daylight are named (C3, C4, D1)', () => {
+    const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }] });
+    const sofa = item('sofa', 'generic-sofa-3', 2, 3.5, 'N');
+    const of = (rule: string, items: ProgramItem[], kitchen?: RoomProgram['kitchen'], r = room) => intentProblems(program(items, kitchen), r, [], [], 'living').filter((x) => x.includes(`(${rule})`));
+    expect(of('C3', [sofa])).toEqual([expect.stringMatching(/„sofa“ schaut nach deinen Startplätzen auf nichts.*Blickziel/)]);
+    // a picture opposite gives the sofa its focal point
+    expect(of('C3', [sofa, item('pic', 'generic-picture-large', 2, 0.02, 'S')])).toEqual([]);
+    // a dining table 50 cm in front of the kitchen run, and one well away from it
+    const kitchen = [{ wall: 'W1', from: { x: 0.5, y: 0 }, to: { x: 3.5, y: 0 }, modules: ['generic-k-sink-80'] }];
+    expect(of('C4', [item('table', 'generic-dining-table-4', 2, 1.53, 'N')], kitchen)).toEqual([expect.stringMatching(/„table“ steht nach deinen Startplätzen im Arbeitsgang der Küche, vor der Zeile bleiben nur \d+ cm.*120 cm/)]);
+    expect(of('C4', [item('table', 'generic-dining-table-4', 2, 2.8, 'N')], kitchen)).toEqual([]);
+    // a tall plant in a room without a window; a shade plant there, or the plant in a room with daylight, is fine
+    const plant = item('plant', 'generic-plant', 0.3, 0.3, 'S');
+    expect(of('D1', [plant])).toEqual([expect.stringMatching(/„plant“ steht nach deinen Startplätzen in einem Raum ohne Fenster.*Schattenpflanze/)]);
+    expect(of('D1', [{ ...plant, label: 'Zamioculcas im Übertopf' }])).toEqual([]);
+    expect(of('D1', [plant], undefined, rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] }))).toEqual([]);
+  });
   it('a television opposite the window is named, one on the side wall not (C3)', () => {
     const room = rectRoom(4, 4, { doors: [{ wall: 'S', at: 3.4 }], windows: [{ wall: 'N', at: 2 }] });
     const tvAt = (x: number, y: number, face: 'N' | 'S' | 'O' | 'W') => [item('board', 'generic-tv-sideboard', x, y, face), item('tv', 'generic-tv', x, y, face)];

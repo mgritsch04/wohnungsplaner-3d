@@ -20,8 +20,9 @@ import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
 import { RoomCtx } from '../review/context';
-import { checkDesk } from '../review/arrangeRules';
-import { checkCurtains } from '../review/decorRules';
+import { checkDesk, checkTv } from '../review/arrangeRules';
+import { checkCurtains, checkPlants } from '../review/decorRules';
+import { checkClearances } from '../review/wayRules';
 import { checkTvGlare } from '../review/groupRules';
 import { boundaryDist } from '../review/geom';
 import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
@@ -173,6 +174,7 @@ export function intentProblems(program: RoomProgram, room: Pick<RoomAnalysis, 'p
   if (room && 'walkways' in room) problems.push(...blockedWays(program, room as RoomAnalysis, existing, products));
   if (room && 'walkways' in room) problems.push(...areaBudget(program, room as RoomAnalysis, existing, products));
   if (type && room && 'walls' in room) problems.push(...windowSpots(program, room as RoomAnalysis, type, existing, products));
+  if (type && room && 'walls' in room) problems.push(...focusSpots(program, room as RoomAnalysis, type, existing, products));
   return problems;
 }
 
@@ -317,6 +319,48 @@ function windowSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, e
         `„${f.items[0]}“ steht nach deinen Startplätzen dem Fenster ${w} gegenüber: bei Tageslicht spiegelt sich das Fenster im Bild (C3). Profis stellen den Fernseher an eine Wand quer zum Fenster, das Licht fällt dann von der Seite; reicht der Platz nicht, einen Vorhang oder ein Rollo am Fenster einplanen.`,
       );
     }
+  return [...new Set(out)];
+}
+
+/**
+ * C3, C4 and D1 on the start places: a sofa that looks at nothing, a dining table in the work aisle of
+ * the kitchen, a tall plant in a room without a window. In the benchmark (7.11.) each came from the plan
+ * (F Zimmer 2, E Küche, A Gang) and the solver kept it; no plan had one that the solver then mended, so
+ * asking adds no repair round the result would not need (the recorded first answer for F Vorraum has a
+ * tall plant without daylight too). Designers give every sofa a focal point (picture,
+ * armchairs, window or television opposite), keep 120 cm between kitchen run and table (NKBA: 42 in work
+ * aisle plus room behind the chairs) and put shade or artificial plants where no daylight comes.
+ */
+function focusSpots(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
+  const wanted = program.items.some((i) => {
+    const c = findCatalogItem(i.catalogId, [...products]);
+    return !!c && !!i.hint && (roleOf(c) === 'sofa' || shapeOf(c) === 'plant' || c.category === 'table');
+  });
+  if (!wanted) return [];
+  const { items, fixed } = hintLayout(program, room, existing, products);
+  const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program, catalog: [...products] });
+  checkTv(ctx);
+  checkPlants(ctx);
+  checkClearances(ctx);
+  const mine = new Set(program.items.map((i) => i.id));
+  const out: string[] = [];
+  for (const f of ctx.findings) {
+    const id = f.items[0];
+    if (!id || !mine.has(id)) continue;
+    if (f.rule === 'C3' && f.text.includes('schaut auf nichts'))
+      out.push(
+        `„${id}“ schaut nach deinen Startplätzen auf nichts: kein Fernseher, kein Fenster, kein Bild und keine Sessel gegenüber (C3). Profis geben jedem Sofa ein Blickziel: gegenüber ein Bild ab 60 cm Breite, Sessel oder das Fenster; oder das Sofa so drehen, dass es in den Raum statt auf eine leere Wand schaut.`,
+      );
+    else if (f.rule === 'C4' && f.text.includes('Arbeitsgang der Küche')) {
+      const left = /bleiben (\d+) cm/.exec(f.text)?.[1];
+      out.push(
+        `„${id}“ steht nach deinen Startplätzen im Arbeitsgang der Küche${left ? `, vor der Zeile bleiben nur ${left} cm` : ''} (C4). Zwischen Küchenzeile und Esstisch plant man mindestens 120 cm, damit man kochen kann, während jemand am Tisch sitzt; den Tisch weiter in den Raum rücken oder quer zur Zeile stellen.`,
+      );
+    } else if (f.rule === 'D1' && f.text.includes('kein Tageslicht'))
+      out.push(
+        `„${id}“ steht nach deinen Startplätzen in einem Raum ohne Fenster und bekommt kein Tageslicht (D1). Dort eine Schattenpflanze wählen und so benennen (Zamioculcas, Sansevieria, Schusterpalme) oder eine Kunstpflanze, sonst die Pflanze in einen Raum mit Fenster.`,
+      );
+  }
   return [...new Set(out)];
 }
 
