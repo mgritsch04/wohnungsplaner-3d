@@ -1,10 +1,16 @@
 /** D Deko, Licht, Textil (#441): plants, lamps, rugs, pictures, curtains. */
 import { findCatalogItem } from '../../catalog/generic';
 import { HANGING_DECOR_SHAPES } from '../../suggest/roomGeometry';
-import { dist, dot, sub, type Vec2 } from '../../model/vec';
+import { dist, dot, pointInPolygon, sub, type Vec2 } from '../../model/vec';
 import type { RoomCtx } from './context';
 import { boundaryDist, cm, overlaps, pointPolyDist, polyDist, segmentDist, toLocal } from './geom';
 import { isDiningTable, isLamp, isPlant, type RItem } from './items';
+
+/**
+ * Plants that get by on little or only artificial light (Zamioculcas, Bogenhanf, Schusterpalme, Efeutute)
+ * and artificial plants: D1 recommends exactly these for a room without windows, so naming one is no finding.
+ */
+const SHADE_PLANT = /zamioculcas|glücksfeder|sansevier|bogenhanf|schusterpalme|aspidistra|efeutute|epipremnum|schattenpflanze|kunstpflanze|künstlich/i;
 
 /** D1, D2: plants and small things on the floor. */
 export function checkPlants(ctx: RoomCtx): void {
@@ -21,7 +27,7 @@ export function checkPlants(ctx: RoomCtx): void {
     if (!inCorner && !beside && !atWindow) ctx.add('D1', 'M', `${ctx.label(p)} steht frei im Raum, Pflanzen gehören in eine Ecke, neben ein Möbel oder ans Fenster.`, [p], p);
     const onWay = walkLines.find((w) => w.path.length > 1 && Math.min(...w.path.slice(1).map((q, k) => segmentDist(p, w.path[k], q))) < p.width / 2 + 0.25);
     if (onWay) ctx.add('D1', 'S', `${ctx.label(p)} steht im Weg zwischen den Türen ${onWay.from} und ${onWay.to}.`, [p], p);
-    if (!ctx.windows.length && p.height >= 1.0) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
+    if (!ctx.windows.length && p.height >= 1.0 && !SHADE_PLANT.test(`${ctx.label(p)} ${p.name}`)) ctx.add('D1', 'L', `${ctx.label(p)} bekommt hier kein Tageslicht, besser eine Schattenpflanze oder eine Kunstpflanze.`, [p], p);
   }
   for (const b of ctx.placed.filter((i) => i.role === 'box' && i.elevation < 0.05 && !i.parent))
     if (!ctx.items.some((o) => o !== b && o.floor && o.height > 0.45 && overlaps(b.poly, o.poly, -0.2)))
@@ -76,17 +82,34 @@ export function checkRugs(ctx: RoomCtx): void {
       const corners = r.poly.map((c) => toLocal(bed, c).u);
       const left = -Math.min(...corners) - bed.width / 2;
       const right = Math.max(...corners) - bed.width / 2;
-      if (Math.min(left, right) < 0.4 - 0.01) ctx.add('D5', 'L', `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, Math.min(left, right)))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
+      // a bed with one long side at the wall: the rug only shows on the free side (benchmark 7.11.: E, day bed in the study)
+      const atWall = (s: -1 | 1) => boundaryDist({ x: bed.x + bed.right.x * s * (bed.width / 2 + 0.05), y: bed.y + bed.right.y * s * (bed.width / 2 + 0.05) }, ctx.an.polygon) < 0.15;
+      const wallLeft = atWall(-1);
+      const wallRight = atWall(1);
+      const free = wallLeft && !wallRight ? right : wallRight && !wallLeft ? left : Math.min(left, right);
+      if (free < 0.4 - 0.01)
+        ctx.add('D5', 'L', wallLeft !== wallRight ? `${ctx.label(r)} ragt auf der freien Seite des Bettes nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm.` : `${ctx.label(r)} ragt neben dem Bett nur ${cm(Math.max(0, free))} cm heraus, besser sind 40 cm auf beiden Seiten.`, [r, bed], r);
     }
     if (ctx.type === 'hall' && r.width < 1.0 && r.depth >= 1.5) {
-      const reach = (dir: Vec2) => {
+      // the middle of the free walking strip: a shoe cabinet or shelf along one wall narrows the hall
+      // (benchmark 7.11.: Claude laid the runner in the middle beside the shelves, the old wall-to-wall
+      // measure called it off-centre)
+      const sides = ctx.items.filter((o) => o.obstacle && o !== r);
+      const free = (p: Vec2) => ctx.inRoom(p) && !sides.some((o) => pointInPolygon(p, o.poly));
+      const reach = (from: Vec2, dir: Vec2) => {
         let t = 0;
-        while (t < 3 && ctx.inRoom({ x: r.x + dir.x * t, y: r.y + dir.y * t })) t += 0.02;
+        while (t < 3 && free({ x: from.x + dir.x * t, y: from.y + dir.y * t })) t += 0.02;
         return t;
       };
-      const left = reach({ x: -r.right.x, y: -r.right.y });
-      const right = reach(r.right);
-      if (Math.abs(left - right) > 0.2) ctx.add('D5', 'L', `${ctx.label(r)} liegt nicht in der Mitte des Gangs.`, [r], r);
+      // along the whole runner: in an L-shaped hall its middle may lie in the corner, its ends in the leg;
+      // only where the hall is a corridor (at most 2.2 m free across), a wide entrance has no middle line
+      const offs = [-0.4, -0.2, 0, 0.2, 0.4].flatMap((k) => {
+        const at = { x: r.x + r.front.x * k * r.depth, y: r.y + r.front.y * k * r.depth };
+        const left = reach(at, { x: -r.right.x, y: -r.right.y });
+        const right = reach(at, r.right);
+        return left + right <= 2.2 ? [Math.abs(left - right)] : [];
+      });
+      if (offs.length && Math.min(...offs) > 0.2) ctx.add('D5', 'L', `${ctx.label(r)} liegt nicht in der Mitte des Gangs.`, [r], r);
     }
   }
 }
@@ -100,7 +123,10 @@ export function checkPictures(ctx: RoomCtx): void {
     if (p.shape === 'wall-shelf' || HANGING.has(p.shape)) continue;
     for (const w of ctx.windows) if (overlaps(w.strip, p.poly, 1e-3) && p.elevation + p.height > w.sill) ctx.add('D6', 'L', `${ctx.label(p)} hängt über dem Fenster ${w.label}.`, [p], p);
     for (const d of ctx.doors) if (Math.abs(dot(sub(p, d.mid), d.wall.dir)) < d.width / 2 && dot(sub(p, d.mid), d.wall.inward) < 0.3) ctx.add('D6', 'L', `${ctx.label(p)} hängt über der Tür ${d.label}.`, [p], p);
-    const under = ctx.parentOf(p) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
+    // the piece Claude hung it over counts only where it really hangs over it: over a sofa standing free in
+    // the room the solver hangs the picture on another wall (benchmark 7.11.: E and F, 2.0 and 2.4 m away)
+    const parent = ctx.parentOf(p);
+    const under = (parent && pointPolyDist(p, parent.poly) < 0.5 ? parent : undefined) ?? ctx.items.filter((o) => (o.role === 'sofa' || o.shape === 'bed') && o.floor && pointPolyDist(p, o.poly) < 0.25 && Math.abs(toLocal(o, p).u) < o.width / 2 + 0.1).sort((a, b) => dist(a, p) - dist(b, p))[0];
     // R7: a picture belongs to the piece under it, 15–30 cm above it; from half a metre it floats
     if (under && p.role === 'wall-art' && under.floor) {
       const gap = p.elevation - (under.elevation + under.height);

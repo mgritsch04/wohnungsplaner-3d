@@ -47,8 +47,8 @@ const run = (sample: Pick<Sample, 'json' | 'images'>, extra: Partial<Parameters<
   return runFurnishing({ sample, project, roomIds, wishes: flat.wishes, seed: 7, timeouts: { opus: 2000, sonnet: 2000 }, ...extra });
 };
 
-// jeder Test stellt eine ganze Wohnung auf, ein Raum, der die Begehung nicht besteht, mit bis zu fünf Startwerten (PLACE_TRIES_FAILING): das dauert auf den Rechnern der CI lange
-describe('runFurnishing', { timeout: 150_000 }, () => {
+// jeder Test stellt eine ganze Wohnung auf, ein Raum, der die Begehung nicht besteht, mit bis zu fünf Startwerten (PLACE_TRIES_FAILING) und dem Feinschliff der zwei besten (POLISH_TOP): das dauert auf den Rechnern der CI lange
+describe('runFurnishing', { timeout: 300_000 }, () => {
   it('reads, asks, places, walks through and criticises – every room ends with a layout and a score', async () => {
     const { sample, calls } = fake(recorded);
     const stages: DesignRunProgress[] = [];

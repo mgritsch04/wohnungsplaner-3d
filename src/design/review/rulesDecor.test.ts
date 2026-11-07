@@ -26,6 +26,13 @@ describe('D1 / D2 Pflanzen', () => {
     const r = review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'other', items: [put('generic-plant', { x: 0.3, y: 0.3 })] });
     expect(r.findings.find((f) => f.rule === 'D1')?.severity).toBe('L');
   });
+  it('a shade plant or an artificial plant in a room without windows is what D1 recommends, so no finding', () => {
+    const dark = (label: string) =>
+      review({ room: rectRoom(3, 3, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'other', items: [put('generic-plant', { x: 0.3, y: 0.3, id: 'pl' })], program: prog({ items: [{ id: 'pl', label } as RoomProgram['items'][number]] }) });
+    expect(has(dark('Große Zimmerpflanze (genügsam, z. B. Zamioculcas) im Terrakotta-Topf'), 'D1')).toBe(false);
+    expect(has(dark('Kunstpflanze Olivenbaum im Korb'), 'D1')).toBe(false);
+    expect(has(dark('Große Pflanze (Olive oder Feige) im Terrakotta-Kübel'), 'D1')).toBe(true);
+  });
   it('D2 a small plant or box on the floor is medium, on a sideboard it is fine', () => {
     expect(has(living([sofa, put('generic-plant-small', { x: 0.3, y: 0.3 })]), 'D2')).toBe(true);
     expect(has(living([sofa, put('generic-sideboard', { x: 3.3, y: 0.225, face: 'S', id: 'sb' }), put('generic-plant-small', { x: 3.3, y: 0.225, elevation: 0.8, parent: 'sb' })]), 'D2')).toBe(false);
@@ -79,6 +86,11 @@ describe('D5 Teppich', () => {
     expect(has(bed(1.6), 'D5', /Bett/)).toBe(true);
     expect(has(bed(2.4), 'D5', /Bett/)).toBe(false);
   });
+  it('a bed rug beside a bed at the wall only shows on the free side', () => {
+    const day = (rug: string, x: number) => review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [put('generic-bed-90', { x: 0.48, y: 1.5, face: 'N' }), put(rug, { x, y: 1.5, face: 'N' })] });
+    expect(has(day('generic-rug-160', 0.8), 'D5', /Bett/)).toBe(false);
+    expect(has(day('generic-rug-120', 0.6), 'D5', /freien Seite/)).toBe(true);
+  });
   it('a rug in a door swing is light', () => {
     const r = review({ room: rectRoom(4, 3.5, { doors: [{ wall: 'S', at: 3.2 }] }), type: 'other', items: [put('generic-rug-160', { x: 0.8, y: 3.0 })] });
     expect(has(r, 'D5', /Tür/)).toBe(true);
@@ -88,6 +100,13 @@ describe('D5 Teppich', () => {
     const hall = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.7 }, { wall: 'N', at: 0.7 }] }), type: 'hall', items: [put('generic-runner', { x, y: 2 })] });
     expect(has(hall(0.7), 'D5', /Mitte/)).toBe(false);
     expect(has(hall(0.5), 'D5', /Mitte/)).toBe(true);
+    // the middle of the free strip counts: shelves along the east wall narrow the hall to 1.1 m
+    const shelves = [1.2, 2, 2.8].map((y) => put('generic-shelf-80', { x: 1.25, y, face: 'W' }));
+    const beside = (x: number) => review({ room: rectRoom(1.4, 4, { doors: [{ wall: 'S', at: 0.5 }, { wall: 'N', at: 0.5 }] }), type: 'hall', items: [...shelves, put('generic-runner', { x, y: 2 })] });
+    expect(has(beside(0.55), 'D5', /Mitte/)).toBe(false);
+    expect(has(beside(0.7), 'D5', /Mitte/)).toBe(true);
+    // a wide entrance hall has no middle line
+    expect(has(review({ room: rectRoom(3, 3.5, { doors: [{ wall: 'S', at: 1.5 }] }), type: 'hall', items: [put('generic-runner', { x: 0.6, y: 1.7 })] }), 'D5', /Mitte/)).toBe(false);
   });
 });
 
@@ -98,6 +117,8 @@ describe('D6 Bild und Spiegel', () => {
     expect(has(living([sofa, pic(2.9, 'generic-picture-large')]), 'D6', /neben der Mitte/)).toBe(true);
     expect(has(living([sofa, pic(2.5, 'generic-picture')]), 'D6', /zu klein/)).toBe(true);
     expect(has(living([sofa, pic(2.5, 'generic-picture-large', 2.0)]), 'D6', /zu breit/)).toBe(true);
+    // planned over the sofa, hung on the wall opposite (the sofa stands free): it is the sofa's view, not off its middle
+    expect(has(living([sofa, put('generic-picture-large', { x: 3.6, y: 0.02, face: 'S', elevation: 1.3, parent: 'sofa' })]), 'D6', /neben der Mitte|über 3-Sitzer|zu (klein|breit)/)).toBe(false);
   });
   it('a picture floating far above its piece and a living room without any picture are light (R7, SL6)', () => {
     expect(has(living([sofa, pic(2.5, 'generic-picture-large')]), 'D6', /schön sind 15 bis 30 cm/)).toBe(false);
@@ -205,8 +226,19 @@ describe('E Gesamteindruck', () => {
     const zones = [{ id: 'sitzen', function: 'Sitzgruppe', rect: { x0: 0, y0: 2, x1: 2, y1: 4 }, why: '' }];
     expect(has(living([put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2')).toBe(false);
     expect(has(living([put('generic-sofa-3', { x: 4.2, y: 3.5, face: 'N', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(true);
+    // a curtain hangs at its window, not in a zone
+    expect(has(living([put('generic-curtain', { x: 4.2, y: 0.05, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
+    // plants and pictures are accents spread over the room, not pieces of a zone
+    expect(has(living([put('generic-plant', { x: 4.7, y: 0.3, zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
+    expect(has(living([put('generic-picture', { x: 4.2, y: 0.03, elevation: 1.4, face: 'S', zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
+    expect(has(living([put('generic-herbs', { x: 4.2, y: 0.1, elevation: 0.9, zone: 'sitzen' })], { program: prog({ zones }) }), 'E2', /außerhalb/)).toBe(false);
     const overlapping = [...zones, { id: 'lesen', function: 'Leseecke', rect: { x0: 0.2, y0: 2.2, x1: 2, y1: 4 }, why: '' }];
-    expect(has(living([sofa], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
+    const reading = put('generic-armchair', { x: 0.6, y: 2.6, face: 'O', zone: 'lesen' });
+    const sitting = put('generic-sofa-3', { x: 1.0, y: 3.5, face: 'N', zone: 'sitzen' });
+    expect(has(living([sitting, reading], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(true);
+    // a zone with nothing on its floor (access, standing room, a ceiling light at most) does not clash
+    const light = put('generic-pendant', { x: 1, y: 3, zone: 'lesen', elevation: 2.2 });
+    expect(has(living([sitting, light], { program: prog({ zones: overlapping }) }), 'E2', /überlappen/)).toBe(false);
   });
   it('E3 chairs without a table, equal shelves on different walls', () => {
     expect(has(living([sofa, put('generic-chair', { x: 4.5, y: 2 })]), 'E3', /Stühle/)).toBe(true);
@@ -214,6 +246,9 @@ describe('E Gesamteindruck', () => {
     const shelf = (id: string, x: number, y: number, face: 'S' | 'W') => put('generic-shelf-80', { id, x, y, face, zone: 'z' });
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 4.85, 2, 'W')]), 'E3', /verschiedenen Wänden/)).toBe(true);
     expect(has(living([sofa, shelf('a', 1, 0.15, 'S'), shelf('b', 2, 0.15, 'S')]), 'E3', /verschiedenen Wänden/)).toBe(false);
+    // a pantry or storeroom has its shelves along two or three walls on purpose
+    const pantry = review({ room: rectRoom(2, 2, { doors: [{ wall: 'S', at: 1 }] }), type: 'utility', items: [shelf('a', 1, 0.15, 'S'), shelf('b', 1.85, 1, 'W')] });
+    expect(has(pantry, 'E3')).toBe(false);
   });
   it('E8 / FM2 a big piece 5–15 LRV points from the floor is light, tone on tone or clearly different is fine', () => {
     const run = (color: string, floorColor?: string) => living([sofa], { floorColor, program: prog({ items: [{ id: 'sofa', catalogId: 'generic-sofa-3', zone: 'z', why: '', color }] }) });

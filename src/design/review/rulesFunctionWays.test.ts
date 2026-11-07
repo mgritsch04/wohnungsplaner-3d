@@ -335,4 +335,19 @@ describe('B Wege und Zugang', () => {
     // on the balcony one is outside already
     expect(rulesOf(review({ room: room(), type: 'balcony', items: row }))).not.toContain('B8');
   });
+  it('B8 over the bathtub, past the reading chair and beside a cabinet the window still opens', () => {
+    const win = (items: ReturnType<typeof put>[], width = 0.9, sill = 1.2) => review({ room: rectRoom(3, 2.5, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'N', at: 1.0, width, sill }] }), type: 'other', items });
+    expect(rulesOf(win([put('generic-bathtub', { x: 0.85, y: 0.375, face: 'S' })]))).not.toContain('B8');
+    expect(rulesOf(win([put('generic-armchair', { x: 1.0, y: 0.41, face: 'S' })], 0.9, 0.85))).not.toContain('B8');
+    // a wide window half behind a tall cabinet: the free half opens
+    expect(rulesOf(win([put('generic-wardrobe-100', { x: 0.55, y: 0.3, face: 'S' })], 1.6, 0.9))).not.toContain('B8');
+    expect(rulesOf(win([put('generic-wardrobe-150', { x: 1.0, y: 0.3, face: 'S' })], 1.2, 0.9), 'L')).toContain('B8');
+  });
+  it('B8 a reading chair a hand’s width off the window, in a niche between two cabinets, is pushed aside', () => {
+    const niche = (items: ReturnType<typeof put>[]) =>
+      review({ room: rectRoom(3, 2.5, { doors: [{ wall: 'S', at: 0.6 }], windows: [{ wall: 'N', at: 1.5, width: 0.9, sill: 0.85 }] }), type: 'other', items: [put('generic-wardrobe-100', { x: 0.5, y: 0.3, face: 'S' }), put('generic-wardrobe-100', { x: 2.5, y: 0.3, face: 'S' }), ...items] });
+    expect(rulesOf(niche([put('generic-armchair', { x: 1.5, y: 0.77, face: 'S' })]))).not.toContain('B8');
+    // a cabinet in the same place stays in the way
+    expect(rulesOf(niche([put('generic-shelf-80', { x: 1.5, y: 0.51, face: 'S' })]), 'L')).toContain('B8');
+  });
 });
