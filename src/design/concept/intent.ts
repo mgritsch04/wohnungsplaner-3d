@@ -18,7 +18,8 @@ import { dist, sub, type Vec2 } from '../../model/vec';
 import type { RoomType } from '../../suggest/furnishing';
 import { roleOf, rotationFacing, shapeOf } from '../../suggest/roomGeometry';
 import { checkWalkways } from '../analysis';
-import { reviewRoom } from '../review';
+import { RoomCtx } from '../review/context';
+import { BALANCED, checkBalance, checkOpenPatch } from '../review/overallRules';
 import { toRItem } from '../review/items';
 import { sideOfVector } from '../coords';
 import { tvRange } from '../tvDistance';
@@ -238,10 +239,13 @@ function hintLayout(program: RoomProgram, room: RoomAnalysis, existing: readonly
 /** E6 on the start places: the walkthrough's own check on the plan as Claude drew it. */
 function emptyFloor(program: RoomProgram, room: RoomAnalysis, type: RoomType, existing: readonly Furniture[], products: readonly CatalogItem[]): string[] {
   const fill = FILL[type];
-  if (!fill) return [];
+  if (!fill || !BALANCED.has(type) || room.area < 12) return [];
   const { items, fixed } = hintLayout(program, room, existing, products);
-  const review = reviewRoom({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program });
-  return review.findings
+  // only the two E6 checks of the walkthrough, not all of it: this runs for every programme Claude sends
+  const ctx = new RoomCtx({ analysis: room, type, layout: { roomId: room.roomId, items, dropped: [], cost: 0, unsolved: [], seed: 0 }, existing: fixed, program });
+  checkBalance(ctx);
+  checkOpenPatch(ctx);
+  return ctx.findings
     .filter((f) => f.rule === 'E6')
     .slice(0, 1)
     .map((f) => `Im Plan gilt nach deinen Startplätzen schon: ${f.text} Dort plant ein Profi ${fill}; Wege bleiben frei.`);
