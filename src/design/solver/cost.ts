@@ -422,8 +422,14 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
     const fa = isFloor(a);
     const wa = isWallItem(a);
     if (isRug(a)) {
-      // a rug does not run under cabinets, wardrobes or a kitchen run
+      // a rug does not run under cabinets, wardrobes or a kitchen run, nor over another rug
+      // (a small reading rug on the big one of the seating group, image review r11)
       for (const b of v.nodes) {
+        if (isRug(b)) {
+          const d = overlapDepth(a.poly, b.poly);
+          if (d > 0.02) hard(0.5 + 5 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} liegt auf ${name(b)}` }));
+          continue;
+        }
         if (!isFloor(b) || b.spec.wall !== 'always') continue;
         const d = overlapDepth(a.poly, b.poly);
         if (d > 0.02) hard(0.5 + 5 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} liegt unter ${name(b)}` }));

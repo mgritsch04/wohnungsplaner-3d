@@ -12,7 +12,7 @@ import { RECORDED } from '../fixtures/recorded';
 import { rectRoom } from '../review/testkit';
 import type { Layout, PlacedItem, ProgramItem, Relation, RoomAnalysis, RoomProgram } from '../types';
 import { programFromRecorded } from './recordedProgram';
-import { overlapDepth } from './geom';
+import { boxCorners, overlapDepth } from './geom';
 import { existingPieces, solveRoom } from './solve';
 
 const front = (i: PlacedItem): Vec2 => ({ x: -Math.sin(i.rotation), y: Math.cos(i.rotation) });
@@ -191,6 +191,18 @@ describe('lamps where they light (image review r7/r9)', () => {
     const vase = byId(layout, 'vase');
     // together wider than the 42 cm top: they stand diagonally, the round shade passes the vase
     expect(Math.hypot(lamp.x - vase.x, lamp.y - vase.y)).toBeGreaterThanOrEqual((lamp.width + vase.width) / 2);
+  });
+
+  it('a reading rug does not lie on the rug of the seating group (image review r11)', () => {
+    const p = program(room, [item('sofa', 'generic-sofa-3', [2.25, 3.5, Math.PI]), item('rug', 'generic-rug-200'), item('chair', 'generic-armchair', [1.0, 1.4, 0]), item('rug2', 'generic-rug-120')], [
+      { kind: 'under-front', item: 'rug', target: 'sofa' },
+      { kind: 'under-front', item: 'rug2', target: 'chair' },
+    ]);
+    const layout = solveRoom(room, p, { seed: 2 });
+    const corners = (i: PlacedItem) => boxCorners({ x: i.x, y: i.y, hw: i.width / 2, hd: i.depth / 2, rotation: i.rotation });
+    const rugs = layout.items.filter((i) => i.id === 'rug' || i.id === 'rug2');
+    expect(rugs).toHaveLength(2);
+    expect(overlapDepth(corners(rugs[0]), corners(rugs[1]))).toBeLessThan(0.02);
   });
 
   it('a pendant over the coffee table hangs at 1.9 m, not in the line of sight', () => {
