@@ -16,7 +16,8 @@ import { programFromRecorded } from '../solver/recordedProgram';
 import { existingPieces, solveRoom } from '../solver/solve';
 import { randomProgram, type Kind } from '../solver/testPrograms';
 import type { RoomProgram, RoomType } from '../types';
-import { isPlaceholderId, layoutSuggestion, type PlacedRoom } from '.';
+import { isPlaceholderId, layoutSuggestion, pieceName, type PlacedRoom } from '.';
+import { findCatalogItem } from '../../catalog/generic';
 
 const KIND: Partial<Record<RoomType, Kind>> = { living: 'living', bedroom: 'bedroom', kids: 'bedroom', office: 'office', dining: 'dining', hall: 'hall', kitchen: 'kitchen', other: 'living' };
 
@@ -100,5 +101,17 @@ describe('Einbau of the new proposal', () => {
     expect(new Set(second.replaces)).toEqual(new Set(first.items.map((f) => f.id)));
     applyFurnishing(project, second);
     expect(project.furniture.length).toBe(own + second.items.length);
+  });
+});
+
+describe('placeholder names follow the piece that stands there', () => {
+  const rug = findCatalogItem('generic-rug-160')!;
+  it('a bigger rug than planned gets its own size in the name (image review r7)', () => {
+    const prog = { id: 'rug', catalogId: 'generic-rug-120', zone: 'z', why: '', label: 'Teppich 120×170 in Salbei' };
+    expect(pieceName(rug, prog)).toBe('Teppich 160×230 in Salbei (Platzhalter)');
+    expect(pieceName(rug, { ...prog, label: 'Wollteppich 170 x 120' })).toBe('Wollteppich 230×160 (Platzhalter)');
+  });
+  it('the planned piece keeps Claude’s words', () => {
+    expect(pieceName(rug, { id: 'rug', catalogId: 'generic-rug-160', zone: 'z', why: '', label: 'Teppich 150×220' })).toBe('Teppich 150×220 (Platzhalter)');
   });
 });
