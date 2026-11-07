@@ -376,6 +376,21 @@ function armchairCost(a: Unit, group: Unit): number {
   const near = chair.zone === ref.zone ? Math.max(0, gapBetween(chair.poly, (table ?? ref).poly) - ARMCHAIR_GAP) : 0;
   return 1.0 * Math.max(0, COS_AIM - (f.x * dx + f.y * dy) / len) + 0.8 * near;
 }
+/** Centres closer than both half diagonals plus `gap`. */
+function closeBy(a: Node, b: Node, gap: number): boolean {
+  const dx = a.box.x - b.box.x;
+  const dy = a.box.y - b.box.y;
+  return Math.sqrt(dx * dx + dy * dy) - Math.sqrt(a.box.hw * a.box.hw + a.box.hd * a.box.hd) - Math.sqrt(b.box.hw * b.box.hw + b.box.hd * b.box.hd) < gap;
+}
+
+/** Centres further apart than both reaches: nothing of the two can touch (squared, no Math.hypot in the inner loop). */
+function far(a: Node, b: Node): boolean {
+  const dx = a.box.x - b.box.x;
+  const dy = a.box.y - b.box.y;
+  const r = a.reach + b.reach;
+  return dx * dx + dy * dy > r * r;
+}
+
 /** Farthest an armchair of the seating zone stands from the coffee table (m). */
 const ARMCHAIR_GAP = 0.9;
 // aimed at 60° so the search does not stop right at the 70° the walk-through allows
@@ -397,7 +412,7 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
   if (near) {
     for (const a of u.nodes) {
       for (const b of v.nodes) {
-        if (Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) > a.reach + b.reach) continue;
+        if (far(a, b)) continue;
         clearCost(a, b, hard, (x) => (c.soft += x));
         clearCost(b, a, hard, (x) => (c.soft += x));
       }
@@ -425,19 +440,15 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
       const fb = isFloor(b);
       const wb = isWallItem(b);
       if (!fb && !wb && !isStackedOn(b)) continue;
-      if (Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) > a.reach + b.reach) continue;
+      if (far(a, b)) continue;
       if (fa && fb) {
         if (!tucked(a, b)) {
           const d = overlapDepth(a.poly, b.poly);
           if (d > EPS) hard(1 + 10 * d, () => ({ rule: 'overlap', items: [a.id, b.id], text: `${name(a)} überschneidet ${name(b)}` }));
         }
-        for (const [p, q] of [
-          [a, b],
-          [b, a],
-        ] as const) {
-          for (const cp of p.comfort) c.soft += 0.4 * Math.min(0.5, overlapDepth(cp, q.poly));
-        }
-        if (isFirm(a) && isFirm(b) && Math.hypot(a.box.x - b.box.x, a.box.y - b.box.y) - Math.hypot(a.box.hw, a.box.hd) - Math.hypot(b.box.hw, b.box.hd) < 0.2) {
+        for (const cp of a.comfort) c.soft += 0.4 * Math.min(0.5, overlapDepth(cp, b.poly));
+        for (const cp of b.comfort) c.soft += 0.4 * Math.min(0.5, overlapDepth(cp, a.poly));
+        if (isFirm(a) && isFirm(b) && closeBy(a, b, 0.2)) {
           const g = gapBetween(a.poly, b.poly);
           const row = (a.spec.category === 'storage' || a.run !== undefined) && (b.spec.category === 'storage' || b.run !== undefined);
           if (g > 0.02 && g < 0.2 && !row) c.soft += 0.5;
@@ -454,16 +465,15 @@ export function pairCost(m: Model, u: Unit, v: Unit, sink: Sink = null): Cost {
   }
   // what stands on a piece and what hangs on the wall above it in another unit (a lamp on the
   // lowboard and the TV hung on the wall over it, #443): the plan's check sees them collide
+  const standsIn = (p: Node, q: Node) => {
+    if (p.rule?.kind !== 'on' || !isWallItem(q)) return;
+    const zOverlap = Math.min(p.elevation + p.spec.height, q.elevation + q.spec.height) - Math.max(p.elevation, q.elevation);
+    if (zOverlap > 0.02 && overlapDepth(p.poly, q.poly) > EPS) hard(0.5, () => ({ rule: 'overlap', items: [p.id, q.id], text: `${name(p)} steht in ${name(q)}` }));
+  };
   for (const a of near ? u.nodes : []) {
     for (const b of v.nodes) {
-      for (const [p, q] of [
-        [a, b],
-        [b, a],
-      ] as const) {
-        if (p.rule?.kind !== 'on' || !isWallItem(q)) continue;
-        const zOverlap = Math.min(p.elevation + p.spec.height, q.elevation + q.spec.height) - Math.max(p.elevation, q.elevation);
-        if (zOverlap > 0.02 && overlapDepth(p.poly, q.poly) > EPS) hard(0.5, () => ({ rule: 'overlap', items: [p.id, q.id], text: `${name(p)} steht in ${name(q)}` }));
-      }
+      standsIn(a, b);
+      standsIn(b, a);
     }
   }
   for (const r of relationsOf(m, u.index, v.index)) c.soft += relationCost(m, r);
@@ -493,7 +503,10 @@ function cornerGapCost(u: Unit, v: Unit): number {
 // relations
 // ---------------------------------------------------------------------------------------------
 
-const relCache = new WeakMap<Model, Map<string, SoftRelation[]>>();
+const relCache = new WeakMap<Model, Map<number, SoftRelation[]>>();
+const NONE: SoftRelation[] = [];
+/** Key of a pair of units (b = −1: within a), a number so the hot path builds no strings. */
+const relKey = (a: number, b: number) => (b < 0 || b === a ? a * 65536 + 65535 : Math.min(a, b) * 65536 + Math.max(a, b));
 
 /** Soft relations between unit a and unit b (b = −1: within a or with something fixed). */
 export function relationsOf(m: Model, a: number, b: number): SoftRelation[] {
@@ -504,13 +517,12 @@ export function relationsOf(m: Model, a: number, b: number): SoftRelation[] {
       const ua = m.nodes.get(r.item)?.unit;
       if (ua === undefined) continue;
       const ub = r.target ? m.nodes.get(r.target)?.unit : undefined;
-      const key = ub === undefined || ub === ua ? `${ua}|-1` : `${Math.min(ua, ub)}|${Math.max(ua, ub)}`;
+      const key = relKey(ua, ub ?? -1);
       map.set(key, [...(map.get(key) ?? []), r]);
     }
     relCache.set(m, map);
   }
-  const key = b < 0 ? `${a}|-1` : `${Math.min(a, b)}|${Math.max(a, b)}`;
-  return map.get(key) ?? [];
+  return map.get(relKey(a, b)) ?? NONE;
 }
 
 /** Call after units or relations change shape (fallback pieces keep ids, so rarely needed). */

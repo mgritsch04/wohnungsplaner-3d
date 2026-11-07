@@ -72,17 +72,6 @@ export function aabbOf(pts: readonly Vec2[]): Aabb {
   return { minX, minY, maxX, maxY };
 }
 
-function project(poly: readonly Vec2[], ax: number, ay: number): [number, number] {
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (const p of poly) {
-    const d = p.x * ax + p.y * ay;
-    if (d < lo) lo = d;
-    if (d > hi) hi = d;
-  }
-  return [lo, hi];
-}
-
 /**
  * Penetration depth of two convex polygons (separating axis test): the smallest push that
  * separates them, 0 when they do not overlap.
@@ -112,20 +101,34 @@ export function overlapDepth(a: readonly Vec2[], b: readonly Vec2[]): number {
   const sepX = bMinX >= aMaxX || bMaxX <= aMinX;
   const sepY = bMinY >= aMaxY || bMaxY <= aMinY;
   if (sepX || sepY) return 0;
+  // the solver calls this in its innermost loop: no arrays per axis (garbage collection)
   let best = Infinity;
-  for (const poly of [a, b]) {
+  for (let k = 0; k < 2; k++) {
+    const poly = k === 0 ? a : b;
     const n = poly.length;
     for (let i = 0; i < n; i++) {
       const p = poly[i];
       const q = poly[(i + 1) % n];
       let ax = q.y - p.y;
       let ay = p.x - q.x;
-      const len = Math.hypot(ax, ay);
+      const len = Math.sqrt(ax * ax + ay * ay);
       if (len < 1e-9) continue;
       ax /= len;
       ay /= len;
-      const [a0, a1] = project(a, ax, ay);
-      const [b0, b1] = project(b, ax, ay);
+      let a0 = Infinity;
+      let a1 = -Infinity;
+      for (const v of a) {
+        const d = v.x * ax + v.y * ay;
+        if (d < a0) a0 = d;
+        if (d > a1) a1 = d;
+      }
+      let b0 = Infinity;
+      let b1 = -Infinity;
+      for (const v of b) {
+        const d = v.x * ax + v.y * ay;
+        if (d < b0) b0 = d;
+        if (d > b1) b1 = d;
+      }
       const o = Math.min(a1, b1) - Math.max(a0, b0);
       if (o <= 0) return 0;
       if (o < best) best = o;
@@ -139,8 +142,10 @@ function segDist(p: Vec2, a: Vec2, b: Vec2): number {
   const aby = b.y - a.y;
   const l2 = abx * abx + aby * aby;
   let t = l2 < 1e-12 ? 0 : ((p.x - a.x) * abx + (p.y - a.y) * aby) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(p.x - a.x - abx * t, p.y - a.y - aby * t);
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const dx = p.x - a.x - abx * t;
+  const dy = p.y - a.y - aby * t;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 /** Clear distance between two convex polygons (0 when they touch or overlap). */

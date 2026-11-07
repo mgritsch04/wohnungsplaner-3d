@@ -129,7 +129,7 @@ export class State {
       refreshUnit(m, c.u);
     }
     const newUnit = new Map<number, Cost>();
-    const newPair = new Map<string, Cost>();
+    const newPair: { a: number; b: number; c: Cost }[] = [];
     let delta = 0;
     for (const c of changes) {
       const nc = unitCost(m, c.u);
@@ -138,7 +138,7 @@ export class State {
       for (const v of m.units) {
         if (v === c.u || (set.has(v.index) && v.index < c.u.index)) continue;
         const pc = pairCost(m, c.u, v);
-        newPair.set(`${c.u.index}|${v.index}`, pc);
+        newPair.push({ a: c.u.index, b: v.index, c: pc });
         delta += total(pc) - total(this.pair(c.u.index, v.index));
       }
     }
@@ -164,8 +164,7 @@ export class State {
       delta,
       commit: () => {
         for (const [i, c] of newUnit) this.unitC[i] = c;
-        for (const [k, c] of newPair) {
-          const [a, b] = k.split('|').map(Number);
+        for (const { a, b, c } of newPair) {
           if (a < b) this.pairC[a][b] = c;
           else this.pairC[b][a] = c;
         }

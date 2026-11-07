@@ -21,7 +21,7 @@ export class WalkGrid {
   readonly radii: number[];
   /** Extra distance kept to placed pieces per layer (m), so the independent check measures the full width too. */
   readonly pads: number[];
-  private readonly fixed: Uint8Array[];
+  /** Pieces covering each cell per layer, plus one for a cell blocked by the room itself. */
   private readonly count: Uint16Array[];
   private readonly label: Int32Array;
   private readonly queue: Int32Array;
@@ -59,12 +59,11 @@ export class WalkGrid {
         dist[k] = d;
       }
     }
-    this.fixed = radii.map((r) => {
-      const f = new Uint8Array(n);
+    this.count = radii.map((r) => {
+      const f = new Uint16Array(n);
       for (let k = 0; k < n; k++) f[k] = !inside[k] || dist[k] < r ? 1 : 0;
       return f;
     });
-    this.count = radii.map(() => new Uint16Array(n));
     this.label = new Int32Array(n);
     this.queue = new Int32Array(n);
   }
@@ -110,7 +109,7 @@ export class WalkGrid {
   }
 
   free(layer: number, k: number): boolean {
-    return k >= 0 && !this.fixed[layer][k] && this.count[layer][k] === 0;
+    return k >= 0 && this.count[layer][k] === 0;
   }
 
   /**
@@ -122,13 +121,12 @@ export class WalkGrid {
     const { label, queue, nx, ny } = this;
     label.fill(-1);
     this.labelLayer = layer;
-    const fixed = this.fixed[layer];
     const cnt = this.count[layer];
     const out: number[] = [];
     let comp = 0;
     for (const s of seeds) {
       const k0 = this.cellOf(s);
-      if (k0 < 0 || fixed[k0] || cnt[k0]) {
+      if (k0 < 0 || cnt[k0]) {
         out.push(-1);
         continue;
       }
@@ -146,28 +144,28 @@ export class WalkGrid {
         const j = (k - i) / nx;
         if (i > 0) {
           const q = k - 1;
-          if (label[q] < 0 && !fixed[q] && !cnt[q]) {
+          if (label[q] < 0 && !cnt[q]) {
             label[q] = comp;
             queue[tail++] = q;
           }
         }
         if (i < nx - 1) {
           const q = k + 1;
-          if (label[q] < 0 && !fixed[q] && !cnt[q]) {
+          if (label[q] < 0 && !cnt[q]) {
             label[q] = comp;
             queue[tail++] = q;
           }
         }
         if (j > 0) {
           const q = k - nx;
-          if (label[q] < 0 && !fixed[q] && !cnt[q]) {
+          if (label[q] < 0 && !cnt[q]) {
             label[q] = comp;
             queue[tail++] = q;
           }
         }
         if (j < ny - 1) {
           const q = k + nx;
-          if (label[q] < 0 && !fixed[q] && !cnt[q]) {
+          if (label[q] < 0 && !cnt[q]) {
             label[q] = comp;
             queue[tail++] = q;
           }
