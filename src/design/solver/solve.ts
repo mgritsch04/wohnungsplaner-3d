@@ -13,12 +13,12 @@ import type { Project } from '../../model/schema';
 import type { DroppedItem, Layout, PlacedItem, RoomAnalysis, RoomProgram } from '../types';
 import { gridCost, HARD, pairCost, resetRelations, unitCost, type Violation } from './cost';
 import { inSwing, refreshUnit, resizeNode, rugBorder } from './derive';
-import { wrapAngle } from './geom';
+import { boxCorners, overlapDepth, wrapAngle, type Box } from './geom';
 import { smallerOptions } from './items';
 import { kitchenTops } from './kitchenTops';
 import { buildModel, detachUnit, runId, type Model, type Node, type Unit } from './model';
 import { Rng } from './rng';
-import { buildRoom, type FixedPiece } from './room';
+import { alongWall, boxOnWall, buildRoom, offWall, type FixedPiece } from './room';
 import { findCatalogItem } from '../../catalog/generic';
 import { roleOf } from '../../suggest/roomGeometry';
 import { candidates, hintPose, poseOf, randomMove, setPose, State, type Pose } from './search';
@@ -681,19 +681,65 @@ function tryFallbacks(st: State, u: Unit, rng: Rng): boolean {
   return false;
 }
 
+/**
+ * An open curtain panel whose place beside the window is taken by a piece standing there (the
+ * reading chair, its side table, a shelf) moves over to the other side of the window, next to the
+ * panel hanging there, where that side is free (image reviews r16/r17 A: the panel hung into the
+ * reading corner). Only the handed-over layout changes; the search does not see curtains as obstacles.
+ */
+function settleCurtains(m: Model): Map<string, Box> {
+  const out = new Map<string, Box>();
+  const ctx = m.ctx;
+  const active = [...m.nodes.values()].filter((n) => m.units[n.unit].active);
+  const obstacles = [
+    ...active.filter((o) => o.spec.base === 'floor' && o.elevation < 0.05 && o.spec.item.solid !== false && o.spec.height > 0.3).map((o) => o.poly),
+    ...ctx.fixed.filter((f) => f.floor && f.piece.height > 0.3).map((f) => f.poly),
+  ];
+  const blocked = (b: Box) => {
+    const poly = boxCorners(b);
+    return obstacles.some((o) => overlapDepth(poly, o) > 0.01);
+  };
+  const byWindow = new Map<string, Node[]>();
+  for (const n of active) if (n.rule?.kind === 'curtain') byWindow.set(n.rule.window, [...(byWindow.get(n.rule.window) ?? []), n]);
+  for (const [label, panels] of byWindow) {
+    const win = ctx.windows.find((w) => w.label === label);
+    if (!win) continue;
+    const w = ctx.walls[win.wall];
+    const mid = (win.t0 + win.t1) / 2;
+    const placed = new Map(panels.map((p) => [p, p.box]));
+    for (const p of panels) {
+      if (!blocked(p.box)) continue;
+      const g = 2 * p.box.hw;
+      const tp = alongWall(w, p.box);
+      const side = tp < mid ? 1 : -1;
+      // next to the outermost free panel on the other side, or mirrored when there is none
+      const others = panels.filter((o) => o !== p && (alongWall(w, placed.get(o)!) - mid) * side > 0 && !blocked(placed.get(o)!));
+      const t = others.length ? Math.max(...others.map((o) => side * alongWall(w, placed.get(o)!))) * side + side * g : 2 * mid - tp;
+      if (t < g / 2 || t > w.length - g / 2) continue;
+      const box = boxOnWall(w, t, g, 2 * p.box.hd, offWall(w, p.box) - p.box.hd);
+      if (blocked(box) || panels.some((o) => o !== p && overlapDepth(boxCorners(box), boxCorners(placed.get(o)!)) > 0.005)) continue;
+      placed.set(p, box);
+      out.set(p.id, box);
+    }
+  }
+  return out;
+}
+
 function toLayout(st: State, dropped: DroppedItem[], seed: number): Layout {
   const m = st.m;
   const items: PlacedItem[] = [];
+  const moved = settleCurtains(m);
   for (const u of m.units) {
     if (!u.active) continue;
     for (const n of u.nodes) {
       const parent = n.parent && m.nodes.has(n.parent) ? n.parent : undefined;
+      const box = moved.get(n.id) ?? n.box;
       items.push({
         id: n.id,
         catalogId: n.catalogId,
         zone: n.zone,
-        x: n.box.x,
-        y: n.box.y,
+        x: box.x,
+        y: box.y,
         rotation: wrapAngle(n.box.rotation),
         elevation: n.elevation,
         width: 2 * n.box.hw,
